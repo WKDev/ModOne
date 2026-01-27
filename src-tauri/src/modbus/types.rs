@@ -196,3 +196,151 @@ impl ConnectionInfo {
         }
     }
 }
+
+// ============================================================================
+// Event Types for Tauri Event System
+// ============================================================================
+
+/// Event emitted when a memory value changes
+#[derive(Debug, Clone, Serialize)]
+pub struct MemoryChangeEvent {
+    /// Type of memory: "coil", "discrete", "holding", or "input"
+    pub register_type: String,
+    /// Address that changed
+    pub address: u16,
+    /// Previous value (bool for coils/discrete, u16 for registers)
+    pub old_value: serde_json::Value,
+    /// New value (bool for coils/discrete, u16 for registers)
+    pub new_value: serde_json::Value,
+    /// Source of the change: "internal", "external", or "simulation"
+    pub source: String,
+}
+
+impl MemoryChangeEvent {
+    /// Create a coil change event
+    pub fn coil(address: u16, old_value: bool, new_value: bool, source: &str) -> Self {
+        Self {
+            register_type: "coil".to_string(),
+            address,
+            old_value: serde_json::json!(old_value),
+            new_value: serde_json::json!(new_value),
+            source: source.to_string(),
+        }
+    }
+
+    /// Create a discrete input change event
+    pub fn discrete(address: u16, old_value: bool, new_value: bool, source: &str) -> Self {
+        Self {
+            register_type: "discrete".to_string(),
+            address,
+            old_value: serde_json::json!(old_value),
+            new_value: serde_json::json!(new_value),
+            source: source.to_string(),
+        }
+    }
+
+    /// Create a holding register change event
+    pub fn holding(address: u16, old_value: u16, new_value: u16, source: &str) -> Self {
+        Self {
+            register_type: "holding".to_string(),
+            address,
+            old_value: serde_json::json!(old_value),
+            new_value: serde_json::json!(new_value),
+            source: source.to_string(),
+        }
+    }
+
+    /// Create an input register change event
+    pub fn input(address: u16, old_value: u16, new_value: u16, source: &str) -> Self {
+        Self {
+            register_type: "input".to_string(),
+            address,
+            old_value: serde_json::json!(old_value),
+            new_value: serde_json::json!(new_value),
+            source: source.to_string(),
+        }
+    }
+}
+
+/// Event emitted when multiple memory values change (batch operation)
+#[derive(Debug, Clone, Serialize)]
+pub struct MemoryBatchChangeEvent {
+    /// All changes in the batch
+    pub changes: Vec<MemoryChangeEvent>,
+}
+
+/// Event emitted when a client connects or disconnects
+#[derive(Debug, Clone, Serialize)]
+pub struct ConnectionEvent {
+    /// Type of event: "connected" or "disconnected"
+    pub event_type: String,
+    /// Protocol: "tcp" or "rtu"
+    pub protocol: String,
+    /// Client address (IP:port for TCP, port name for RTU)
+    pub client_addr: String,
+    /// ISO 8601 timestamp
+    pub timestamp: String,
+}
+
+impl ConnectionEvent {
+    /// Create a TCP connected event
+    pub fn tcp_connected(client_addr: &str) -> Self {
+        Self {
+            event_type: "connected".to_string(),
+            protocol: "tcp".to_string(),
+            client_addr: client_addr.to_string(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+        }
+    }
+
+    /// Create a TCP disconnected event
+    pub fn tcp_disconnected(client_addr: &str) -> Self {
+        Self {
+            event_type: "disconnected".to_string(),
+            protocol: "tcp".to_string(),
+            client_addr: client_addr.to_string(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+        }
+    }
+
+    /// Create an RTU connected event
+    pub fn rtu_connected(port_name: &str) -> Self {
+        Self {
+            event_type: "connected".to_string(),
+            protocol: "rtu".to_string(),
+            client_addr: port_name.to_string(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+        }
+    }
+
+    /// Create an RTU disconnected event
+    pub fn rtu_disconnected(port_name: &str) -> Self {
+        Self {
+            event_type: "disconnected".to_string(),
+            protocol: "rtu".to_string(),
+            client_addr: port_name.to_string(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+        }
+    }
+}
+
+/// Source of a memory change
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChangeSource {
+    /// Change from internal API (Tauri commands)
+    Internal,
+    /// Change from external Modbus client
+    External,
+    /// Change from simulation engine
+    Simulation,
+}
+
+impl ChangeSource {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ChangeSource::Internal => "internal",
+            ChangeSource::External => "external",
+            ChangeSource::Simulation => "simulation",
+        }
+    }
+}

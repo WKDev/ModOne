@@ -14,4 +14,7 @@ pub use rtu::{
     RtuStopBits,
 };
 pub use tcp::ModbusTcpServer;
-pub use types::{ConnectionInfo, MemoryError, MemoryMapSettings, ModbusError, TcpConfig};
+pub use types::{
+    ChangeSource, ConnectionEvent, ConnectionInfo, MemoryBatchChangeEvent, MemoryChangeEvent,
+    MemoryError, MemoryMapSettings, ModbusError, TcpConfig,
+};

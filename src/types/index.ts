@@ -32,3 +32,6 @@ export type { Parity as ProjectParity } from './project';
 
 // Settings types
 export * from './settings';
+
+// Modbus types
+export * from './modbus';

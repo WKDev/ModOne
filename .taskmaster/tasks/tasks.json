@@ -1830,7 +1830,7 @@
         "dependencies": [
           "23"
         ],
-        "status": "pending",
+        "status": "in-progress",
         "subtasks": [
           {
             "id": 1,
@@ -1838,9 +1838,10 @@
             "description": "Create MemoryChangeEvent, ConnectionEvent, and MemoryBatchChangeEvent structs with Serialize and Clone derives for Tauri event emission.",
             "dependencies": [],
             "details": "Add three event structs to `src-tauri/src/modbus/types.rs`:\n\n1. `MemoryChangeEvent` with fields:\n   - `register_type: String` (\"coil\" | \"discrete\" | \"holding\" | \"input\")\n   - `address: u16`\n   - `old_value: serde_json::Value` (to handle both bool and u16)\n   - `new_value: serde_json::Value`\n   - `source: String` (\"internal\" | \"external\" | \"simulation\")\n\n2. `ConnectionEvent` with fields:\n   - `event_type: String` (\"connected\" | \"disconnected\")\n   - `protocol: String` (\"tcp\" | \"rtu\")\n   - `client_addr: String`\n   - `timestamp: String` (ISO8601 format)\n\n3. `MemoryBatchChangeEvent` with fields:\n   - `changes: Vec<MemoryChangeEvent>`\n\nAll structs must derive `Serialize, Clone` and use `#[derive(serde::Serialize, Clone)]`. Add `serde_json` to dependencies in Cargo.toml if not present.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit test that each struct can be serialized to JSON correctly. Test MemoryChangeEvent with both bool (coil) and u16 (register) values serialize properly via serde_json::Value. Verify Clone trait works for all structs.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T10:34:36.862Z"
           },
           {
             "id": 2,
@@ -1891,7 +1892,8 @@
             "testStrategy": "Test SubscriptionManager.should_emit returns true for changes within subscribed range. Test returns false for changes outside all subscriptions. Test empty subscriptions list allows all events (no filtering). Frontend: verify TypeScript types compile without errors. Integration test: frontend receives events emitted from Rust backend correctly.",
             "parentId": "undefined"
           }
-        ]
+        ],
+        "updatedAt": "2026-01-27T10:34:36.862Z"
       },
       {
         "id": "25",
@@ -2052,7 +2054,7 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-01-27T10:33:18.473Z",
+      "lastModified": "2026-01-27T10:34:36.862Z",
       "taskCount": 26,
       "completedCount": 23,
       "tags": [
