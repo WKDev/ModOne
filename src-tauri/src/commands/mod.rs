@@ -4,6 +4,7 @@
 //! from the frontend application.
 
 pub mod layout;
+pub mod logging;
 pub mod modbus;
 pub mod project;
 pub mod settings;
@@ -21,6 +22,9 @@ pub use project::{
 
 // Re-export settings commands
 pub use settings::{get_app_settings, save_app_settings};
+
+// Re-export logging commands
+pub use logging::{clear_error_logs, get_log_path, get_recent_errors, open_logs_directory};
 
 // Re-export layout commands
 pub use layout::{

@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { AlertCircle, RefreshCw, X, FileArchive, XCircle } from 'lucide-react';
+import { AlertCircle, RefreshCw, X, FileArchive, XCircle, FolderOpen } from 'lucide-react';
 import type { ModOneError } from '../../types/error';
 import {
   getErrorTitle,
@@ -25,6 +25,8 @@ interface ErrorDialogProps {
   onClose: () => void;
   /** Callback when open backup button is clicked */
   onOpenBackup?: () => void;
+  /** Callback when view logs button is clicked */
+  onViewLogs?: () => void;
 }
 
 /**
@@ -36,6 +38,7 @@ export function ErrorDialog({
   onIgnore,
   onClose,
   onOpenBackup,
+  onViewLogs,
 }: ErrorDialogProps): React.JSX.Element | null {
   if (!error) {
     return null;
@@ -113,6 +116,16 @@ export function ErrorDialog({
             >
               <RefreshCw className="h-4 w-4" />
               Retry
+            </button>
+          )}
+
+          {onViewLogs && (
+            <button
+              onClick={onViewLogs}
+              className="flex items-center gap-2 rounded bg-neutral-700 px-3 py-1.5 text-sm text-white transition-colors hover:bg-neutral-600"
+            >
+              <FolderOpen className="h-4 w-4" />
+              View Logs
             </button>
           )}
 

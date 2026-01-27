@@ -4,11 +4,15 @@
 
 pub mod commands;
 pub mod error;
+pub mod logging;
 pub mod modbus;
 pub mod project;
 
 // Re-export error types for convenience
 pub use error::{ModOneError, ModOneResult};
+
+// Re-export logging types
+pub use logging::{ErrorLogger, SharedErrorLogger, LogEntry};
 
 use project::{AutoSaveManager, ProjectManager};
 
@@ -25,6 +29,8 @@ use commands::{
     // Layout commands
     delete_layout, get_last_active_layout, get_restore_last_session, list_layouts, load_layout,
     save_layout, set_last_active_layout, set_restore_last_session,
+    // Logging commands
+    clear_error_logs, get_log_path, get_recent_errors, open_logs_directory,
     // Modbus commands
     modbus_bulk_write, modbus_get_status, modbus_list_serial_ports, modbus_load_memory_csv,
     modbus_read_coils, modbus_read_discrete_inputs, modbus_read_holding_registers,
@@ -51,11 +57,19 @@ pub fn run() {
     // Initialize Modbus state
     let modbus_state = ModbusState::default();
 
+    // Initialize error logger
+    let error_logger = ErrorLogger::new_shared()
+        .unwrap_or_else(|e| {
+            log::warn!("Failed to initialize error logger: {}. Using default.", e);
+            std::sync::Arc::new(std::sync::Mutex::new(ErrorLogger::default()))
+        });
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(project_manager)
         .manage(auto_save_manager)
         .manage(modbus_state)
+        .manage(error_logger)
         .setup(|app| {
             log::info!("ModOne application starting...");
             if cfg!(debug_assertions) {
@@ -93,6 +107,11 @@ pub fn run() {
             validate_project_integrity,
             recover_project_from_backup,
             attempt_project_recovery,
+            // Logging commands
+            get_log_path,
+            get_recent_errors,
+            clear_error_logs,
+            open_logs_directory,
             // Settings commands
             get_app_settings,
             save_app_settings,
