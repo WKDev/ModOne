@@ -3,8 +3,12 @@
 //! This is the main library crate for the ModOne Tauri application.
 
 pub mod commands;
+pub mod error;
 pub mod modbus;
 pub mod project;
+
+// Re-export error types for convenience
+pub use error::{ModOneError, ModOneResult};
 
 use project::{AutoSaveManager, ProjectManager};
 
