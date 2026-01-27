@@ -43,6 +43,7 @@
 
 pub mod auto_save;
 pub mod config;
+pub mod layout;
 pub mod mop_file;
 
 pub use auto_save::{AutoSaveManager, SharedAutoSaveManager};

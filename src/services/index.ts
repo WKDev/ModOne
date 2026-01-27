@@ -1,2 +1,3 @@
 // API and Tauri service layer
-// Export services here as they are created
+export { projectService, default as ProjectService } from './projectService';
+export { layoutService, default as LayoutService } from './layoutService';

@@ -1,5 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { Check } from 'lucide-react';
 import { useLayoutStore } from '../../stores/layoutStore';
+import { useLayoutPersistenceStore } from '../../stores/layoutPersistenceStore';
+import { SaveLayoutDialog } from './SaveLayoutDialog';
 
 interface MenuItem {
   label: string;
@@ -8,6 +11,7 @@ interface MenuItem {
   separator?: boolean;
   disabled?: boolean;
   submenu?: MenuItem[];
+  checked?: boolean;
 }
 
 interface Menu {
@@ -15,7 +19,7 @@ interface Menu {
   items: MenuItem[];
 }
 
-const menus: Menu[] = [
+const baseMenus: Menu[] = [
   {
     label: 'File',
     items: [
@@ -61,7 +65,8 @@ const menus: Menu[] = [
         ],
       },
       { separator: true, label: '' },
-      { label: 'Reset Layout' },
+      // Layouts submenu will be injected dynamically
+      { label: '__LAYOUTS_PLACEHOLDER__' },
       { separator: true, label: '' },
       { label: 'Zoom In', shortcut: 'Ctrl++' },
       { label: 'Zoom Out', shortcut: 'Ctrl+-' },
@@ -102,6 +107,14 @@ const menus: Menu[] = [
 export function MenuBar() {
   const { menuOpen, setMenuOpen } = useLayoutStore();
   const menuRef = useRef<HTMLDivElement>(null);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+
+  const {
+    currentLayoutName,
+    getAvailableLayouts,
+    loadLayout,
+    resetToDefault,
+  } = useLayoutPersistenceStore();
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -122,7 +135,75 @@ export function MenuBar() {
     return `menu-${label.toLowerCase().replace(/\s+/g, '-')}`;
   };
 
+  // Build the Layouts submenu dynamically
+  const buildLayoutsSubmenu = useCallback((): MenuItem[] => {
+    const availableLayouts = getAvailableLayouts();
+    const builtInLayouts = availableLayouts.filter((l) => l.isBuiltIn);
+    const userLayouts = availableLayouts.filter((l) => !l.isBuiltIn);
+
+    const submenuItems: MenuItem[] = [];
+
+    // Built-in layouts
+    builtInLayouts.forEach((layout) => {
+      submenuItems.push({
+        label: layout.name,
+        checked: currentLayoutName === layout.name,
+        action: () => loadLayout(layout.name),
+      });
+    });
+
+    // User layouts (if any)
+    if (userLayouts.length > 0) {
+      submenuItems.push({ separator: true, label: '' });
+      userLayouts.forEach((layout) => {
+        submenuItems.push({
+          label: layout.name,
+          checked: currentLayoutName === layout.name,
+          action: () => loadLayout(layout.name),
+        });
+      });
+    }
+
+    // Actions
+    submenuItems.push({ separator: true, label: '' });
+    submenuItems.push({
+      label: 'Save Layout As...',
+      action: () => setSaveDialogOpen(true),
+    });
+    submenuItems.push({
+      label: 'Reset to Default',
+      action: () => resetToDefault(),
+    });
+
+    return submenuItems;
+  }, [currentLayoutName, getAvailableLayouts, loadLayout, resetToDefault]);
+
+  // Build menus with dynamic Layouts submenu
+  const menus = useMemo((): Menu[] => {
+    return baseMenus.map((menu) => {
+      if (menu.label !== 'View') return menu;
+
+      // Replace the placeholder with the Layouts submenu
+      const items = menu.items.map((item) => {
+        if (item.label === '__LAYOUTS_PLACEHOLDER__') {
+          return {
+            label: 'Layouts',
+            submenu: buildLayoutsSubmenu(),
+          } as MenuItem;
+        }
+        return item;
+      });
+
+      return { ...menu, items };
+    });
+  }, [buildLayoutsSubmenu]);
+
   return (
+    <>
+      <SaveLayoutDialog
+        isOpen={saveDialogOpen}
+        onClose={() => setSaveDialogOpen(false)}
+      />
     <div
       ref={menuRef}
       data-testid="menu-bar"
@@ -160,7 +241,8 @@ export function MenuBar() {
           )}
         </div>
       ))}
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -193,7 +275,14 @@ function MenuItemComponent({ item, onClose }: MenuItemComponentProps) {
         onClick={handleClick}
         disabled={item.disabled}
       >
-        <span>{item.label}</span>
+        <span className="flex items-center gap-2">
+          {item.checked !== undefined && (
+            <span className="w-4 h-4 flex items-center justify-center">
+              {item.checked && <Check size={14} className="text-blue-400" />}
+            </span>
+          )}
+          {item.label}
+        </span>
         <span className="text-gray-500 text-xs ml-8">
           {item.shortcut}
           {item.submenu && '\u25B6'}
@@ -208,7 +297,7 @@ function MenuItemComponent({ item, onClose }: MenuItemComponentProps) {
             ) : (
               <button
                 key={subItem.label}
-                className={`w-full px-4 py-1.5 text-left ${
+                className={`w-full px-4 py-1.5 text-left flex items-center ${
                   subItem.disabled
                     ? 'text-gray-500 cursor-not-allowed'
                     : 'hover:bg-gray-700'
@@ -219,6 +308,11 @@ function MenuItemComponent({ item, onClose }: MenuItemComponentProps) {
                   onClose();
                 }}
               >
+                {subItem.checked !== undefined && (
+                  <span className="w-4 h-4 mr-2 flex items-center justify-center">
+                    {subItem.checked && <Check size={14} className="text-blue-400" />}
+                  </span>
+                )}
                 {subItem.label}
               </button>
             )

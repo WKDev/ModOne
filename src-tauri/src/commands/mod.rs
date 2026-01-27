@@ -3,6 +3,7 @@
 //! This module contains all Tauri IPC command handlers that can be invoked
 //! from the frontend application.
 
+pub mod layout;
 pub mod project;
 pub mod settings;
 
@@ -16,6 +17,12 @@ pub use project::{
 
 // Re-export settings commands
 pub use settings::{get_app_settings, save_app_settings};
+
+// Re-export layout commands
+pub use layout::{
+    delete_layout, get_last_active_layout, get_restore_last_session, list_layouts, load_layout,
+    save_layout, set_last_active_layout, set_restore_last_session,
+};
 
 // Future command modules will be added here:
 // pub mod modbus;

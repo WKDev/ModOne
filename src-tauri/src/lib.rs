@@ -15,6 +15,9 @@ use commands::{
     mark_project_modified, open_project, remove_from_recent, save_app_settings, save_project,
     set_auto_save_enabled, set_auto_save_interval, set_backup_count, start_auto_save,
     stop_auto_save,
+    // Layout commands
+    delete_layout, get_last_active_layout, get_restore_last_session, list_layouts, load_layout,
+    save_layout, set_last_active_layout, set_restore_last_session,
 };
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -32,6 +35,7 @@ pub fn run() {
     let auto_save_manager = std::sync::Arc::new(std::sync::Mutex::new(AutoSaveManager::default()));
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(project_manager)
         .manage(auto_save_manager)
         .setup(|app| {
@@ -69,6 +73,15 @@ pub fn run() {
             // Settings commands
             get_app_settings,
             save_app_settings,
+            // Layout commands
+            save_layout,
+            load_layout,
+            list_layouts,
+            delete_layout,
+            set_last_active_layout,
+            get_last_active_layout,
+            set_restore_last_session,
+            get_restore_last_session,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

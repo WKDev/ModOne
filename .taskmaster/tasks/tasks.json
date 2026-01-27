@@ -487,7 +487,7 @@
           "2",
           "6"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -495,9 +495,10 @@
             "description": "Create the src/services/projectService.ts file that wraps all Tauri backend commands for project CRUD operations using the @tauri-apps/api invoke function.",
             "dependencies": [],
             "details": "Create src/services/projectService.ts with the following implementation: 1) Import invoke from '@tauri-apps/api/core' and import types from '@/types/project': ProjectInfo, ProjectData, RecentProject, PlcManufacturer. 2) Define the projectService object with async methods: createProject(name: string, path: string, plcManufacturer: PlcManufacturer, plcModel: string) calls invoke('create_project', { name, path, plc_manufacturer: plcManufacturer, plc_model: plcModel }) - note snake_case for Rust parameters. openProject(path: string) calls invoke('open_project', { path }). saveProject(path?: string) calls invoke('save_project', { path: path ?? null }). closeProject() calls invoke('close_project'). getRecentProjects() calls invoke('get_recent_projects'). 3) Export the projectService object as named export. Ensure all return types are properly typed with Promise<T> matching the TypeScript types from Task 3.5.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Create a mock for @tauri-apps/api/core invoke function using vitest or jest. Test each service method calls invoke with correct command name and parameter structure. Verify parameter names use snake_case to match Rust command expectations. Test that return types are correctly inferred.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T07:41:56.022Z"
           },
           {
             "id": 2,
@@ -507,9 +508,10 @@
               1
             ],
             "details": "Update src/stores/projectStore.ts created in Task 2.5 to add: 1) Add currentProjectPath: string | null field to track the file path of the open project separately from project data. 2) Add setCurrentProjectPath: (path: string | null) => void action. 3) Add clearError: () => void action that sets error to null. 4) Modify the setProject action to also accept an optional path parameter and call setCurrentProjectPath. 5) Add updateConfig: (config: Partial<ProjectConfig>) => void action that merges config changes and sets isModified to true. 6) Consider adding a loadingOperation: string | null field to track which operation is loading (e.g., 'create', 'open', 'save') for more granular loading states. 7) Ensure all new actions are properly typed in the ProjectStore interface. The store should work with the types defined in Task 3.5.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test setCurrentProjectPath updates the path correctly. Test clearError resets error to null. Test updateConfig merges partial config and sets isModified to true. Test setProject with path parameter updates both project and path. Verify initial state values for new fields.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T07:41:56.028Z"
           },
           {
             "id": 3,
@@ -520,9 +522,10 @@
               2
             ],
             "details": "Create src/hooks/useProject.ts with: 1) Import useCallback from 'react', useProjectStore from '@/stores/projectStore', and projectService from '@/services/projectService'. 2) Export function useProject() that destructures needed state and actions from useProjectStore(). 3) Implement createProject callback: set loading true, call projectService.createProject(), then call projectService.openProject(info.path) to load the created project data, update store with setProject and setCurrentProjectPath, refresh recent projects, set loading false. Wrap in try/catch to setError on failure. 4) Implement openProject callback: set loading, call projectService.openProject(path), update store with project data and path, refresh recent projects, handle errors. 5) Implement saveProject callback: set loading, call projectService.saveProject(path), set isModified to false on success, handle errors. If path provided (Save As), update currentProjectPath. 6) Implement closeProject callback: check isModified first (could return boolean indicating unsaved changes), call projectService.closeProject(), reset store state. 7) Return object with: currentProject, currentProjectPath, isModified, isLoading, error, recentProjects, and all operation callbacks.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Mock projectService and useProjectStore for unit testing. Test createProject calls service then opens project and updates store. Test openProject updates store with returned data. Test saveProject with and without path parameter. Test closeProject resets store state. Test error handling sets error state and clears loading. Test loading state transitions for each operation.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T07:41:56.034Z"
           },
           {
             "id": 4,
@@ -532,9 +535,10 @@
               3
             ],
             "details": "In src/hooks/useProject.ts, add: 1) Import useEffect from 'react'. 2) Implement refreshRecentProjects callback that calls projectService.getRecentProjects() and updates store with setRecentProjects. Include error handling that doesn't throw but logs to console. 3) Add useEffect that calls refreshRecentProjects() on component mount (empty dependency array) to populate recent projects when the app starts. 4) Consider adding a removeFromRecentProjects(path: string) callback - this may require a new Tauri command in the backend, so for now create a placeholder that filters the local recentProjects state (note: this won't persist without backend support). 5) Add openRecentProject(recentProject: RecentProject) convenience callback that calls openProject(recentProject.path). 6) Ensure all callbacks use useCallback with proper dependencies to prevent unnecessary re-renders. 7) Export these new functions from the hook's return object.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test refreshRecentProjects calls service and updates store. Test useEffect triggers refreshRecentProjects on mount. Test openRecentProject correctly calls openProject with the path. Test error in refreshRecentProjects is caught and logged but doesn't throw. Verify useCallback dependencies are correctly specified.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T07:41:56.040Z"
           },
           {
             "id": 5,
@@ -544,11 +548,13 @@
               3
             ],
             "details": "Enhance src/hooks/useProject.ts with: 1) Create an ErrorHandler type or interface: { message: string, code?: string, recoverable?: boolean }. 2) Create a helper function formatError(error: unknown): string that handles Error objects, string errors, and Tauri command errors (which may have specific structure). Extract meaningful message from Tauri errors which come as strings from Rust. 3) Add optional onError callback parameter to useProject or use a simple toast notification pattern: create useToast hook stub in src/hooks/useToast.ts that exports showError(message: string), showSuccess(message: string) functions (implementations can be placeholder console.logs until a toast library is added in Task 8). 4) Wrap all try/catch blocks in the hook to: a) Call setError with formatted error message, b) Call showError with user-friendly message, c) Set loading to false. 5) Add specific error messages for common cases: 'Failed to create project', 'Failed to open project - file may be corrupted', 'Failed to save project', 'No project is currently open'. 6) Consider adding a retry mechanism for transient errors in saveProject. 7) Export clearError action from the hook for components to dismiss errors.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test formatError handles different error types correctly. Test each operation surfaces errors through both setError and toast (when implemented). Test specific error messages appear for known error conditions. Test clearError resets error state. Test loading state is always set to false after error. Mock console.error to verify errors are logged for debugging.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T07:41:56.046Z"
           }
-        ]
+        ],
+        "updatedAt": "2026-01-27T07:41:56.046Z"
       },
       {
         "id": "8",
@@ -560,7 +566,7 @@
         "dependencies": [
           "7"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -568,9 +574,10 @@
             "description": "Build the NewProjectDialog React component with a modal form for creating new projects, including project name input, folder path selection with native picker, PLC manufacturer dropdown, and PLC model input field.",
             "dependencies": [],
             "details": "Create src/components/NewProjectDialog.tsx with the following implementation: 1) Define interface NewProjectDialogProps with isOpen, onClose, onCreated callbacks. 2) Import open from '@tauri-apps/plugin-dialog' for native folder picker. 3) Build form state using useState for: projectName (string), savePath (string), plcManufacturer (PlcManufacturer type: 'LS' | 'Mitsubishi' | 'Siemens'), plcModel (string). 4) Create selectFolder async handler that calls open({ directory: true, title: 'Select Project Folder' }) and updates savePath state. 5) Add form validation: projectName required and non-empty, savePath required, plcManufacturer required. 6) Create handleSubmit that calls useProject().createProject with form values, then calls onCreated callback with the result. 7) Style with Tailwind CSS: modal overlay with backdrop blur, centered dialog box with rounded corners, form layout with labels above inputs, primary/secondary button styling. 8) Include Cancel and Create buttons with proper disabled states during submission. 9) Add loading state with spinner during project creation.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit test component renders with isOpen=true. Test form validation prevents submission with empty fields. Test selectFolder updates savePath state. Mock @tauri-apps/plugin-dialog and verify open is called with correct options. Test onCreated callback receives project info after successful creation. Test onClose is called when Cancel is clicked.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T08:48:25.843Z"
           },
           {
             "id": 2,
@@ -580,9 +587,10 @@
               1
             ],
             "details": "Create two components: 1) src/components/OpenProjectDialog.tsx: Simple wrapper that calls the native file picker immediately when triggered. Import open from '@tauri-apps/plugin-dialog'. Create async openProjectPicker function that calls open({ filters: [{ name: 'ModOne Project', extensions: ['mop'] }], multiple: false, title: 'Open Project' }). If user selects a file, call useProject().openProject(selectedPath). This component may not need visible UI - it can be a hook or trigger function. Consider creating useOpenProjectDialog hook that returns { openPicker: () => Promise<void> }. 2) src/components/UnsavedChangesDialog.tsx: Interface with isOpen, onSave, onDontSave, onCancel props. Modal with warning icon (exclamation triangle), message 'You have unsaved changes. Do you want to save before closing?', and three buttons: 'Save' (primary), 'Don't Save' (secondary/danger), 'Cancel' (tertiary). Style with Tailwind: warning/destructive color scheme, clear button hierarchy. Add isLoading state for Save button during save operation.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test OpenProjectDialog triggers native picker with correct .mop filter. Mock dialog plugin and verify file selection calls openProject. Test UnsavedChangesDialog renders all three buttons. Test each button calls its respective callback. Test isOpen false hides the dialog. Test Save button shows loading state during save.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T08:48:25.851Z"
           },
           {
             "id": 3,
@@ -590,9 +598,10 @@
             "description": "Build the RecentProjectsList component that displays recent projects with name, path, and last opened date, featuring click-to-open functionality and a right-click context menu for removing items from the list.",
             "dependencies": [],
             "details": "Create src/components/RecentProjectsList.tsx: 1) Define interface RecentProjectsListProps with optional onProjectOpen callback. 2) Use useProject() hook to get recentProjects array and openProject function. 3) Create list rendering with each item showing: project name (bold), truncated file path with ellipsis, relative time since last opened (e.g., '2 hours ago', 'Yesterday'). Consider using date-fns formatDistanceToNow or similar. 4) Add onClick handler for each item that calls openProject(project.path). 5) Implement right-click context menu using custom state management: onContextMenu handler sets contextMenuPosition {x, y} and selectedProject, render absolutely positioned menu with 'Open' and 'Remove from list' options. 6) Add click-outside handler to close context menu. 7) Style with Tailwind: list items with hover state (bg-gray-100), selected state for context menu target, context menu with shadow and rounded corners, proper spacing and typography. 8) Show empty state message 'No recent projects' when list is empty. 9) Add subtle animations for list item hover and context menu appearance.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test component renders empty state when no recent projects. Test component renders project items with correct information. Test click on item calls openProject with correct path. Test right-click opens context menu at mouse position. Test clicking outside closes context menu. Test Remove from list option triggers removal (or placeholder action). Test relative time display is correct.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T08:48:25.857Z"
           },
           {
             "id": 4,
@@ -600,9 +609,10 @@
             "description": "Build the ProjectHeader component that displays the current project name with an asterisk indicator when there are unsaved modifications, styled to fit in the application header area.",
             "dependencies": [],
             "details": "Create src/components/ProjectHeader.tsx: 1) Use useProject() hook or useProjectStore() directly to access currentProject and isModified state. 2) Render project name from currentProject?.config?.project?.name or show 'No Project Open' when null. 3) Conditionally append asterisk (*) after project name when isModified is true: '{projectName}*'. 4) Style with Tailwind: appropriate font size for header (text-lg or text-xl), font weight (font-medium), proper text color contrasting with header background. 5) Consider adding subtle transition/animation when modified state changes. 6) Add optional onClick prop for potential 'project info' action. 7) Add tooltip on hover showing full project path if a project is open. 8) Consider responsive behavior - truncate long project names with ellipsis. 9) Export component with proper TypeScript typing. This component should be simple and focused - it's a display component with minimal logic.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test component shows 'No Project Open' when currentProject is null. Test component displays project name when project is open. Test asterisk appears when isModified is true. Test asterisk disappears when isModified is false. Test tooltip shows project path on hover. Test truncation works for long project names.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T08:48:25.863Z"
           },
           {
             "id": 5,
@@ -613,11 +623,13 @@
               2
             ],
             "details": "Create src/hooks/useKeyboardShortcuts.ts: 1) Import necessary hooks and the useProject hook. 2) Accept configuration object with callbacks: onNewProject, onOpenProject, onSaveProject. 3) Use useEffect to add 'keydown' event listener to document. 4) In handler, check for key combinations: (e.ctrlKey || e.metaKey) && e.key === 'n' for Ctrl+N/Cmd+N, similarly for 'o' and 's'. 5) Call e.preventDefault() to prevent browser default behavior (e.g., Ctrl+S saving page). 6) Call the appropriate callback based on detected shortcut. 7) Return cleanup function that removes event listener. 8) Create src/hooks/useProjectShortcuts.ts that uses useKeyboardShortcuts with project-specific implementations: Ctrl+N opens NewProjectDialog (requires managing dialog state), Ctrl+O triggers openPicker, Ctrl+S calls saveProject if project is open. 9) Alternative: Create a ProjectShortcutsProvider component that wraps the app and provides this functionality via context. 10) Consider adding Ctrl+Shift+S for 'Save As' functionality. 11) Add visual indicator in menus/buttons showing keyboard shortcuts (e.g., 'New Project (Ctrl+N)').",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test useKeyboardShortcuts hook adds event listener on mount and removes on unmount. Test Ctrl+N fires onNewProject callback. Test Ctrl+O fires onOpenProject callback. Test Ctrl+S fires onSaveProject callback. Test Cmd key works on Mac (metaKey). Test preventDefault is called to stop browser default. Test shortcuts don't fire when input fields are focused (optional - may need refinement). Integration test shortcuts work in the actual app context.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T08:48:25.868Z"
           }
-        ]
+        ],
+        "updatedAt": "2026-01-27T08:48:25.868Z"
       },
       {
         "id": "9",
@@ -1420,7 +1432,7 @@
           "13",
           "16"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -1428,9 +1440,10 @@
             "description": "Create TypeScript interfaces for layout configuration in src/types/layout.ts and corresponding Rust structs in src-tauri/src/types/layout.rs for serialization.",
             "dependencies": [],
             "details": "Create src/types/layout.ts with the following interfaces:\n\n1. LayoutConfig interface:\n   - name: string (layout preset name)\n   - grid: { columns: string[], rows: string[] } (CSS grid template definitions)\n   - panels: array of panel configurations with id, type (PanelType), gridArea, and optional tabs\n   - sidebar: { visible: boolean, width: number, activePanel: string }\n   - isBuiltIn?: boolean (prevents deletion if true)\n\n2. Supporting types:\n   - PanelLayoutConfig: { id: string, type: PanelType, gridArea: string, tabs?: TabConfig[] }\n   - TabConfig: { type: PanelType, title: string }\n   - GridConfig: { columns: string[], rows: string[] }\n   - SidebarConfig: { visible: boolean, width: number, activePanel: string }\n\n3. Create corresponding Rust structs in src-tauri/src/types/layout.rs:\n   - LayoutConfig with #[derive(Serialize, Deserialize, Clone)]\n   - PanelLayoutConfig, TabConfig, GridConfig, SidebarConfig\n   - Ensure field names match TypeScript (use serde rename if needed)\n\n4. Export types from src/types/index.ts for easy importing throughout the application.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit test that LayoutConfig can be serialized to JSON and deserialized back correctly. Test that all required fields are present. Test TypeScript compilation catches missing required fields. Test Rust structs serialize/deserialize with serde_json. Verify round-trip serialization preserves all data.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T10:00:02.655Z"
           },
           {
             "id": 2,
@@ -1440,9 +1453,10 @@
               1
             ],
             "details": "Create src/config/layoutPresets.ts with the following presets:\n\n1. DEFAULT_LAYOUT:\n   - 2x2 grid: columns ['1fr', '1fr'], rows ['1fr', '1fr']\n   - Panels: Ladder Editor (top-left, gridArea: '1/1/2/2'), Memory Visualizer (top-right, gridArea: '1/2/2/3'), One Canvas (bottom-left, gridArea: '2/1/3/2'), Console (bottom-right, gridArea: '2/2/3/3')\n   - Sidebar: visible=true, width=250, activePanel='explorer'\n   - isBuiltIn=true\n\n2. COMPACT_LAYOUT:\n   - 1x1 grid: columns ['1fr'], rows ['1fr']\n   - Single panel with all panels as tabs array\n   - isBuiltIn=true\n\n3. DEBUG_LAYOUT:\n   - 2-row split (70/30): columns ['1fr'], rows ['70fr', '30fr']\n   - Main panels as tabs (top), Console expanded (bottom)\n   - isBuiltIn=true\n\n4. MEMORY_FOCUS_LAYOUT:\n   - 2-column split (80/20): columns ['80fr', '20fr'], rows ['1fr']\n   - Large Memory Visualizer (left), Properties panel (right)\n   - isBuiltIn=true\n\n5. Export BUILT_IN_LAYOUTS array containing all presets\n6. Export getPresetByName(name: string) helper function",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test each preset has isBuiltIn=true. Test DEFAULT_LAYOUT has exactly 4 panels in correct grid positions. Test COMPACT_LAYOUT has single panel with 4 tabs. Test DEBUG_LAYOUT has 70/30 split ratio. Test MEMORY_FOCUS_LAYOUT has 80/20 split. Test getPresetByName returns correct preset or undefined for unknown names.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T10:00:53.469Z"
           },
           {
             "id": 3,
@@ -1452,9 +1466,10 @@
               1
             ],
             "details": "Create src-tauri/src/commands/layout.rs with the following commands:\n\n1. #[tauri::command] pub async fn save_layout(app: AppHandle, name: String, config: LayoutConfig) -> Result<(), String>\n   - Validate name is not empty and doesn't contain invalid characters\n   - Load existing layouts.json from app_data_dir\n   - Add/update layout in the list\n   - Write back to layouts.json with pretty formatting\n   - Handle file creation if doesn't exist\n\n2. #[tauri::command] pub async fn load_layout(app: AppHandle, name: String) -> Result<LayoutConfig, String>\n   - Read layouts.json from app_data_dir\n   - Find layout by name, return error if not found\n   - Return the LayoutConfig\n\n3. #[tauri::command] pub async fn list_layouts(app: AppHandle) -> Result<Vec<String>, String>\n   - Read layouts.json, return list of layout names\n   - Return empty vec if file doesn't exist\n\n4. #[tauri::command] pub async fn delete_layout(app: AppHandle, name: String) -> Result<(), String>\n   - Check isBuiltIn flag, return error if true\n   - Remove layout from list and save\n\n5. Register commands in src-tauri/src/lib.rs tauri::Builder\n6. Use tauri::path::BaseDirectory::AppData for storage location\n7. Create LayoutStorage struct to encapsulate file operations",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test save_layout creates layouts.json if not exists. Test load_layout returns error for non-existent layout. Test list_layouts returns empty vec for new installation. Test delete_layout fails for built-in layouts with appropriate error message. Test save then load returns identical config. Test concurrent saves don't corrupt file. Integration test with actual Tauri app context.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T10:01:01.481Z"
           },
           {
             "id": 4,
@@ -1466,9 +1481,10 @@
               3
             ],
             "details": "Extend src/stores/panelStore.ts with layout management:\n\n1. Add new state properties:\n   - currentLayoutName: string (name of currently active layout)\n   - savedLayouts: LayoutConfig[] (cached list of user layouts)\n   - isLayoutModified: boolean (track unsaved changes)\n\n2. Add new actions:\n   - saveLayout: (name: string) => Promise<void> - serialize current state, call Tauri save_layout\n   - loadLayout: (name: string) => Promise<void> - call Tauri load_layout, apply to state\n   - deleteLayout: (name: string) => Promise<void> - call Tauri delete_layout, refresh savedLayouts\n   - resetToDefault: () => void - load DEFAULT_LAYOUT preset\n   - exportLayout: (name: string) => LayoutConfig - return current state as LayoutConfig\n   - importLayout: (config: LayoutConfig) => void - apply external config to state\n   - getAvailableLayouts: () => LayoutConfig[] - return built-in + user layouts\n   - refreshSavedLayouts: () => Promise<void> - reload from Tauri storage\n   - setLayoutModified: (modified: boolean) => void\n\n3. Helper functions:\n   - serializeCurrentLayout(): LayoutConfig - convert current store state to config\n   - applyLayoutConfig(config: LayoutConfig): void - apply config to store state\n\n4. Initialize savedLayouts on store creation by calling refreshSavedLayouts\n5. Track layout modifications by subscribing to relevant state changes",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test saveLayout calls Tauri command with serialized state. Test loadLayout applies config to panels, grid, and sidebar state. Test deleteLayout removes from savedLayouts cache. Test resetToDefault applies DEFAULT_LAYOUT. Test getAvailableLayouts returns combined built-in and user layouts. Test isLayoutModified becomes true when panels change. Test export/import round-trip preserves layout. Mock Tauri invoke for unit tests.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T10:02:38.913Z"
           },
           {
             "id": 5,
@@ -1479,11 +1495,13 @@
               4
             ],
             "details": "1. Create src/components/layout/SaveLayoutDialog.tsx:\n   - Modal with name input field (validate non-empty, no special chars)\n   - Show simplified grid preview of current layout\n   - Warning message if name conflicts with existing layout\n   - Checkbox for 'Replace existing' when name exists\n   - Save and Cancel buttons\n   - Call panelStore.saveLayout on confirm\n\n2. Update MenuBar View menu (src/components/layout/MenuBar.tsx):\n   - Add 'Layouts' submenu\n   - List built-in presets with separator (Default, Compact, Debug, Memory Focus)\n   - List user layouts below separator (from panelStore.savedLayouts)\n   - Checkmark on currentLayoutName\n   - 'Save Current Layout As...' opens SaveLayoutDialog\n   - 'Reset Layout' calls panelStore.resetToDefault()\n   - 'Manage Layouts...' submenu with delete options for user layouts\n\n3. Implement auto-save on close:\n   - Listen to Tauri window close-requested event in App.tsx\n   - Save current layout as '_lastSession' before closing\n   - On app start, check settings for 'restoreLastSession' flag\n   - If enabled, call loadLayout('_lastSession')\n\n4. Add keyboard shortcut Ctrl+Shift+S for 'Save Layout As...' in layoutStore shortcuts\n5. Create src/components/layout/LayoutPreview.tsx for simplified grid visualization in dialog",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test SaveLayoutDialog validates empty name shows error. Test name conflict shows warning message. Test Save button calls saveLayout with entered name. Test Cancel closes dialog without saving. Test View menu shows all built-in presets. Test checkmark appears on active layout. Test clicking preset calls loadLayout. Test auto-save triggers on window close event. Test '_lastSession' layout restores on startup when enabled. E2E test: create layout, restart app, verify restored.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T10:06:40.462Z"
           }
-        ]
+        ],
+        "updatedAt": "2026-01-27T10:06:40.462Z"
       },
       {
         "id": "20",
@@ -1950,7 +1968,7 @@
         "dependencies": [
           "15"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -1958,9 +1976,10 @@
             "description": "Install @playwright/test package, run browser installation, and create playwright.config.ts with Tauri-specific settings for E2E testing.",
             "dependencies": [],
             "details": "Install Playwright dependencies: `npm install -D @playwright/test` and `npx playwright install`. Create `playwright.config.ts` in project root with: testDir set to './tests/e2e', timeout of 60000ms for Tauri app startup, retries set to 2 for CI and 0 locally, trace/screenshot/video capture on failure, and a 'tauri' project configuration. Add npm scripts to package.json: 'test:e2e' for headless runs, 'test:e2e:ui' for Playwright UI mode, and 'test:e2e:headed' for headed browser execution. Configure webServer to build and launch the Tauri app before tests using 'npm run tauri dev' command.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify Playwright installation by running 'npx playwright --version'. Test configuration by running 'npx playwright test --list' to confirm test directory is recognized. Verify npm scripts execute without errors.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T09:40:29.506Z"
           },
           {
             "id": 2,
@@ -1970,9 +1989,10 @@
               1
             ],
             "details": "Create `tests/e2e/utils/` directory structure. Implement `app.ts` with launchApp() function that handles Tauri/WebView2 app startup on Windows, closeApp() for cleanup, and waitForAppReady() that waits for main window to be interactive. Create `selectors.ts` with data-testid based selectors for: menu bar components (menu-bar, menu-file, menu-new-project), project operations (new-project-btn, project-name-input, create-btn, project-header), sidebar elements (sidebar, sidebar-tab-*), panel system (panel-container, panel-header, resize-handle), and Modbus controls (modbus-start-tcp, tcp-status). Create `helpers.ts` with common test operations: createNewProject(page, name), openProject(page, path), toggleSidebar(page), switchSidebarTab(page, tab).",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit test selector constants are properly exported. Test app lifecycle helpers launch and close a minimal Tauri app without errors. Verify helper functions work with mock page objects.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T09:41:55.618Z"
           },
           {
             "id": 3,
@@ -1982,9 +2002,10 @@
               1
             ],
             "details": "Create `tests/e2e/fixtures/` directory. Generate sample .mop files: 'valid-project.mop' as a properly structured ZIP archive containing config.yml with project metadata, plc_csv/ directory with sample PLC data, and memory snapshots. Create 'corrupted-project.mop' with intentionally invalid ZIP structure for error handling tests. Create 'minimal-project.mop' with only required files for quick loading tests. Add 'mock-config.yml' with sample project configuration. Create 'test-memory-values.json' containing predefined coil and register values for Modbus testing (addresses 0-99 with various values). Add 'expected-layouts.json' defining expected panel positions after layout operations.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify .mop files can be opened by the application without errors. Test corrupted file triggers appropriate error handling. Validate JSON fixtures parse correctly and contain expected data structures.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T09:42:52.967Z"
           },
           {
             "id": 4,
@@ -1995,9 +2016,10 @@
               3
             ],
             "details": "Create `tests/e2e/project.spec.ts` with tests: 'creates new project' (click menu, fill name, select folder, verify header shows project name), 'opens existing project' (use fixture .mop file, verify project loads), 'saves project' (modify content, save, reopen to verify persistence), 'handles corrupted project file gracefully' (open corrupted fixture, verify error dialog). Create `tests/e2e/layout.spec.ts` with tests: 'toggles sidebar with Ctrl+B' (verify visibility change), 'resizes panels using drag handle' (drag handle, verify size changes), 'switches sidebar tabs' (click each tab, verify content changes), 'remembers layout after restart' (modify layout, restart app, verify layout restored). Create `tests/e2e/modbus.spec.ts` with tests: 'starts and stops Modbus TCP server' (click start, verify status shows Running, click stop, verify Stopped), 'displays memory values' (start server, write values, verify display updates), 'handles server errors gracefully' (attempt invalid port, verify error message).",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Run full test suite with 'npm run test:e2e' and verify all tests pass. Check screenshot capture works on intentional failures. Verify tests are isolated and can run in any order.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T09:44:26.446Z"
           },
           {
             "id": 5,
@@ -2007,18 +2029,20 @@
               4
             ],
             "details": "Establish naming convention: component-name or component-action format (e.g., 'menu-bar', 'new-project-btn', 'sidebar-tab-explorer'). Update MenuBar component: add data-testid='menu-bar', 'menu-file', 'menu-edit', 'menu-view', 'menu-new-project', 'menu-open-project', 'menu-save'. Update Sidebar component: add data-testid='sidebar', 'sidebar-toggle', 'sidebar-tab-explorer', 'sidebar-tab-search', 'sidebar-tab-modbus', 'sidebar-tab-settings'. Update Panel components: add data-testid='panel-container', 'panel-{id}', 'panel-header-{id}', 'resize-handle-horizontal', 'resize-handle-vertical'. Update Project UI: add data-testid='project-header', 'project-name-input', 'project-folder-select', 'create-btn', 'cancel-btn'. Update Modbus components: add data-testid='modbus-start-tcp', 'modbus-stop-tcp', 'tcp-status', 'tcp-port-input', 'memory-visualizer'. Document all data-testid values in selectors.ts for synchronization.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify all selectors from selectors.ts can locate corresponding elements in the running application. Run E2E test suite to confirm all element selections work correctly. Check no duplicate data-testid values exist in the component tree.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T09:47:30.697Z"
           }
-        ]
+        ],
+        "updatedAt": "2026-01-27T09:47:30.697Z"
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-01-27T05:36:59.590Z",
+      "lastModified": "2026-01-27T10:06:40.462Z",
       "taskCount": 26,
-      "completedCount": 17,
+      "completedCount": 21,
       "tags": [
         "master"
       ]
