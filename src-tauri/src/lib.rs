@@ -19,6 +19,9 @@ use commands::{
     mark_project_modified, open_project, remove_from_recent, save_app_settings, save_project,
     set_auto_save_enabled, set_auto_save_interval, set_backup_count, start_auto_save,
     stop_auto_save,
+    // Recovery commands
+    get_available_backups, validate_project_integrity, recover_project_from_backup,
+    attempt_project_recovery,
     // Layout commands
     delete_layout, get_last_active_layout, get_restore_last_session, list_layouts, load_layout,
     save_layout, set_last_active_layout, set_restore_last_session,
@@ -85,6 +88,11 @@ pub fn run() {
             set_backup_count,
             start_auto_save,
             stop_auto_save,
+            // Recovery commands
+            get_available_backups,
+            validate_project_integrity,
+            recover_project_from_backup,
+            attempt_project_recovery,
             // Settings commands
             get_app_settings,
             save_app_settings,

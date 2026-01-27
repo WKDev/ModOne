@@ -45,6 +45,7 @@ pub mod auto_save;
 pub mod config;
 pub mod layout;
 pub mod mop_file;
+pub mod recovery;
 pub mod validation;
 
 pub use auto_save::{AutoSaveManager, SharedAutoSaveManager};
@@ -54,6 +55,11 @@ pub use config::{
     ProjectConfig, ProjectSettings,
 };
 pub use mop_file::{MopFile, MopFileError};
+pub use recovery::{
+    find_backups, validate_mop_integrity, attempt_partial_recovery,
+    recover_from_backup, get_most_recent_valid_backup,
+    BackupInfo, MopIntegrityResult, RecoveryResult,
+};
 pub use validation::{validate_project_config, ValidationResult};
 
 use std::fs::{self, File};

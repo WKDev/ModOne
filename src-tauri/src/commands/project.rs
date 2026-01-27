@@ -11,6 +11,9 @@ use tauri::State;
 use crate::project::{
     AutoSaveSettings, CanvasData, MemorySnapshot, PlcSettings, ProjectConfig, ProjectError,
     RecentProject, ScenarioData, SharedAutoSaveManager, SharedProjectManager,
+    // Recovery utilities
+    find_backups, validate_mop_integrity, attempt_partial_recovery, recover_from_backup,
+    BackupInfo, MopIntegrityResult, RecoveryResult,
 };
 
 // ============================================================================
@@ -416,4 +419,74 @@ pub async fn stop_auto_save(
         .map_err(|e| format!("Internal error: failed to acquire lock: {}", e))?
         .stop();
     Ok(())
+}
+
+// ============================================================================
+// Recovery Commands
+// ============================================================================
+
+/// Get all available backup files for a project
+///
+/// Returns a list of backup files sorted by timestamp (most recent first).
+#[tauri::command]
+pub async fn get_available_backups(path: String) -> Result<Vec<BackupInfo>, String> {
+    let path = PathBuf::from(path);
+
+    if !path.exists() {
+        return Err(format!("Project file not found: {}", path.display()));
+    }
+
+    Ok(find_backups(&path))
+}
+
+/// Validate the integrity of a .mop file
+///
+/// Returns detailed information about the file's structure and any issues found.
+#[tauri::command]
+pub async fn validate_project_integrity(path: String) -> Result<MopIntegrityResult, String> {
+    let path = PathBuf::from(path);
+
+    if !path.exists() {
+        return Err(format!("File not found: {}", path.display()));
+    }
+
+    Ok(validate_mop_integrity(&path))
+}
+
+/// Recover a project from a backup file
+///
+/// Validates the backup integrity before copying to ensure it's valid.
+#[tauri::command]
+pub async fn recover_project_from_backup(
+    backup_path: String,
+    target_path: String,
+) -> Result<(), String> {
+    let backup_path = PathBuf::from(backup_path);
+    let target_path = PathBuf::from(target_path);
+
+    if !backup_path.exists() {
+        return Err(format!("Backup file not found: {}", backup_path.display()));
+    }
+
+    recover_from_backup(&backup_path, &target_path)
+        .map_err(|e| e.to_string())
+}
+
+/// Attempt to recover data from a corrupted project file
+///
+/// Extracts as much data as possible from the corrupted file to an output directory.
+#[tauri::command]
+pub async fn attempt_project_recovery(
+    corrupted_path: String,
+    output_dir: String,
+) -> Result<RecoveryResult, String> {
+    let corrupted_path = PathBuf::from(corrupted_path);
+    let output_dir = PathBuf::from(output_dir);
+
+    if !corrupted_path.exists() {
+        return Err(format!("File not found: {}", corrupted_path.display()));
+    }
+
+    attempt_partial_recovery(&corrupted_path, &output_dir)
+        .map_err(|e| e.to_string())
 }

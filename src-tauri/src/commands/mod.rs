@@ -14,6 +14,9 @@ pub use project::{
     get_auto_save_settings, get_project_status, get_recent_projects, mark_project_modified,
     open_project, remove_from_recent, save_project, set_auto_save_enabled, set_auto_save_interval,
     set_backup_count, start_auto_save, stop_auto_save,
+    // Recovery commands
+    get_available_backups, validate_project_integrity, recover_project_from_backup,
+    attempt_project_recovery,
 };
 
 // Re-export settings commands
