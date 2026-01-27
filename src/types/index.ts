@@ -35,3 +35,6 @@ export * from './settings';
 
 // Modbus types
 export * from './modbus';
+
+// Error types
+export * from './error';

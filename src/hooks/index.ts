@@ -1,5 +1,6 @@
 // Custom React hooks
 export { useAutoSave } from './useAutoSave';
+export { useErrorHandler, default as UseErrorHandler } from './useErrorHandler';
 export { useKeyboardShortcuts, default as UseKeyboardShortcuts } from './useKeyboardShortcuts';
 export { useModbus, default as UseModbus } from './useModbus';
 export {
