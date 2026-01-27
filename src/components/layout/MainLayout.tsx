@@ -10,7 +10,7 @@ interface MainLayoutProps {
 
 export function MainLayout({ children }: MainLayoutProps) {
   return (
-    <div className="h-screen w-screen overflow-hidden flex flex-col bg-gray-900 text-gray-100">
+    <div data-testid="main-layout" className="h-screen w-screen overflow-hidden flex flex-col bg-gray-900 text-gray-100">
       {/* Header: Menu Bar + Toolbar */}
       <header className="flex-shrink-0">
         <MenuBar />
@@ -23,7 +23,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         <Sidebar />
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto bg-gray-900">
+        <main data-testid="panel-container" className="flex-1 overflow-auto bg-gray-900">
           {children}
         </main>
       </div>

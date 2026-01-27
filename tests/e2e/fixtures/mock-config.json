@@ -1,0 +1,43 @@
+{
+  "version": "1.0",
+  "project": {
+    "name": "Test Project",
+    "description": "A test project for E2E testing",
+    "created_at": "2025-01-15T10:00:00.000Z",
+    "updated_at": "2025-01-15T10:00:00.000Z"
+  },
+  "plc": {
+    "manufacturer": "LS",
+    "model": "XGK-CPUHN",
+    "scan_time_ms": 10
+  },
+  "modbus": {
+    "tcp": {
+      "enabled": true,
+      "port": 502,
+      "unit_id": 1
+    },
+    "rtu": {
+      "enabled": false,
+      "com_port": "",
+      "baud_rate": 9600,
+      "parity": "None",
+      "stop_bits": 1
+    }
+  },
+  "memory_map": {
+    "coil_start": 0,
+    "coil_count": 1000,
+    "discrete_input_start": 0,
+    "discrete_input_count": 1000,
+    "holding_register_start": 0,
+    "holding_register_count": 1000,
+    "input_register_start": 0,
+    "input_register_count": 1000
+  },
+  "auto_save": {
+    "enabled": true,
+    "interval_secs": 300,
+    "backup_count": 3
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "description": "Expected layout configurations for E2E testing",
+  "defaultLayout": {
+    "sidebar": {
+      "visible": true,
+      "width": 240,
+      "minWidth": 200,
+      "maxWidth": 400,
+      "activePanel": "explorer"
+    },
+    "mainPanel": {
+      "tabs": [],
+      "activeTab": null
+    },
+    "statusBar": {
+      "visible": true,
+      "height": 24
+    },
+    "menuBar": {
+      "visible": true,
+      "height": 32
+    }
+  },
+  "sidebarCollapsed": {
+    "sidebar": {
+      "visible": false,
+      "width": 0
+    }
+  },
+  "sidebarExpanded": {
+    "sidebar": {
+      "visible": true,
+      "width": 240
+    }
+  },
+  "panelPositions": {
+    "ladderEditor": {
+      "position": "center",
+      "type": "tab"
+    },
+    "memoryVisualizer": {
+      "position": "right",
+      "type": "panel"
+    },
+    "console": {
+      "position": "bottom",
+      "type": "panel"
+    },
+    "properties": {
+      "position": "right",
+      "type": "panel"
+    }
+  },
+  "sidebarTabs": [
+    {
+      "id": "explorer",
+      "label": "Explorer",
+      "icon": "folder"
+    },
+    {
+      "id": "search",
+      "label": "Search",
+      "icon": "search"
+    },
+    {
+      "id": "modbus",
+      "label": "Modbus",
+      "icon": "network"
+    },
+    {
+      "id": "settings",
+      "label": "Settings",
+      "icon": "settings"
+    }
+  ],
+  "testScenarios": {
+    "resizeSidebar": {
+      "initialWidth": 240,
+      "dragDelta": 60,
+      "expectedWidth": 300
+    },
+    "minimizeSidebar": {
+      "initialWidth": 240,
+      "dragDelta": -200,
+      "expectedWidth": 200
+    }
+  }
+}

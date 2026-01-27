@@ -118,14 +118,20 @@ export function MenuBar() {
     setMenuOpen(menuOpen === label ? null : label);
   };
 
+  const getMenuTestId = (label: string) => {
+    return `menu-${label.toLowerCase().replace(/\s+/g, '-')}`;
+  };
+
   return (
     <div
       ref={menuRef}
+      data-testid="menu-bar"
       className="h-8 bg-gray-800 border-b border-gray-700 flex items-center px-2 text-sm"
     >
       {menus.map((menu) => (
         <div key={menu.label} className="relative">
           <button
+            data-testid={getMenuTestId(menu.label)}
             className={`px-3 py-1 rounded hover:bg-gray-700 ${
               menuOpen === menu.label ? 'bg-gray-700' : ''
             }`}
@@ -171,9 +177,14 @@ function MenuItemComponent({ item, onClose }: MenuItemComponentProps) {
     }
   };
 
+  const getItemTestId = (label: string) => {
+    return `menu-${label.toLowerCase().replace(/\s+/g, '-').replace(/\.\.\./g, '')}`;
+  };
+
   return (
     <div className="relative group">
       <button
+        data-testid={getItemTestId(item.label)}
         className={`w-full px-4 py-1.5 text-left flex items-center justify-between ${
           item.disabled
             ? 'text-gray-500 cursor-not-allowed'

@@ -1,0 +1,66 @@
+{
+  "description": "Test memory values for Modbus E2E testing",
+  "coils": {
+    "0": true,
+    "1": false,
+    "2": true,
+    "3": true,
+    "4": false,
+    "10": true,
+    "11": false,
+    "20": true,
+    "50": true,
+    "99": true
+  },
+  "discreteInputs": {
+    "0": false,
+    "1": true,
+    "2": false,
+    "10": true,
+    "50": false
+  },
+  "holdingRegisters": {
+    "0": 100,
+    "1": 200,
+    "2": 300,
+    "3": 0,
+    "4": 65535,
+    "10": 1234,
+    "20": 5678,
+    "50": 32767,
+    "99": 42
+  },
+  "inputRegisters": {
+    "0": 1000,
+    "1": 2000,
+    "2": 3000,
+    "10": 4567,
+    "50": 8901
+  },
+  "testCases": [
+    {
+      "name": "Basic coil write",
+      "operation": "writeSingleCoil",
+      "address": 100,
+      "value": true
+    },
+    {
+      "name": "Basic register write",
+      "operation": "writeSingleRegister",
+      "address": 100,
+      "value": 12345
+    },
+    {
+      "name": "Multiple coils write",
+      "operation": "writeMultipleCoils",
+      "startAddress": 200,
+      "values": [true, false, true, true, false, true, false, false]
+    },
+    {
+      "name": "Multiple registers write",
+      "operation": "writeMultipleRegisters",
+      "startAddress": 200,
+      "values": [1111, 2222, 3333, 4444, 5555]
+    }
+  ]
+}

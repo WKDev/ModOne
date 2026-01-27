@@ -9,9 +9,10 @@ interface ActivityBarItemProps {
   onClick: () => void;
 }
 
-function ActivityBarItem({ icon, tooltip, isActive, onClick }: ActivityBarItemProps) {
+function ActivityBarItem({ icon, panel, tooltip, isActive, onClick }: ActivityBarItemProps) {
   return (
     <button
+      data-testid={`activity-${panel}`}
       className={`w-12 h-12 flex items-center justify-center relative ${
         isActive
           ? 'text-white'
@@ -50,7 +51,7 @@ export function ActivityBar() {
   ];
 
   return (
-    <div className="w-12 bg-gray-900 border-r border-gray-700 flex flex-col">
+    <div data-testid="activity-bar" className="w-12 bg-gray-900 border-r border-gray-700 flex flex-col">
       {items.map((item) => (
         <ActivityBarItem
           key={item.panel}

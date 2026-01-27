@@ -62,17 +62,18 @@ export function Sidebar() {
   };
 
   return (
-    <div ref={sidebarRef} className="flex h-full">
+    <div ref={sidebarRef} data-testid="sidebar" className="flex h-full">
       <ActivityBar />
 
       <div
+        data-testid="sidebar-content"
         className={`bg-gray-800 border-r border-gray-700 flex flex-col transition-all duration-200 overflow-hidden ${
           isVisible ? '' : 'w-0'
         }`}
         style={{ width: isVisible ? width : 0 }}
       >
         {/* Panel Header */}
-        <div className="h-9 px-4 flex items-center border-b border-gray-700 text-xs font-semibold uppercase tracking-wider text-gray-400">
+        <div data-testid="sidebar-header" className="h-9 px-4 flex items-center border-b border-gray-700 text-xs font-semibold uppercase tracking-wider text-gray-400">
           {activePanel}
         </div>
 
@@ -85,6 +86,7 @@ export function Sidebar() {
       {/* Resize Handle */}
       {isVisible && (
         <div
+          data-testid="sidebar-resize-handle"
           className="w-1 cursor-col-resize hover:bg-blue-500 active:bg-blue-500 transition-colors"
           onMouseDown={startResizing}
         />

@@ -43,7 +43,7 @@ export function StatusBar() {
   };
 
   return (
-    <div className="h-6 bg-gray-800 border-t border-gray-700 flex items-center justify-between px-4 text-xs font-mono">
+    <div data-testid="status-bar" className="h-6 bg-gray-800 border-t border-gray-700 flex items-center justify-between px-4 text-xs font-mono">
       {/* Left Section: Simulation Status */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-1.5">

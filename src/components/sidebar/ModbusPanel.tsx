@@ -43,7 +43,7 @@ export function ModbusPanel() {
             ) : (
               <WifiOff size={16} className="text-gray-500" />
             )}
-            <span className={modbusConnected ? 'text-green-400' : 'text-gray-400'}>
+            <span data-testid="tcp-status" className={modbusConnected ? 'text-green-400' : 'text-gray-400'}>
               {modbusConnected ? 'Running' : 'Stopped'}
             </span>
           </div>
@@ -55,6 +55,7 @@ export function ModbusPanel() {
         {/* Server Controls */}
         <div className="flex gap-2">
           <button
+            data-testid="modbus-start-tcp"
             className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded text-sm ${
               modbusConnected
                 ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
@@ -67,6 +68,7 @@ export function ModbusPanel() {
             Start
           </button>
           <button
+            data-testid="modbus-stop-tcp"
             className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded text-sm ${
               !modbusConnected
                 ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
