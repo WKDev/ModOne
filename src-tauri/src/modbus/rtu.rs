@@ -5,12 +5,17 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use tauri::Emitter;
 use tokio::sync::Mutex;
 use tokio_serial::{DataBits, Parity, SerialPortBuilderExt, SerialStream, StopBits};
 
 use super::memory::ModbusMemory;
-use super::types::ModbusError;
+use super::types::{ChangeSource, ConnectionEvent, ModbusError};
+
+// Event channel name for connection events
+const EVENT_CONNECTION: &str = "modbus:connection";
 
 /// Information about an available serial port
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -148,6 +153,8 @@ pub struct ModbusRtuServer {
     running: Arc<AtomicBool>,
     port: Arc<Mutex<Option<SerialStream>>>,
     task_handle: Option<tokio::task::JoinHandle<()>>,
+    /// Tauri app handle for event emission
+    app_handle: Arc<RwLock<Option<Arc<tauri::AppHandle>>>>,
 }
 
 impl ModbusRtuServer {
@@ -159,6 +166,19 @@ impl ModbusRtuServer {
             running: Arc::new(AtomicBool::new(false)),
             port: Arc::new(Mutex::new(None)),
             task_handle: None,
+            app_handle: Arc::new(RwLock::new(None)),
+        }
+    }
+
+    /// Set the Tauri app handle for event emission
+    pub fn set_app_handle(&self, handle: tauri::AppHandle) {
+        *self.app_handle.write() = Some(Arc::new(handle));
+    }
+
+    /// Emit a connection event
+    fn emit_connection_event(app_handle: &Arc<RwLock<Option<Arc<tauri::AppHandle>>>>, event: ConnectionEvent) {
+        if let Some(handle) = app_handle.read().as_ref() {
+            let _ = handle.emit(EVENT_CONNECTION, event);
         }
     }
 
@@ -200,6 +220,9 @@ impl ModbusRtuServer {
         // Mark as running
         self.running.store(true, Ordering::SeqCst);
 
+        // Emit connected event
+        Self::emit_connection_event(&self.app_handle, ConnectionEvent::rtu_connected(&self.config.com_port));
+
         // Clone what we need for the RTU loop
         let memory = Arc::clone(&self.memory);
         let running = Arc::clone(&self.running);
@@ -221,6 +244,8 @@ impl ModbusRtuServer {
             return Err(ModbusError::NotRunning);
         }
 
+        let port_name = self.config.com_port.clone();
+
         // Signal stop
         self.running.store(false, Ordering::SeqCst);
 
@@ -232,6 +257,9 @@ impl ModbusRtuServer {
 
         // Close the port
         *self.port.lock().await = None;
+
+        // Emit disconnected event
+        Self::emit_connection_event(&self.app_handle, ConnectionEvent::rtu_disconnected(&port_name));
 
         log::info!("Modbus RTU server stopped");
         Ok(())
@@ -501,7 +529,7 @@ fn process_rtu_request(memory: &ModbusMemory, function_code: u8, pdu: &[u8]) -> 
             let value = u16::from_be_bytes([pdu[3], pdu[4]]);
             let coil_value = value == 0xFF00;
 
-            match memory.write_coil(addr, coil_value) {
+            match memory.write_coil_with_source(addr, coil_value, ChangeSource::External) {
                 Ok(_) => pdu.to_vec(),
                 Err(_) => exception_response(function_code, 0x02),
             }
@@ -515,7 +543,7 @@ fn process_rtu_request(memory: &ModbusMemory, function_code: u8, pdu: &[u8]) -> 
             let addr = u16::from_be_bytes([pdu[1], pdu[2]]);
             let value = u16::from_be_bytes([pdu[3], pdu[4]]);
 
-            match memory.write_holding_register(addr, value) {
+            match memory.write_holding_register_with_source(addr, value, ChangeSource::External) {
                 Ok(_) => pdu.to_vec(),
                 Err(_) => exception_response(function_code, 0x02),
             }
@@ -536,7 +564,7 @@ fn process_rtu_request(memory: &ModbusMemory, function_code: u8, pdu: &[u8]) -> 
 
             let values = unpack_bits(&pdu[6..6 + byte_count], quantity as usize);
 
-            match memory.write_coils(start_addr, &values) {
+            match memory.write_coils_with_source(start_addr, &values, ChangeSource::External) {
                 Ok(_) => vec![function_code, pdu[1], pdu[2], pdu[3], pdu[4]],
                 Err(_) => exception_response(function_code, 0x02),
             }
@@ -559,7 +587,7 @@ fn process_rtu_request(memory: &ModbusMemory, function_code: u8, pdu: &[u8]) -> 
                 .map(|i| u16::from_be_bytes([pdu[6 + i * 2], pdu[7 + i * 2]]))
                 .collect();
 
-            match memory.write_holding_registers(start_addr, &values) {
+            match memory.write_holding_registers_with_source(start_addr, &values, ChangeSource::External) {
                 Ok(_) => vec![function_code, pdu[1], pdu[2], pdu[3], pdu[4]],
                 Err(_) => exception_response(function_code, 0x02),
             }

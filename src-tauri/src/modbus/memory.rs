@@ -5,8 +5,17 @@ use parking_lot::RwLock;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
+use std::sync::Arc;
+use tauri::Emitter;
 
-use super::types::{MemoryError, MemoryMapSettings, MemoryType};
+use super::types::{
+    ChangeSource, MemoryBatchChangeEvent, MemoryChangeEvent, MemoryError, MemoryMapSettings,
+    MemoryType,
+};
+
+// Event channel names
+const EVENT_MEMORY_CHANGED: &str = "modbus:memory-changed";
+const EVENT_MEMORY_BATCH_CHANGED: &str = "modbus:memory-batch-changed";
 
 /// Thread-safe Modbus memory storage
 ///
@@ -21,6 +30,12 @@ pub struct ModbusMemory {
     holding_registers: RwLock<Vec<u16>>,
     input_registers: RwLock<Vec<u16>>,
     config: MemoryMapSettings,
+    /// Tauri app handle for event emission
+    app_handle: RwLock<Option<Arc<tauri::AppHandle>>>,
+    /// Buffer for batching change events
+    change_buffer: RwLock<Vec<MemoryChangeEvent>>,
+    /// Whether we're in batch mode
+    batch_mode: RwLock<bool>,
 }
 
 impl ModbusMemory {
@@ -32,6 +47,9 @@ impl ModbusMemory {
             holding_registers: RwLock::new(vec![0u16; config.holding_register_count as usize]),
             input_registers: RwLock::new(vec![0u16; config.input_register_count as usize]),
             config: config.clone(),
+            app_handle: RwLock::new(None),
+            change_buffer: RwLock::new(Vec::new()),
+            batch_mode: RwLock::new(false),
         }
     }
 
@@ -43,6 +61,50 @@ impl ModbusMemory {
     /// Get the memory configuration
     pub fn config(&self) -> &MemoryMapSettings {
         &self.config
+    }
+
+    // ========== Event Infrastructure ==========
+
+    /// Set the Tauri app handle for event emission
+    pub fn set_app_handle(&self, handle: tauri::AppHandle) {
+        *self.app_handle.write() = Some(Arc::new(handle));
+    }
+
+    /// Start batch mode - changes will be buffered until end_batch is called
+    pub fn start_batch(&self) {
+        *self.batch_mode.write() = true;
+    }
+
+    /// End batch mode and emit all buffered changes as a single batch event
+    pub fn end_batch(&self) {
+        *self.batch_mode.write() = false;
+        self.flush_changes();
+    }
+
+    /// Flush all buffered changes as a batch event
+    fn flush_changes(&self) {
+        let changes: Vec<MemoryChangeEvent> = {
+            let mut buffer = self.change_buffer.write();
+            std::mem::take(&mut *buffer)
+        };
+
+        if changes.is_empty() {
+            return;
+        }
+
+        if let Some(handle) = self.app_handle.read().as_ref() {
+            let event = MemoryBatchChangeEvent { changes };
+            let _ = handle.emit(EVENT_MEMORY_BATCH_CHANGED, event);
+        }
+    }
+
+    /// Emit a single memory change event (or buffer it if in batch mode)
+    fn emit_change(&self, event: MemoryChangeEvent) {
+        if *self.batch_mode.read() {
+            self.change_buffer.write().push(event);
+        } else if let Some(handle) = self.app_handle.read().as_ref() {
+            let _ = handle.emit(EVENT_MEMORY_CHANGED, event);
+        }
     }
 
     // ========== Coils (Function codes 0x01, 0x05, 0x0F) ==========
@@ -60,21 +122,80 @@ impl ModbusMemory {
 
     /// Write a single coil at the specified address
     pub fn write_coil(&self, address: u16, value: bool) -> Result<(), MemoryError> {
+        self.write_coil_with_source(address, value, ChangeSource::Internal)
+    }
+
+    /// Write a single coil with specified change source
+    pub fn write_coil_with_source(
+        &self,
+        address: u16,
+        value: bool,
+        source: ChangeSource,
+    ) -> Result<(), MemoryError> {
         self.validate_address(address, self.config.coil_count, "coil")?;
 
-        let mut coils = self.coils.write();
-        coils.set(address as usize, value);
+        let old_value = {
+            let coils = self.coils.read();
+            coils[address as usize]
+        };
+
+        {
+            let mut coils = self.coils.write();
+            coils.set(address as usize, value);
+        }
+
+        // Only emit if value actually changed
+        if old_value != value {
+            self.emit_change(MemoryChangeEvent::coil(address, old_value, value, source.as_str()));
+        }
+
         Ok(())
     }
 
     /// Write multiple coils starting from the specified address
     pub fn write_coils(&self, start: u16, values: &[bool]) -> Result<(), MemoryError> {
+        self.write_coils_with_source(start, values, ChangeSource::Internal)
+    }
+
+    /// Write multiple coils with specified change source
+    pub fn write_coils_with_source(
+        &self,
+        start: u16,
+        values: &[bool],
+        source: ChangeSource,
+    ) -> Result<(), MemoryError> {
         self.validate_bit_range(start, values.len() as u16, self.config.coil_count, "coil")?;
 
-        let mut coils = self.coils.write();
-        for (i, &value) in values.iter().enumerate() {
-            coils.set(start as usize + i, value);
+        // Read old values first
+        let old_values: Vec<bool> = {
+            let coils = self.coils.read();
+            (0..values.len())
+                .map(|i| coils[start as usize + i])
+                .collect()
+        };
+
+        // Write new values
+        {
+            let mut coils = self.coils.write();
+            for (i, &value) in values.iter().enumerate() {
+                coils.set(start as usize + i, value);
+            }
         }
+
+        // Emit batch event for changes
+        self.start_batch();
+        for (i, (&old, &new)) in old_values.iter().zip(values.iter()).enumerate() {
+            if old != new {
+                self.emit_change(MemoryChangeEvent::coil(
+                    start + i as u16,
+                    old,
+                    new,
+                    source.as_str(),
+                ));
+            }
+        }
+        self.end_batch();
+
         Ok(())
     }
 
@@ -93,15 +214,49 @@ impl ModbusMemory {
 
     /// Write a single discrete input (internal use for simulation)
     pub fn write_discrete_input(&self, address: u16, value: bool) -> Result<(), MemoryError> {
+        self.write_discrete_input_with_source(address, value, ChangeSource::Internal)
+    }
+
+    /// Write a single discrete input with specified change source
+    pub fn write_discrete_input_with_source(
+        &self,
+        address: u16,
+        value: bool,
+        source: ChangeSource,
+    ) -> Result<(), MemoryError> {
         self.validate_address(address, self.config.discrete_input_count, "discrete input")?;
 
-        let mut inputs = self.discrete_inputs.write();
-        inputs.set(address as usize, value);
+        let old_value = {
+            let inputs = self.discrete_inputs.read();
+            inputs[address as usize]
+        };
+
+        {
+            let mut inputs = self.discrete_inputs.write();
+            inputs.set(address as usize, value);
+        }
+
+        if old_value != value {
+            self.emit_change(MemoryChangeEvent::discrete(
+                address, old_value, value, source.as_str(),
+            ));
+        }
+
         Ok(())
     }
 
     /// Write multiple discrete inputs (internal use for simulation)
     pub fn write_discrete_inputs(&self, start: u16, values: &[bool]) -> Result<(), MemoryError> {
+        self.write_discrete_inputs_with_source(start, values, ChangeSource::Internal)
+    }
+
+    /// Write multiple discrete inputs with specified change source
+    pub fn write_discrete_inputs_with_source(
+        &self,
+        start: u16,
+        values: &[bool],
+        source: ChangeSource,
+    ) -> Result<(), MemoryError> {
         self.validate_bit_range(
             start,
             values.len() as u16,
@@ -109,10 +264,33 @@ impl ModbusMemory {
             "discrete input",
         )?;
 
-        let mut inputs = self.discrete_inputs.write();
-        for (i, &value) in values.iter().enumerate() {
-            inputs.set(start as usize + i, value);
+        let old_values: Vec<bool> = {
+            let inputs = self.discrete_inputs.read();
+            (0..values.len())
+                .map(|i| inputs[start as usize + i])
+                .collect()
+        };
+
+        {
+            let mut inputs = self.discrete_inputs.write();
+            for (i, &value) in values.iter().enumerate() {
+                inputs.set(start as usize + i, value);
+            }
         }
+
+        self.start_batch();
+        for (i, (&old, &new)) in old_values.iter().zip(values.iter()).enumerate() {
+            if old != new {
+                self.emit_change(MemoryChangeEvent::discrete(
+                    start + i as u16,
+                    old,
+                    new,
+                    source.as_str(),
+                ));
+            }
+        }
+        self.end_batch();
+
         Ok(())
     }
 
@@ -131,15 +309,49 @@ impl ModbusMemory {
 
     /// Write a single holding register at the specified address
     pub fn write_holding_register(&self, address: u16, value: u16) -> Result<(), MemoryError> {
+        self.write_holding_register_with_source(address, value, ChangeSource::Internal)
+    }
+
+    /// Write a single holding register with specified change source
+    pub fn write_holding_register_with_source(
+        &self,
+        address: u16,
+        value: u16,
+        source: ChangeSource,
+    ) -> Result<(), MemoryError> {
         self.validate_address(address, self.config.holding_register_count, "holding register")?;
 
-        let mut registers = self.holding_registers.write();
-        registers[address as usize] = value;
+        let old_value = {
+            let registers = self.holding_registers.read();
+            registers[address as usize]
+        };
+
+        {
+            let mut registers = self.holding_registers.write();
+            registers[address as usize] = value;
+        }
+
+        if old_value != value {
+            self.emit_change(MemoryChangeEvent::holding(
+                address, old_value, value, source.as_str(),
+            ));
+        }
+
         Ok(())
     }
 
     /// Write multiple holding registers starting from the specified address
     pub fn write_holding_registers(&self, start: u16, values: &[u16]) -> Result<(), MemoryError> {
+        self.write_holding_registers_with_source(start, values, ChangeSource::Internal)
+    }
+
+    /// Write multiple holding registers with specified change source
+    pub fn write_holding_registers_with_source(
+        &self,
+        start: u16,
+        values: &[u16],
+        source: ChangeSource,
+    ) -> Result<(), MemoryError> {
         self.validate_register_range(
             start,
             values.len() as u16,
@@ -147,10 +359,31 @@ impl ModbusMemory {
             "holding register",
         )?;
 
-        let mut registers = self.holding_registers.write();
-        for (i, &value) in values.iter().enumerate() {
-            registers[start as usize + i] = value;
+        let old_values: Vec<u16> = {
+            let registers = self.holding_registers.read();
+            registers[start as usize..start as usize + values.len()].to_vec()
+        };
+
+        {
+            let mut registers = self.holding_registers.write();
+            for (i, &value) in values.iter().enumerate() {
+                registers[start as usize + i] = value;
+            }
         }
+
+        self.start_batch();
+        for (i, (&old, &new)) in old_values.iter().zip(values.iter()).enumerate() {
+            if old != new {
+                self.emit_change(MemoryChangeEvent::holding(
+                    start + i as u16,
+                    old,
+                    new,
+                    source.as_str(),
+                ));
+            }
+        }
+        self.end_batch();
+
         Ok(())
     }
 
@@ -169,15 +402,49 @@ impl ModbusMemory {
 
     /// Write a single input register (internal use for simulation)
     pub fn write_input_register(&self, address: u16, value: u16) -> Result<(), MemoryError> {
+        self.write_input_register_with_source(address, value, ChangeSource::Internal)
+    }
+
+    /// Write a single input register with specified change source
+    pub fn write_input_register_with_source(
+        &self,
+        address: u16,
+        value: u16,
+        source: ChangeSource,
+    ) -> Result<(), MemoryError> {
         self.validate_address(address, self.config.input_register_count, "input register")?;
 
-        let mut registers = self.input_registers.write();
-        registers[address as usize] = value;
+        let old_value = {
+            let registers = self.input_registers.read();
+            registers[address as usize]
+        };
+
+        {
+            let mut registers = self.input_registers.write();
+            registers[address as usize] = value;
+        }
+
+        if old_value != value {
+            self.emit_change(MemoryChangeEvent::input(
+                address, old_value, value, source.as_str(),
+            ));
+        }
+
         Ok(())
     }
 
     /// Write multiple input registers (internal use for simulation)
     pub fn write_input_registers(&self, start: u16, values: &[u16]) -> Result<(), MemoryError> {
+        self.write_input_registers_with_source(start, values, ChangeSource::Internal)
+    }
+
+    /// Write multiple input registers with specified change source
+    pub fn write_input_registers_with_source(
+        &self,
+        start: u16,
+        values: &[u16],
+        source: ChangeSource,
+    ) -> Result<(), MemoryError> {
         self.validate_register_range(
             start,
             values.len() as u16,
@@ -185,10 +452,31 @@ impl ModbusMemory {
             "input register",
         )?;
 
-        let mut registers = self.input_registers.write();
-        for (i, &value) in values.iter().enumerate() {
-            registers[start as usize + i] = value;
+        let old_values: Vec<u16> = {
+            let registers = self.input_registers.read();
+            registers[start as usize..start as usize + values.len()].to_vec()
+        };
+
+        {
+            let mut registers = self.input_registers.write();
+            for (i, &value) in values.iter().enumerate() {
+                registers[start as usize + i] = value;
+            }
         }
+
+        self.start_batch();
+        for (i, (&old, &new)) in old_values.iter().zip(values.iter()).enumerate() {
+            if old != new {
+                self.emit_change(MemoryChangeEvent::input(
+                    start + i as u16,
+                    old,
+                    new,
+                    source.as_str(),
+                ));
+            }
+        }
+        self.end_batch();
+
         Ok(())
     }
 

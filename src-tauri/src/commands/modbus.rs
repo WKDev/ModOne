@@ -123,6 +123,7 @@ impl From<TcpServerConfig> for TcpConfig {
 #[tauri::command]
 pub async fn modbus_start_tcp(
     state: State<'_, ModbusState>,
+    app_handle: tauri::AppHandle,
     config: Option<TcpServerConfig>,
 ) -> Result<(), String> {
     let mut tcp_server = state.tcp_server.lock().await;
@@ -131,8 +132,14 @@ pub async fn modbus_start_tcp(
         return Err("TCP server is already running".to_string());
     }
 
+    // Set app handle on memory for event emission
+    state.memory.set_app_handle(app_handle.clone());
+
     let tcp_config: TcpConfig = config.unwrap_or_default().into();
     let mut server = ModbusTcpServer::new(tcp_config, Arc::clone(&state.memory));
+
+    // Set app handle on server for connection events
+    server.set_app_handle(app_handle);
 
     server.start().await.map_err(|e| e.to_string())?;
 
@@ -162,6 +169,7 @@ pub async fn modbus_stop_tcp(state: State<'_, ModbusState>) -> Result<(), String
 #[tauri::command]
 pub async fn modbus_start_rtu(
     state: State<'_, ModbusState>,
+    app_handle: tauri::AppHandle,
     config: RtuConfig,
 ) -> Result<(), String> {
     let mut rtu_server = state.rtu_server.lock().await;
@@ -170,7 +178,13 @@ pub async fn modbus_start_rtu(
         return Err("RTU server is already running".to_string());
     }
 
+    // Set app handle on memory for event emission
+    state.memory.set_app_handle(app_handle.clone());
+
     let mut server = ModbusRtuServer::new(config, Arc::clone(&state.memory));
+
+    // Set app handle on server for connection events
+    server.set_app_handle(app_handle);
 
     server.start().await.map_err(|e| e.to_string())?;
 

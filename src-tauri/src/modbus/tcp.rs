@@ -6,12 +6,16 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use parking_lot::RwLock;
+use tauri::Emitter;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::broadcast;
 
 use super::memory::ModbusMemory;
-use super::types::{ConnectionInfo, ModbusError, TcpConfig};
+use super::types::{ChangeSource, ConnectionEvent, ConnectionInfo, ModbusError, TcpConfig};
+
+// Event channel name for connection events
+const EVENT_CONNECTION: &str = "modbus:connection";
 
 // Modbus TCP constants
 const MBAP_HEADER_SIZE: usize = 7;
@@ -24,6 +28,8 @@ pub struct ModbusTcpServer {
     running: Arc<AtomicBool>,
     connections: Arc<RwLock<Vec<ConnectionInfo>>>,
     shutdown_tx: Option<broadcast::Sender<()>>,
+    /// Tauri app handle for event emission
+    app_handle: Arc<RwLock<Option<Arc<tauri::AppHandle>>>>,
 }
 
 impl ModbusTcpServer {
@@ -35,6 +41,19 @@ impl ModbusTcpServer {
             running: Arc::new(AtomicBool::new(false)),
             connections: Arc::new(RwLock::new(Vec::new())),
             shutdown_tx: None,
+            app_handle: Arc::new(RwLock::new(None)),
+        }
+    }
+
+    /// Set the Tauri app handle for event emission
+    pub fn set_app_handle(&self, handle: tauri::AppHandle) {
+        *self.app_handle.write() = Some(Arc::new(handle));
+    }
+
+    /// Emit a connection event
+    fn emit_connection_event(app_handle: &Arc<RwLock<Option<Arc<tauri::AppHandle>>>>, event: ConnectionEvent) {
+        if let Some(handle) = app_handle.read().as_ref() {
+            let _ = handle.emit(EVENT_CONNECTION, event);
         }
     }
 
@@ -84,6 +103,7 @@ impl ModbusTcpServer {
         let memory = Arc::clone(&self.memory);
         let connections = Arc::clone(&self.connections);
         let running = Arc::clone(&self.running);
+        let app_handle = Arc::clone(&self.app_handle);
         let max_connections = self.config.max_connections;
         let unit_id = self.config.unit_id;
 
@@ -113,10 +133,14 @@ impl ModbusTcpServer {
                                 connections.write().push(conn_info);
                                 log::info!("New Modbus client connected: {}", peer_addr);
 
+                                // Emit connection event
+                                let peer_addr_str = peer_addr.to_string();
+                                Self::emit_connection_event(&app_handle, ConnectionEvent::tcp_connected(&peer_addr_str));
+
                                 // Handle connection
                                 let memory = Arc::clone(&memory);
                                 let connections = Arc::clone(&connections);
-                                let peer_addr_str = peer_addr.to_string();
+                                let app_handle_clone = Arc::clone(&app_handle);
 
                                 tokio::spawn(async move {
                                     if let Err(e) = handle_connection(stream, &memory, unit_id).await {
@@ -126,6 +150,9 @@ impl ModbusTcpServer {
                                     // Remove connection on disconnect
                                     connections.write().retain(|c| c.address != peer_addr_str);
                                     log::info!("Modbus client disconnected: {}", peer_addr);
+
+                                    // Emit disconnection event
+                                    Self::emit_connection_event(&app_handle_clone, ConnectionEvent::tcp_disconnected(&peer_addr_str));
                                 });
                             }
                             Err(e) => {
@@ -341,7 +368,7 @@ fn process_request(memory: &ModbusMemory, function_code: u8, pdu: &[u8]) -> Vec<
             let value = u16::from_be_bytes([pdu[3], pdu[4]]);
             let coil_value = value == 0xFF00;
 
-            match memory.write_coil(addr, coil_value) {
+            match memory.write_coil_with_source(addr, coil_value, ChangeSource::External) {
                 Ok(_) => {
                     // Echo the request
                     pdu.to_vec()
@@ -358,7 +385,7 @@ fn process_request(memory: &ModbusMemory, function_code: u8, pdu: &[u8]) -> Vec<
             let addr = u16::from_be_bytes([pdu[1], pdu[2]]);
             let value = u16::from_be_bytes([pdu[3], pdu[4]]);
 
-            match memory.write_holding_register(addr, value) {
+            match memory.write_holding_register_with_source(addr, value, ChangeSource::External) {
                 Ok(_) => {
                     // Echo the request
                     pdu.to_vec()
@@ -382,7 +409,7 @@ fn process_request(memory: &ModbusMemory, function_code: u8, pdu: &[u8]) -> Vec<
 
             let values = unpack_bits(&pdu[6..6 + byte_count], quantity as usize);
 
-            match memory.write_coils(start_addr, &values) {
+            match memory.write_coils_with_source(start_addr, &values, ChangeSource::External) {
                 Ok(_) => {
                     vec![function_code, pdu[1], pdu[2], pdu[3], pdu[4]]
                 }
@@ -407,7 +434,7 @@ fn process_request(memory: &ModbusMemory, function_code: u8, pdu: &[u8]) -> Vec<
                 .map(|i| u16::from_be_bytes([pdu[6 + i * 2], pdu[7 + i * 2]]))
                 .collect();
 
-            match memory.write_holding_registers(start_addr, &values) {
+            match memory.write_holding_registers_with_source(start_addr, &values, ChangeSource::External) {
                 Ok(_) => {
                     vec![function_code, pdu[1], pdu[2], pdu[3], pdu[4]]
                 }
