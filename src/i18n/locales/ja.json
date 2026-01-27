@@ -1,0 +1,151 @@
+{
+  "menu": {
+    "file": {
+      "label": "ファイル",
+      "new": "新規プロジェクト",
+      "open": "プロジェクトを開く",
+      "save": "保存",
+      "saveAs": "名前を付けて保存...",
+      "recent": "最近のプロジェクト",
+      "close": "プロジェクトを閉じる",
+      "exit": "終了"
+    },
+    "edit": {
+      "label": "編集",
+      "undo": "元に戻す",
+      "redo": "やり直し",
+      "cut": "切り取り",
+      "copy": "コピー",
+      "paste": "貼り付け",
+      "delete": "削除",
+      "selectAll": "すべて選択"
+    },
+    "view": {
+      "label": "表示",
+      "toggleSidebar": "サイドバーの切り替え",
+      "resetLayout": "レイアウトをリセット",
+      "zoomIn": "拡大",
+      "zoomOut": "縮小",
+      "fitToWindow": "ウィンドウに合わせる"
+    },
+    "simulation": {
+      "label": "シミュレーション",
+      "start": "開始",
+      "stop": "停止",
+      "pause": "一時停止",
+      "step": "ステップ実行",
+      "reset": "リセット"
+    },
+    "modbus": {
+      "label": "Modbus",
+      "serverSettings": "サーバー設定",
+      "startServer": "サーバー開始",
+      "stopServer": "サーバー停止"
+    },
+    "help": {
+      "label": "ヘルプ",
+      "documentation": "ドキュメント",
+      "about": "バージョン情報"
+    }
+  },
+  "dialog": {
+    "newProject": {
+      "title": "新規プロジェクト",
+      "name": "プロジェクト名",
+      "description": "説明",
+      "path": "保存場所",
+      "plcManufacturer": "PLCメーカー",
+      "plcModel": "PLCモデル",
+      "browse": "参照..."
+    },
+    "openProject": {
+      "title": "プロジェクトを開く"
+    },
+    "settings": {
+      "title": "設定",
+      "save": "保存",
+      "cancel": "キャンセル",
+      "apply": "適用"
+    },
+    "unsavedChanges": {
+      "title": "未保存の変更",
+      "message": "未保存の変更があります。閉じる前に保存しますか？",
+      "save": "保存",
+      "dontSave": "保存しない",
+      "cancel": "キャンセル"
+    }
+  },
+  "status": {
+    "running": "実行中",
+    "stopped": "停止",
+    "paused": "一時停止",
+    "connected": "接続済み",
+    "disconnected": "未接続"
+  },
+  "settings": {
+    "general": {
+      "title": "一般",
+      "language": "言語",
+      "autoSave": "自動保存",
+      "autoSaveInterval": "自動保存間隔",
+      "startup": "起動オプション",
+      "openLastProject": "起動時に最後のプロジェクトを開く"
+    },
+    "simulation": {
+      "title": "シミュレーション",
+      "scanTime": "スキャンタイム",
+      "precision": "計算精度",
+      "speed": "シミュレーション速度"
+    },
+    "modbus": {
+      "title": "Modbus",
+      "tcpEnabled": "TCP有効",
+      "tcpPort": "TCPポート",
+      "rtuEnabled": "RTU有効",
+      "rtuPort": "シリアルポート",
+      "baudRate": "ボーレート"
+    },
+    "appearance": {
+      "title": "外観",
+      "theme": "テーマ",
+      "themeLight": "ライト",
+      "themeDark": "ダーク",
+      "themeSystem": "システム",
+      "fontSize": "フォントサイズ",
+      "gridDisplay": "グリッド表示",
+      "animation": "アニメーション有効"
+    }
+  },
+  "panel": {
+    "ladderEditor": "ラダーエディタ",
+    "memoryVisualizer": "メモリビューア",
+    "oneCanvas": "ワンキャンバス",
+    "scenarioEditor": "シナリオエディタ",
+    "console": "コンソール",
+    "properties": "プロパティ"
+  },
+  "errors": {
+    "projectNotFound": "プロジェクトが見つかりません: {{path}}",
+    "saveError": "プロジェクトの保存に失敗しました: {{message}}",
+    "loadError": "プロジェクトの読み込みに失敗しました: {{message}}",
+    "invalidPath": "無効なファイルパス",
+    "unsavedChanges": "未保存の変更があります"
+  },
+  "common": {
+    "ok": "OK",
+    "cancel": "キャンセル",
+    "save": "保存",
+    "delete": "削除",
+    "create": "作成",
+    "close": "閉じる",
+    "yes": "はい",
+    "no": "いいえ",
+    "loading": "読み込み中...",
+    "search": "検索",
+    "noResults": "結果がありません"
+  },
+  "autoSave": {
+    "notification": "プロジェクトを自動保存しました",
+    "failed": "自動保存に失敗しました: {{message}}"
+  }
+}

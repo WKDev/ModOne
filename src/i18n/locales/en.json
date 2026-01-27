@@ -1,0 +1,151 @@
+{
+  "menu": {
+    "file": {
+      "label": "File",
+      "new": "New Project",
+      "open": "Open Project",
+      "save": "Save",
+      "saveAs": "Save As...",
+      "recent": "Recent Projects",
+      "close": "Close Project",
+      "exit": "Exit"
+    },
+    "edit": {
+      "label": "Edit",
+      "undo": "Undo",
+      "redo": "Redo",
+      "cut": "Cut",
+      "copy": "Copy",
+      "paste": "Paste",
+      "delete": "Delete",
+      "selectAll": "Select All"
+    },
+    "view": {
+      "label": "View",
+      "toggleSidebar": "Toggle Sidebar",
+      "resetLayout": "Reset Layout",
+      "zoomIn": "Zoom In",
+      "zoomOut": "Zoom Out",
+      "fitToWindow": "Fit to Window"
+    },
+    "simulation": {
+      "label": "Simulation",
+      "start": "Start",
+      "stop": "Stop",
+      "pause": "Pause",
+      "step": "Step",
+      "reset": "Reset"
+    },
+    "modbus": {
+      "label": "Modbus",
+      "serverSettings": "Server Settings",
+      "startServer": "Start Server",
+      "stopServer": "Stop Server"
+    },
+    "help": {
+      "label": "Help",
+      "documentation": "Documentation",
+      "about": "About"
+    }
+  },
+  "dialog": {
+    "newProject": {
+      "title": "New Project",
+      "name": "Project Name",
+      "description": "Description",
+      "path": "Save Location",
+      "plcManufacturer": "PLC Manufacturer",
+      "plcModel": "PLC Model",
+      "browse": "Browse..."
+    },
+    "openProject": {
+      "title": "Open Project"
+    },
+    "settings": {
+      "title": "Settings",
+      "save": "Save",
+      "cancel": "Cancel",
+      "apply": "Apply"
+    },
+    "unsavedChanges": {
+      "title": "Unsaved Changes",
+      "message": "You have unsaved changes. Do you want to save before closing?",
+      "save": "Save",
+      "dontSave": "Don't Save",
+      "cancel": "Cancel"
+    }
+  },
+  "status": {
+    "running": "Running",
+    "stopped": "Stopped",
+    "paused": "Paused",
+    "connected": "Connected",
+    "disconnected": "Disconnected"
+  },
+  "settings": {
+    "general": {
+      "title": "General",
+      "language": "Language",
+      "autoSave": "Auto-save",
+      "autoSaveInterval": "Auto-save interval",
+      "startup": "Startup options",
+      "openLastProject": "Open last project on startup"
+    },
+    "simulation": {
+      "title": "Simulation",
+      "scanTime": "Scan Time",
+      "precision": "Calculation Precision",
+      "speed": "Simulation Speed"
+    },
+    "modbus": {
+      "title": "Modbus",
+      "tcpEnabled": "TCP Enabled",
+      "tcpPort": "TCP Port",
+      "rtuEnabled": "RTU Enabled",
+      "rtuPort": "Serial Port",
+      "baudRate": "Baud Rate"
+    },
+    "appearance": {
+      "title": "Appearance",
+      "theme": "Theme",
+      "themeLight": "Light",
+      "themeDark": "Dark",
+      "themeSystem": "System",
+      "fontSize": "Font Size",
+      "gridDisplay": "Show Grid",
+      "animation": "Enable Animations"
+    }
+  },
+  "panel": {
+    "ladderEditor": "Ladder Editor",
+    "memoryVisualizer": "Memory Visualizer",
+    "oneCanvas": "One Canvas",
+    "scenarioEditor": "Scenario Editor",
+    "console": "Console",
+    "properties": "Properties"
+  },
+  "errors": {
+    "projectNotFound": "Project not found: {{path}}",
+    "saveError": "Failed to save project: {{message}}",
+    "loadError": "Failed to load project: {{message}}",
+    "invalidPath": "Invalid file path",
+    "unsavedChanges": "Project has unsaved changes"
+  },
+  "common": {
+    "ok": "OK",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "create": "Create",
+    "close": "Close",
+    "yes": "Yes",
+    "no": "No",
+    "loading": "Loading...",
+    "search": "Search",
+    "noResults": "No results found"
+  },
+  "autoSave": {
+    "notification": "Project auto-saved",
+    "failed": "Auto-save failed: {{message}}"
+  }
+}
