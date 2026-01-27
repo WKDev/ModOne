@@ -4,9 +4,14 @@
 //! for the ModOne PLC simulator.
 
 pub mod memory;
+pub mod rtu;
 pub mod tcp;
 pub mod types;
 
 pub use memory::ModbusMemory;
+pub use rtu::{
+    list_available_ports, ModbusRtuServer, PortInfo, RtuConfig, RtuDataBits, RtuParity,
+    RtuStopBits,
+};
 pub use tcp::ModbusTcpServer;
 pub use types::{ConnectionInfo, MemoryError, MemoryMapSettings, ModbusError, TcpConfig};

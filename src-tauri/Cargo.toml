@@ -48,5 +48,9 @@ log = "0.4"
 bitvec = "1"
 parking_lot = "0.12"
 
+# Serial port for Modbus RTU
+tokio-serial = "5"
+serialport = "4"
+
 # App directories
 directories = "5"

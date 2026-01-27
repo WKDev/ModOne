@@ -1668,7 +1668,7 @@
           "20",
           "21"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -1676,9 +1676,10 @@
             "description": "Add tokio-serial and serialport dependencies to Cargo.toml and create the rtu.rs module file with basic imports and type definitions.",
             "dependencies": [],
             "details": "Add to src-tauri/Cargo.toml:\n- tokio-serial = \"5\" for async serial communication\n- serialport = \"4\" for port enumeration\n\nCreate src-tauri/src/modbus/rtu.rs with:\n- Imports: tokio_serial::{SerialPortBuilderExt, SerialStream}, serialport, std::sync::Arc, parking_lot::RwLock, std::sync::atomic::{AtomicBool, Ordering}\n- RtuConfig struct with fields: com_port (String), baud_rate (u32), parity (Parity enum), stop_bits (StopBits enum), data_bits (DataBits enum), unit_id (u8)\n- PortInfo struct for enumeration results: name (String), port_type (String), description (Option<String>)\n- ModbusRtuServer struct skeleton with config, memory, port, running, task_handle fields\n- Update mod.rs to include pub mod rtu;",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify Cargo.toml compiles with new dependencies. Verify rtu.rs module is accessible from parent module. Check all type definitions are properly declared with required derives (Debug, Clone, Serialize where needed).",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T10:30:33.617Z"
           },
           {
             "id": 2,
@@ -1688,9 +1689,10 @@
               1
             ],
             "details": "Implement in src-tauri/src/modbus/rtu.rs:\n\npub fn list_available_ports() -> Result<Vec<PortInfo>, std::io::Error> {\n  let ports = serialport::available_ports()?;\n  Ok(ports.into_iter().map(|p| {\n    let (port_type, description) = match &p.port_type {\n      SerialPortType::UsbPort(info) => (\n        \"USB\".to_string(),\n        Some(format!(\"{} {}\", info.manufacturer.as_deref().unwrap_or(\"\"), info.product.as_deref().unwrap_or(\"\")).trim().to_string())\n      ),\n      SerialPortType::BluetoothPort => (\"Bluetooth\".to_string(), None),\n      SerialPortType::PciPort => (\"PCI\".to_string(), None),\n      SerialPortType::Unknown => (\"Unknown\".to_string(), None),\n    };\n    PortInfo { name: p.port_name, port_type, description }\n  }).collect())\n}\n\nAdd #[derive(Serialize)] to PortInfo for Tauri command exposure.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit test that list_available_ports returns Ok on systems with no ports. Manual test on Windows with COM ports to verify USB port info extraction. Test that returned PortInfo contains expected fields.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T10:30:42.160Z"
           },
           {
             "id": 3,
@@ -1700,9 +1702,10 @@
               1
             ],
             "details": "Implement in src-tauri/src/modbus/rtu.rs:\n\nfn calculate_crc(data: &[u8]) -> u16 {\n  let mut crc: u16 = 0xFFFF;\n  for byte in data {\n    crc ^= *byte as u16;\n    for _ in 0..8 {\n      if crc & 0x0001 != 0 {\n        crc = (crc >> 1) ^ 0xA001;\n      } else {\n        crc >>= 1;\n      }\n    }\n  }\n  crc\n}\n\nfn validate_frame(frame: &[u8]) -> bool {\n  if frame.len() < 4 { return false; }  // Min: unit_id + fc + crc(2)\n  let data_len = frame.len() - 2;\n  let received_crc = u16::from_le_bytes([frame[data_len], frame[data_len + 1]]);\n  calculate_crc(&frame[..data_len]) == received_crc\n}\n\nfn build_response_frame(unit_id: u8, response: &[u8]) -> Vec<u8> {\n  let mut frame = Vec::with_capacity(response.len() + 3);\n  frame.push(unit_id);\n  frame.extend_from_slice(response);\n  let crc = calculate_crc(&frame);\n  frame.extend_from_slice(&crc.to_le_bytes());\n  frame\n}",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit test calculate_crc with known test vectors from Modbus specification. Test validate_frame rejects frames with bad CRC. Test validate_frame rejects frames shorter than 4 bytes. Test build_response_frame produces valid CRC that passes validation.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T10:30:42.168Z"
           },
           {
             "id": 4,
@@ -1714,9 +1717,10 @@
               3
             ],
             "details": "Implement in src-tauri/src/modbus/rtu.rs:\n\nimpl ModbusRtuServer {\n  pub fn new(config: RtuConfig, memory: Arc<ModbusMemory>) -> Self {\n    Self { config, memory, port: None, running: Arc::new(AtomicBool::new(false)), task_handle: None }\n  }\n\n  pub async fn start(&mut self) -> Result<(), ModbusError> {\n    if self.running.load(Ordering::SeqCst) { return Err(ModbusError::AlreadyRunning); }\n    let builder = tokio_serial::new(&self.config.com_port, self.config.baud_rate)\n      .parity(self.config.parity)\n      .stop_bits(self.config.stop_bits)\n      .data_bits(self.config.data_bits);\n    let port = builder.open_native_async()?;\n    self.port = Some(port);\n    self.running.store(true, Ordering::SeqCst);\n    // Spawn RTU loop task (implemented in subtask 5)\n    Ok(())\n  }\n\n  pub async fn stop(&mut self) -> Result<(), ModbusError> {\n    self.running.store(false, Ordering::SeqCst);\n    if let Some(handle) = self.task_handle.take() { handle.abort(); }\n    self.port = None;\n    Ok(())\n  }\n\n  pub fn is_running(&self) -> bool { self.running.load(Ordering::SeqCst) }\n}",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test new() creates server in stopped state. Test start() on invalid port returns appropriate error. Test start() when already running returns AlreadyRunning error. Test stop() sets running to false. Test is_running() reflects actual state. Integration test with virtual COM port pair (com0com on Windows).",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T10:30:42.173Z"
           },
           {
             "id": 5,
@@ -1727,11 +1731,13 @@
               4
             ],
             "details": "Implement in src-tauri/src/modbus/rtu.rs:\n\nasync fn rtu_loop(mut port: SerialStream, memory: Arc<ModbusMemory>, running: Arc<AtomicBool>, unit_id: u8) {\n  let mut buffer = [0u8; 256];\n  let mut frame_buffer = Vec::with_capacity(256);\n  let char_time_us = 11_000_000 / 9600; // Adjust based on baud rate\n  let t35_timeout = Duration::from_micros((char_time_us * 35).max(1750)); // 3.5 char or 1.75ms min\n\n  while running.load(Ordering::SeqCst) {\n    match timeout(t35_timeout, port.read(&mut buffer)).await {\n      Ok(Ok(n)) if n > 0 => frame_buffer.extend_from_slice(&buffer[..n]),\n      Ok(Ok(_)) | Err(_) => {\n        // Frame complete (timeout) - process if we have data\n        if frame_buffer.len() >= 4 && validate_frame(&frame_buffer) {\n          if frame_buffer[0] == unit_id {\n            let response = process_request(&frame_buffer[1..frame_buffer.len()-2], &memory);\n            let response_frame = build_response_frame(unit_id, &response);\n            let _ = port.write_all(&response_frame).await;\n          }\n        }\n        frame_buffer.clear();\n      }\n      Ok(Err(e)) => {\n        log::error!(\"Serial read error: {}\", e);\n        frame_buffer.clear();\n        // Consider reconnection logic for persistent errors\n      }\n    }\n  }\n}\n\nIntegrate with start() method to spawn this loop as a tokio task.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test with virtual COM port pair sending valid Modbus RTU frames. Test frame reassembly across multiple reads. Test 3.5 character timeout triggers frame processing. Test invalid CRC frames are silently discarded. Test frames addressed to wrong unit_id are ignored. Test serial error recovery does not crash the loop.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T10:30:42.179Z"
           }
-        ]
+        ],
+        "updatedAt": "2026-01-27T10:30:42.179Z"
       },
       {
         "id": "23",
@@ -2040,9 +2046,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-01-27T10:06:40.462Z",
+      "lastModified": "2026-01-27T10:30:42.179Z",
       "taskCount": 26,
-      "completedCount": 21,
+      "completedCount": 22,
       "tags": [
         "master"
       ]
