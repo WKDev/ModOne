@@ -32,6 +32,9 @@ importers:
       i18next-browser-languagedetector:
         specifier: ^8.2.0
         version: 8.2.0
+      immer:
+        specifier: ^11.1.3
+        version: 11.1.3
       lucide-react:
         specifier: ^0.563.0
         version: 0.563.0(react@19.2.4)
@@ -46,7 +49,7 @@ importers:
         version: 16.5.3(i18next@25.8.0(typescript@5.9.3))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
       zustand:
         specifier: ^5.0.10
-        version: 5.0.10(@types/react@19.2.9)(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
+        version: 5.0.10(@types/react@19.2.9)(immer@11.1.3)(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
     devDependencies:
       '@playwright/test':
         specifier: ^1.58.0
@@ -787,6 +790,9 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
+
+  immer@11.1.3:
+    resolution: {integrity: sha512-6jQTc5z0KJFtr1UgFpIL3N9XSC3saRaI9PwWtzM2pSqkNGtiNkYY2OSwkOGDK2XcTRcLb1pi/aNkKZz0nxVH4Q==}
 
   jiti@2.6.1:
     resolution: {integrity: sha512-ekilCSN1jwRvIbgeg/57YFh8qQDNbwDb9xT/qu2DAHbFFZUicIl4ygVaAvzveMhMVr3LnpSKTNnwt8PoOfmKhQ==}
@@ -1643,6 +1649,8 @@ snapshots:
     optionalDependencies:
       typescript: 5.9.3
 
+  immer@11.1.3: {}
+
   jiti@2.6.1: {}
 
   js-tokens@4.0.0: {}
@@ -1835,8 +1843,9 @@ snapshots:
 
   yallist@3.1.1: {}
 
-  zustand@5.0.10(@types/react@19.2.9)(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4)):
+  zustand@5.0.10(@types/react@19.2.9)(immer@11.1.3)(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4)):
     optionalDependencies:
       '@types/react': 19.2.9
+      immer: 11.1.3
       react: 19.2.4
       use-sync-external-store: 1.6.0(react@19.2.4)
