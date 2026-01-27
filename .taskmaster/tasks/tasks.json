@@ -1750,7 +1750,7 @@
           "21",
           "22"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -1758,9 +1758,10 @@
             "description": "Set up the Tauri commands module for Modbus by creating src-tauri/src/commands/modbus.rs with the ModbusState managed state struct and necessary imports.",
             "dependencies": [],
             "details": "Create src-tauri/src/commands/modbus.rs file with all required imports: std::sync::Arc, tauri::State, tokio::sync::Mutex (or parking_lot::Mutex), serde::{Serialize, Deserialize}. Define the ModbusState struct containing: memory: Arc<ModbusMemory>, tcp_server: Mutex<Option<ModbusTcpServer>>, rtu_server: Mutex<Option<ModbusRtuServer>>. Add the modbus module to src-tauri/src/commands/mod.rs with 'pub mod modbus;' and re-export public items. Ensure ModbusState derives or implements Default if needed for Tauri managed state initialization. This struct will be the central state container that all Modbus Tauri commands access.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Run 'cargo check' in src-tauri directory to verify the module compiles. Verify ModbusState can be instantiated with default values. Check that the modbus module is properly exported from commands/mod.rs.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T10:33:18.449Z"
           },
           {
             "id": 2,
@@ -1770,9 +1771,10 @@
               1
             ],
             "details": "Implement #[tauri::command] pub async fn modbus_start_tcp(state: State<'_, ModbusState>, port: u16) -> Result<(), String> that: acquires lock on tcp_server mutex, checks if server already running (return error if so), creates new ModbusTcpServer with shared memory Arc, calls server.start().await, stores server in Option. Implement #[tauri::command] pub async fn modbus_stop_tcp(state: State<'_, ModbusState>) -> Result<(), String> that: acquires lock, extracts server from Option with take(), calls server.stop().await if Some, returns Ok. Use map_err(|e| e.to_string()) to convert errors for Tauri. Handle edge cases: starting when already started, stopping when not running.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test start_tcp succeeds and sets tcp_server to Some. Test start_tcp returns error when already running. Test stop_tcp succeeds when running. Test stop_tcp returns Ok (no-op) when not running. Integration test with actual TCP binding on available port.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T10:33:18.456Z"
           },
           {
             "id": 3,
@@ -1782,9 +1784,10 @@
               1
             ],
             "details": "Define RtuConfig struct (derive Deserialize) with fields: port_name: String, baud_rate: u32, data_bits: u8, parity: String, stop_bits: u8, unit_id: u8, timeout_ms: u64. Implement #[tauri::command] pub async fn modbus_start_rtu(state: State<'_, ModbusState>, config: RtuConfig) -> Result<(), String> with same pattern as TCP. Implement #[tauri::command] pub async fn modbus_stop_rtu(state: State<'_, ModbusState>) -> Result<(), String>. Define PortInfo struct (derive Serialize) with fields: name: String, port_type: String (USB, PCI, etc.), manufacturer: Option<String>, product: Option<String>. Implement #[tauri::command] pub async fn modbus_list_serial_ports() -> Result<Vec<PortInfo>, String> using serialport::available_ports() to enumerate COM ports.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test list_serial_ports returns Ok even with no ports. Test start_rtu with valid config succeeds on systems with serial ports. Test stop_rtu when running. Mock serial port for unit testing. Manual test on Windows with USB-to-Serial adapter.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T10:33:18.462Z"
           },
           {
             "id": 4,
@@ -1794,9 +1797,10 @@
               1
             ],
             "details": "Implement #[tauri::command] pub async fn modbus_read_coils(state: State<'_, ModbusState>, start: u16, count: u16) -> Result<Vec<bool>, String> that calls memory.read_coils(). Implement #[tauri::command] pub async fn modbus_write_coil(state: State<'_, ModbusState>, address: u16, value: bool) -> Result<(), String>. Implement #[tauri::command] pub async fn modbus_read_registers(state: State<'_, ModbusState>, register_type: String, start: u16, count: u16) -> Result<Vec<u16>, String> where register_type is 'holding' or 'input' - match on string to call appropriate memory method. Implement #[tauri::command] pub async fn modbus_write_register(state: State<'_, ModbusState>, address: u16, value: u16) -> Result<(), String> for holding registers only (input registers are read-only). Add validation for count > 0 and address + count <= max_address.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test read_coils returns correct bool array. Test write_coil updates memory. Test read_registers with both 'holding' and 'input' types. Test write_register updates holding register. Test error on invalid register_type. Test boundary conditions (address 0, address 65535, count spanning end).",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T10:33:18.467Z"
           },
           {
             "id": 5,
@@ -1808,11 +1812,13 @@
               4
             ],
             "details": "Define ModbusStatus struct (derive Serialize) with fields: tcp_running: bool, tcp_port: Option<u16>, tcp_connections: usize, rtu_running: bool, rtu_port: Option<String>. Implement #[tauri::command] pub async fn modbus_get_status(state: State<'_, ModbusState>) -> Result<ModbusStatus, String> that queries both servers for status. Define WriteOperation struct (derive Deserialize) with fields: register_type: String, address: u16, value: u16. Implement #[tauri::command] pub async fn modbus_bulk_write(state: State<'_, ModbusState>, operations: Vec<WriteOperation>) -> Result<(), String> that applies all write operations, supporting both coils (value != 0 = true) and holding registers. In main.rs: add .manage(ModbusState { memory: Arc::new(ModbusMemory::new(&MemoryMapSettings::default())), tcp_server: Mutex::new(None), rtu_server: Mutex::new(None) }) and register all 11 commands with tauri::generate_handler![].",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test get_status returns correct running states. Test bulk_write applies all operations. Test bulk_write with mixed coil and register operations. Test bulk_write rolls back or errors appropriately on failure. Verify all commands registered in main.rs by running app and calling from frontend. Integration test complete workflow: start server, write memory, read back, stop server.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-27T10:33:18.473Z"
           }
-        ]
+        ],
+        "updatedAt": "2026-01-27T10:33:18.473Z"
       },
       {
         "id": "24",
@@ -2046,9 +2052,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-01-27T10:30:42.179Z",
+      "lastModified": "2026-01-27T10:33:18.473Z",
       "taskCount": 26,
-      "completedCount": 22,
+      "completedCount": 23,
       "tags": [
         "master"
       ]

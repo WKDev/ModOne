@@ -4,6 +4,7 @@
 //! from the frontend application.
 
 pub mod layout;
+pub mod modbus;
 pub mod project;
 pub mod settings;
 
@@ -24,7 +25,16 @@ pub use layout::{
     save_layout, set_last_active_layout, set_restore_last_session,
 };
 
+// Re-export modbus commands and state
+pub use modbus::{
+    modbus_bulk_write, modbus_get_status, modbus_list_serial_ports, modbus_load_memory_csv,
+    modbus_read_coils, modbus_read_discrete_inputs, modbus_read_holding_registers,
+    modbus_read_input_registers, modbus_save_memory_csv, modbus_start_rtu, modbus_start_tcp,
+    modbus_stop_rtu, modbus_stop_tcp, modbus_write_coil, modbus_write_coils,
+    modbus_write_discrete_input, modbus_write_holding_register, modbus_write_holding_registers,
+    modbus_write_input_register, ModbusState,
+};
+
 // Future command modules will be added here:
-// pub mod modbus;
 // pub mod canvas;
 // pub mod scenario;
