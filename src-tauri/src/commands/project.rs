@@ -69,6 +69,7 @@ fn format_error(error: ProjectError) -> String {
         }
         ProjectError::MopFile(e) => format!("Project file error: {}", e),
         ProjectError::Config(e) => format!("Configuration error: {}", e),
+        ProjectError::ConfigValidation(e) => format!("Configuration validation error: {}", e),
         ProjectError::Io(e) => format!("File operation failed: {}", e),
         ProjectError::Json(e) => format!("Data serialization error: {}", e),
         ProjectError::ProjectNotSaved => {

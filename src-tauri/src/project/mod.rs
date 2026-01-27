@@ -45,6 +45,7 @@ pub mod auto_save;
 pub mod config;
 pub mod layout;
 pub mod mop_file;
+pub mod validation;
 
 pub use auto_save::{AutoSaveManager, SharedAutoSaveManager};
 pub use config::{
@@ -53,6 +54,7 @@ pub use config::{
     ProjectConfig, ProjectSettings,
 };
 pub use mop_file::{MopFile, MopFileError};
+pub use validation::{validate_project_config, ValidationResult};
 
 use std::fs::{self, File};
 use std::io::{BufReader, BufWriter};
@@ -188,6 +190,9 @@ pub enum ProjectError {
     #[error("Configuration error: {0}")]
     Config(#[from] serde_yaml::Error),
 
+    #[error("Configuration validation error: {0}")]
+    ConfigValidation(#[from] crate::error::ModOneError),
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -309,6 +314,9 @@ impl ProjectManager {
         let mut config = ProjectConfig::new(&name);
         config.plc = plc;
 
+        // Validate config before saving
+        validate_project_config(&config)?;
+
         // Write config.yml to the mop file
         let config_path = mop_file.config_path();
         let config_file = File::create(&config_path)?;
@@ -363,6 +371,9 @@ impl ProjectManager {
         let config_file = File::open(&config_path)?;
         let reader = BufReader::new(config_file);
         let config: ProjectConfig = serde_yaml::from_reader(reader)?;
+
+        // Validate config before proceeding
+        validate_project_config(&config)?;
 
         let project_name = config.project.name.clone();
 

@@ -49,29 +49,31 @@ impl ProjectConfig {
         config
     }
 
-    /// Validate the configuration values
+    /// Validate the configuration values using the validation module
+    ///
+    /// This is a convenience method that delegates to the comprehensive
+    /// validation in the validation module.
     pub fn validate(&self) -> Result<(), ConfigValidationError> {
-        // Validate project name
-        if self.project.name.trim().is_empty() {
-            return Err(ConfigValidationError::EmptyProjectName);
-        }
+        use super::validation::validate_project_config;
+        use crate::error::ModOneError;
 
-        // Validate scan time
-        if self.plc.scan_time_ms == 0 {
-            return Err(ConfigValidationError::InvalidScanTime);
+        match validate_project_config(self) {
+            Ok(()) => Ok(()),
+            Err(ModOneError::ConfigValidationError { field, message }) => {
+                // Map to legacy ConfigValidationError for backward compatibility
+                match field.as_str() {
+                    "project.name" => Err(ConfigValidationError::EmptyProjectName),
+                    "plc.scan_time_ms" => Err(ConfigValidationError::InvalidScanTime),
+                    f if f.contains("port") => Err(ConfigValidationError::InvalidPort),
+                    f if f.contains("baud_rate") => Err(ConfigValidationError::InvalidBaudRate),
+                    _ => Err(ConfigValidationError::Other { field, message }),
+                }
+            }
+            Err(_) => Err(ConfigValidationError::Other {
+                field: "unknown".to_string(),
+                message: "Validation failed".to_string(),
+            }),
         }
-
-        // Validate TCP port
-        if self.modbus.tcp.enabled && self.modbus.tcp.port == 0 {
-            return Err(ConfigValidationError::InvalidPort);
-        }
-
-        // Validate RTU baud rate
-        if self.modbus.rtu.enabled && self.modbus.rtu.baud_rate == 0 {
-            return Err(ConfigValidationError::InvalidBaudRate);
-        }
-
-        Ok(())
     }
 }
 
@@ -330,6 +332,9 @@ pub enum ConfigValidationError {
 
     #[error("Baud rate must be greater than 0")]
     InvalidBaudRate,
+
+    #[error("Validation error in {field}: {message}")]
+    Other { field: String, message: String },
 }
 
 #[cfg(test)]
