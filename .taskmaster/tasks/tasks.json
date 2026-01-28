@@ -3772,7 +3772,7 @@
           "49",
           "51"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -3780,9 +3780,10 @@
             "description": "Implement the base ScenarioGrid component with CSS grid layout defining all column widths according to PRD specifications.",
             "dependencies": [],
             "details": "Create `src/components/ScenarioEditor/ScenarioGrid.tsx` with CSS grid layout. Define columns: Checkbox (30px), Time (80px), Address (120px), Value (80px), Persist (70px), Duration (80px), Note (flex: 1fr). Implement the grid container with `display: grid` and `grid-template-columns`. Create header row with column labels using existing Tailwind patterns. Set up basic cell rendering for each column type - checkbox inputs for enable/persist, number inputs for time/value/duration, text inputs for address/note. Apply consistent cell padding and borders matching the codebase style. Ensure proper scrolling behavior for large datasets.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit test verifying grid renders with correct column widths. Snapshot test for header row. Test that all 7 columns are present with correct input types. Verify responsive behavior when container resizes.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T17:14:52.649Z"
           },
           {
             "id": 2,
@@ -3792,9 +3793,10 @@
               1
             ],
             "details": "Implement focus management system using React refs and state to track active cell position (row, column). Handle arrow key navigation - Up/Down moves between rows, Left/Right moves between columns with wrap-around at row boundaries. Tab key advances to next cell, Shift+Tab moves to previous cell. Enter key confirms edit and moves to next row (same column). Escape key cancels edit and restores previous value. Create useFocusManager hook to encapsulate focus logic. Prevent focus from entering disabled cells (duration when persist=true, disabled rows). Implement visual focus indicator ring around active cell using Tailwind classes `ring-2 ring-blue-500`.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests for keyboard event handlers. Test arrow key navigation in all directions. Test Tab/Shift+Tab cycling. Test Enter commits changes. Test Escape cancels edit. Test focus skips disabled cells. Integration test for complete navigation flow.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T17:14:52.662Z"
           },
           {
             "id": 3,
@@ -3804,9 +3806,10 @@
               1
             ],
             "details": "Create ScenarioGridRow component that receives event data and execution state. Connect to scenario store to get execution state (executionState.completedEvents, executionState.currentEventIndex). Implement conditional Tailwind classes: completed events get `bg-green-900/20`, current executing event gets `bg-yellow-900/30 animate-pulse`, disabled events (enabled=false) get `text-gray-500` with reduced opacity, events with validation errors get `ring-1 ring-red-500`. Create helper function getRowClassName(event, executionState) for clean logic. Ensure proper z-index layering so highlighting doesn't interfere with focus indicators. Add smooth transitions between states using `transition-colors duration-200`.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Component tests rendering rows in each execution state. Test completed row has green background. Test current row has yellow background with animation. Test disabled row has gray text. Test error row has red ring. Test state transitions happen smoothly. Mock scenario store for testing.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T17:14:52.672Z"
           },
           {
             "id": 4,
@@ -3817,9 +3820,10 @@
               2
             ],
             "details": "Add selectedRows state as Set<number> to track selected row indices. Implement click handler that checks modifier keys: plain click selects single row and clears others, Ctrl+click (Cmd on Mac) toggles individual row selection, Shift+click selects range from last selected row to clicked row. Store lastSelectedRow for range selection anchor. Add visual feedback for selected rows using `bg-blue-900/30` background in addition to execution state styling. Implement Select All (Ctrl+A) keyboard shortcut when grid is focused. Create useRowSelection hook to encapsulate selection logic. Expose selected rows for context menu operations. Add selection count indicator in toolbar area.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test single click selects one row. Test Ctrl+click toggles selection. Test Shift+click selects range. Test Ctrl+A selects all rows. Test clicking outside clears selection. Test selection state persists during scroll. Test visual feedback matches design spec.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T17:14:52.684Z"
           },
           {
             "id": 5,
@@ -3830,14 +3834,16 @@
               4
             ],
             "details": "Create ScenarioGridContextMenu component using a dropdown/popover pattern. Show on right-click with options: Insert Row Above, Insert Row Below, Duplicate Row(s), Delete Row(s), Enable/Disable Row(s), Copy, Paste. Menu items should be contextual based on selection (pluralize when multiple rows selected). Disable irrelevant options (e.g., can't delete if no selection). Use lucide-react icons: Plus, Copy, Trash2, ToggleLeft. Create Add Row button fixed at bottom of grid using existing button styles - `+ Add Event` with Plus icon. Connect menu actions to scenario store mutations. Handle keyboard shortcut for delete (Delete key) and duplicate (Ctrl+D). Close menu on action execution or click outside.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test context menu appears on right-click at correct position. Test all menu items are present and functional. Test menu items disabled when appropriate. Test Add Row button creates new event at end. Test Delete key removes selected rows. Test Ctrl+D duplicates selection. E2E test for complete row operation workflow.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T17:14:52.696Z"
           }
         ],
         "complexity": 7,
         "recommendedSubtasks": 5,
-        "expansionPrompt": "Break down into: 1) Create grid layout with fixed-width columns matching PRD spec using CSS grid. 2) Implement keyboard navigation (arrow keys, Tab, Enter) with cell focus management. 3) Implement row rendering with execution state highlighting (completed, current, disabled, error). 4) Add multi-select support (Shift+click, Ctrl+click) with visual feedback. 5) Implement context menu and add row functionality."
+        "expansionPrompt": "Break down into: 1) Create grid layout with fixed-width columns matching PRD spec using CSS grid. 2) Implement keyboard navigation (arrow keys, Tab, Enter) with cell focus management. 3) Implement row rendering with execution state highlighting (completed, current, disabled, error). 4) Add multi-select support (Shift+click, Ctrl+click) with visual feedback. 5) Implement context menu and add row functionality.",
+        "updatedAt": "2026-01-28T17:14:52.696Z"
       },
       {
         "id": "53",
@@ -3850,7 +3856,7 @@
           "50",
           "52"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -3858,9 +3864,10 @@
             "description": "Implement TimeCell component with precise time input handling, 0.000s display format, non-negative validation, and parent communication for auto-sorting events on blur.",
             "dependencies": [],
             "details": "Create `src/components/ScenarioEditor/cells/TimeCell.tsx`:\n\n1. **Input Configuration:**\n   - Use number input with step=0.001 for millisecond precision\n   - Set min=0 to prevent negative values\n   - Handle both controlled input state and formatting\n\n2. **Display Formatting:**\n   - In display mode: format as `{value.toFixed(3)}s`\n   - In edit mode: show raw number value\n   - Toggle between modes using onFocus/onBlur\n\n3. **Validation Logic:**\n   - Validate value >= 0 on change and blur\n   - Clamp negative values to 0\n   - Handle empty input gracefully (default to 0)\n\n4. **Auto-Sort Integration:**\n   - Accept `onSortRequest` callback prop from parent\n   - Call `onSortRequest()` on blur after value commit\n   - Parent grid will sort events by time column ascending\n\n5. **Keyboard Navigation:**\n   - Tab: move to next cell\n   - Enter: commit value and exit edit mode\n   - Escape: revert to original value and exit edit mode\n\n6. **Styling:**\n   - Use consistent input styling with existing codebase\n   - Right-align numbers for better readability\n   - Subtle focus ring on edit mode",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests: validate input accepts only non-negative numbers, format displays as 0.000s, onBlur triggers sort callback, keyboard shortcuts work correctly. Test edge cases: very large numbers, floating point precision.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T17:17:17.444Z"
           },
           {
             "id": 2,
@@ -3870,9 +3877,10 @@
               1
             ],
             "details": "Create `src/components/ScenarioEditor/cells/AddressCell.tsx`:\n\n1. **Autocomplete Dropdown:**\n   - Show dropdown on focus with common address suggestions\n   - Filter suggestions as user types (e.g., typing 'C' shows coil addresses)\n   - Support keyboard navigation in dropdown (Arrow Up/Down, Enter to select)\n   - Dismiss dropdown on Escape or blur\n\n2. **Real-Time Validation:**\n   - Import and use existing `addressParser` utility\n   - Validate on every keystroke with debounce (100ms)\n   - Parse address to determine type (Coil, Discrete Input, Holding Register, Input Register)\n   - Store parsed result for type icon display\n\n3. **Type Icon Display:**\n   - Show icon/badge indicating parsed address type:\n     - C: Coil icon\n     - DI: Discrete Input icon\n     - H: Holding Register icon\n     - IR: Input Register icon\n   - Position icon at start of cell (left side)\n   - Gray out icon when input is empty\n\n4. **Invalid State Styling:**\n   - Red border (border-red-500) when address is invalid\n   - Optional error tooltip showing validation message\n   - Clear red styling immediately when input becomes valid\n\n5. **Keyboard Navigation:**\n   - Tab: commit and move to next cell\n   - Enter: select dropdown item or commit\n   - Escape: close dropdown or revert value\n   - Arrow keys: navigate dropdown when open",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests: validate various address formats (C0, C100, DI0, H40001, IR30001), test autocomplete filtering, verify type icons appear correctly, test red border appears for invalid addresses. Test keyboard navigation through dropdown.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T17:17:17.456Z"
           },
           {
             "id": 3,
@@ -3882,9 +3890,10 @@
               2
             ],
             "details": "Create `src/components/ScenarioEditor/cells/ValueCell.tsx`:\n\n1. **Address Type Detection:**\n   - Accept `addressType` prop from parent row context\n   - Determine if address is Coil type or Register type\n   - Re-render when address type changes\n\n2. **Coil Toggle Button (for C addresses):**\n   - Display toggle button with ON/OFF or 1/0 labels\n   - Visual feedback: green when ON (1), gray when OFF (0)\n   - Single click toggles value\n   - Accessible: keyboard Enter/Space to toggle\n\n3. **Register Number Input (for H/IR/DI addresses):**\n   - Number input with min=0, max=65535 (u16 range)\n   - Validate input stays within range\n   - Clamp out-of-range values on blur\n   - Handle empty input (default to 0)\n\n4. **Common Behaviors:**\n   - onFocus/onBlur for edit mode state\n   - Keyboard navigation: Tab, Enter, Escape\n   - Consistent sizing regardless of input type\n\n5. **Styling:**\n   - Toggle button: rounded, colored states\n   - Number input: right-aligned, consistent with TimeCell\n   - Smooth transition between display and edit modes",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests: verify toggle renders for Coil addresses, number input renders for Register addresses. Test toggle switches between 0 and 1. Test number input validates 0-65535 range. Test switching address types updates UI correctly.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T17:17:17.466Z"
           },
           {
             "id": 4,
@@ -3894,14 +3903,16 @@
               1
             ],
             "details": "Create three cell components in `src/components/ScenarioEditor/cells/`:\n\n**PersistCell.tsx:**\n- Checkbox input with 'Persist' label\n- When unchecked, programmatically focus DurationCell in same row\n- Accept `onFocusDuration` callback prop for row coordination\n- Accessible: keyboard Space to toggle\n\n**DurationCell.tsx:**\n- Number input for duration in milliseconds\n- Accept `isPersisted` prop from row context\n- When `isPersisted=true`: disable input, show grayed styling\n- When `isPersisted=false`: enable input, default value 500\n- Display 'ms' suffix text after input\n- Validate positive numbers only\n- Accept focus programmatically from PersistCell\n\n**NoteCell.tsx:**\n- Text input for free-form notes\n- Display mode: truncate with ellipsis (CSS text-overflow)\n- Edit mode: expand to full width, show all text\n- No validation required\n- Support multi-byte characters (Korean, etc.)\n\n**Shared Keyboard Navigation:**\n- All cells implement onKeyDown handler\n- Tab: move to next cell in row\n- Shift+Tab: move to previous cell\n- Enter: commit and exit edit mode\n- Escape: revert changes and exit edit mode\n- Create shared hook `useCellNavigation` for consistency\n\n**Shared Styling:**\n- Consistent padding, border-radius, focus states\n- Match existing codebase design tokens\n- Export all cells from `cells/index.ts` barrel file",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests: PersistCell toggle triggers focus on DurationCell, DurationCell disables when persist is true, NoteCell truncates long text with ellipsis. Test keyboard navigation (Tab, Enter, Escape) works consistently across all cells. Integration test: full row keyboard navigation flow.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T17:17:17.478Z"
           }
         ],
         "complexity": 5,
         "recommendedSubtasks": 4,
-        "expansionPrompt": "Break down into: 1) Create TimeCell with number input, formatting (0.000s), and auto-sort trigger on blur. 2) Create AddressCell with autocomplete, real-time validation, and type icon display. 3) Create ValueCell with conditional rendering (toggle for coils, number input for registers). 4) Create PersistCell, DurationCell, and NoteCell with their specific behaviors and keyboard navigation support."
+        "expansionPrompt": "Break down into: 1) Create TimeCell with number input, formatting (0.000s), and auto-sort trigger on blur. 2) Create AddressCell with autocomplete, real-time validation, and type icon display. 3) Create ValueCell with conditional rendering (toggle for coils, number input for registers). 4) Create PersistCell, DurationCell, and NoteCell with their specific behaviors and keyboard navigation support.",
+        "updatedAt": "2026-01-28T17:17:17.478Z"
       },
       {
         "id": "54",
@@ -4363,9 +4374,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-01-28T17:12:43.160Z",
+      "lastModified": "2026-01-28T17:17:17.478Z",
       "taskCount": 60,
-      "completedCount": 45,
+      "completedCount": 47,
       "tags": [
         "master"
       ]
