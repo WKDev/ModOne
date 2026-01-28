@@ -53,6 +53,13 @@ export interface MemoryMapSettings {
   input_register_count: number;
 }
 
+// Auto-save configuration settings
+export interface AutoSaveSettings {
+  enabled: boolean;
+  interval_secs: number;
+  backup_count: number;
+}
+
 // Full project configuration (matches config.yml schema)
 export interface ProjectConfig {
   version: string;
@@ -60,21 +67,59 @@ export interface ProjectConfig {
   plc: PlcSettings;
   modbus: ModbusSettings;
   memory_map: MemoryMapSettings;
+  auto_save?: AutoSaveSettings;
 }
 
-// Project data with state (for frontend state management)
+// Placeholder types (to be fully implemented in later units)
+export interface CanvasData {
+  data?: unknown;
+}
+
+export interface ScenarioData {
+  data?: unknown;
+}
+
+export interface MemorySnapshot {
+  data?: unknown;
+}
+
+// Project data returned from Tauri backend (matches Rust ProjectData)
 export interface ProjectData {
   config: ProjectConfig;
-  filePath: string | null;
-  isModified: boolean;
+  canvas_data?: CanvasData;
+  scenario_data?: ScenarioData;
+  memory_snapshot?: MemorySnapshot;
+  is_modified: boolean;
 }
 
-// Recent project entry for quick access
+// Project info returned after creating a project (matches Rust ProjectInfo)
+export interface ProjectInfo {
+  name: string;
+  path: string;
+  created_at: string;
+}
+
+// Current project status (matches Rust ProjectStatus)
+export interface ProjectStatus {
+  is_open: boolean;
+  is_modified: boolean;
+  name?: string;
+  path?: string;
+}
+
+// Recent project entry for quick access (matches Rust RecentProject)
 export interface RecentProject {
   name: string;
   path: string;
-  lastOpened: string;
+  last_opened: string;
 }
+
+// Default auto-save settings
+export const DEFAULT_AUTO_SAVE_SETTINGS: AutoSaveSettings = {
+  enabled: true,
+  interval_secs: 300, // 5 minutes
+  backup_count: 3,
+};
 
 // Default configuration values
 export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
@@ -114,4 +159,5 @@ export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
     input_register_start: 0,
     input_register_count: 1000,
   },
+  auto_save: DEFAULT_AUTO_SAVE_SETTINGS,
 };

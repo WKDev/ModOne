@@ -48,7 +48,14 @@
       "Bash(pnpm tsc:*)",
       "Bash(pnpm build:*)",
       "Bash(pnpm add:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nchore: initial commit - ModOne PLC simulator project\n\nFeatures implemented:\n- Tauri v2 desktop application structure \\(Rust + React\\)\n- Panel system with drag-and-drop support\n- Tab system with lazy loading and context menus\n- Theme system \\(light/dark/system\\)\n- i18n support \\(English, Korean, Japanese\\)\n- Settings dialog with multiple categories\n- Project Manager with recent projects\n- Auto-save functionality\n- Zustand state management\n- Task Master AI integration\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: set up end-to-end testing infrastructure with Playwright\n\n- Install @playwright/test and configure for Tauri app testing\n- Create playwright.config.ts with chromium project and webServer config\n- Add test utilities: selectors, app lifecycle helpers, and common operations\n- Create test fixtures with mock configs and expected layouts\n- Implement initial E2E test suites for project, layout, and modbus features\n- Add data-testid attributes to key components for reliable test selection\n- Add npm scripts: test:e2e, test:e2e:ui, test:e2e:headed, test:e2e:debug\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)",
+      "Bash(pnpm run type-check:*)",
+      "Bash(pnpm exec tsc:*)",
+      "mcp__mcp-obsidian__obsidian_get_periodic_note",
+      "Bash(findstr:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
