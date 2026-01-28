@@ -36,5 +36,8 @@ export * from './settings';
 // Modbus types
 export * from './modbus';
 
+// Scenario types
+export * from './scenario';
+
 // Error types
 export * from './error';

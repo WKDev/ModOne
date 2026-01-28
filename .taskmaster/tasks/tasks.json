@@ -2598,7 +2598,7 @@
         "testStrategy": "Unit tests validating type guards, discriminated unions work correctly, and all block types can be instantiated with required properties. Test that the types are compatible with the YAML schema through round-trip serialization.",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -2652,7 +2652,8 @@
         ],
         "complexity": 4,
         "recommendedSubtasks": 4,
-        "expansionPrompt": "Break down into: 1) Define base types (BlockType, Position, Port, BaseBlock) with discriminated union for block types. 2) Define specialized block property interfaces (PlcOutBlockProps, PlcInBlockProps, LedBlockProps, ButtonBlockProps, ScopeBlockProps). 3) Define wire and connection types (WireEndpoint, Wire, CircuitState). 4) Define simulation state types and YAML schema types for serialization."
+        "expansionPrompt": "Break down into: 1) Define base types (BlockType, Position, Port, BaseBlock) with discriminated union for block types. 2) Define specialized block property interfaces (PlcOutBlockProps, PlcInBlockProps, LedBlockProps, ButtonBlockProps, ScopeBlockProps). 3) Define wire and connection types (WireEndpoint, Wire, CircuitState). 4) Define simulation state types and YAML schema types for serialization.",
+        "updatedAt": "2026-01-28T11:53:58.247Z"
       },
       {
         "id": "36",
@@ -2664,7 +2665,7 @@
         "dependencies": [
           "35"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -2729,7 +2730,8 @@
         ],
         "complexity": 7,
         "recommendedSubtasks": 5,
-        "expansionPrompt": "Break down into: 1) Define state interface with components, wires, selection, viewport, grid, and history arrays. 2) Implement component CRUD actions (add, remove, update) with proper Map handling. 3) Implement wire management actions with connection validation. 4) Implement selection operations (single, multi, range, clear) and viewport controls (zoom, pan). 5) Implement undo/redo history management with state snapshots."
+        "expansionPrompt": "Break down into: 1) Define state interface with components, wires, selection, viewport, grid, and history arrays. 2) Implement component CRUD actions (add, remove, update) with proper Map handling. 3) Implement wire management actions with connection validation. 4) Implement selection operations (single, multi, range, clear) and viewport controls (zoom, pan). 5) Implement undo/redo history management with state snapshots.",
+        "updatedAt": "2026-01-28T13:18:06.763Z"
       },
       {
         "id": "37",
@@ -2741,7 +2743,7 @@
         "dependencies": [
           "36"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -2792,7 +2794,8 @@
         ],
         "complexity": 6,
         "recommendedSubtasks": 4,
-        "expansionPrompt": "Break down into: 1) Create GridBackground component with SVG pattern that scales with zoom. 2) Create Canvas component with CSS transform-based pan/zoom rendering. 3) Implement wheel event handler for zoom (Ctrl+wheel) and pan (wheel) with smooth transitions. 4) Create coordinate transformation utilities (screenToCanvas, canvasToScreen, snapToGrid) and implement touch/trackpad pinch-to-zoom support."
+        "expansionPrompt": "Break down into: 1) Create GridBackground component with SVG pattern that scales with zoom. 2) Create Canvas component with CSS transform-based pan/zoom rendering. 3) Implement wheel event handler for zoom (Ctrl+wheel) and pan (wheel) with smooth transitions. 4) Create coordinate transformation utilities (screenToCanvas, canvasToScreen, snapToGrid) and implement touch/trackpad pinch-to-zoom support.",
+        "updatedAt": "2026-01-28T13:20:09.005Z"
       },
       {
         "id": "38",
@@ -2804,7 +2807,7 @@
         "dependencies": [
           "37"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -2869,7 +2872,8 @@
         ],
         "complexity": 6,
         "recommendedSubtasks": 5,
-        "expansionPrompt": "Break down into: 1) Create Port component with visual styling based on state (connected, disconnected, hover) and wire interaction handlers. 2) Create BlockRenderer component that dispatches to specific block components based on type. 3) Implement PowerBlock and GndBlock components with voltage display and single port. 4) Implement LedBlock component with configurable color and glow effect based on voltage. 5) Add common block styling (selection ring, drag handle) and interaction handlers."
+        "expansionPrompt": "Break down into: 1) Create Port component with visual styling based on state (connected, disconnected, hover) and wire interaction handlers. 2) Create BlockRenderer component that dispatches to specific block components based on type. 3) Implement PowerBlock and GndBlock components with voltage display and single port. 4) Implement LedBlock component with configurable color and glow effect based on voltage. 5) Add common block styling (selection ring, drag handle) and interaction handlers.",
+        "updatedAt": "2026-01-28T13:24:06.367Z"
       },
       {
         "id": "39",
@@ -2881,7 +2885,7 @@
         "dependencies": [
           "38"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -2932,7 +2936,8 @@
         ],
         "complexity": 6,
         "recommendedSubtasks": 4,
-        "expansionPrompt": "Break down into: 1) Create Toolbox component with categorized block items and collapsible sections. 2) Implement draggable toolbox items using @dnd-kit with drag preview. 3) Implement canvas drop handler with coordinate transformation and grid snapping. 4) Add existing component drag-to-move functionality with multi-select drag support and snap-line feedback."
+        "expansionPrompt": "Break down into: 1) Create Toolbox component with categorized block items and collapsible sections. 2) Implement draggable toolbox items using @dnd-kit with drag preview. 3) Implement canvas drop handler with coordinate transformation and grid snapping. 4) Add existing component drag-to-move functionality with multi-select drag support and snap-line feedback.",
+        "updatedAt": "2026-01-28T13:28:29.731Z"
       },
       {
         "id": "40",
@@ -2944,7 +2949,7 @@
         "dependencies": [
           "38"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -3006,7 +3011,8 @@
         ],
         "complexity": 7,
         "recommendedSubtasks": 5,
-        "expansionPrompt": "Break down into: 1) Create Wire component with SVG path rendering supporting straight/bezier modes and color coding by type. 2) Create useWireDrawing hook managing wire creation state (start, preview, end). 3) Implement connection validation logic (port direction, same-component check, duplicate wire check). 4) Implement wire path calculation from component/port positions. 5) Add temporary wire preview rendering during draw operation with valid target highlighting."
+        "expansionPrompt": "Break down into: 1) Create Wire component with SVG path rendering supporting straight/bezier modes and color coding by type. 2) Create useWireDrawing hook managing wire creation state (start, preview, end). 3) Implement connection validation logic (port direction, same-component check, duplicate wire check). 4) Implement wire path calculation from component/port positions. 5) Add temporary wire preview rendering during draw operation with valid target highlighting.",
+        "updatedAt": "2026-01-28T13:30:55.216Z"
       },
       {
         "id": "41",
@@ -3592,7 +3598,7 @@
         "testStrategy": "Write unit tests verifying type guards and validation functions work correctly. Test serialization/deserialization of Scenario objects to JSON.",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -3619,7 +3625,8 @@
         ],
         "complexity": 3,
         "recommendedSubtasks": 2,
-        "expansionPrompt": "Break down into: 1) Define core types (ScenarioEvent, ScenarioMetadata, ScenarioSettings, ScenarioStatus, Scenario) with all required fields. 2) Define execution state types (ScenarioExecutionState) and address format types with validation patterns."
+        "expansionPrompt": "Break down into: 1) Define core types (ScenarioEvent, ScenarioMetadata, ScenarioSettings, ScenarioStatus, Scenario) with all required fields. 2) Define execution state types (ScenarioExecutionState) and address format types with validation patterns.",
+        "updatedAt": "2026-01-28T13:16:03.351Z"
       },
       {
         "id": "50",
@@ -4339,9 +4346,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-01-28T11:50:52.054Z",
+      "lastModified": "2026-01-28T13:30:55.217Z",
       "taskCount": 60,
-      "completedCount": 34,
+      "completedCount": 41,
       "tags": [
         "master"
       ]

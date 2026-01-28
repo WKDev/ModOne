@@ -1,0 +1,463 @@
+/**
+ * OneCanvas Type Definitions
+ *
+ * Types for circuit simulation canvas including blocks, wires, ports,
+ * simulation state, and YAML serialization schema.
+ */
+
+// ============================================================================
+// Block Types
+// ============================================================================
+
+/** Available block types in the canvas */
+export type BlockType =
+  | 'power_24v'
+  | 'power_12v'
+  | 'gnd'
+  | 'plc_out'
+  | 'plc_in'
+  | 'led'
+  | 'button'
+  | 'scope';
+
+/** Position in canvas coordinates */
+export interface Position {
+  x: number;
+  y: number;
+}
+
+/** Size of a block */
+export interface Size {
+  width: number;
+  height: number;
+}
+
+// ============================================================================
+// Port Types
+// ============================================================================
+
+/** Type of port connection */
+export type PortType = 'input' | 'output' | 'bidirectional';
+
+/** Position of port on block edge */
+export type PortPosition = 'top' | 'bottom' | 'left' | 'right';
+
+/** A connection port on a block */
+export interface Port {
+  /** Unique identifier for this port within the block */
+  id: string;
+  /** Type of port */
+  type: PortType;
+  /** Display label for the port */
+  label: string;
+  /** Position on block edge */
+  position: PortPosition;
+  /** Offset along the edge (0-1, default 0.5 = center) */
+  offset?: number;
+}
+
+// ============================================================================
+// Base Block
+// ============================================================================
+
+/** Base interface for all block types */
+export interface BaseBlock<T extends BlockType = BlockType> {
+  /** Unique identifier */
+  id: string;
+  /** Block type discriminator */
+  type: T;
+  /** Position on canvas */
+  position: Position;
+  /** Connection ports */
+  ports: Port[];
+  /** Whether block is selected */
+  selected?: boolean;
+  /** Optional display label */
+  label?: string;
+}
+
+// ============================================================================
+// Specialized Block Types
+// ============================================================================
+
+/** 24V power supply block */
+export interface Power24vBlock extends BaseBlock<'power_24v'> {
+  /** Maximum current in mA (default: 1000) */
+  maxCurrent?: number;
+}
+
+/** 12V power supply block */
+export interface Power12vBlock extends BaseBlock<'power_12v'> {
+  /** Maximum current in mA (default: 1000) */
+  maxCurrent?: number;
+}
+
+/** Ground (0V) block */
+export interface GndBlock extends BaseBlock<'gnd'> {}
+
+/** PLC output (Coil) block - controls circuit based on PLC state */
+export interface PlcOutBlock extends BaseBlock<'plc_out'> {
+  /** Modbus address (e.g., 'C:0x0001' or 'Y:16') */
+  address: string;
+  /** Whether contact is normally open (default: true) */
+  normallyOpen: boolean;
+  /** Whether output is inverted (default: false) */
+  inverted: boolean;
+}
+
+/** PLC input (Discrete Input) block - sends circuit state to PLC */
+export interface PlcInBlock extends BaseBlock<'plc_in'> {
+  /** Modbus address (e.g., 'DI:0x0001' or 'X:0') */
+  address: string;
+  /** Threshold voltage to trigger input (default: 12V) */
+  thresholdVoltage: number;
+  /** Whether input is inverted (default: false) */
+  inverted: boolean;
+}
+
+/** LED colors */
+export type LedColor = 'red' | 'green' | 'blue' | 'yellow' | 'white';
+
+/** LED block */
+export interface LedBlock extends BaseBlock<'led'> {
+  /** LED color */
+  color: LedColor;
+  /** Forward voltage drop (default: 2.0V for red, 3.0V for blue/white) */
+  forwardVoltage: number;
+  /** Current state: lit or not */
+  lit?: boolean;
+}
+
+/** Button operation mode */
+export type ButtonMode = 'momentary' | 'stationary';
+
+/** Contact configuration */
+export type ContactConfig = '1a' | '1b' | '1a1b' | '2a' | '2b' | '2a2b' | '3a3b';
+
+/** Button/Switch block */
+export interface ButtonBlock extends BaseBlock<'button'> {
+  /** Operation mode */
+  mode: ButtonMode;
+  /** Contact configuration */
+  contactConfig: ContactConfig;
+  /** Current pressed state */
+  pressed?: boolean;
+}
+
+/** Oscilloscope trigger mode */
+export type TriggerMode = 'auto' | 'normal' | 'single';
+
+/** Oscilloscope block */
+export interface ScopeBlock extends BaseBlock<'scope'> {
+  /** Number of input channels (1-4) */
+  channels: 1 | 2 | 3 | 4;
+  /** Trigger mode */
+  triggerMode: TriggerMode;
+  /** Time base in ms per division */
+  timeBase: number;
+  /** Voltage scale in V per division */
+  voltageScale?: number;
+}
+
+/** Discriminated union of all block types */
+export type Block =
+  | Power24vBlock
+  | Power12vBlock
+  | GndBlock
+  | PlcOutBlock
+  | PlcInBlock
+  | LedBlock
+  | ButtonBlock
+  | ScopeBlock;
+
+// ============================================================================
+// Wire Types
+// ============================================================================
+
+/** Endpoint of a wire connection */
+export interface WireEndpoint {
+  /** ID of the component block */
+  componentId: string;
+  /** ID of the port on the component */
+  portId: string;
+}
+
+/** Wire connection between two ports */
+export interface Wire {
+  /** Unique identifier */
+  id: string;
+  /** Source endpoint */
+  from: WireEndpoint;
+  /** Destination endpoint */
+  to: WireEndpoint;
+  /** Whether wire is selected */
+  selected?: boolean;
+  /** Optional wire color */
+  color?: string;
+  /** Wire path points for routing (optional) */
+  points?: Position[];
+}
+
+// ============================================================================
+// Circuit State
+// ============================================================================
+
+/** Circuit metadata */
+export interface CircuitMetadata {
+  /** Circuit name */
+  name: string;
+  /** Description */
+  description: string;
+  /** Tags for categorization */
+  tags: string[];
+  /** Author name */
+  author?: string;
+  /** Creation date (ISO string) */
+  createdAt?: string;
+  /** Last modified date (ISO string) */
+  modifiedAt?: string;
+  /** Schema version */
+  version?: string;
+}
+
+/** Complete circuit state */
+export interface CircuitState {
+  /** All component blocks by ID */
+  components: Map<string, Block>;
+  /** All wire connections */
+  wires: Wire[];
+  /** Circuit metadata */
+  metadata: CircuitMetadata;
+  /** Currently selected component/wire IDs */
+  selectedIds?: Set<string>;
+  /** Viewport state */
+  viewport?: ViewportState;
+}
+
+/** Viewport (pan/zoom) state */
+export interface ViewportState {
+  /** Zoom level (1.0 = 100%) */
+  zoom: number;
+  /** Pan X offset */
+  panX: number;
+  /** Pan Y offset */
+  panY: number;
+}
+
+/** Serializable version of CircuitState (for JSON) */
+export interface SerializableCircuitState {
+  components: Record<string, Block>;
+  wires: Wire[];
+  metadata: CircuitMetadata;
+  viewport?: ViewportState;
+}
+
+// ============================================================================
+// Simulation State
+// ============================================================================
+
+/** Runtime simulation state */
+export interface SimulationState {
+  /** Whether simulation is running */
+  running: boolean;
+  /** Whether simulation is paused */
+  paused?: boolean;
+  /** Step-by-step mode */
+  stepMode?: boolean;
+  /** Voltage at each port (portId -> voltage in volts) */
+  voltages: Map<string, number>;
+  /** Current through each wire (wireId -> current in amps) */
+  currents: Map<string, number>;
+  /** Complete current paths (arrays of connected port IDs) */
+  currentPaths: string[][];
+  /** Current simulation time in ms */
+  simulationTime: number;
+  /** Simulation ticks per second */
+  tickRate: number;
+}
+
+/** Serializable simulation state */
+export interface SerializableSimulationState {
+  running: boolean;
+  paused?: boolean;
+  voltages: Record<string, number>;
+  currents: Record<string, number>;
+  currentPaths: string[][];
+  simulationTime: number;
+}
+
+// ============================================================================
+// YAML Schema Types
+// ============================================================================
+
+/** YAML block definition */
+export interface YamlBlockDefinition {
+  id: string;
+  type: BlockType;
+  position: { x: number; y: number };
+  label?: string;
+  properties?: Record<string, unknown>;
+  ports?: Array<{
+    id: string;
+    type: string;
+    label: string;
+    position: string;
+  }>;
+}
+
+/** YAML wire definition */
+export interface YamlWireDefinition {
+  id: string;
+  from: { component: string; port: string };
+  to: { component: string; port: string };
+  color?: string;
+}
+
+/** Complete YAML circuit schema */
+export interface YamlCircuitSchema {
+  /** Schema version for migrations */
+  version: string;
+  /** Circuit metadata */
+  metadata: {
+    name: string;
+    description: string;
+    tags: string[];
+    created?: string;
+    modified?: string;
+  };
+  /** Component blocks */
+  components: YamlBlockDefinition[];
+  /** Wire connections */
+  wires: YamlWireDefinition[];
+}
+
+// ============================================================================
+// Type Guards
+// ============================================================================
+
+/** Check if a string is a valid BlockType */
+export function isValidBlockType(type: string): type is BlockType {
+  return [
+    'power_24v',
+    'power_12v',
+    'gnd',
+    'plc_out',
+    'plc_in',
+    'led',
+    'button',
+    'scope',
+  ].includes(type);
+}
+
+/** Check if a block is a power source */
+export function isPowerBlock(
+  block: Block
+): block is Power24vBlock | Power12vBlock {
+  return block.type === 'power_24v' || block.type === 'power_12v';
+}
+
+/** Check if a block is a PLC I/O block */
+export function isPlcBlock(block: Block): block is PlcOutBlock | PlcInBlock {
+  return block.type === 'plc_out' || block.type === 'plc_in';
+}
+
+/** Check if a block is interactive (can be clicked/toggled) */
+export function isInteractiveBlock(
+  block: Block
+): block is ButtonBlock | LedBlock {
+  return block.type === 'button' || block.type === 'led';
+}
+
+// ============================================================================
+// Default Values
+// ============================================================================
+
+/** Default viewport state */
+export const DEFAULT_VIEWPORT: ViewportState = {
+  zoom: 1.0,
+  panX: 0,
+  panY: 0,
+};
+
+/** Default circuit metadata */
+export const DEFAULT_METADATA: CircuitMetadata = {
+  name: 'Untitled Circuit',
+  description: '',
+  tags: [],
+};
+
+/** Default simulation state */
+export const DEFAULT_SIMULATION_STATE: SimulationState = {
+  running: false,
+  paused: false,
+  stepMode: false,
+  voltages: new Map(),
+  currents: new Map(),
+  currentPaths: [],
+  simulationTime: 0,
+  tickRate: 60,
+};
+
+// ============================================================================
+// Conversion Utilities
+// ============================================================================
+
+/** Convert CircuitState to serializable format */
+export function circuitStateToSerializable(
+  state: CircuitState
+): SerializableCircuitState {
+  return {
+    components: Object.fromEntries(state.components),
+    wires: state.wires,
+    metadata: state.metadata,
+    viewport: state.viewport,
+  };
+}
+
+/** Convert serializable format to CircuitState */
+export function serializableToCircuitState(
+  data: SerializableCircuitState
+): CircuitState {
+  return {
+    components: new Map(Object.entries(data.components)),
+    wires: data.wires,
+    metadata: data.metadata,
+    viewport: data.viewport,
+    selectedIds: new Set(),
+  };
+}
+
+/** Convert CircuitState to YAML schema */
+export function circuitStateToYaml(state: CircuitState): YamlCircuitSchema {
+  const components: YamlBlockDefinition[] = [];
+
+  for (const [, block] of state.components) {
+    const { id, type, position, label, ports, ...properties } = block;
+    components.push({
+      id,
+      type,
+      position,
+      label,
+      properties: Object.keys(properties).length > 0 ? properties : undefined,
+      ports: ports.length > 0 ? ports : undefined,
+    });
+  }
+
+  return {
+    version: '1.0',
+    metadata: {
+      name: state.metadata.name,
+      description: state.metadata.description,
+      tags: state.metadata.tags,
+      created: state.metadata.createdAt,
+      modified: state.metadata.modifiedAt,
+    },
+    components,
+    wires: state.wires.map((wire) => ({
+      id: wire.id,
+      from: { component: wire.from.componentId, port: wire.from.portId },
+      to: { component: wire.to.componentId, port: wire.to.portId },
+      color: wire.color,
+    })),
+  };
+}

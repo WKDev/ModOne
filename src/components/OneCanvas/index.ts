@@ -1,0 +1,45 @@
+/**
+ * OneCanvas Component
+ *
+ * Circuit simulation canvas for placing and connecting electronic components.
+ */
+
+// Types
+export * from './types';
+
+// Components
+export { Canvas } from './Canvas';
+export type { CanvasRef } from './Canvas';
+export { GridBackground } from './GridBackground';
+
+// Block Components (named to avoid conflicts with types)
+export { Port as PortComponent } from './components/Port';
+export { BlockRenderer } from './components/BlockRenderer';
+export { BlockWrapper } from './components/blocks/BlockWrapper';
+export { PowerBlock as PowerBlockComponent } from './components/blocks/PowerBlock';
+export { GndBlock as GndBlockComponent } from './components/blocks/GndBlock';
+export { LedBlock as LedBlockComponent } from './components/blocks/LedBlock';
+export { PlcOutBlock as PlcOutBlockComponent } from './components/blocks/PlcOutBlock';
+export { PlcInBlock as PlcInBlockComponent } from './components/blocks/PlcInBlock';
+export { ButtonBlock as ButtonBlockComponent } from './components/blocks/ButtonBlock';
+export { ScopeBlock as ScopeBlockComponent } from './components/blocks/ScopeBlock';
+
+// Toolbox and Drag/Drop
+export { Toolbox } from './Toolbox';
+export { CanvasDropZone } from './CanvasDropZone';
+export { BlockDragOverlay } from './DragOverlay';
+export { DraggableBlock } from './components/DraggableBlock';
+
+// Wire Components
+export { Wire, WirePreview } from './Wire';
+export type { WireType } from './Wire';
+
+// Hooks
+export { useCanvasInteraction } from './hooks/useCanvasInteraction';
+export { useDragDrop } from './hooks/useDragDrop';
+export type { DragState } from './hooks/useDragDrop';
+export { useWireDrawing } from './hooks/useWireDrawing';
+export type { WireDrawingState } from './hooks/useWireDrawing';
+
+// Utilities
+export * from './utils';
