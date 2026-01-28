@@ -10,3 +10,4 @@ export * from './circuitGraph';
 export * from './pathFinder';
 export * from './switchEvaluator';
 export * from './circuitSimulator';
+export * from './serialization';

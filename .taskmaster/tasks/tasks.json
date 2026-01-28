@@ -3185,7 +3185,7 @@
         "dependencies": [
           "42"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -3193,9 +3193,10 @@
             "description": "Create TypeScript types for all contact configurations (1a, 1b, 1a1b, 2a, 2b, 2a2b, 3a3b) and implement a port generation function that returns the appropriate ports based on configuration.",
             "dependencies": [],
             "details": "Create `src/components/OneCanvas/types/buttonTypes.ts` with:\n\n1. **ContactConfig type:**\n```typescript\ntype ContactConfig = '1a' | '1b' | '1a1b' | '2a' | '2b' | '2a2b' | '3a3b';\n```\n\n2. **Port definitions:**\n- Define common port (shared terminal)\n- Define NO (normally open) port structure\n- Define NC (normally closed) port structure\n\n3. **getPortsForConfig function:**\n- '1a': [common, 1xNO] - 2 ports\n- '1b': [common, 1xNC] - 2 ports  \n- '1a1b': [common, 1xNO, 1xNC] - 3 ports\n- '2a': [common, 2xNO] - 3 ports\n- '2b': [common, 2xNC] - 3 ports\n- '2a2b': [common, 2xNO, 2xNC] - 5 ports\n- '3a3b': [common, 3xNO, 3xNC] - 7 ports\n\n4. **Port metadata:**\n- Each port should include type ('common' | 'no' | 'nc'), position, and label for visual rendering",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests for getPortsForConfig verifying correct port count and types for each configuration. Test that common port is always present. Verify NO/NC port counts match the configuration number.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T17:19:03.739Z"
           },
           {
             "id": 2,
@@ -3205,9 +3206,10 @@
               1
             ],
             "details": "Create `src/components/OneCanvas/components/ButtonBlock.tsx`:\n\n1. **Component structure:**\n```tsx\nfunction ButtonBlock({ block }: { block: ButtonBlockType }) {\n  const { momentary, contactConfig } = block.properties;\n  const [pressed, setPressed] = useState(false);\n  \n  // Event handlers\n  const handleMouseDown = () => setPressed(true);\n  const handleMouseUp = () => { if (momentary) setPressed(false); };\n  const handleClick = () => { if (!momentary) setPressed(p => !p); };\n}\n```\n\n2. **Momentary mode:** Button pressed on mousedown, released on mouseup/mouseleave\n\n3. **Toggle mode:** Button toggles state on click, stays in new state\n\n4. **Keyboard accessibility:**\n- Space/Enter key support for activation\n- Focus states for accessibility\n\n5. **Port rendering:** Use getPortsForConfig to determine which ports to render based on contactConfig property",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test momentary button releases on mouseup and mouseleave. Test toggle button maintains state after click. Test keyboard activation with Enter and Space keys. Verify all 7 contact configurations render correct number of ports.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T17:19:03.751Z"
           },
           {
             "id": 3,
@@ -3218,9 +3220,10 @@
               2
             ],
             "details": "Add contact state logic to integrate with simulation engine:\n\n1. **Contact state interface:**\n```typescript\ninterface ContactState {\n  portId: string;\n  type: 'no' | 'nc';\n  isClosed: boolean;\n}\n```\n\n2. **State calculation based on pressed state:**\n- NO contacts: `isClosed = pressed` (closed when pressed, open when released)\n- NC contacts: `isClosed = !pressed` (open when pressed, closed when released)\n\n3. **Export contact states for simulation:**\n- Provide method to get current contact states for all ports\n- Emit state change events when button state changes\n- Integration point with circuit simulator (Task 42)\n\n4. **Simultaneous state changes:** All contacts must update atomically when button state changes to prevent simulation glitches",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test NO contact closes when button pressed. Test NC contact opens when button pressed. Test both NO and NC change simultaneously. Test state reversal on release. Integration test with circuit simulator verifying current flow through contacts.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T17:19:03.762Z"
           },
           {
             "id": 4,
@@ -3231,14 +3234,16 @@
               3
             ],
             "details": "1. **Tauri Commands in src-tauri/src/canvas/commands.rs:**\n```rust\n#[tauri::command]\npub async fn canvas_button_press(button_id: String) -> Result<(), String>\n\n#[tauri::command]\npub async fn canvas_button_release(button_id: String) -> Result<(), String>\n\n#[tauri::command]\npub async fn canvas_button_toggle(button_id: String) -> Result<(), String>\n```\n\n2. **Frontend event listeners:** Subscribe to Tauri events for external button control\n\n3. **Visual design:**\n- Square button shape with beveled edge (3D appearance)\n- Default state: raised, lighter color\n- Pressed state: darker color, inset shadow effect\n- Transition animation for smooth press feedback\n\n4. **Contact indicators:**\n- Small circles near each port\n- NO ports: hollow circle when open, filled when closed\n- NC ports: filled circle when closed, hollow when open\n- Color coding: green when closed (conducting), red when open",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test Tauri canvas_button_press sets button to pressed state. Test canvas_button_release releases momentary button. Test canvas_button_toggle toggles stationary button. Verify visual feedback shows correct pressed/released appearance. Test contact indicators update correctly.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T17:19:03.772Z"
           }
         ],
         "complexity": 5,
         "recommendedSubtasks": 4,
-        "expansionPrompt": "Break down into: 1) Define contact configuration types and port generation function for each config (1a, 1b, 1a1b, 2a, 2b, 2a2b, 3a3b). 2) Implement ButtonBlock component with momentary (mousedown/mouseup) and toggle (click) modes. 3) Implement contact state logic (NO contacts close on press, NC contacts open on press). 4) Add Tauri command integration for external button control and visual feedback for pressed state."
+        "expansionPrompt": "Break down into: 1) Define contact configuration types and port generation function for each config (1a, 1b, 1a1b, 2a, 2b, 2a2b, 3a3b). 2) Implement ButtonBlock component with momentary (mousedown/mouseup) and toggle (click) modes. 3) Implement contact state logic (NO contacts close on press, NC contacts open on press). 4) Add Tauri command integration for external button control and visual feedback for pressed state.",
+        "updatedAt": "2026-01-28T17:19:03.772Z"
       },
       {
         "id": "44",
@@ -3250,7 +3255,7 @@
         "dependencies": [
           "43"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -3304,7 +3309,8 @@
         ],
         "complexity": 5,
         "recommendedSubtasks": 4,
-        "expansionPrompt": "Break down into: 1) Create PropertiesPanel router that renders appropriate editor based on selected component type. 2) Create common property fields (ID, position, label) shared across all blocks. 3) Create type-specific property editors (PlcOutProperties, LedProperties, ButtonProperties) with validation. 4) Implement form state binding with debounced updates to canvasStore."
+        "expansionPrompt": "Break down into: 1) Create PropertiesPanel router that renders appropriate editor based on selected component type. 2) Create common property fields (ID, position, label) shared across all blocks. 3) Create type-specific property editors (PlcOutProperties, LedProperties, ButtonProperties) with validation. 4) Implement form state binding with debounced updates to canvasStore.",
+        "updatedAt": "2026-01-28T17:24:18.570Z"
       },
       {
         "id": "45",
@@ -3316,7 +3322,7 @@
         "dependencies": [
           "42"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -3379,7 +3385,8 @@
         ],
         "complexity": 6,
         "recommendedSubtasks": 5,
-        "expansionPrompt": "Break down into: 1) Add yaml package dependency and create circuitToYaml serialization function. 2) Create yamlToCircuit deserialization function with validation. 3) Implement Rust Tauri commands (canvas_save_circuit, canvas_load_circuit, canvas_create_circuit). 4) Create frontend canvasService wrapping Tauri commands. 5) Integrate with project system for circuit file management."
+        "expansionPrompt": "Break down into: 1) Add yaml package dependency and create circuitToYaml serialization function. 2) Create yamlToCircuit deserialization function with validation. 3) Implement Rust Tauri commands (canvas_save_circuit, canvas_load_circuit, canvas_create_circuit). 4) Create frontend canvasService wrapping Tauri commands. 5) Integrate with project system for circuit file management.",
+        "updatedAt": "2026-01-28T17:28:40.278Z"
       },
       {
         "id": "46",
@@ -3391,7 +3398,7 @@
         "dependencies": [
           "44"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -3453,7 +3460,8 @@
         ],
         "complexity": 6,
         "recommendedSubtasks": 5,
-        "expansionPrompt": "Break down into: 1) Create SelectionBox component for drag-to-select with rectangle rendering. 2) Implement selection modes (click, shift+click, ctrl+click, drag select) in canvas interaction handler. 3) Create useCanvasKeyboardShortcuts hook with all canvas-specific shortcuts. 4) Implement clipboard operations (copy/paste/cut/duplicate) with component serialization and offset positioning. 5) Implement undo/redo keyboard shortcuts integrated with canvas store history."
+        "expansionPrompt": "Break down into: 1) Create SelectionBox component for drag-to-select with rectangle rendering. 2) Implement selection modes (click, shift+click, ctrl+click, drag select) in canvas interaction handler. 3) Create useCanvasKeyboardShortcuts hook with all canvas-specific shortcuts. 4) Implement clipboard operations (copy/paste/cut/duplicate) with component serialization and offset positioning. 5) Implement undo/redo keyboard shortcuts integrated with canvas store history.",
+        "updatedAt": "2026-01-28T17:31:33.757Z"
       },
       {
         "id": "47",
@@ -3465,7 +3473,7 @@
         "dependencies": [
           "42"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -3518,7 +3526,8 @@
         ],
         "complexity": 5,
         "recommendedSubtasks": 4,
-        "expansionPrompt": "Break down into: 1) Create SimulationToolbar component with play/pause/stop buttons and status indicator. 2) Implement Tauri commands for simulation state control and event emission. 3) Create CSS animations for current flow visualization (animated dashes). 4) Add visual indicators for powered components and switch states."
+        "expansionPrompt": "Break down into: 1) Create SimulationToolbar component with play/pause/stop buttons and status indicator. 2) Implement Tauri commands for simulation state control and event emission. 3) Create CSS animations for current flow visualization (animated dashes). 4) Add visual indicators for powered components and switch states.",
+        "updatedAt": "2026-01-28T17:33:11.457Z"
       },
       {
         "id": "48",
@@ -3531,7 +3540,7 @@
           "46",
           "47"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -3596,7 +3605,8 @@
         ],
         "complexity": 6,
         "recommendedSubtasks": 5,
-        "expansionPrompt": "Break down into: 1) Update OneCanvasPanel component to include SimulationToolbar, Toolbox, and Canvas in proper layout. 2) Implement tab integration for multiple circuit files with modified indicator. 3) Set up Properties panel communication for selected component editing. 4) Implement file operations (New, Open, Save) with menu/keyboard shortcuts. 5) Manage per-tab canvas store instances for multi-document support."
+        "expansionPrompt": "Break down into: 1) Update OneCanvasPanel component to include SimulationToolbar, Toolbox, and Canvas in proper layout. 2) Implement tab integration for multiple circuit files with modified indicator. 3) Set up Properties panel communication for selected component editing. 4) Implement file operations (New, Open, Save) with menu/keyboard shortcuts. 5) Manage per-tab canvas store instances for multi-document support.",
+        "updatedAt": "2026-01-28T17:46:48.447Z"
       },
       {
         "id": "49",
@@ -3924,7 +3934,7 @@
         "dependencies": [
           "51"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -3963,7 +3973,8 @@
         ],
         "complexity": 4,
         "recommendedSubtasks": 3,
-        "expansionPrompt": "Break down into: 1) Create toolbar layout with execution buttons (Play/Pause/Stop) using lucide-react icons with proper enable/disable states. 2) Implement loop toggle, time display (mm:ss.fff format), and file dropdown menu. 3) Create ScenarioSettingsDialog for loop configuration (count, delay, auto-start)."
+        "expansionPrompt": "Break down into: 1) Create toolbar layout with execution buttons (Play/Pause/Stop) using lucide-react icons with proper enable/disable states. 2) Implement loop toggle, time display (mm:ss.fff format), and file dropdown menu. 3) Create ScenarioSettingsDialog for loop configuration (count, delay, auto-start).",
+        "updatedAt": "2026-01-28T17:36:11.476Z"
       },
       {
         "id": "55",
@@ -3976,7 +3987,7 @@
           "49",
           "50"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -4015,7 +4026,8 @@
         ],
         "complexity": 4,
         "recommendedSubtasks": 3,
-        "expansionPrompt": "Break down into: 1) Implement parseScenarioCsv with line parsing, delimiter detection, and quoted field handling. 2) Implement error/warning collection for invalid data (bad addresses, out-of-range values). 3) Implement generateScenarioCsv with proper formatting, escaping, and persist logic for duration field."
+        "expansionPrompt": "Break down into: 1) Implement parseScenarioCsv with line parsing, delimiter detection, and quoted field handling. 2) Implement error/warning collection for invalid data (bad addresses, out-of-range values). 3) Implement generateScenarioCsv with proper formatting, escaping, and persist logic for duration field.",
+        "updatedAt": "2026-01-28T17:48:07.063Z"
       },
       {
         "id": "56",
@@ -4027,7 +4039,7 @@
         "dependencies": [
           "49"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -4066,7 +4078,8 @@
         ],
         "complexity": 4,
         "recommendedSubtasks": 3,
-        "expansionPrompt": "Break down into: 1) Define Rust types (ScenarioEvent, Scenario, ScenarioMetadata, ScenarioSettings) with Serialize/Deserialize. 2) Implement file I/O commands (scenario_load, scenario_save) with JSON serialization. 3) Implement CSV import/export commands with error handling."
+        "expansionPrompt": "Break down into: 1) Define Rust types (ScenarioEvent, Scenario, ScenarioMetadata, ScenarioSettings) with Serialize/Deserialize. 2) Implement file I/O commands (scenario_load, scenario_save) with JSON serialization. 3) Implement CSV import/export commands with error handling.",
+        "updatedAt": "2026-01-28T17:41:09.223Z"
       },
       {
         "id": "57",
@@ -4080,7 +4093,7 @@
           "51",
           "56"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -4156,7 +4169,8 @@
         ],
         "complexity": 8,
         "recommendedSubtasks": 6,
-        "expansionPrompt": "Break down into: 1) Create useScenarioExecution hook with requestAnimationFrame-based timing loop. 2) Implement event scheduling logic that finds events to execute based on elapsed time. 3) Implement Modbus write integration using existing modbusService for coils and registers. 4) Implement persist=false auto-release logic with setTimeout scheduling. 5) Implement loop handling with iteration counting, delay, and reset. 6) Add event emission for UI updates (scenario:event-executed, scenario:status-changed)."
+        "expansionPrompt": "Break down into: 1) Create useScenarioExecution hook with requestAnimationFrame-based timing loop. 2) Implement event scheduling logic that finds events to execute based on elapsed time. 3) Implement Modbus write integration using existing modbusService for coils and registers. 4) Implement persist=false auto-release logic with setTimeout scheduling. 5) Implement loop handling with iteration counting, delay, and reset. 6) Add event emission for UI updates (scenario:event-executed, scenario:status-changed).",
+        "updatedAt": "2026-01-28T17:43:07.884Z"
       },
       {
         "id": "58",
@@ -4169,7 +4183,7 @@
           "51",
           "57"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -4234,7 +4248,8 @@
         ],
         "complexity": 2,
         "recommendedSubtasks": 0,
-        "expansionPrompt": "This task is simple enough to implement without subtasks. Create a progress bar component that reads from scenarioStore to display percentage completion, event counts, and optional loop iteration indicator with appropriate color changes based on execution state."
+        "expansionPrompt": "This task is simple enough to implement without subtasks. Create a progress bar component that reads from scenarioStore to display percentage completion, event counts, and optional loop iteration indicator with appropriate color changes based on execution state.",
+        "updatedAt": "2026-01-28T17:51:14.194Z"
       },
       {
         "id": "59",
@@ -4250,7 +4265,7 @@
           "57",
           "58"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -4301,7 +4316,8 @@
         ],
         "complexity": 5,
         "recommendedSubtasks": 4,
-        "expansionPrompt": "Break down into: 1) Create directory structure and index.ts exports for all ScenarioEditor components. 2) Assemble ScenarioEditorPanel component with toolbar, grid, and progress bar layout. 3) Wire up useScenarioExecution hook and connect run/pause/stop handlers to toolbar. 4) Implement component coordination ensuring proper data flow between grid, store, and execution engine."
+        "expansionPrompt": "Break down into: 1) Create directory structure and index.ts exports for all ScenarioEditor components. 2) Assemble ScenarioEditorPanel component with toolbar, grid, and progress bar layout. 3) Wire up useScenarioExecution hook and connect run/pause/stop handlers to toolbar. 4) Implement component coordination ensuring proper data flow between grid, store, and execution engine.",
+        "updatedAt": "2026-01-28T17:52:55.242Z"
       },
       {
         "id": "60",
@@ -4316,7 +4332,7 @@
           "56",
           "59"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -4369,14 +4385,15 @@
         ],
         "complexity": 5,
         "recommendedSubtasks": 4,
-        "expansionPrompt": "Break down into: 1) Create useScenarioFileOps hook with open, save, saveAs functions using @tauri-apps/plugin-dialog. 2) Implement CSV import/export functions with merge/replace option for import. 3) Implement dirty state tracking and unsaved changes prompt using existing UnsavedChangesDialog pattern. 4) Integrate file operations with toolbar dropdown menu handlers."
+        "expansionPrompt": "Break down into: 1) Create useScenarioFileOps hook with open, save, saveAs functions using @tauri-apps/plugin-dialog. 2) Implement CSV import/export functions with merge/replace option for import. 3) Implement dirty state tracking and unsaved changes prompt using existing UnsavedChangesDialog pattern. 4) Integrate file operations with toolbar dropdown menu handlers.",
+        "updatedAt": "2026-01-28T17:54:48.346Z"
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-01-28T17:17:17.478Z",
+      "lastModified": "2026-01-28T17:54:48.346Z",
       "taskCount": 60,
-      "completedCount": 47,
+      "completedCount": 60,
       "tags": [
         "master"
       ]

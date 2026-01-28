@@ -3,10 +3,12 @@
 //! This module contains all Tauri IPC command handlers that can be invoked
 //! from the frontend application.
 
+pub mod canvas;
 pub mod layout;
 pub mod logging;
 pub mod modbus;
 pub mod project;
+pub mod scenario;
 pub mod settings;
 
 // Re-export all project commands for convenient registration in lib.rs
@@ -42,6 +44,14 @@ pub use modbus::{
     modbus_write_input_register, ModbusState,
 };
 
-// Future command modules will be added here:
-// pub mod canvas;
-// pub mod scenario;
+// Re-export canvas commands
+pub use canvas::{
+    canvas_circuit_exists, canvas_create_circuit, canvas_delete_circuit, canvas_list_circuits,
+    canvas_load_circuit, canvas_save_circuit,
+};
+
+// Re-export scenario commands
+pub use scenario::{
+    scenario_create, scenario_delete, scenario_exists, scenario_export_csv, scenario_import_csv,
+    scenario_list, scenario_load, scenario_save,
+};

@@ -1,16 +1,335 @@
-import { PenTool } from 'lucide-react';
+/**
+ * OneCanvasPanel Component
+ *
+ * Panel content for the OneCanvas circuit simulation canvas.
+ * Integrates SimulationToolbar, Toolbox, Canvas with blocks/wires, and DnD support.
+ */
 
-export function OneCanvasPanel() {
+import { memo, useCallback, useRef, useState } from 'react';
+import {
+  DndContext,
+  DragOverlay,
+  useSensor,
+  useSensors,
+  PointerSensor,
+  useDroppable,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import { useCanvasStore } from '../../../stores/canvasStore';
+import {
+  Canvas,
+  Toolbox,
+  SimulationToolbar,
+  BlockRenderer,
+  Wire,
+  WirePreview,
+  SelectionBox,
+  useSimulation,
+  useCanvasKeyboardShortcuts,
+  type CanvasRef,
+  type BlockType,
+  type Position,
+  type SelectionBoxState,
+} from '../../OneCanvas';
+
+// Import simulation styles
+import '../../OneCanvas/styles/simulation.css';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+interface OneCanvasPanelProps {
+  /** Tab data (contains documentId, filePath) - reserved for future use */
+  data?: unknown;
+}
+
+// ============================================================================
+// Block Preview Component (for drag overlay)
+// ============================================================================
+
+const BlockDragPreview = memo(function BlockDragPreview({ type }: { type: BlockType }) {
+  const labels: Record<BlockType, string> = {
+    power_24v: '+24V',
+    power_12v: '+12V',
+    gnd: 'GND',
+    plc_out: 'PLC Out',
+    plc_in: 'PLC In',
+    led: 'LED',
+    button: 'Button',
+    scope: 'Scope',
+  };
+
   return (
-    <div className="h-full flex flex-col items-center justify-center text-gray-500 p-4">
-      <PenTool size={48} className="mb-4 text-gray-600" />
-      <h3 className="text-lg font-medium mb-2">One Canvas</h3>
-      <p className="text-sm text-center">
-        Coming in Unit 5
-      </p>
-      <p className="text-xs text-gray-600 mt-2 text-center">
-        Design circuit diagrams with drag-and-drop components
-      </p>
+    <div className="px-3 py-2 bg-neutral-700 border border-neutral-500 rounded shadow-lg text-white text-sm font-medium">
+      {labels[type] || type}
     </div>
   );
+});
+
+// ============================================================================
+// Canvas Drop Zone
+// ============================================================================
+
+interface CanvasDropZoneProps {
+  children: React.ReactNode;
+  className?: string;
 }
+
+const CanvasDropZone = memo(function CanvasDropZone({ children, className }: CanvasDropZoneProps) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: 'canvas-dropzone',
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`${className} ${isOver ? 'ring-2 ring-blue-500 ring-inset' : ''}`}
+    >
+      {children}
+    </div>
+  );
+});
+
+// ============================================================================
+// Wire Renderer (converts store Wire to component props)
+// ============================================================================
+
+interface WireRendererProps {
+  wireId: string;
+  from: { componentId: string; portId: string };
+  to: { componentId: string; portId: string };
+  components: Map<string, { position: Position; ports: Array<{ id: string; position: string; offset?: number }> }>;
+  isSelected: boolean;
+}
+
+const WireRenderer = memo(function WireRenderer({
+  wireId,
+  from,
+  to,
+  components,
+  isSelected,
+}: WireRendererProps) {
+  // Get component positions and calculate wire endpoints
+  const fromComponent = components.get(from.componentId);
+  const toComponent = components.get(to.componentId);
+
+  if (!fromComponent || !toComponent) return null;
+
+  // Calculate port positions (simplified - assumes 60x60 blocks)
+  const getPortPosition = (
+    component: { position: Position; ports: Array<{ id: string; position: string; offset?: number }> },
+    portId: string
+  ): Position => {
+    const port = component.ports.find((p) => p.id === portId);
+    const basePos = component.position;
+    const blockWidth = 60;
+    const blockHeight = 60;
+
+    if (!port) return basePos;
+
+    switch (port.position) {
+      case 'top':
+        return { x: basePos.x + blockWidth / 2, y: basePos.y };
+      case 'bottom':
+        return { x: basePos.x + blockWidth / 2, y: basePos.y + blockHeight };
+      case 'left':
+        return { x: basePos.x, y: basePos.y + blockHeight / 2 };
+      case 'right':
+        return { x: basePos.x + blockWidth, y: basePos.y + blockHeight / 2 };
+      default:
+        return { x: basePos.x + blockWidth / 2, y: basePos.y + blockHeight / 2 };
+    }
+  };
+
+  const fromPos = getPortPosition(fromComponent, from.portId);
+  const toPos = getPortPosition(toComponent, to.portId);
+
+  return (
+    <Wire
+      id={wireId}
+      from={fromPos}
+      to={toPos}
+      isSelected={isSelected}
+    />
+  );
+});
+
+// ============================================================================
+// Component
+// ============================================================================
+
+export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPanelProps) {
+  const canvasRef = useRef<CanvasRef>(null);
+
+  // Store selectors
+  const components = useCanvasStore((state) => state.components);
+  const wires = useCanvasStore((state) => state.wires);
+  const wireDrawing = useCanvasStore((state) => state.wireDrawing);
+  const selectedIds = useCanvasStore((state) => state.selectedIds);
+  const zoom = useCanvasStore((state) => state.zoom);
+  const pan = useCanvasStore((state) => state.pan);
+  const addComponent = useCanvasStore((state) => state.addComponent);
+
+  // Convert Map to Array for simulation
+  const componentsArray = Array.from(components.values());
+
+  // Simulation hook
+  const simulation = useSimulation(componentsArray, wires);
+
+  // Keyboard shortcuts
+  useCanvasKeyboardShortcuts();
+
+  // Selection box state for drag-to-select
+  const [selectionBox] = useState<SelectionBoxState | null>(null);
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
+
+  // Track dragging state
+  const [draggedType, setDraggedType] = useState<BlockType | null>(null);
+
+  // Handle drag start from toolbox
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const { active } = event;
+    const blockType = active.data.current?.blockType as BlockType | undefined;
+    if (blockType) {
+      setDraggedType(blockType);
+    }
+  }, []);
+
+  // Handle drag end
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      setDraggedType(null);
+
+      // Check if dropped over canvas
+      if (over?.id === 'canvas-dropzone') {
+        const blockType = active.data.current?.blockType as BlockType | undefined;
+        if (blockType) {
+          // Get the canvas container for coordinate calculation
+          const container = canvasRef.current?.getContainer();
+          if (!container) return;
+
+          // Calculate drop position in canvas coordinates
+          const rect = container.getBoundingClientRect();
+          const dropX = event.delta.x + rect.width / 2;
+          const dropY = event.delta.y + rect.height / 2;
+
+          // Convert screen position to canvas coordinates
+          const canvasX = (dropX - pan.x) / zoom;
+          const canvasY = (dropY - pan.y) / zoom;
+
+          const position: Position = { x: canvasX, y: canvasY };
+          addComponent(blockType, position);
+        }
+      }
+    },
+    [addComponent, zoom, pan]
+  );
+
+  return (
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="h-full flex flex-col bg-neutral-950">
+        {/* Simulation Toolbar */}
+        <SimulationToolbar
+          running={simulation.running}
+          onStart={simulation.start}
+          onStop={simulation.stop}
+          onReset={simulation.reset}
+          onStep={simulation.step}
+          measuredRate={simulation.measuredRate}
+        />
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Toolbox */}
+          <Toolbox />
+
+          {/* Canvas Area */}
+          <CanvasDropZone className="flex-1 relative overflow-hidden">
+            <Canvas ref={canvasRef} className="w-full h-full">
+              {/* Render blocks */}
+              {Array.from(components.values()).map((block) => (
+                <BlockRenderer
+                  key={block.id}
+                  block={block}
+                  isSelected={selectedIds.has(block.id)}
+                />
+              ))}
+
+              {/* Render wires */}
+              {wires.map((wire) => (
+                <WireRenderer
+                  key={wire.id}
+                  wireId={wire.id}
+                  from={wire.from}
+                  to={wire.to}
+                  components={components as Map<string, { position: Position; ports: Array<{ id: string; position: string; offset?: number }> }>}
+                  isSelected={selectedIds.has(wire.id)}
+                />
+              ))}
+
+              {/* Wire preview during drawing */}
+              {wireDrawing && (() => {
+                // Calculate the from position from the endpoint
+                const fromComponent = components.get(wireDrawing.from.componentId);
+                if (!fromComponent) return null;
+
+                const fromPort = fromComponent.ports.find((p) => p.id === wireDrawing.from.portId);
+                const blockSize = 60;
+                let fromPos: Position = { x: fromComponent.position.x + blockSize / 2, y: fromComponent.position.y + blockSize / 2 };
+
+                if (fromPort) {
+                  switch (fromPort.position) {
+                    case 'top':
+                      fromPos = { x: fromComponent.position.x + blockSize / 2, y: fromComponent.position.y };
+                      break;
+                    case 'bottom':
+                      fromPos = { x: fromComponent.position.x + blockSize / 2, y: fromComponent.position.y + blockSize };
+                      break;
+                    case 'left':
+                      fromPos = { x: fromComponent.position.x, y: fromComponent.position.y + blockSize / 2 };
+                      break;
+                    case 'right':
+                      fromPos = { x: fromComponent.position.x + blockSize, y: fromComponent.position.y + blockSize / 2 };
+                      break;
+                  }
+                }
+
+                return (
+                  <WirePreview
+                    from={fromPos}
+                    to={wireDrawing.tempPosition}
+                  />
+                );
+              })()}
+
+              {/* Selection box */}
+              <SelectionBox box={selectionBox} />
+            </Canvas>
+          </CanvasDropZone>
+        </div>
+      </div>
+
+      {/* Drag Overlay */}
+      <DragOverlay>
+        {draggedType && <BlockDragPreview type={draggedType} />}
+      </DragOverlay>
+    </DndContext>
+  );
+});
+
+export default OneCanvasPanel;

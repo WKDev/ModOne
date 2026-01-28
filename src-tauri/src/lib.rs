@@ -7,6 +7,7 @@ pub mod error;
 pub mod logging;
 pub mod modbus;
 pub mod project;
+pub mod scenario;
 
 // Re-export error types for convenience
 pub use error::{ModOneError, ModOneResult};
@@ -38,6 +39,12 @@ use commands::{
     modbus_stop_rtu, modbus_stop_tcp, modbus_write_coil, modbus_write_coils,
     modbus_write_discrete_input, modbus_write_holding_register, modbus_write_holding_registers,
     modbus_write_input_register, ModbusState,
+    // Canvas commands
+    canvas_circuit_exists, canvas_create_circuit, canvas_delete_circuit, canvas_list_circuits,
+    canvas_load_circuit, canvas_save_circuit,
+    // Scenario commands
+    scenario_create, scenario_delete, scenario_exists, scenario_export_csv, scenario_import_csv,
+    scenario_list, scenario_load, scenario_save,
 };
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -144,6 +151,22 @@ pub fn run() {
             modbus_bulk_write,
             modbus_save_memory_csv,
             modbus_load_memory_csv,
+            // Canvas commands
+            canvas_save_circuit,
+            canvas_load_circuit,
+            canvas_create_circuit,
+            canvas_list_circuits,
+            canvas_delete_circuit,
+            canvas_circuit_exists,
+            // Scenario commands
+            scenario_load,
+            scenario_save,
+            scenario_import_csv,
+            scenario_export_csv,
+            scenario_create,
+            scenario_list,
+            scenario_delete,
+            scenario_exists,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

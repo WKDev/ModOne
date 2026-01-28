@@ -1,0 +1,187 @@
+/**
+ * Simulation Visual Styles
+ *
+ * CSS for current flow animations, powered component effects,
+ * and switch state indicators.
+ */
+
+/* ============================================================================
+   Wire Animations
+   ============================================================================ */
+
+/* Active wire with current flow animation */
+.wire-active {
+  stroke-dasharray: 8 4;
+  animation: current-flow 0.4s linear infinite;
+  will-change: stroke-dashoffset;
+}
+
+/* Reverse flow direction */
+.wire-active.wire-flow-reverse {
+  animation-direction: reverse;
+}
+
+@keyframes current-flow {
+  from {
+    stroke-dashoffset: 12;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Inactive wire (no animation) */
+.wire-inactive {
+  stroke-dasharray: none;
+  animation: none;
+}
+
+/* Wire color states */
+.wire-powered {
+  stroke: #22c55e; /* green-500 */
+  filter: drop-shadow(0 0 2px #22c55e);
+  transition: stroke 0.2s ease-in-out, filter 0.2s ease-in-out;
+}
+
+.wire-unpowered {
+  stroke: #6b7280; /* gray-500 */
+  filter: none;
+  transition: stroke 0.2s ease-in-out, filter 0.2s ease-in-out;
+}
+
+/* High voltage warning */
+.wire-high-voltage {
+  stroke: #eab308; /* yellow-500 */
+  filter: drop-shadow(0 0 3px #eab308);
+}
+
+/* ============================================================================
+   Component Power States
+   ============================================================================ */
+
+/* Powered component glow effect */
+.component-powered {
+  filter: drop-shadow(0 0 4px #22c55e) drop-shadow(0 0 8px rgba(34, 197, 94, 0.4));
+  transition: filter 0.2s ease-in-out;
+}
+
+/* Unpowered component - slightly dimmed */
+.component-unpowered {
+  filter: none;
+  opacity: 0.85;
+  transition: filter 0.2s ease-in-out, opacity 0.2s ease-in-out;
+}
+
+/* Active component (LED on, etc) */
+.component-active {
+  filter: drop-shadow(0 0 6px currentColor) drop-shadow(0 0 12px currentColor);
+}
+
+/* ============================================================================
+   Switch State Indicators
+   ============================================================================ */
+
+/* Switch indicator base */
+.switch-indicator {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  top: -4px;
+  right: -4px;
+  transition: background-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+/* Open switch (no current can flow) */
+.switch-open {
+  background-color: #ef4444; /* red-500 */
+  box-shadow: 0 0 4px #ef4444;
+}
+
+/* Closed switch (current can flow) */
+.switch-closed {
+  background-color: #22c55e; /* green-500 */
+  box-shadow: 0 0 4px #22c55e;
+}
+
+/* ============================================================================
+   LED States
+   ============================================================================ */
+
+/* LED off state */
+.led-off {
+  fill: #374151; /* gray-700 */
+  stroke: #4b5563; /* gray-600 */
+}
+
+/* LED on states by color */
+.led-on-red {
+  fill: #ef4444;
+  filter: drop-shadow(0 0 6px #ef4444) drop-shadow(0 0 10px rgba(239, 68, 68, 0.6));
+}
+
+.led-on-green {
+  fill: #22c55e;
+  filter: drop-shadow(0 0 6px #22c55e) drop-shadow(0 0 10px rgba(34, 197, 94, 0.6));
+}
+
+.led-on-blue {
+  fill: #3b82f6;
+  filter: drop-shadow(0 0 6px #3b82f6) drop-shadow(0 0 10px rgba(59, 130, 246, 0.6));
+}
+
+.led-on-yellow {
+  fill: #eab308;
+  filter: drop-shadow(0 0 6px #eab308) drop-shadow(0 0 10px rgba(234, 179, 8, 0.6));
+}
+
+.led-on-white {
+  fill: #f9fafb;
+  filter: drop-shadow(0 0 6px #f9fafb) drop-shadow(0 0 10px rgba(249, 250, 251, 0.6));
+}
+
+/* ============================================================================
+   Power Source Indicators
+   ============================================================================ */
+
+/* Power source active */
+.power-source-active {
+  filter: drop-shadow(0 0 4px #facc15) drop-shadow(0 0 8px rgba(250, 204, 21, 0.4));
+}
+
+/* Ground connection active */
+.ground-active {
+  filter: drop-shadow(0 0 3px #22c55e);
+}
+
+/* ============================================================================
+   Simulation Mode Border
+   ============================================================================ */
+
+/* Canvas border when simulation is running */
+.canvas-simulating {
+  box-shadow: inset 0 0 0 2px rgba(34, 197, 94, 0.3);
+}
+
+/* ============================================================================
+   Performance Optimizations
+   ============================================================================ */
+
+/* Reduce animation complexity when many wires */
+@media (prefers-reduced-motion: reduce) {
+  .wire-active {
+    animation: none;
+    stroke-dasharray: 4 4;
+  }
+}
+
+/* GPU acceleration hints */
+.wire-active,
+.component-powered,
+.led-on-red,
+.led-on-green,
+.led-on-blue,
+.led-on-yellow,
+.led-on-white {
+  transform: translateZ(0);
+}

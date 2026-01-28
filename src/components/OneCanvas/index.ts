@@ -49,6 +49,17 @@ export {
 } from './hooks/usePlcBlock';
 export { useSimulation } from './hooks/useSimulation';
 export type { UseSimulationReturn, UseSimulationOptions } from './hooks/useSimulation';
+export { useCanvasKeyboardShortcuts } from './hooks/useCanvasKeyboardShortcuts';
+export { useSelectionHandler } from './hooks/useSelectionHandler';
+
+// Selection
+export { SelectionBox, type SelectionBoxState, isPointInBox, doesRectIntersectBox } from './components/SelectionBox';
+
+// Simulation UI
+export { SimulationToolbar } from './SimulationToolbar';
 
 // Utilities
 export * from './utils';
+
+// Styles (import in app entry point)
+// import './styles/simulation.css';
