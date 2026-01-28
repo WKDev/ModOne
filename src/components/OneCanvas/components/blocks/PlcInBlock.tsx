@@ -2,11 +2,14 @@
  * PLC Input Block Component
  *
  * PLC discrete input that sends circuit state to PLC.
+ * Integrates with Modbus store for real-time discrete input writing.
  */
 
 import { memo } from 'react';
 import { BlockWrapper } from './BlockWrapper';
 import { Port } from '../Port';
+import { usePlcInBlock } from '../../hooks/usePlcBlock';
+import { formatDiscreteAddress, parsePlcAddress } from '../../utils/plcAddressUtils';
 import type { PlcInBlock as PlcInBlockType } from '../../types';
 
 // ============================================================================
@@ -53,9 +56,22 @@ export const PlcInBlock = memo(function PlcInBlock({
   connectedPorts,
   voltage = 0,
 }: PlcInBlockProps) {
-  // Check if voltage exceeds threshold
-  const isTriggered = voltage >= block.thresholdVoltage;
-  const finalState = block.inverted ? !isTriggered : isTriggered;
+  // Parse address from string format (e.g., "DI:0x0001" -> 1)
+  const parsedAddress = parsePlcAddress(block.address);
+  const numericAddress = parsedAddress?.address ?? 0;
+
+  // Use Modbus integration hook - writes to discrete input based on voltage
+  const { inputState } = usePlcInBlock({
+    address: numericAddress,
+    thresholdVoltage: block.thresholdVoltage,
+    inverted: block.inverted,
+    voltage,
+  });
+
+  const finalState = inputState;
+
+  // Format address for display
+  const displayAddress = formatDiscreteAddress(numericAddress);
 
   return (
     <BlockWrapper
@@ -119,7 +135,7 @@ export const PlcInBlock = memo(function PlcInBlock({
 
         {/* Address label */}
         <span className="text-[10px] text-neutral-400 mt-1">
-          {block.address}
+          {displayAddress}
         </span>
 
         {/* Threshold indicator */}

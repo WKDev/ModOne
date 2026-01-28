@@ -2,11 +2,14 @@
  * PLC Output Block Component
  *
  * PLC coil/output that controls circuit based on PLC state.
+ * Integrates with Modbus store for real-time coil value reading.
  */
 
 import { memo } from 'react';
 import { BlockWrapper } from './BlockWrapper';
 import { Port } from '../Port';
+import { usePlcOutBlock } from '../../hooks/usePlcBlock';
+import { formatCoilAddress, parsePlcAddress } from '../../utils/plcAddressUtils';
 import type { PlcOutBlock as PlcOutBlockType } from '../../types';
 
 // ============================================================================
@@ -26,8 +29,8 @@ interface PlcOutBlockProps {
   onEndWire?: (blockId: string, portId: string) => void;
   /** Connected port IDs */
   connectedPorts?: Set<string>;
-  /** Whether the output is active (from PLC state) */
-  isActive?: boolean;
+  /** Override active state (if not using Modbus integration) */
+  isActiveOverride?: boolean;
 }
 
 // ============================================================================
@@ -51,10 +54,25 @@ export const PlcOutBlock = memo(function PlcOutBlock({
   onStartWire,
   onEndWire,
   connectedPorts,
-  isActive = false,
+  isActiveOverride,
 }: PlcOutBlockProps) {
-  // Determine contact state based on normally open/closed and active state
-  const isClosed = block.normallyOpen ? isActive : !isActive;
+  // Parse address from string format (e.g., "C:0x0001" -> 1)
+  const parsedAddress = parsePlcAddress(block.address);
+  const numericAddress = parsedAddress?.address ?? 0;
+
+  // Use Modbus integration hook
+  const { coilValue, isConnected } = usePlcOutBlock({
+    address: numericAddress,
+    normallyOpen: block.normallyOpen,
+    inverted: block.inverted,
+  });
+
+  // Use override if provided, otherwise use Modbus value
+  const isActive = isActiveOverride ?? coilValue ?? false;
+  const isClosed = isConnected;
+
+  // Format address for display
+  const displayAddress = formatCoilAddress(numericAddress);
 
   return (
     <BlockWrapper
@@ -114,7 +132,7 @@ export const PlcOutBlock = memo(function PlcOutBlock({
 
         {/* Address label */}
         <span className="text-[10px] text-neutral-400 mt-1">
-          {block.address}
+          {displayAddress}
         </span>
 
         {/* NO/NC indicator */}

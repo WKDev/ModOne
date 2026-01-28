@@ -101,7 +101,7 @@ export const BlockRenderer = memo(function BlockRenderer({
           <PlcOutBlock
             block={block}
             {...commonProps}
-            isActive={plcOutputStates?.get(block.address)}
+            isActiveOverride={plcOutputStates?.get(block.address)}
           />
         );
 

@@ -33,6 +33,7 @@ export { DraggableBlock } from './components/DraggableBlock';
 // Wire Components
 export { Wire, WirePreview } from './Wire';
 export type { WireType } from './Wire';
+export { AnimatedWire, wireAnimationStyles } from './components/AnimatedWire';
 
 // Hooks
 export { useCanvasInteraction } from './hooks/useCanvasInteraction';
@@ -40,6 +41,14 @@ export { useDragDrop } from './hooks/useDragDrop';
 export type { DragState } from './hooks/useDragDrop';
 export { useWireDrawing } from './hooks/useWireDrawing';
 export type { WireDrawingState } from './hooks/useWireDrawing';
+export {
+  usePlcOutBlock,
+  usePlcInBlock,
+  useCoilSubscription,
+  useDiscreteSubscription,
+} from './hooks/usePlcBlock';
+export { useSimulation } from './hooks/useSimulation';
+export type { UseSimulationReturn, UseSimulationOptions } from './hooks/useSimulation';
 
 // Utilities
 export * from './utils';

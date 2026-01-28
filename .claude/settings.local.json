@@ -55,7 +55,10 @@
       "Bash(pnpm run type-check:*)",
       "Bash(pnpm exec tsc:*)",
       "mcp__mcp-obsidian__obsidian_get_periodic_note",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(pnpm task-master:*)",
+      "Bash(pnpm list:*)",
+      "Bash(dir:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

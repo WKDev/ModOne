@@ -3024,7 +3024,7 @@
         "dependencies": [
           "40"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -3075,7 +3075,8 @@
         ],
         "complexity": 6,
         "recommendedSubtasks": 4,
-        "expansionPrompt": "Break down into: 1) Create PlcOutBlock component displaying Modbus address and NO/NC state, reading from modbusStore. 2) Create PlcInBlock component that writes to discrete input based on circuit voltage. 3) Implement address formatting (M0001 format) and properties panel integration. 4) Set up real-time subscription to modbus:memory-changed events for instant updates."
+        "expansionPrompt": "Break down into: 1) Create PlcOutBlock component displaying Modbus address and NO/NC state, reading from modbusStore. 2) Create PlcInBlock component that writes to discrete input based on circuit voltage. 3) Implement address formatting (M0001 format) and properties panel integration. 4) Set up real-time subscription to modbus:memory-changed events for instant updates.",
+        "updatedAt": "2026-01-28T13:34:54.278Z"
       },
       {
         "id": "42",
@@ -3087,7 +3088,7 @@
         "dependencies": [
           "41"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -3095,9 +3096,10 @@
             "description": "Create the graph building utilities that convert canvas components and wires into a traversable graph structure suitable for circuit simulation.",
             "dependencies": [],
             "details": "Create `src/components/OneCanvas/utils/circuitGraph.ts` with:\n\n1. **CircuitGraph Interface:**\n```typescript\ninterface CircuitNode {\n  id: string;\n  componentId: string;\n  portId: string;\n  type: 'power' | 'ground' | 'switch' | 'load' | 'junction';\n  voltage?: number;\n}\n\ninterface CircuitEdge {\n  from: string;  // nodeId\n  to: string;    // nodeId\n  wireId?: string;\n  conductance: boolean;  // false if open switch\n}\n\ninterface CircuitGraph {\n  nodes: Map<string, CircuitNode>;\n  edges: Map<string, CircuitEdge[]>;  // adjacency list\n  powerNodes: string[];\n  groundNodes: string[];\n}\n```\n\n2. **buildCircuitGraph(components: Block[], wires: Wire[]): CircuitGraph**\n- Create nodes for each component port\n- Mark power source nodes (+24V, +12V) as 'power' type\n- Mark GND blocks as 'ground' type\n- Create edges from wires connecting ports\n- Handle switch components as conditional edges\n\n3. **Node ID Generation:**\n- Use format: `${componentId}:${portId}` for unique node identification\n- Map wire endpoints to their connected nodes\n\n4. **Edge Building:**\n- For regular wires: bidirectional edges with conductance=true\n- For switches: edges that will be evaluated later based on state",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests: Test graph building with simple 3-component circuit (power -> LED -> GND). Verify correct node types assigned. Test wire connections create proper edges. Test switch components create conditional edges. Test component with multiple ports creates multiple nodes.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T13:36:23.160Z"
           },
           {
             "id": 2,
@@ -3107,9 +3109,10 @@
               1
             ],
             "details": "Create `src/components/OneCanvas/utils/pathFinder.ts` with:\n\n1. **CurrentPath Interface:**\n```typescript\ninterface CurrentPath {\n  nodes: string[];      // Ordered list of node IDs from power to ground\n  powerSource: string;  // Starting power node ID\n  voltage: number;      // Voltage level of this path\n  isComplete: boolean;  // True if reaches ground\n}\n```\n\n2. **findCurrentPaths(graph: CircuitGraph, powerNodeId: string): CurrentPath[]**\n- Use BFS to find all paths from power node to ground nodes\n- Only traverse edges where conductance=true (closed switches)\n- Track visited nodes to prevent cycles\n- Return all complete paths that reach ground\n\n3. **findAllCircuitPaths(graph: CircuitGraph): CurrentPath[]**\n- Iterate over all power nodes in graph.powerNodes\n- Call findCurrentPaths for each power source\n- Aggregate and return all paths\n\n4. **Path Validation:**\n- Ensure paths don't create short circuits (power directly to ground)\n- Handle branching circuits where current splits\n- Support multiple independent power sources\n\n5. **Performance Optimization:**\n- Early termination when path reaches ground\n- Limit max path length to prevent infinite loops in malformed circuits\n- Use Set for O(1) visited node lookups",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests: Test simple linear path (power -> switch -> LED -> GND). Test branching path (power splits to 2 LEDs). Test path not found when switch open. Test multiple power sources find independent paths. Test cycle detection doesn't hang. Performance test with 50+ node graph completes in <10ms.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T13:37:24.973Z"
           },
           {
             "id": 3,
@@ -3119,9 +3122,10 @@
               1
             ],
             "details": "Create `src/components/OneCanvas/utils/switchEvaluator.ts` with:\n\n1. **SwitchState Interface:**\n```typescript\ninterface SwitchState {\n  componentId: string;\n  isOpen: boolean;       // true = no current flow, false = current flows\n  stateSource: 'plc' | 'button' | 'relay' | 'manual';\n}\n\ninterface SwitchStateMap {\n  states: Map<string, SwitchState>;\n}\n```\n\n2. **evaluateSwitchStates(components: Block[], runtimeState: RuntimeState): SwitchStateMap**\n- For 'plc_out' components: check corresponding PLC output bit state\n- For 'button' components: check if button is currently pressed\n- For 'relay' components: check if relay coil is energized\n- For 'toggle_switch': check manual toggle state\n\n3. **RuntimeState Integration:**\n```typescript\ninterface RuntimeState {\n  plcOutputs: Map<string, boolean>;    // address -> state\n  buttonStates: Map<string, boolean>;   // componentId -> pressed\n  manualOverrides: Map<string, boolean>; // componentId -> forced state\n}\n```\n\n4. **applySwitchStatesToGraph(graph: CircuitGraph, switchStates: SwitchStateMap): CircuitGraph**\n- Update edge conductance based on switch states\n- Return modified graph with current switch positions\n\n5. **NO/NC Contact Logic:**\n- Normally Open (NO): conductance = switchState.isOn\n- Normally Closed (NC): conductance = !switchState.isOn",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests: Test PLC output ON makes switch closed. Test button pressed makes switch closed. Test NO vs NC contact logic inverts correctly. Test manual override takes precedence. Test switch state changes update graph edges correctly.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T13:38:57.192Z"
           },
           {
             "id": 4,
@@ -3133,9 +3137,10 @@
               3
             ],
             "details": "Create `src/components/OneCanvas/utils/voltagePropagator.ts` with:\n\n1. **SimulationResult Interface:**\n```typescript\ninterface SimulationResult {\n  nodeVoltages: Map<string, number>;  // nodeId -> voltage (0, 12, 24, etc.)\n  currentPaths: CurrentPath[];\n  poweredComponents: Set<string>;     // componentIds receiving power\n  shortCircuits: ShortCircuit[];      // Detected issues\n}\n\ninterface ShortCircuit {\n  path: string[];\n  powerSource: string;\n}\n```\n\n2. **propagateVoltage(graph: CircuitGraph, paths: CurrentPath[]): Map<string, number>**\n- Start from power source nodes with their voltage level\n- BFS propagation through conductive edges\n- Each node inherits voltage from its power source\n- Nodes not in any path have voltage = 0\n\n3. **determinePoweredComponents(nodeVoltages: Map<string, number>, components: Block[]): Set<string>**\n- A component is powered if it has voltage on input AND path to ground\n- Check load components (LED, motor, lamp) for complete circuit\n- Return set of component IDs that should be visually active\n\n4. **detectShortCircuits(paths: CurrentPath[]): ShortCircuit[]**\n- Check for paths with no load between power and ground\n- Warn about potential short circuit conditions\n\n5. **simulateCircuit(components: Block[], wires: Wire[], runtimeState: RuntimeState): SimulationResult**\n- Main simulation function combining all steps:\n  1. Build circuit graph\n  2. Evaluate switch states\n  3. Apply switch states to graph\n  4. Find current paths\n  5. Propagate voltage\n  6. Determine powered components",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests: Test voltage propagates from +24V source correctly. Test open switch blocks voltage propagation. Test load component shows powered only with complete circuit. Test multiple voltage levels don't mix (24V and 12V independent). Test short circuit detection identifies direct power-to-ground paths.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T13:40:15.442Z"
           },
           {
             "id": 5,
@@ -3145,9 +3150,10 @@
               4
             ],
             "details": "Create `src/components/OneCanvas/hooks/useSimulation.ts` with:\n\n1. **Hook Interface:**\n```typescript\ninterface UseSimulationReturn {\n  running: boolean;\n  result: SimulationResult | null;\n  start: () => void;\n  stop: () => void;\n  reset: () => void;\n  runtimeState: RuntimeState;\n  setPlcOutput: (address: string, value: boolean) => void;\n  setButtonState: (componentId: string, pressed: boolean) => void;\n}\n```\n\n2. **useSimulation Hook Implementation:**\n```typescript\nexport function useSimulation(): UseSimulationReturn {\n  const { components, wires } = useCanvasStore();\n  const [running, setRunning] = useState(false);\n  const [result, setResult] = useState<SimulationResult | null>(null);\n  const [runtimeState, setRuntimeState] = useState<RuntimeState>(initialState);\n  const lastUpdateRef = useRef<number>(0);\n  \n  useEffect(() => {\n    if (!running) return;\n    \n    let frameId: number;\n    const UPDATE_INTERVAL = 50; // 20Hz = 50ms\n    \n    const tick = (timestamp: number) => {\n      if (timestamp - lastUpdateRef.current >= UPDATE_INTERVAL) {\n        setResult(simulateCircuit(components, wires, runtimeState));\n        lastUpdateRef.current = timestamp;\n      }\n      frameId = requestAnimationFrame(tick);\n    };\n    \n    frameId = requestAnimationFrame(tick);\n    return () => cancelAnimationFrame(frameId);\n  }, [running, components, wires, runtimeState]);\n}\n```\n\n3. **State Management:**\n- Track PLC output states via setPlcOutput\n- Track button press states via setButtonState\n- Reset clears all runtime state and result\n\n4. **Performance Considerations:**\n- Use useMemo for stable runtimeState reference\n- Only re-run simulation when inputs change\n- Throttle to 20Hz even with faster frame rates",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests: Test start() sets running=true and begins simulation. Test stop() halts simulation loop. Test reset() clears result and runtime state. Test simulation updates at ~20Hz rate. Test setPlcOutput updates state and triggers re-simulation. Integration test with React Testing Library verifying hook behavior.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T13:41:25.515Z"
           },
           {
             "id": 6,
@@ -3158,14 +3164,16 @@
               5
             ],
             "details": "Create `src/components/OneCanvas/components/AnimatedWire.tsx` and update wire rendering:\n\n1. **AnimatedWire Component:**\n```typescript\ninterface AnimatedWireProps {\n  wire: Wire;\n  isPowered: boolean;\n  currentDirection: 'forward' | 'reverse' | null;\n  voltage: number;\n}\n\nfunction AnimatedWire({ wire, isPowered, currentDirection, voltage }: AnimatedWireProps) {\n  // Use CSS animation for flowing dashes\n  const animationClass = isPowered \n    ? `wire-flow-${currentDirection}` \n    : 'wire-idle';\n  \n  const strokeColor = isPowered \n    ? getVoltageColor(voltage)  // Different colors for 24V vs 12V\n    : 'gray';\n}\n```\n\n2. **CSS Animations (add to OneCanvas.css):**\n```css\n.wire-flow-forward {\n  stroke-dasharray: 8 4;\n  animation: dash-flow-forward 0.5s linear infinite;\n}\n\n@keyframes dash-flow-forward {\n  to { stroke-dashoffset: -12; }\n}\n\n.wire-flow-reverse {\n  animation: dash-flow-reverse 0.5s linear infinite;\n}\n```\n\n3. **Current Direction Calculation:**\n- In currentPaths, track direction from power to ground\n- Wire direction = direction in path it belongs to\n- Wires in multiple paths: use dominant direction\n\n4. **Visual States:**\n- Unpowered: solid gray line\n- Powered (24V): animated blue dashes flowing toward ground\n- Powered (12V): animated green dashes flowing toward ground\n- Short circuit: red pulsing line (warning indicator)\n\n5. **Wire Rendering Integration:**\n- Update WireLayer to use simulation result\n- Pass isPowered and direction to each wire\n- Optimize: only animate visible wires in viewport",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Visual tests: Verify powered wires show animated dashes. Verify animation direction points toward ground. Verify different voltage levels have distinct colors. Test animation stops when simulation pauses. Performance test: 50+ animated wires maintain 60fps. Test short circuit wires show warning indicator.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T13:42:50.442Z"
           }
         ],
         "complexity": 9,
         "recommendedSubtasks": 6,
-        "expansionPrompt": "Break down into: 1) Implement circuit graph builder that converts components and wires into traversable graph structure. 2) Implement path finding algorithm (BFS/DFS) to find all paths from power sources to ground. 3) Implement switch state evaluation (open/closed based on PLC output and button states). 4) Implement voltage propagation through closed switches. 5) Create useSimulation hook with 20Hz update loop using requestAnimationFrame. 6) Add current flow animation system for powered wires."
+        "expansionPrompt": "Break down into: 1) Implement circuit graph builder that converts components and wires into traversable graph structure. 2) Implement path finding algorithm (BFS/DFS) to find all paths from power sources to ground. 3) Implement switch state evaluation (open/closed based on PLC output and button states). 4) Implement voltage propagation through closed switches. 5) Create useSimulation hook with 20Hz update loop using requestAnimationFrame. 6) Add current flow animation system for powered wires.",
+        "updatedAt": "2026-01-28T13:42:50.442Z"
       },
       {
         "id": "43",
@@ -3638,7 +3646,7 @@
         "dependencies": [
           "49"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -3646,9 +3654,10 @@
             "description": "Create parsing logic for standard Modbus address prefixes (C:, DI:, H:, IR:) with support for both hexadecimal (0x prefix) and decimal address formats.",
             "dependencies": [],
             "details": "Implement the core address prefix parsing functionality in `src/components/ScenarioEditor/utils/addressParser.ts`:\n\n1. Define the ADDRESS_PREFIXES constant mapping prefixes to memory types:\n   - 'C:' → 'coil'\n   - 'DI:' → 'discrete'\n   - 'H:' → 'holding'\n   - 'IR:' → 'input'\n\n2. Create `parsePrefixedAddress(input: string): ParsedAddress | null` function:\n   - Case-insensitive prefix matching (C:, c:, DI:, di:, etc.)\n   - Detect hex format: if address starts with '0x' or '0X', parse as hexadecimal\n   - Parse decimal format: standard number parsing\n   - Validate address is non-negative integer within valid range (0-65535)\n   - Return ParsedAddress object with type, address number, and original input string\n   - Return null for invalid formats\n\n3. Handle edge cases:\n   - Whitespace trimming\n   - Empty strings\n   - Invalid hex characters\n   - Overflow values",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests covering: valid prefix formats (C:0x0001, DI:100, H:0xFFFF, IR:0), case variations (c:100, C:100, di:0x10), invalid inputs (C:, C:abc, C:-1, C:99999), edge cases (C:0, C:65535, whitespace handling).",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T17:11:28.729Z"
           },
           {
             "id": 2,
@@ -3658,9 +3667,10 @@
               1
             ],
             "details": "Add PLC alias parsing to `src/components/ScenarioEditor/utils/addressParser.ts`:\n\n1. Define PLC_ALIAS_PATTERNS array with regex patterns:\n   - M pattern: `/^M(\\d{4})$/i` → type: 'coil', offset: 0 (e.g., M0001 → C:0x0001)\n   - D pattern: `/^D(\\d{1,5})$/i` → type: 'holding', offset: 0 (e.g., D12345 → H:0x3039)\n   - Add extensible pattern structure for future PLC types\n\n2. Create `parseAliasAddress(input: string): ParsedAddress | null` function:\n   - Iterate through PLC_ALIAS_PATTERNS\n   - Match input against each pattern regex\n   - Extract numeric portion from matched groups\n   - Apply offset if defined in pattern\n   - Convert decimal number to appropriate address value\n   - Return ParsedAddress with inferred type and converted address\n\n3. Conversion logic:\n   - Parse captured digits as decimal integer\n   - Apply any offset transformation\n   - Store both the original alias string and converted address\n   - Handle leading zeros correctly (M0001 = address 1, not octal)",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests for: M pattern variations (M0001, M1234, M9999, m0001), D pattern variations (D1, D12345, D65535, d100), invalid aliases (M123, M12345, D123456, X0001), conversion accuracy (M0001=1, D12345=12345), case insensitivity.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T17:11:28.740Z"
           },
           {
             "id": 3,
@@ -3671,14 +3681,16 @@
               2
             ],
             "details": "Complete the public API in `src/components/ScenarioEditor/utils/addressParser.ts`:\n\n1. `parseAddress(input: string): ParsedAddress | null`:\n   - Trim and validate input is non-empty\n   - Try parsePrefixedAddress first (standard format)\n   - If null, try parseAliasAddress (PLC format)\n   - Return result or null if neither matches\n\n2. `formatAddress(parsed: ParsedAddress): string`:\n   - Map type to prefix: coil→'C:', discrete→'DI:', holding→'H:', input→'IR:'\n   - Format address as hex with 0x prefix: `0x${address.toString(16).toUpperCase().padStart(4, '0')}`\n   - Return concatenated prefix + formatted address\n\n3. `isValidAddress(input: string): boolean`:\n   - Simply return `parseAddress(input) !== null`\n   - Provides convenient boolean check for validation\n\n4. `addressToMemoryType(input: string): MemoryType | null`:\n   - Import MemoryType from existing types\n   - Parse address and map parsed.type to MemoryType enum\n   - Return null if parsing fails\n   - Handle mapping: 'coil'→Coil, 'discrete'→DiscreteInput, 'holding'→HoldingRegister, 'input'→InputRegister\n\n5. Export all functions and types from the module",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Integration tests for: parseAddress combining both formats, formatAddress roundtrip (parse then format), isValidAddress boolean responses, addressToMemoryType enum mapping, null handling for invalid inputs, full roundtrip tests (parse→format→parse equality).",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T17:11:28.751Z"
           }
         ],
         "complexity": 4,
         "recommendedSubtasks": 3,
-        "expansionPrompt": "Break down into: 1) Implement address prefix parsing for standard formats (C:, DI:, H:, IR:) with hex and decimal support. 2) Implement PLC alias pattern matching (M0001 -> C:0x0001, D12345 -> H:0x3039). 3) Create validation and conversion utilities (parseAddress, formatAddress, isValidAddress, addressToMemoryType)."
+        "expansionPrompt": "Break down into: 1) Implement address prefix parsing for standard formats (C:, DI:, H:, IR:) with hex and decimal support. 2) Implement PLC alias pattern matching (M0001 -> C:0x0001, D12345 -> H:0x3039). 3) Create validation and conversion utilities (parseAddress, formatAddress, isValidAddress, addressToMemoryType).",
+        "updatedAt": "2026-01-28T17:11:28.751Z"
       },
       {
         "id": "51",
@@ -3690,7 +3702,7 @@
         "dependencies": [
           "49"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -3698,9 +3710,10 @@
             "description": "Create the TypeScript interfaces for ScenarioStoreState including scenario data, execution state tracking, and selection management, following the established patterns from modbusStore.ts.",
             "dependencies": [],
             "details": "Create `src/stores/scenarioStore.ts` with type definitions:\n\n1. **Scenario Types** (from PRD):\n   - `ScenarioEvent` interface with id, time, address, value, persist, persistDuration, note, enabled fields\n   - `ScenarioMetadata` interface with name, description, createdAt, updatedAt, author\n   - `ScenarioSettings` interface with loop, loopCount, loopDelay, autoStart\n   - `Scenario` interface combining metadata, settings, and events array\n\n2. **Execution State**:\n   - `ScenarioExecutionState` interface with isRunning, isPaused, currentTime, currentEventIndex, completedEvents (string[]), loopIteration, error\n\n3. **Store State Interface**:\n   ```typescript\n   interface ScenarioStoreState {\n     scenario: Scenario | null;\n     isDirty: boolean;\n     filePath: string | null;\n     executionState: ScenarioExecutionState;\n     selectedEventIds: string[];\n     editingEventId: string | null;\n   }\n   ```\n\n4. Define `initialState` constant with default values (null scenario, empty execution state, empty selection)\n\n5. Set up store skeleton with `create`, `devtools`, and `immer` middleware following modbusStore pattern:\n   ```typescript\n   export const useScenarioStore = create<ScenarioStore>()(\n     devtools(\n       immer((set, get) => ({ ... })),\n       { name: 'scenario-store' }\n     )\n   );\n   ```",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify TypeScript compilation succeeds with all interfaces. Test that initial state matches expected defaults. Ensure store can be created and accessed without errors.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T17:12:43.128Z"
           },
           {
             "id": 2,
@@ -3710,9 +3723,10 @@
               1
             ],
             "details": "Add scenario CRUD actions to the store:\n\n1. **newScenario()**:\n   - Reset scenario to default with empty events array\n   - Set metadata with current timestamp, empty name/description/author\n   - Set default settings (loop: false, loopCount: 0, loopDelay: 1000, autoStart: false)\n   - Clear filePath, set isDirty to false\n   - Reset execution state and selection\n\n2. **loadScenario(scenario: Scenario, filePath?: string)**:\n   - Set scenario data directly\n   - Update filePath if provided\n   - Set isDirty to false\n   - Reset execution state\n   - Clear selection\n   - Sort events by time on load\n\n3. **updateMetadata(metadata: Partial<ScenarioMetadata>)**:\n   - Merge partial metadata with existing\n   - Update `updatedAt` timestamp automatically\n   - Set isDirty to true\n   - Use immer for immutable updates\n\n4. **updateSettings(settings: Partial<ScenarioSettings>)**:\n   - Merge partial settings with existing\n   - Update metadata.updatedAt\n   - Set isDirty to true\n\n5. **Helper: markDirty()**:\n   - Private helper to set isDirty and update timestamp\n\n6. **reset()**:\n   - Reset entire store to initialState (following modbusStore pattern)\n\nDevtools action names: 'newScenario', 'loadScenario', 'updateMetadata', 'updateSettings', 'reset'",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests for: newScenario creates valid empty scenario, loadScenario sets all fields correctly, updateMetadata/updateSettings partially update and mark dirty, reset returns to initial state. Test dirty flag transitions.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T17:12:43.139Z"
           },
           {
             "id": 3,
@@ -3722,9 +3736,10 @@
               1
             ],
             "details": "Add event CRUD actions with auto-sorting:\n\n1. **ID Generator**:\n   - Create `generateEventId()` using nanoid or crypto.randomUUID()\n\n2. **sortEventsByTime()** helper:\n   - Sort events array by time field ascending\n   - Call after any event modification\n\n3. **addEvent(event: Omit<ScenarioEvent, 'id'>): string**:\n   - Generate unique id\n   - Add event with defaults: enabled=true, persist=true\n   - Sort events by time\n   - Mark dirty, return new id\n\n4. **updateEvent(id: string, updates: Partial<ScenarioEvent>)**:\n   - Find event by id and merge updates\n   - If time was updated, re-sort events\n   - Mark dirty\n\n5. **removeEvent(id: string)**:\n   - Filter out event by id\n   - Remove from selectedEventIds if selected\n   - Clear editingEventId if editing this event\n   - Mark dirty\n\n6. **duplicateEvent(id: string): string**:\n   - Clone event with new id\n   - Optionally offset time slightly (e.g., +0.1s)\n   - Insert after original, sort by time\n   - Mark dirty, return new id\n\n7. **reorderEvents(fromIndex: number, toIndex: number)**:\n   - Manual reorder (for drag-drop), updates time values to maintain order\n   - Recalculate times based on position or swap times\n   - Mark dirty\n\n8. **toggleEventEnabled(id: string)**:\n   - Toggle enabled field\n   - Mark dirty\n\nDevtools action names: 'addEvent/{id}', 'updateEvent/{id}', 'removeEvent/{id}', 'duplicateEvent/{id}', 'reorderEvents', 'toggleEventEnabled/{id}'",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests for: addEvent generates unique ID and sorts correctly, updateEvent merges and re-sorts on time change, removeEvent cleans up selection state, duplicateEvent creates valid clone, reorderEvents updates order, toggleEventEnabled toggles. Test auto-sort after all modifications.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T17:12:43.150Z"
           },
           {
             "id": 4,
@@ -3735,14 +3750,16 @@
               3
             ],
             "details": "Add selection, bulk operations, and execution state actions:\n\n**Selection Actions:**\n1. **selectEvent(id: string, multi?: boolean)**:\n   - If multi=false (default): replace selection with single id\n   - If multi=true: toggle id in/out of selection array\n   - Clear editingEventId when selection changes\n\n2. **selectRange(fromId: string, toId: string)**:\n   - Find indices of both events in sorted array\n   - Select all events between them (inclusive)\n   - Use for Shift+click selection\n\n3. **clearSelection()**:\n   - Set selectedEventIds to empty array\n   - Clear editingEventId\n\n4. **setEditingEventId(id: string | null)**:\n   - Set the currently editing event for inline editing\n\n**Bulk Operations:**\n5. **removeSelectedEvents()**:\n   - Remove all events in selectedEventIds\n   - Clear selection afterward\n   - Mark dirty\n\n6. **enableSelectedEvents()**:\n   - Set enabled=true for all selected events\n   - Mark dirty\n\n7. **disableSelectedEvents()**:\n   - Set enabled=false for all selected events\n   - Mark dirty\n\n**Execution State Actions:**\n8. **setExecutionState(state: Partial<ScenarioExecutionState>)**:\n   - Merge partial state updates\n   - For event-driven updates from Tauri backend\n\n9. **resetExecution()**:\n   - Reset to initial execution state (isRunning: false, isPaused: false, currentTime: 0, currentEventIndex: 0, completedEvents: [], loopIteration: 0, error: null)\n\n**Selectors:**\n- selectScenario, selectEvents, selectSelectedEvents, selectExecutionState, selectIsDirty, selectEnabledEvents",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit tests for: selectEvent single/multi modes, selectRange selects correct range, clearSelection resets state, bulk operations affect only selected events, execution state updates merge correctly, resetExecution returns to defaults. Test selection edge cases (empty, already selected, invalid ids).",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-28T17:12:43.160Z"
           }
         ],
         "complexity": 5,
         "recommendedSubtasks": 4,
-        "expansionPrompt": "Break down into: 1) Define state interface with scenario, execution state, and selection state following modbusStore patterns. 2) Implement scenario CRUD actions (newScenario, loadScenario, updateMetadata, updateSettings). 3) Implement event CRUD actions (addEvent, updateEvent, removeEvent, duplicateEvent) with auto-sorting by time. 4) Implement selection and bulk operations (selectEvent, selectRange, removeSelectedEvents, enable/disable selected)."
+        "expansionPrompt": "Break down into: 1) Define state interface with scenario, execution state, and selection state following modbusStore patterns. 2) Implement scenario CRUD actions (newScenario, loadScenario, updateMetadata, updateSettings). 3) Implement event CRUD actions (addEvent, updateEvent, removeEvent, duplicateEvent) with auto-sorting by time. 4) Implement selection and bulk operations (selectEvent, selectRange, removeSelectedEvents, enable/disable selected).",
+        "updatedAt": "2026-01-28T17:12:43.160Z"
       },
       {
         "id": "52",
@@ -4346,9 +4363,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-01-28T13:30:55.217Z",
+      "lastModified": "2026-01-28T17:12:43.160Z",
       "taskCount": 60,
-      "completedCount": 41,
+      "completedCount": 45,
       "tags": [
         "master"
       ]
