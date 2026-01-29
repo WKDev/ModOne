@@ -6,6 +6,7 @@ pub mod commands;
 pub mod error;
 pub mod logging;
 pub mod modbus;
+pub mod parser;
 pub mod project;
 pub mod scenario;
 
