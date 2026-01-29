@@ -25,7 +25,9 @@ import { ContactProperties } from './ContactProperties';
 import { CoilProperties } from './CoilProperties';
 import { TimerProperties } from './TimerProperties';
 import { CounterProperties } from './CounterProperties';
+import { CompareProperties } from './CompareProperties';
 import { DeviceSelectDialog } from '../dialogs';
+import type { CompareElement } from '../../../types/ladder';
 
 export interface LadderPropertiesPanelProps {
   /** Optional class name */
@@ -169,11 +171,13 @@ function SingleElementProperties({
   }
 
   if (isCompareElement(element)) {
-    // Compare properties will be added in subtask 4
     return (
-      <div className="p-4 text-sm text-neutral-400">
-        Compare block properties (coming soon)
-      </div>
+      <CompareProperties
+        element={element}
+        onUpdate={onUpdate as (updates: Partial<CompareElement>) => void}
+        disabled={disabled}
+        onDeviceSelect={onDeviceSelect}
+      />
     );
   }
 

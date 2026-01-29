@@ -21,3 +21,9 @@ export type { TimerPropertiesProps } from './TimerProperties';
 
 export { CounterProperties } from './CounterProperties';
 export type { CounterPropertiesProps } from './CounterProperties';
+
+export { CompareProperties } from './CompareProperties';
+export type { ComparePropertiesProps } from './CompareProperties';
+
+export { OperandField } from './OperandField';
+export type { OperandFieldProps, OperandMode } from './OperandField';
