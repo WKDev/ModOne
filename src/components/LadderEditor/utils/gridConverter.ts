@@ -642,6 +642,570 @@ export function getNodeStats(node: LadderNode): {
   return stats;
 }
 
+// ============================================================================
+// Grid to AST Conversion Types
+// ============================================================================
+
+/** Parallel group detected from wire topology */
+export interface ParallelGroup {
+  /** Starting column of the parallel group */
+  startColumn: number;
+  /** Ending column of the parallel group */
+  endColumn: number;
+  /** Rows that are part of this parallel group */
+  rows: number[];
+}
+
+/** Row groups - elements grouped by row and sorted by column */
+export type RowGroups = Map<number, LadderElement[]>;
+
+// ============================================================================
+// Grid to AST Conversion Functions
+// ============================================================================
+
+/**
+ * Group elements by row and sort by column within each row
+ */
+export function groupElementsByRow(
+  elements: Map<string, LadderElement>
+): RowGroups {
+  const rows = new Map<number, LadderElement[]>();
+
+  for (const element of elements.values()) {
+    // Skip wire and rail elements
+    if (
+      element.type.startsWith('wire_') ||
+      element.type === 'power_rail' ||
+      element.type === 'neutral_rail'
+    ) {
+      continue;
+    }
+
+    const row = element.position.row;
+    if (!rows.has(row)) {
+      rows.set(row, []);
+    }
+    rows.get(row)!.push(element);
+  }
+
+  // Sort elements in each row by column
+  for (const [, elements] of rows) {
+    elements.sort((a, b) => a.position.col - b.position.col);
+  }
+
+  return rows;
+}
+
+/**
+ * Detect parallel groups from wire topology
+ */
+export function detectParallelGroups(
+  rowGroups: RowGroups,
+  wires: LadderWire[]
+): ParallelGroup[] {
+  const groups: ParallelGroup[] = [];
+
+  // Find vertical wires that indicate parallel connections
+  const verticalWires = wires.filter((w) => w.type === 'vertical');
+
+  if (verticalWires.length === 0 || rowGroups.size <= 1) {
+    return groups;
+  }
+
+  // Get all rows from rowGroups
+  const allRows = Array.from(rowGroups.keys()).sort((a, b) => a - b);
+
+  if (allRows.length <= 1) {
+    return groups;
+  }
+
+  // Build column-based wire map to find branching points
+  const columnWires = new Map<number, Set<number>>();
+
+  for (const wire of verticalWires) {
+    // Find the column where this vertical wire exists by looking at connected elements
+    // This is approximate - we look at element positions
+    const fromElement = findElementByWireEndpoint(
+      wire.from.elementId,
+      rowGroups
+    );
+    const toElement = findElementByWireEndpoint(wire.to.elementId, rowGroups);
+
+    if (fromElement && toElement) {
+      const col = Math.min(fromElement.position.col, toElement.position.col);
+      if (!columnWires.has(col)) {
+        columnWires.set(col, new Set());
+      }
+      columnWires.get(col)!.add(fromElement.position.row);
+      columnWires.get(col)!.add(toElement.position.row);
+    }
+  }
+
+  // Create parallel groups from connected rows
+  for (const [col, connectedRows] of columnWires) {
+    if (connectedRows.size >= 2) {
+      const rowArray = Array.from(connectedRows).sort((a, b) => a - b);
+
+      // Find the end column for this group (next branching point or max column)
+      let endCol = col;
+      for (const [otherCol] of columnWires) {
+        if (otherCol > col) {
+          endCol = otherCol;
+          break;
+        }
+      }
+
+      // Get max column from elements if no other branch point
+      if (endCol === col) {
+        for (const row of rowArray) {
+          const elements = rowGroups.get(row);
+          if (elements) {
+            const maxElemCol = Math.max(...elements.map((e) => e.position.col));
+            endCol = Math.max(endCol, maxElemCol);
+          }
+        }
+      }
+
+      groups.push({
+        startColumn: col,
+        endColumn: endCol,
+        rows: rowArray,
+      });
+    }
+  }
+
+  return groups;
+}
+
+/**
+ * Find element by wire endpoint element ID
+ */
+function findElementByWireEndpoint(
+  elementId: string,
+  rowGroups: RowGroups
+): LadderElement | null {
+  for (const elements of rowGroups.values()) {
+    const element = elements.find((e) => e.id === elementId);
+    if (element) return element;
+  }
+  return null;
+}
+
+/**
+ * Map editor element type to AST node type
+ */
+function mapElementTypeToNodeType(
+  elementType: LadderElementType
+): LadderNode['type'] | null {
+  const typeMap: Record<string, LadderNode['type']> = {
+    // Contacts
+    contact_no: 'contact_no',
+    contact_nc: 'contact_nc',
+    contact_p: 'contact_p',
+    contact_n: 'contact_n',
+    // Coils
+    coil: 'coil_out',
+    coil_set: 'coil_set',
+    coil_reset: 'coil_rst',
+    // Timers
+    timer_ton: 'timer_ton',
+    timer_tof: 'timer_tof',
+    timer_tmr: 'timer_tmr',
+    // Counters
+    counter_ctu: 'counter_ctu',
+    counter_ctd: 'counter_ctd',
+    counter_ctud: 'counter_ctud',
+    // Comparison
+    compare_eq: 'comparison',
+    compare_gt: 'comparison',
+    compare_lt: 'comparison',
+    compare_ge: 'comparison',
+    compare_le: 'comparison',
+    compare_ne: 'comparison',
+  };
+
+  return typeMap[elementType] ?? null;
+}
+
+/**
+ * Parse address string to DeviceAddress
+ */
+function parseAddressString(address: string): DeviceAddress | null {
+  if (!address || address.length < 2) return null;
+
+  const device = address.charAt(0).toUpperCase();
+  const rest = address.slice(1);
+
+  // Check for bit index
+  const dotIndex = rest.indexOf('.');
+  let addressNum: number;
+  let bitIndex: number | undefined;
+
+  if (dotIndex >= 0) {
+    addressNum = parseInt(rest.slice(0, dotIndex), 10);
+    bitIndex = parseInt(rest.slice(dotIndex + 1), 10);
+  } else {
+    addressNum = parseInt(rest, 10);
+  }
+
+  if (isNaN(addressNum)) return null;
+
+  return {
+    device: device as DeviceAddress['device'],
+    address: addressNum,
+    bitIndex,
+  };
+}
+
+/**
+ * Convert a single element to an AST node
+ */
+function elementToASTNode(element: LadderElement): LadderNode | null {
+  const nodeType = mapElementTypeToNodeType(element.type);
+  if (!nodeType) return null;
+
+  const address = element.address
+    ? parseAddressString(element.address)
+    : { device: 'M' as const, address: 0 };
+
+  if (!address) return null;
+
+  const baseNode = {
+    id: element.id,
+    gridPosition: element.position,
+    comment: element.label ?? element.properties?.comment,
+  };
+
+  switch (nodeType) {
+    case 'contact_no':
+    case 'contact_nc':
+    case 'contact_p':
+    case 'contact_n':
+      return {
+        ...baseNode,
+        type: nodeType,
+        address,
+      } as ContactNode;
+
+    case 'coil_out':
+    case 'coil_set':
+    case 'coil_rst':
+      return {
+        ...baseNode,
+        type: nodeType,
+        address,
+      } as CoilNode;
+
+    case 'timer_ton':
+    case 'timer_tof':
+    case 'timer_tmr': {
+      const timerProps = element.properties as TimerProperties;
+      return {
+        ...baseNode,
+        type: nodeType,
+        address,
+        preset: timerProps?.presetTime ?? 100,
+        timeBase: timerProps?.timeBase ?? 'ms',
+      } as TimerNode;
+    }
+
+    case 'counter_ctu':
+    case 'counter_ctd':
+    case 'counter_ctud': {
+      const counterProps = element.properties as CounterProperties;
+      return {
+        ...baseNode,
+        type: nodeType,
+        address,
+        preset: counterProps?.presetValue ?? 10,
+      } as CounterNode;
+    }
+
+    case 'comparison': {
+      const compareProps = element.properties as CompareProperties;
+      const operator = compareProps?.operator ?? '=';
+      const compareValue = compareProps?.compareValue ?? 0;
+
+      return {
+        ...baseNode,
+        type: nodeType,
+        operator,
+        operand1: address,
+        operand2:
+          typeof compareValue === 'number'
+            ? compareValue
+            : parseAddressString(compareValue) ?? 0,
+      } as ComparisonNode;
+    }
+
+    default:
+      return null;
+  }
+}
+
+/**
+ * Build AST from row groups and parallel groups
+ */
+export function buildASTFromGroups(
+  rowGroups: RowGroups,
+  parallelGroups: ParallelGroup[]
+): LadderNode | null {
+  const rows = Array.from(rowGroups.keys()).sort((a, b) => a - b);
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  // Single row - create series node
+  if (rows.length === 1 && parallelGroups.length === 0) {
+    const elements = rowGroups.get(rows[0])!;
+    const nodes = elements.map(elementToASTNode).filter((n): n is LadderNode => n !== null);
+
+    if (nodes.length === 0) return null;
+    if (nodes.length === 1) return nodes[0];
+
+    return {
+      id: `block-${Date.now()}`,
+      type: 'block_series',
+      children: nodes,
+      gridPosition: { row: rows[0], col: 0 },
+    } as BlockNode;
+  }
+
+  // Multiple rows or parallel groups - create parallel structure
+  if (parallelGroups.length > 0) {
+    return buildParallelAST(rowGroups, parallelGroups);
+  }
+
+  // Multiple rows without detected parallel groups - treat as independent series
+  const branches: LadderNode[] = [];
+
+  for (const row of rows) {
+    const elements = rowGroups.get(row)!;
+    const nodes = elements.map(elementToASTNode).filter((n): n is LadderNode => n !== null);
+
+    if (nodes.length > 0) {
+      if (nodes.length === 1) {
+        branches.push(nodes[0]);
+      } else {
+        branches.push({
+          id: `series-${row}-${Date.now()}`,
+          type: 'block_series',
+          children: nodes,
+          gridPosition: { row, col: 0 },
+        } as BlockNode);
+      }
+    }
+  }
+
+  if (branches.length === 0) return null;
+  if (branches.length === 1) return branches[0];
+
+  return {
+    id: `parallel-${Date.now()}`,
+    type: 'block_parallel',
+    children: branches,
+    gridPosition: { row: rows[0], col: 0 },
+  } as BlockNode;
+}
+
+/**
+ * Build parallel AST from detected parallel groups
+ */
+function buildParallelAST(
+  rowGroups: RowGroups,
+  parallelGroups: ParallelGroup[]
+): LadderNode | null {
+  // Simple case: one parallel group covering all rows
+  if (parallelGroups.length === 1) {
+    const group = parallelGroups[0];
+    const branches: LadderNode[] = [];
+
+    for (const row of group.rows) {
+      const elements = rowGroups.get(row);
+      if (!elements) continue;
+
+      // Filter elements within the parallel group columns
+      const groupElements = elements.filter(
+        (e) => e.position.col >= group.startColumn && e.position.col <= group.endColumn
+      );
+
+      const nodes = groupElements.map(elementToASTNode).filter((n): n is LadderNode => n !== null);
+
+      if (nodes.length > 0) {
+        if (nodes.length === 1) {
+          branches.push(nodes[0]);
+        } else {
+          branches.push({
+            id: `series-${row}-${Date.now()}`,
+            type: 'block_series',
+            children: nodes,
+            gridPosition: { row, col: group.startColumn },
+          } as BlockNode);
+        }
+      }
+    }
+
+    if (branches.length === 0) return null;
+    if (branches.length === 1) return branches[0];
+
+    return {
+      id: `parallel-${Date.now()}`,
+      type: 'block_parallel',
+      children: branches,
+      gridPosition: { row: group.rows[0], col: group.startColumn },
+    } as BlockNode;
+  }
+
+  // Multiple parallel groups - build nested structure
+  const allRows = Array.from(rowGroups.keys()).sort((a, b) => a - b);
+  const branches: LadderNode[] = [];
+
+  for (const row of allRows) {
+    const elements = rowGroups.get(row);
+    if (!elements) continue;
+
+    const nodes = elements.map(elementToASTNode).filter((n): n is LadderNode => n !== null);
+
+    if (nodes.length > 0) {
+      if (nodes.length === 1) {
+        branches.push(nodes[0]);
+      } else {
+        branches.push({
+          id: `series-${row}-${Date.now()}`,
+          type: 'block_series',
+          children: nodes,
+          gridPosition: { row, col: 0 },
+        } as BlockNode);
+      }
+    }
+  }
+
+  if (branches.length === 0) return null;
+  if (branches.length === 1) return branches[0];
+
+  return {
+    id: `parallel-${Date.now()}`,
+    type: 'block_parallel',
+    children: branches,
+    gridPosition: { row: allRows[0], col: 0 },
+  } as BlockNode;
+}
+
+/**
+ * Normalize AST by removing unnecessary nesting
+ */
+export function normalizeAST(ast: LadderNode | null): LadderNode | null {
+  if (!ast) return null;
+
+  // Non-block nodes are already normalized
+  if (!isBlockNode(ast)) {
+    return ast;
+  }
+
+  const block = ast as BlockNode;
+
+  // Recursively normalize children
+  const normalizedChildren = block.children
+    .map((child) => normalizeAST(child))
+    .filter((n): n is LadderNode => n !== null);
+
+  // Empty block -> null
+  if (normalizedChildren.length === 0) {
+    return null;
+  }
+
+  // Single child -> unwrap
+  if (normalizedChildren.length === 1) {
+    return normalizedChildren[0];
+  }
+
+  // Flatten nested same-type blocks
+  const flattenedChildren: LadderNode[] = [];
+  for (const child of normalizedChildren) {
+    if (isBlockNode(child) && (child as BlockNode).type === block.type) {
+      // Flatten: same-type block inside block
+      flattenedChildren.push(...(child as BlockNode).children);
+    } else {
+      flattenedChildren.push(child);
+    }
+  }
+
+  // Sort parallel branches consistently (by first element's row)
+  if (block.type === 'block_parallel') {
+    flattenedChildren.sort((a, b) => {
+      const rowA = a.gridPosition?.row ?? 0;
+      const rowB = b.gridPosition?.row ?? 0;
+      return rowA - rowB;
+    });
+  }
+
+  return {
+    ...block,
+    children: flattenedChildren,
+  };
+}
+
+/**
+ * Convert ladder grid to AST format
+ *
+ * @param elements - Map of element ID to LadderElement
+ * @param wires - Array of wire connections
+ * @returns Normalized AST node or null if empty
+ */
+export function gridToAST(
+  elements: Map<string, LadderElement>,
+  wires: LadderWire[]
+): LadderNode | null {
+  // Handle empty grid
+  if (elements.size === 0) {
+    return null;
+  }
+
+  // Step 1: Group elements by row
+  const rowGroups = groupElementsByRow(elements);
+
+  // Handle no logic elements (only wires/rails)
+  if (rowGroups.size === 0) {
+    return null;
+  }
+
+  // Step 2: Detect parallel connections from wires
+  const parallelGroups = detectParallelGroups(rowGroups, wires);
+
+  // Step 3: Build AST from groups
+  const rawAST = buildASTFromGroups(rowGroups, parallelGroups);
+
+  // Step 4: Normalize AST
+  return normalizeAST(rawAST);
+}
+
+/**
+ * Convert editor LadderNetwork to AST LadderNetwork
+ */
+export function convertEditorNetworkToAST(
+  network: LadderNetwork
+): LadderNetworkAST | null {
+  const ast = gridToAST(network.elements, network.wires);
+
+  if (!ast) {
+    return null;
+  }
+
+  // Flatten the AST to get all nodes as a flat list for the network
+  const nodes = flattenNodes(ast).filter((n) => !isBlockNode(n));
+
+  // If the root is a series or simple node, use it directly
+  const resultNodes = isBlockNode(ast) ? nodes : [ast];
+
+  return {
+    id: network.id,
+    step: parseInt(network.label?.replace(/\D/g, '') ?? '1', 10),
+    nodes: resultNodes,
+    comment: network.comment,
+  };
+}
+
 export default {
   convertNodeToGrid,
   convertNetworkToGrid,
@@ -650,4 +1214,11 @@ export default {
   flattenNodes,
   getNodeStats,
   calculateNodeDimensions,
+  // Grid to AST exports
+  groupElementsByRow,
+  detectParallelGroups,
+  buildASTFromGroups,
+  normalizeAST,
+  gridToAST,
+  convertEditorNetworkToAST,
 };

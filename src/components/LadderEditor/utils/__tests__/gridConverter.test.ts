@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import {
+import gridConverter, {
   convertNodeToGrid,
   convertNetworkToGrid,
   convertToEditorNetwork,
@@ -24,6 +24,7 @@ import type {
   LadderNetwork as LadderNetworkAST,
   DeviceAddress,
 } from '../../../OneParser/types';
+import type { LadderElement } from '../../../../types/ladder';
 import { isContactElement, isCoilElement, isTimerElement, isCounterElement } from '../../../../types/ladder';
 
 // ============================================================================
@@ -625,6 +626,333 @@ describe('gridConverter', () => {
       const result = convertNodeToGrid(block);
 
       expect(result.elements).toHaveLength(3);
+    });
+  });
+});
+
+// ============================================================================
+// Grid to AST Conversion Tests
+// ============================================================================
+
+describe('Grid to AST Conversion', () => {
+  // Import Grid to AST functions
+  const {
+    groupElementsByRow,
+    detectParallelGroups,
+    buildASTFromGroups,
+    normalizeAST,
+    gridToAST,
+  } = gridConverter;
+
+  // Helper to create editor elements
+  function createEditorContact(
+    id: string,
+    row: number,
+    col: number,
+    device: string,
+    address: number
+  ): LadderElement {
+    return {
+      id,
+      type: 'contact_no',
+      position: { row, col },
+      address: `${device}${address.toString().padStart(4, '0')}`,
+      properties: {},
+    } as LadderElement;
+  }
+
+  function createEditorCoil(
+    id: string,
+    row: number,
+    col: number,
+    device: string,
+    address: number
+  ): LadderElement {
+    return {
+      id,
+      type: 'coil',
+      position: { row, col },
+      address: `${device}${address.toString().padStart(4, '0')}`,
+      properties: {},
+    } as LadderElement;
+  }
+
+  function createEditorTimer(
+    id: string,
+    row: number,
+    col: number,
+    address: number,
+    preset: number = 100
+  ): LadderElement {
+    return {
+      id,
+      type: 'timer_ton',
+      position: { row, col },
+      address: `T${address.toString().padStart(4, '0')}`,
+      properties: {
+        presetTime: preset,
+        timeBase: 'ms',
+      },
+    } as LadderElement;
+  }
+
+  describe('groupElementsByRow', () => {
+    it('returns empty map for empty input', () => {
+      const result = groupElementsByRow(new Map());
+      expect(result.size).toBe(0);
+    });
+
+    it('groups single element correctly', () => {
+      const elements = new Map<string, LadderElement>();
+      elements.set('e1', createEditorContact('e1', 0, 0, 'M', 0));
+
+      const result = groupElementsByRow(elements);
+
+      expect(result.size).toBe(1);
+      expect(result.get(0)).toHaveLength(1);
+    });
+
+    it('groups multiple elements in same row', () => {
+      const elements = new Map<string, LadderElement>();
+      elements.set('e1', createEditorContact('e1', 0, 0, 'M', 0));
+      elements.set('e2', createEditorContact('e2', 0, 1, 'M', 1));
+      elements.set('e3', createEditorCoil('e3', 0, 2, 'M', 10));
+
+      const result = groupElementsByRow(elements);
+
+      expect(result.size).toBe(1);
+      expect(result.get(0)).toHaveLength(3);
+    });
+
+    it('sorts elements by column within row', () => {
+      const elements = new Map<string, LadderElement>();
+      elements.set('e3', createEditorContact('e3', 0, 2, 'M', 2));
+      elements.set('e1', createEditorContact('e1', 0, 0, 'M', 0));
+      elements.set('e2', createEditorContact('e2', 0, 1, 'M', 1));
+
+      const result = groupElementsByRow(elements);
+      const row0 = result.get(0)!;
+
+      expect(row0[0].id).toBe('e1');
+      expect(row0[1].id).toBe('e2');
+      expect(row0[2].id).toBe('e3');
+    });
+
+    it('groups elements in different rows', () => {
+      const elements = new Map<string, LadderElement>();
+      elements.set('e1', createEditorContact('e1', 0, 0, 'M', 0));
+      elements.set('e2', createEditorContact('e2', 1, 0, 'M', 1));
+      elements.set('e3', createEditorContact('e3', 2, 0, 'M', 2));
+
+      const result = groupElementsByRow(elements);
+
+      expect(result.size).toBe(3);
+      expect(result.get(0)).toHaveLength(1);
+      expect(result.get(1)).toHaveLength(1);
+      expect(result.get(2)).toHaveLength(1);
+    });
+
+    it('skips wire elements', () => {
+      const elements = new Map<string, LadderElement>();
+      elements.set('e1', createEditorContact('e1', 0, 0, 'M', 0));
+      elements.set('w1', {
+        id: 'w1',
+        type: 'wire_h',
+        position: { row: 0, col: 1 },
+        properties: {},
+      } as LadderElement);
+
+      const result = groupElementsByRow(elements);
+
+      expect(result.size).toBe(1);
+      expect(result.get(0)).toHaveLength(1);
+    });
+  });
+
+  describe('gridToAST', () => {
+    it('returns null for empty grid', () => {
+      const result = gridToAST(new Map(), []);
+      expect(result).toBeNull();
+    });
+
+    it('returns null for grid with only wires', () => {
+      const elements = new Map<string, LadderElement>();
+      elements.set('w1', {
+        id: 'w1',
+        type: 'wire_h',
+        position: { row: 0, col: 0 },
+        properties: {},
+      } as LadderElement);
+
+      const result = gridToAST(elements, []);
+      expect(result).toBeNull();
+    });
+
+    it('converts single element to single node', () => {
+      const elements = new Map<string, LadderElement>();
+      elements.set('e1', createEditorContact('e1', 0, 0, 'M', 0));
+
+      const result = gridToAST(elements, []);
+
+      expect(result).not.toBeNull();
+      expect(result!.type).toBe('contact_no');
+    });
+
+    it('converts single row to series node', () => {
+      const elements = new Map<string, LadderElement>();
+      elements.set('e1', createEditorContact('e1', 0, 0, 'M', 0));
+      elements.set('e2', createEditorContact('e2', 0, 1, 'M', 1));
+      elements.set('e3', createEditorCoil('e3', 0, 2, 'M', 10));
+
+      const result = gridToAST(elements, []);
+
+      expect(result).not.toBeNull();
+      expect(result!.type).toBe('block_series');
+      expect((result as BlockNode).children).toHaveLength(3);
+    });
+
+    it('converts multiple rows to parallel node', () => {
+      const elements = new Map<string, LadderElement>();
+      elements.set('e1', createEditorContact('e1', 0, 0, 'M', 0));
+      elements.set('e2', createEditorContact('e2', 1, 0, 'M', 1));
+
+      const result = gridToAST(elements, []);
+
+      expect(result).not.toBeNull();
+      expect(result!.type).toBe('block_parallel');
+      expect((result as BlockNode).children).toHaveLength(2);
+    });
+
+    it('preserves timer properties', () => {
+      const elements = new Map<string, LadderElement>();
+      elements.set('t1', createEditorTimer('t1', 0, 0, 0, 500));
+
+      const result = gridToAST(elements, []);
+
+      expect(result).not.toBeNull();
+      expect(result!.type).toBe('timer_ton');
+      expect((result as TimerNode).preset).toBe(500);
+      expect((result as TimerNode).timeBase).toBe('ms');
+    });
+
+    it('parses address correctly', () => {
+      const elements = new Map<string, LadderElement>();
+      elements.set('e1', createEditorContact('e1', 0, 0, 'M', 1234));
+
+      const result = gridToAST(elements, []);
+
+      expect(result).not.toBeNull();
+      expect((result as ContactNode).address.device).toBe('M');
+      expect((result as ContactNode).address.address).toBe(1234);
+    });
+  });
+
+  describe('normalizeAST', () => {
+    it('returns null for null input', () => {
+      const result = normalizeAST(null);
+      expect(result).toBeNull();
+    });
+
+    it('returns leaf node unchanged', () => {
+      const contact = createContactNode('contact_no', 'M', 0);
+      const result = normalizeAST(contact);
+
+      expect(result).toEqual(contact);
+    });
+
+    it('unwraps single-child block', () => {
+      const contact = createContactNode('contact_no', 'M', 0);
+      const block = createSeriesBlock([contact]);
+
+      const result = normalizeAST(block);
+
+      expect(result!.type).toBe('contact_no');
+    });
+
+    it('flattens nested same-type blocks', () => {
+      const inner = createSeriesBlock([
+        createContactNode('contact_no', 'M', 0),
+        createContactNode('contact_no', 'M', 1),
+      ]);
+      const outer = createSeriesBlock([
+        inner,
+        createContactNode('contact_no', 'M', 2),
+      ]);
+
+      const result = normalizeAST(outer);
+
+      expect(result!.type).toBe('block_series');
+      expect((result as BlockNode).children).toHaveLength(3);
+    });
+
+    it('removes empty blocks', () => {
+      const block: BlockNode = {
+        id: 'block-1',
+        type: 'block_series',
+        children: [],
+        gridPosition: { row: 0, col: 0 },
+      };
+
+      const result = normalizeAST(block);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('Round-trip conversion', () => {
+    it('single contact survives round-trip', () => {
+      // AST -> Grid
+      const originalAST = createContactNode('contact_no', 'M', 100);
+      const gridResult = convertNodeToGrid(originalAST);
+
+      // Grid -> AST
+      const elementsMap = new Map<string, LadderElement>();
+      for (const elem of gridResult.elements) {
+        elementsMap.set(elem.id, elem);
+      }
+      const reconstructedAST = gridToAST(elementsMap, gridResult.wires);
+
+      expect(reconstructedAST).not.toBeNull();
+      expect(reconstructedAST!.type).toBe('contact_no');
+      expect((reconstructedAST as ContactNode).address.device).toBe('M');
+      expect((reconstructedAST as ContactNode).address.address).toBe(100);
+    });
+
+    it('series of contacts survives round-trip', () => {
+      const originalAST = createSeriesBlock([
+        createContactNode('contact_no', 'M', 0),
+        createContactNode('contact_nc', 'M', 1),
+        createContactNode('contact_no', 'M', 2),
+      ]);
+      const gridResult = convertNodeToGrid(originalAST);
+
+      const elementsMap = new Map<string, LadderElement>();
+      for (const elem of gridResult.elements) {
+        elementsMap.set(elem.id, elem);
+      }
+      const reconstructedAST = gridToAST(elementsMap, gridResult.wires);
+
+      expect(reconstructedAST).not.toBeNull();
+      expect(reconstructedAST!.type).toBe('block_series');
+      expect((reconstructedAST as BlockNode).children).toHaveLength(3);
+    });
+
+    it('parallel structure survives round-trip', () => {
+      const originalAST = createParallelBlock([
+        createContactNode('contact_no', 'M', 0),
+        createContactNode('contact_no', 'M', 1),
+      ]);
+      const gridResult = convertNodeToGrid(originalAST);
+
+      const elementsMap = new Map<string, LadderElement>();
+      for (const elem of gridResult.elements) {
+        elementsMap.set(elem.id, elem);
+      }
+      const reconstructedAST = gridToAST(elementsMap, gridResult.wires);
+
+      expect(reconstructedAST).not.toBeNull();
+      expect(reconstructedAST!.type).toBe('block_parallel');
+      expect((reconstructedAST as BlockNode).children).toHaveLength(2);
     });
   });
 });
