@@ -37,6 +37,8 @@ export type {
   TimeBase,
   ComparisonOperator,
   MathOperator,
+  // Grid position
+  GridPosition,
   // Program structure
   LadderNetwork as LadderNetworkAST,
   SymbolEntry,
