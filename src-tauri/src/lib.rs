@@ -54,6 +54,9 @@ use commands::{
     // Scenario commands
     scenario_create, scenario_delete, scenario_exists, scenario_export_csv, scenario_import_csv,
     scenario_list, scenario_load, scenario_save,
+    // Scenario execution commands
+    scenario_run, scenario_pause, scenario_resume, scenario_stop, scenario_get_status,
+    scenario_get_state, ScenarioExecutorState,
     // Parser commands
     parser_format_modbus_address, parser_is_read_only, parser_load_program,
     parser_map_address_to_modbus, parser_map_modbus_to_address, parser_parse_csv_content,
@@ -86,6 +89,9 @@ pub fn run() {
     // Initialize Modbus state
     let modbus_state = ModbusState::default();
 
+    // Initialize Scenario Executor state (shares Modbus memory)
+    let scenario_executor_state = ScenarioExecutorState::new(modbus_state.memory.clone());
+
     // Initialize Canvas Sync state
     let canvas_sync_state = CanvasSyncState::default();
 
@@ -105,6 +111,7 @@ pub fn run() {
         .manage(project_manager)
         .manage(auto_save_manager)
         .manage(modbus_state)
+        .manage(scenario_executor_state)
         .manage(canvas_sync_state)
         .manage(sim_state)
         .manage(error_logger)
@@ -214,6 +221,13 @@ pub fn run() {
             scenario_list,
             scenario_delete,
             scenario_exists,
+            // Scenario execution commands
+            scenario_run,
+            scenario_pause,
+            scenario_resume,
+            scenario_stop,
+            scenario_get_status,
+            scenario_get_state,
             // Parser commands
             parser_parse_csv_file,
             parser_parse_csv_content,

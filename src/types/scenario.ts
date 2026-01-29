@@ -120,8 +120,100 @@ export interface ScenarioSettings {
 // Execution State
 // ============================================================================
 
-/** Scenario execution status */
+/** Scenario execution status (used by frontend store) */
 export type ScenarioStatus = 'idle' | 'running' | 'paused' | 'stopped';
+
+// ============================================================================
+// Backend Execution Status (from Tauri)
+// ============================================================================
+
+/** Scenario execution state from backend */
+export type BackendScenarioState = 'idle' | 'running' | 'paused' | 'completed' | { error: string };
+
+/**
+ * Execution status from the Rust backend
+ */
+export interface BackendScenarioStatus {
+  /** Current execution state */
+  state: BackendScenarioState;
+  /** Elapsed time in seconds */
+  elapsedTime: number;
+  /** Total number of events in scenario */
+  totalEvents: number;
+  /** Number of events executed */
+  executedEvents: number;
+  /** Current loop iteration (1-based) */
+  currentLoop: number;
+  /** Total loop count (0 = infinite) */
+  totalLoops: number;
+  /** Time until next event in seconds (if any) */
+  nextEventTime: number | null;
+  /** ID of the last executed event */
+  lastExecutedEventId: string | null;
+}
+
+/** Payload when an event is executed */
+export interface EventExecutedPayload {
+  eventId: string;
+  time: number;
+  address: string;
+  value: number;
+}
+
+/** Payload when a loop completes */
+export interface LoopCompletedPayload {
+  loopNumber: number;
+  totalLoops: number;
+}
+
+/** Payload when an execution error occurs */
+export interface ExecutionErrorPayload {
+  message: string;
+  eventId: string | null;
+}
+
+// ============================================================================
+// Backend Scenario Types (for Tauri IPC)
+// ============================================================================
+
+/**
+ * Scenario settings in backend format (matches Rust serde)
+ */
+export interface BackendScenarioSettings {
+  /** Whether to loop the scenario */
+  loopEnabled: boolean;
+  /** Number of loop iterations (0 = infinite) */
+  loopCount: number;
+  /** Delay between loops in ms */
+  loopDelay: number;
+  /** Whether to start automatically when loaded */
+  autoStart: boolean;
+}
+
+/**
+ * Scenario in backend format (matches Rust serde)
+ */
+export interface BackendScenario {
+  metadata: ScenarioMetadata;
+  settings: BackendScenarioSettings;
+  events: ScenarioEvent[];
+}
+
+/**
+ * Convert frontend scenario to backend format
+ */
+export function toBackendScenario(scenario: Scenario): BackendScenario {
+  return {
+    metadata: scenario.metadata,
+    settings: {
+      loopEnabled: scenario.settings.loop,
+      loopCount: scenario.settings.loopCount,
+      loopDelay: scenario.settings.loopDelay,
+      autoStart: scenario.settings.autoStart,
+    },
+    events: scenario.events,
+  };
+}
 
 /**
  * Runtime execution state for UI tracking

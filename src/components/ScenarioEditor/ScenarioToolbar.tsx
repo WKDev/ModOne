@@ -4,7 +4,7 @@
  * Toolbar for scenario execution controls, file operations, and settings.
  */
 
-import { memo, useState, useCallback } from 'react';
+import { memo, useState, useCallback, useEffect } from 'react';
 import {
   Play,
   Pause,
@@ -17,8 +17,10 @@ import {
   Download,
   Upload,
   ChevronDown,
+  AlertCircle,
 } from 'lucide-react';
 import { useScenarioStore, selectExecutionState, selectSettings } from '../../stores/scenarioStore';
+import { useScenarioExecution } from './hooks/useScenarioExecution';
 import type { ScenarioStatus } from '../../types/scenario';
 
 // ============================================================================
@@ -26,12 +28,6 @@ import type { ScenarioStatus } from '../../types/scenario';
 // ============================================================================
 
 interface ScenarioToolbarProps {
-  /** Callback when run is clicked */
-  onRun?: () => void;
-  /** Callback when pause is clicked */
-  onPause?: () => void;
-  /** Callback when stop is clicked */
-  onStop?: () => void;
   /** Callback when new scenario is requested */
   onNew?: () => void;
   /** Callback when open is requested */
@@ -64,20 +60,6 @@ function formatTime(seconds: number): string {
   const ms = Math.round((secs - wholeSecs) * 1000);
 
   return `${mins.toString().padStart(2, '0')}:${wholeSecs.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
-}
-
-/**
- * Check if run button should be enabled.
- */
-function canRun(status: ScenarioStatus): boolean {
-  return status === 'idle' || status === 'stopped' || status === 'paused';
-}
-
-/**
- * Check if pause button should be enabled.
- */
-function canPause(status: ScenarioStatus): boolean {
-  return status === 'running';
 }
 
 /**
@@ -271,9 +253,6 @@ const MenuDivider = memo(function MenuDivider() {
 // ============================================================================
 
 export const ScenarioToolbar = memo(function ScenarioToolbar({
-  onRun,
-  onPause,
-  onStop,
   onNew,
   onOpen,
   onSave,
@@ -286,27 +265,45 @@ export const ScenarioToolbar = memo(function ScenarioToolbar({
   // Store state
   const executionState = useScenarioStore(selectExecutionState);
   const settings = useScenarioStore(selectSettings);
-  const setExecutionState = useScenarioStore((state) => state.setExecutionState);
   const updateSettings = useScenarioStore((state) => state.updateSettings);
+
+  // Execution hook
+  const {
+    isRunning,
+    isPaused,
+    error,
+    run,
+    pause,
+    resume,
+    stop,
+    clearError,
+  } = useScenarioExecution();
 
   const { status, currentTime, currentLoopIteration } = executionState;
   const loopEnabled = settings?.loop ?? false;
 
+  // Clear error after 5 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => clearError(), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error, clearError]);
+
   // Handlers
-  const handleRun = useCallback(() => {
-    setExecutionState({ status: 'running' });
-    onRun?.();
-  }, [setExecutionState, onRun]);
+  const handlePlayPause = useCallback(async () => {
+    if (isRunning) {
+      await pause();
+    } else if (isPaused) {
+      await resume();
+    } else {
+      await run();
+    }
+  }, [isRunning, isPaused, run, pause, resume]);
 
-  const handlePause = useCallback(() => {
-    setExecutionState({ status: 'paused' });
-    onPause?.();
-  }, [setExecutionState, onPause]);
-
-  const handleStop = useCallback(() => {
-    setExecutionState({ status: 'stopped', currentTime: 0, currentEventIndex: 0, completedEvents: [] });
-    onStop?.();
-  }, [setExecutionState, onStop]);
+  const handleStop = useCallback(async () => {
+    await stop();
+  }, [stop]);
 
   const handleToggleLoop = useCallback(() => {
     updateSettings({ loop: !loopEnabled });
@@ -334,24 +331,14 @@ export const ScenarioToolbar = memo(function ScenarioToolbar({
 
       {/* Execution Controls */}
       <div className="flex items-center gap-1">
-        {/* Run/Resume */}
+        {/* Play/Pause toggle */}
         <ToolbarButton
-          icon={<Play size={16} />}
-          label={compact ? undefined : (status === 'paused' ? 'Resume' : 'Run')}
-          onClick={handleRun}
-          disabled={!canRun(status)}
-          variant="success"
-          title="Run Scenario (F5)"
-        />
-
-        {/* Pause */}
-        <ToolbarButton
-          icon={<Pause size={16} />}
-          label={compact ? undefined : 'Pause'}
-          onClick={handlePause}
-          disabled={!canPause(status)}
-          variant="warning"
-          title="Pause Scenario (F6)"
+          icon={isRunning ? <Pause size={16} /> : <Play size={16} />}
+          label={compact ? undefined : (isRunning ? 'Pause' : isPaused ? 'Resume' : 'Run')}
+          onClick={handlePlayPause}
+          disabled={false}
+          variant={isRunning ? 'warning' : 'success'}
+          title={isRunning ? 'Pause Scenario (F6)' : 'Run Scenario (F5)'}
         />
 
         {/* Stop */}
@@ -363,6 +350,17 @@ export const ScenarioToolbar = memo(function ScenarioToolbar({
           title="Stop Scenario (F7)"
         />
       </div>
+
+      {/* Error Display */}
+      {error && (
+        <>
+          <div className="w-px h-6 bg-neutral-600" />
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-red-900/50 border border-red-700 rounded text-sm text-red-300">
+            <AlertCircle size={14} />
+            <span className="max-w-[200px] truncate" title={error}>{error}</span>
+          </div>
+        </>
+      )}
 
       {/* Separator */}
       <div className="w-px h-6 bg-neutral-600" />

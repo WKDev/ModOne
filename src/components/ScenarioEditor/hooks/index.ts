@@ -11,10 +11,6 @@ export {
 
 export type {
   UseScenarioExecutionReturn,
-  ScenarioEventExecuted,
-  ScenarioStatusChanged,
-  ScenarioEmittedEvent,
-  ScenarioEventCallback,
 } from './useScenarioExecution';
 
 export {

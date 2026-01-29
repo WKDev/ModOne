@@ -54,10 +54,13 @@ pub use canvas::{
     canvas_load_circuit, canvas_save_circuit,
 };
 
-// Re-export scenario commands
+// Re-export scenario commands and state
 pub use scenario::{
     scenario_create, scenario_delete, scenario_exists, scenario_export_csv, scenario_import_csv,
     scenario_list, scenario_load, scenario_save,
+    // Execution commands
+    scenario_run, scenario_pause, scenario_resume, scenario_stop, scenario_get_status,
+    scenario_get_state, ScenarioExecutorState,
 };
 
 // Re-export parser commands

@@ -11,7 +11,6 @@ import {
   ScenarioGrid,
   ExecutionProgress,
   ScenarioSettingsDialog,
-  useScenarioExecution,
   useScenarioFileOps,
 } from '../../ScenarioEditor';
 import { useScenarioStore } from '../../../stores/scenarioStore';
@@ -33,9 +32,6 @@ interface ScenarioEditorPanelProps {
 export const ScenarioEditorPanel = memo(function ScenarioEditorPanel(
   _props: ScenarioEditorPanelProps
 ) {
-  // Execution engine
-  const execution = useScenarioExecution();
-
   // File operations
   const fileOps = useScenarioFileOps();
 
@@ -59,9 +55,6 @@ export const ScenarioEditorPanel = memo(function ScenarioEditorPanel(
     <div className="h-full flex flex-col bg-neutral-950">
       {/* Toolbar */}
       <ScenarioToolbar
-        onRun={execution.run}
-        onPause={execution.pause}
-        onStop={execution.stop}
         onNew={fileOps.newScenario}
         onOpen={fileOps.openScenario}
         onSave={fileOps.saveScenario}

@@ -1,75 +1,81 @@
 /**
  * Scenario Execution Hook
  *
- * Manages scenario execution with precise timing using requestAnimationFrame,
+ * Manages scenario execution via Tauri backend with precise timing,
  * event scheduling, Modbus writes, and loop handling.
  */
 
-import { useRef, useCallback, useEffect } from 'react';
-import { useScenarioStore, selectEnabledEvents, selectSettings, selectExecutionState } from '../../../stores/scenarioStore';
-import { modbusService } from '../../../services/modbusService';
-import { parseAddress } from '../utils/addressParser';
-import type { ScenarioEvent, ScenarioStatus } from '../../../types/scenario';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { listen, UnlistenFn } from '@tauri-apps/api/event';
+import { useScenarioStore, selectScenario, selectExecutionState } from '../../../stores/scenarioStore';
+import type {
+  BackendScenarioStatus,
+  BackendScenarioState,
+  EventExecutedPayload,
+  LoopCompletedPayload,
+  ExecutionErrorPayload,
+} from '../../../types/scenario';
+import { toBackendScenario } from '../../../types/scenario';
 
 // ============================================================================
 // Types
 // ============================================================================
 
 /**
- * Event emitted when a scenario event executes.
- */
-export interface ScenarioEventExecuted {
-  type: 'scenario:event-executed';
-  eventId: string;
-  address: string;
-  value: number;
-  time: number;
-}
-
-/**
- * Event emitted when status changes.
- */
-export interface ScenarioStatusChanged {
-  type: 'scenario:status-changed';
-  status: ScenarioStatus;
-  currentTime: number;
-  iteration: number;
-}
-
-/**
- * Union type for all scenario events.
- */
-export type ScenarioEmittedEvent = ScenarioEventExecuted | ScenarioStatusChanged;
-
-/**
- * Callback for scenario event subscription.
- */
-export type ScenarioEventCallback = (event: ScenarioEmittedEvent) => void;
-
-/**
  * Return type for useScenarioExecution hook.
  */
 export interface UseScenarioExecutionReturn {
+  /** Backend execution status */
+  status: BackendScenarioStatus | null;
+  /** Whether scenario is currently running */
+  isRunning: boolean;
+  /** Whether scenario is paused */
+  isPaused: boolean;
+  /** Whether scenario has completed */
+  isCompleted: boolean;
+  /** Whether scenario is idle */
+  isIdle: boolean;
+  /** Current error message (if any) */
+  error: string | null;
   /** Start scenario execution */
-  run: () => void;
+  run: () => Promise<void>;
   /** Pause scenario execution */
-  pause: () => void;
+  pause: () => Promise<void>;
   /** Resume from pause */
-  resume: () => void;
+  resume: () => Promise<void>;
   /** Stop execution and reset time */
-  stop: () => void;
-  /** Reset execution state */
-  reset: () => void;
-  /** Subscribe to execution events */
-  subscribe: (callback: ScenarioEventCallback) => () => void;
+  stop: () => Promise<void>;
+  /** Clear any error */
+  clearError: () => void;
 }
 
 // ============================================================================
-// Constants
+// Helper Functions
 // ============================================================================
 
-/** Minimum time between UI updates (ms) */
-const UI_UPDATE_THROTTLE = 50; // ~20fps
+/**
+ * Parse backend state into a string state name
+ */
+function parseBackendState(state: BackendScenarioState): 'idle' | 'running' | 'paused' | 'completed' | 'error' {
+  if (typeof state === 'string') {
+    return state as 'idle' | 'running' | 'paused' | 'completed';
+  }
+  if (typeof state === 'object' && 'error' in state) {
+    return 'error';
+  }
+  return 'idle';
+}
+
+/**
+ * Extract error message from backend state
+ */
+function getErrorFromState(state: BackendScenarioState): string | null {
+  if (typeof state === 'object' && 'error' in state) {
+    return state.error;
+  }
+  return null;
+}
 
 // ============================================================================
 // Hook Implementation
@@ -77,389 +83,204 @@ const UI_UPDATE_THROTTLE = 50; // ~20fps
 
 export function useScenarioExecution(): UseScenarioExecutionReturn {
   // Store access
-  const events = useScenarioStore(selectEnabledEvents);
-  const settings = useScenarioStore(selectSettings);
+  const scenario = useScenarioStore(selectScenario);
   const executionState = useScenarioStore(selectExecutionState);
   const setExecutionState = useScenarioStore((state) => state.setExecutionState);
-  const resetExecution = useScenarioStore((state) => state.resetExecution);
 
-  // Timing refs
-  const animationFrameRef = useRef<number | null>(null);
-  const startTimeRef = useRef<number>(0);
-  const pausedTimeRef = useRef<number>(0);
-  const lastUIUpdateRef = useRef<number>(0);
+  // Local state
+  const [status, setStatus] = useState<BackendScenarioStatus | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Execution state refs
-  const executedEventsRef = useRef<Set<string>>(new Set());
-  const iterationRef = useRef<number>(1);
-  const isRunningRef = useRef<boolean>(false);
-
-  // Auto-release scheduling refs
-  const scheduledReleasesRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-
-  // Event subscribers
-  const subscribersRef = useRef<Set<ScenarioEventCallback>>(new Set());
+  // Track mounted state
+  const mountedRef = useRef(true);
 
   // ============================================================================
-  // Event Emission
+  // Event Listeners
   // ============================================================================
 
-  const emit = useCallback((event: ScenarioEmittedEvent) => {
-    subscribersRef.current.forEach((callback) => {
-      try {
-        callback(event);
-      } catch (error) {
-        console.error('Error in scenario event callback:', error);
-      }
-    });
-  }, []);
+  useEffect(() => {
+    mountedRef.current = true;
+    const unlisteners: Promise<UnlistenFn>[] = [];
 
-  const subscribe = useCallback((callback: ScenarioEventCallback): (() => void) => {
-    subscribersRef.current.add(callback);
-    return () => {
-      subscribersRef.current.delete(callback);
-    };
-  }, []);
+    // Listen for status changes
+    unlisteners.push(
+      listen<BackendScenarioStatus>('scenario:status-changed', (event) => {
+        if (!mountedRef.current) return;
+        setStatus(event.payload);
 
-  // ============================================================================
-  // Modbus Write Execution
-  // ============================================================================
+        // Sync with store
+        const stateName = parseBackendState(event.payload.state);
+        const storeStatus = stateName === 'completed' ? 'stopped' : stateName === 'error' ? 'stopped' : stateName;
 
-  const executeModbusWrite = useCallback(async (address: string, value: number) => {
-    const parsed = parseAddress(address);
-    if (!parsed) {
-      console.error(`Invalid Modbus address: ${address}`);
-      return;
-    }
+        setExecutionState({
+          status: storeStatus,
+          currentTime: event.payload.elapsedTime,
+          currentEventIndex: event.payload.executedEvents,
+          currentLoopIteration: event.payload.currentLoop,
+        });
 
-    try {
-      switch (parsed.type) {
-        case 'coil':
-          await modbusService.writeCoil(parsed.address, value !== 0);
-          break;
-        case 'discrete':
-          await modbusService.writeDiscreteInput(parsed.address, value !== 0);
-          break;
-        case 'holding':
-          await modbusService.writeHoldingRegister(parsed.address, value);
-          break;
-        case 'input':
-          await modbusService.writeInputRegister(parsed.address, value);
-          break;
-      }
-    } catch (error) {
-      console.error(`Failed to write Modbus ${address}:`, error);
-    }
-  }, []);
-
-  // ============================================================================
-  // Event Execution
-  // ============================================================================
-
-  const executeEvent = useCallback(async (event: ScenarioEvent, currentTime: number) => {
-    // Execute Modbus write
-    await executeModbusWrite(event.address, event.value);
-
-    // Mark as executed
-    executedEventsRef.current.add(event.id);
-
-    // Emit event
-    emit({
-      type: 'scenario:event-executed',
-      eventId: event.id,
-      address: event.address,
-      value: event.value,
-      time: currentTime,
-    });
-
-    // Schedule auto-release if persist=false
-    if (!event.persist && event.persistDuration && event.persistDuration > 0) {
-      // Cancel any existing release for this address
-      const existingRelease = scheduledReleasesRef.current.get(event.id);
-      if (existingRelease) {
-        clearTimeout(existingRelease);
-      }
-
-      const releaseTimeout = setTimeout(async () => {
-        // Release value (write 0)
-        await executeModbusWrite(event.address, 0);
-        scheduledReleasesRef.current.delete(event.id);
-      }, event.persistDuration);
-
-      scheduledReleasesRef.current.set(event.id, releaseTimeout);
-    }
-  }, [executeModbusWrite, emit]);
-
-  // ============================================================================
-  // Clear Scheduled Releases
-  // ============================================================================
-
-  const clearScheduledReleases = useCallback(() => {
-    scheduledReleasesRef.current.forEach((timeout) => {
-      clearTimeout(timeout);
-    });
-    scheduledReleasesRef.current.clear();
-  }, []);
-
-  // ============================================================================
-  // Tick Function
-  // ============================================================================
-
-  const tick = useCallback(() => {
-    if (!isRunningRef.current) return;
-
-    const now = performance.now();
-    const elapsed = (now - startTimeRef.current) / 1000 + pausedTimeRef.current;
-
-    // Find pending events to execute
-    const pendingEvents = events.filter(
-      (event) =>
-        event.time <= elapsed &&
-        !executedEventsRef.current.has(event.id)
+        // Check for error in state
+        const stateError = getErrorFromState(event.payload.state);
+        if (stateError) {
+          setError(stateError);
+        }
+      })
     );
 
-    // Sort by time and execute
-    pendingEvents.sort((a, b) => a.time - b.time);
-    pendingEvents.forEach((event) => {
-      executeEvent(event, elapsed);
-    });
+    // Listen for event executed
+    unlisteners.push(
+      listen<EventExecutedPayload>('scenario:event-executed', (event) => {
+        if (!mountedRef.current) return;
 
-    // Update UI (throttled)
-    if (now - lastUIUpdateRef.current >= UI_UPDATE_THROTTLE) {
-      setExecutionState({
-        currentTime: elapsed,
-        currentEventIndex: executedEventsRef.current.size,
-        completedEvents: Array.from(executedEventsRef.current),
-      });
-      lastUIUpdateRef.current = now;
-    }
+        // Update completed events in store
+        setExecutionState({
+          completedEvents: [...executionState.completedEvents, event.payload.eventId],
+        });
+      })
+    );
 
-    // Check for scenario completion
-    const allEventsExecuted = executedEventsRef.current.size >= events.length;
-    const lastEventTime = events.length > 0
-      ? Math.max(...events.map((e) => e.time))
-      : 0;
-    const scenarioComplete = elapsed > lastEventTime && allEventsExecuted;
+    // Listen for scenario completion
+    unlisteners.push(
+      listen<BackendScenarioStatus>('scenario:completed', (event) => {
+        if (!mountedRef.current) return;
+        setStatus(event.payload);
 
-    if (scenarioComplete && settings) {
-      // Handle looping
-      if (settings.loop) {
-        const { loopCount, loopDelay } = settings;
-
-        // Check if we should continue looping
-        const shouldContinue = loopCount === 0 || iterationRef.current < loopCount;
-
-        if (shouldContinue) {
-          // Wait for loopDelay then restart
-          setTimeout(() => {
-            if (!isRunningRef.current) return;
-
-            iterationRef.current += 1;
-            executedEventsRef.current.clear();
-            clearScheduledReleases();
-            startTimeRef.current = performance.now();
-            pausedTimeRef.current = 0;
-
-            setExecutionState({
-              currentTime: 0,
-              currentEventIndex: 0,
-              completedEvents: [],
-              currentLoopIteration: iterationRef.current,
-            });
-
-            emit({
-              type: 'scenario:status-changed',
-              status: 'running',
-              currentTime: 0,
-              iteration: iterationRef.current,
-            });
-
-            // Continue ticking
-            animationFrameRef.current = requestAnimationFrame(tick);
-          }, loopDelay);
-
-          return;
-        } else {
-          // Reached loop count limit, stop
-          isRunningRef.current = false;
-          setExecutionState({
-            status: 'stopped',
-            currentTime: elapsed,
-          });
-
-          emit({
-            type: 'scenario:status-changed',
-            status: 'stopped',
-            currentTime: elapsed,
-            iteration: iterationRef.current,
-          });
-
-          return;
-        }
-      } else {
-        // No looping, just stop
-        isRunningRef.current = false;
         setExecutionState({
           status: 'stopped',
-          currentTime: elapsed,
+          currentTime: event.payload.elapsedTime,
         });
+      })
+    );
 
-        emit({
-          type: 'scenario:status-changed',
-          status: 'stopped',
-          currentTime: elapsed,
-          iteration: iterationRef.current,
+    // Listen for loop completed
+    unlisteners.push(
+      listen<LoopCompletedPayload>('scenario:loop-completed', (event) => {
+        if (!mountedRef.current) return;
+
+        // Reset completed events for new loop
+        setExecutionState({
+          completedEvents: [],
+          currentLoopIteration: event.payload.loopNumber + 1,
         });
+      })
+    );
 
-        return;
-      }
-    }
+    // Listen for errors
+    unlisteners.push(
+      listen<ExecutionErrorPayload>('scenario:error', (event) => {
+        if (!mountedRef.current) return;
+        setError(event.payload.message);
+      })
+    );
 
-    // Schedule next tick
-    animationFrameRef.current = requestAnimationFrame(tick);
-  }, [events, settings, executeEvent, setExecutionState, emit, clearScheduledReleases]);
+    // Cleanup
+    return () => {
+      mountedRef.current = false;
+      unlisteners.forEach((p) => p.then((fn) => fn()));
+    };
+  }, [setExecutionState, executionState.completedEvents]);
 
   // ============================================================================
   // Control Functions
   // ============================================================================
 
-  const run = useCallback(() => {
-    if (isRunningRef.current) return;
-
-    isRunningRef.current = true;
-    executedEventsRef.current.clear();
-    clearScheduledReleases();
-    iterationRef.current = 1;
-    startTimeRef.current = performance.now();
-    pausedTimeRef.current = 0;
-    lastUIUpdateRef.current = 0;
-
-    setExecutionState({
-      status: 'running',
-      currentTime: 0,
-      currentEventIndex: 0,
-      completedEvents: [],
-      currentLoopIteration: 1,
-    });
-
-    emit({
-      type: 'scenario:status-changed',
-      status: 'running',
-      currentTime: 0,
-      iteration: 1,
-    });
-
-    animationFrameRef.current = requestAnimationFrame(tick);
-  }, [setExecutionState, emit, tick, clearScheduledReleases]);
-
-  const pause = useCallback(() => {
-    if (!isRunningRef.current) return;
-
-    isRunningRef.current = false;
-
-    if (animationFrameRef.current !== null) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
+  const run = useCallback(async () => {
+    if (!scenario) {
+      setError('No scenario loaded');
+      return;
     }
 
-    // Calculate paused time
-    const elapsed = (performance.now() - startTimeRef.current) / 1000 + pausedTimeRef.current;
-    pausedTimeRef.current = elapsed;
+    setError(null);
 
-    setExecutionState({
-      status: 'paused',
-      currentTime: elapsed,
-    });
+    try {
+      // Convert frontend scenario to backend format
+      const backendScenario = toBackendScenario(scenario);
 
-    emit({
-      type: 'scenario:status-changed',
-      status: 'paused',
-      currentTime: elapsed,
-      iteration: iterationRef.current,
-    });
-  }, [setExecutionState, emit]);
+      // Reset store state
+      setExecutionState({
+        status: 'running',
+        currentTime: 0,
+        currentEventIndex: 0,
+        completedEvents: [],
+        currentLoopIteration: 1,
+      });
 
-  const resume = useCallback(() => {
-    if (isRunningRef.current) return;
-    if (executionState.status !== 'paused') return;
-
-    isRunningRef.current = true;
-    startTimeRef.current = performance.now();
-    lastUIUpdateRef.current = 0;
-
-    setExecutionState({
-      status: 'running',
-    });
-
-    emit({
-      type: 'scenario:status-changed',
-      status: 'running',
-      currentTime: pausedTimeRef.current,
-      iteration: iterationRef.current,
-    });
-
-    animationFrameRef.current = requestAnimationFrame(tick);
-  }, [executionState.status, setExecutionState, emit, tick]);
-
-  const stop = useCallback(() => {
-    isRunningRef.current = false;
-
-    if (animationFrameRef.current !== null) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
+      // Start execution on backend
+      await invoke('scenario_run', { scenario: backendScenario });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      setExecutionState({ status: 'stopped' });
     }
+  }, [scenario, setExecutionState]);
 
-    clearScheduledReleases();
-    executedEventsRef.current.clear();
-    iterationRef.current = 1;
-    pausedTimeRef.current = 0;
+  const pause = useCallback(async () => {
+    try {
+      await invoke('scenario_pause');
+      setExecutionState({ status: 'paused' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+    }
+  }, [setExecutionState]);
 
-    setExecutionState({
-      status: 'stopped',
-      currentTime: 0,
-      currentEventIndex: 0,
-      completedEvents: [],
-      currentLoopIteration: 1,
-    });
+  const resume = useCallback(async () => {
+    try {
+      await invoke('scenario_resume');
+      setExecutionState({ status: 'running' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+    }
+  }, [setExecutionState]);
 
-    emit({
-      type: 'scenario:status-changed',
-      status: 'stopped',
-      currentTime: 0,
-      iteration: 1,
-    });
-  }, [setExecutionState, emit, clearScheduledReleases]);
+  const stop = useCallback(async () => {
+    try {
+      await invoke('scenario_stop');
+      setExecutionState({
+        status: 'stopped',
+        currentTime: 0,
+        currentEventIndex: 0,
+        completedEvents: [],
+        currentLoopIteration: 1,
+      });
+      setStatus(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+    }
+  }, [setExecutionState]);
 
-  const reset = useCallback(() => {
-    stop();
-    resetExecution();
-  }, [stop, resetExecution]);
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
 
   // ============================================================================
-  // Cleanup on Unmount
+  // Computed States
   // ============================================================================
 
-  useEffect(() => {
-    return () => {
-      if (animationFrameRef.current !== null) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-      clearScheduledReleases();
-      subscribersRef.current.clear();
-    };
-  }, [clearScheduledReleases]);
+  const stateName = status ? parseBackendState(status.state) : 'idle';
+  const isRunning = stateName === 'running';
+  const isPaused = stateName === 'paused';
+  const isCompleted = stateName === 'completed';
+  const isIdle = stateName === 'idle';
 
   // ============================================================================
   // Return
   // ============================================================================
 
   return {
+    status,
+    isRunning,
+    isPaused,
+    isCompleted,
+    isIdle,
+    error,
     run,
     pause,
     resume,
     stop,
-    reset,
-    subscribe,
+    clearError,
   };
 }
 

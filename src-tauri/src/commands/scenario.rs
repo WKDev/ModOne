@@ -1,9 +1,17 @@
 //! Scenario Command Handlers
 //!
-//! Tauri commands for scenario file operations (load, save, import/export CSV).
+//! Tauri commands for scenario file operations (load, save, import/export CSV)
+//! and scenario execution control.
 
-use crate::scenario::{CsvEventRow, Scenario, ScenarioEvent};
 use std::path::Path;
+use std::sync::Arc;
+
+use tauri::{AppHandle, State};
+use tokio::sync::Mutex;
+
+use crate::scenario::{
+    CsvEventRow, Scenario, ScenarioEvent, ScenarioExecutor, ScenarioState, ScenarioStatus,
+};
 
 /// Load a scenario from a JSON file
 #[tauri::command]
@@ -213,6 +221,137 @@ pub async fn scenario_delete(path: String) -> Result<(), String> {
 pub async fn scenario_exists(path: String) -> Result<bool, String> {
     let file_path = Path::new(&path);
     Ok(file_path.exists() && file_path.is_file())
+}
+
+// ============================================================================
+// Scenario Execution State and Commands
+// ============================================================================
+
+/// Managed state for scenario execution
+pub struct ScenarioExecutorState {
+    /// The scenario executor (protected by async mutex for execution control)
+    pub executor: Mutex<Option<ScenarioExecutor>>,
+    /// Reference to Modbus memory for executor initialization
+    pub modbus_memory: Arc<crate::modbus::ModbusMemory>,
+}
+
+impl ScenarioExecutorState {
+    /// Create a new executor state with the given Modbus memory
+    pub fn new(modbus_memory: Arc<crate::modbus::ModbusMemory>) -> Self {
+        Self {
+            executor: Mutex::new(None),
+            modbus_memory,
+        }
+    }
+}
+
+/// Start scenario execution
+///
+/// Loads the scenario and begins executing events in order.
+#[tauri::command]
+pub async fn scenario_run(
+    scenario: Scenario,
+    state: State<'_, ScenarioExecutorState>,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    log::info!("Starting scenario execution: {}", scenario.metadata.name);
+
+    // Create a new executor with fresh state
+    let mut executor = ScenarioExecutor::new(state.modbus_memory.clone());
+
+    // Load the scenario
+    executor.load(scenario)?;
+
+    // Store the executor
+    {
+        let mut guard = state.executor.lock().await;
+        *guard = Some(executor);
+    }
+
+    // Get the executor and run it
+    let mut guard = state.executor.lock().await;
+    if let Some(ref mut executor) = *guard {
+        // Clone app handle for the async execution
+        let handle = app_handle.clone();
+
+        // Run the executor (this is async and will execute the scenario)
+        executor.run(handle).await?;
+    }
+
+    Ok(())
+}
+
+/// Pause scenario execution
+#[tauri::command]
+pub async fn scenario_pause(state: State<'_, ScenarioExecutorState>) -> Result<(), String> {
+    log::info!("Pausing scenario execution");
+
+    let mut guard = state.executor.lock().await;
+    if let Some(ref mut executor) = *guard {
+        executor.pause()?;
+    } else {
+        return Err("No scenario executor running".into());
+    }
+
+    Ok(())
+}
+
+/// Resume scenario execution from pause
+#[tauri::command]
+pub async fn scenario_resume(state: State<'_, ScenarioExecutorState>) -> Result<(), String> {
+    log::info!("Resuming scenario execution");
+
+    let mut guard = state.executor.lock().await;
+    if let Some(ref mut executor) = *guard {
+        executor.resume()?;
+    } else {
+        return Err("No scenario executor running".into());
+    }
+
+    Ok(())
+}
+
+/// Stop scenario execution
+#[tauri::command]
+pub async fn scenario_stop(state: State<'_, ScenarioExecutorState>) -> Result<(), String> {
+    log::info!("Stopping scenario execution");
+
+    let mut guard = state.executor.lock().await;
+    if let Some(ref mut executor) = *guard {
+        executor.stop()?;
+    }
+
+    // Clear the executor
+    *guard = None;
+
+    Ok(())
+}
+
+/// Get current scenario execution status
+#[tauri::command]
+pub async fn scenario_get_status(
+    state: State<'_, ScenarioExecutorState>,
+) -> Result<ScenarioStatus, String> {
+    let guard = state.executor.lock().await;
+    if let Some(ref executor) = *guard {
+        Ok(executor.get_status())
+    } else {
+        // Return idle status when no executor
+        Ok(ScenarioStatus::default())
+    }
+}
+
+/// Get current scenario execution state
+#[tauri::command]
+pub async fn scenario_get_state(
+    state: State<'_, ScenarioExecutorState>,
+) -> Result<ScenarioState, String> {
+    let guard = state.executor.lock().await;
+    if let Some(ref executor) = *guard {
+        Ok(executor.get_state())
+    } else {
+        Ok(ScenarioState::Idle)
+    }
 }
 
 #[cfg(test)]
