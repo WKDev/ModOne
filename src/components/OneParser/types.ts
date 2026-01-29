@@ -361,6 +361,40 @@ export interface MappingRule {
 }
 
 // ============================================================================
+// Validation Types
+// ============================================================================
+
+/** Validation error type category */
+export type ValidationErrorType = 'syntax' | 'address' | 'logic' | 'structure';
+
+/** Validation error severity level */
+export type ValidationSeverity = 'error' | 'warning';
+
+/** Validation error with location and details */
+export interface ValidationError {
+  /** Network ID where the error occurred */
+  networkId: string;
+  /** Node ID where the error occurred (optional) */
+  nodeId?: string;
+  /** Human-readable error message */
+  message: string;
+  /** Error category for filtering */
+  errorType: ValidationErrorType;
+  /** Severity level */
+  severity: ValidationSeverity;
+}
+
+/** Result of program validation */
+export interface ValidationResult {
+  /** True if no errors (warnings are allowed) */
+  valid: boolean;
+  /** List of errors (blocking issues) */
+  errors: ValidationError[];
+  /** List of warnings (non-blocking issues) */
+  warnings: ValidationError[];
+}
+
+// ============================================================================
 // Type Guards
 // ============================================================================
 

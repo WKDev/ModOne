@@ -31,3 +31,6 @@ export {
   parseModbusAddress,
   createDefaultMapper,
 } from './ModbusMapper';
+
+// Export Program Validator
+export { ProgramValidator, validateProgram } from './Validator';
