@@ -65,5 +65,17 @@ export type { MonitoringToolbarProps } from './MonitoringToolbar';
 export { InlineEditPopover } from './InlineEditPopover';
 export type { InlineEditPopoverProps } from './InlineEditPopover';
 
+// Context menu
+export { LadderContextMenu } from './LadderContextMenu';
+export type {
+  LadderContextMenuProps,
+  ContextMenuPosition,
+  ContextMenuAction,
+} from './LadderContextMenu';
+
+// Hooks
+export { useLadderKeyboardShortcuts } from './hooks';
+export type { UseLadderKeyboardShortcutsOptions } from './hooks';
+
 // Utilities
 export * from './utils';
