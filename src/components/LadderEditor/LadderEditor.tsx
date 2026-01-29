@@ -2,24 +2,45 @@
  * LadderEditor Component
  *
  * Main ladder diagram editor with drag-and-drop support.
- * Integrates the toolbox, grid, and DnD context.
+ * Integrates toolbox, grid, network list, properties panel, and toolbar.
  */
 
-import { useCallback, useEffect } from 'react';
-import { DndContext, DragOverlay, useSensor, useSensors, PointerSensor, KeyboardSensor } from '@dnd-kit/core';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  DndContext,
+  DragOverlay,
+  useSensor,
+  useSensors,
+  PointerSensor,
+  KeyboardSensor,
+} from '@dnd-kit/core';
 import { cn } from '../../lib/utils';
-import { useLadderStore, selectCurrentNetworkId, selectMode, selectNetworksArray } from '../../stores/ladderStore';
+import {
+  useLadderStore,
+  selectCurrentNetworkId,
+  selectCurrentNetwork,
+  selectMode,
+  selectNetworksArray,
+  selectSelectedElementIds,
+} from '../../stores/ladderStore';
 import { LadderGrid } from './LadderGrid';
 import { LadderToolbox } from './LadderToolbox';
+import { LadderToolbar } from './LadderToolbar';
+import { LadderNetworkList } from './LadderNetworkList';
+import { NetworkCommentHeader } from './NetworkCommentHeader';
+import { LadderPropertiesPanel } from './properties';
 import { useLadderDragDrop } from '../../hooks/useLadderDragDrop';
+import { useLadderKeyboardShortcuts } from './hooks';
 
 export interface LadderEditorProps {
   /** Optional additional class names */
   className?: string;
   /** Whether to show the toolbox */
   showToolbox?: boolean;
-  /** Toolbox position */
-  toolboxPosition?: 'left' | 'right';
+  /** Whether to show the network list sidebar */
+  showNetworkList?: boolean;
+  /** Whether to show the properties panel */
+  showPropertiesPanel?: boolean;
 }
 
 /**
@@ -47,20 +68,59 @@ function DragOverlayContent({ activeId }: { activeId: string | null }) {
 }
 
 /**
+ * LadderStatusBar - Status bar at the bottom of the editor
+ */
+function LadderStatusBar() {
+  const mode = useLadderStore(selectMode);
+  const networks = useLadderStore(selectNetworksArray);
+  const selectedElementIds = useLadderStore(selectSelectedElementIds);
+  const currentNetwork = useLadderStore(selectCurrentNetwork);
+
+  const isMonitorMode = mode === 'monitor';
+  const selectedCount = selectedElementIds.size;
+  const elementCount = currentNetwork?.elements.size ?? 0;
+
+  return (
+    <div className="flex items-center justify-between px-3 py-1.5 bg-neutral-800 border-t border-neutral-700 text-xs text-neutral-400">
+      <div className="flex items-center gap-4">
+        <span>Mode: {isMonitorMode ? 'Monitor' : 'Edit'}</span>
+        <span>Networks: {networks.length}</span>
+        <span>Elements: {elementCount}</span>
+        {selectedCount > 0 && <span>{selectedCount} selected</span>}
+      </div>
+      <div className="flex items-center gap-2">
+        {isMonitorMode && (
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            Live
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
  * LadderEditor - Main ladder diagram editor component
  */
 export function LadderEditor({
   className,
   showToolbox = true,
-  toolboxPosition = 'left',
+  showNetworkList = true,
+  showPropertiesPanel = true,
 }: LadderEditorProps) {
   const currentNetworkId = useLadderStore(selectCurrentNetworkId);
+  const currentNetwork = useLadderStore(selectCurrentNetwork);
   const mode = useLadderStore(selectMode);
   const networks = useLadderStore(selectNetworksArray);
   const addNetwork = useLadderStore((state) => state.addNetwork);
+  const updateNetwork = useLadderStore((state) => state.updateNetwork);
 
   // Drag and drop handlers
   const { handleDragStart, handleDragOver, handleDragEnd } = useLadderDragDrop();
+
+  // Keyboard shortcuts
+  useLadderKeyboardShortcuts({ enabled: true });
 
   // DnD sensors
   const sensors = useSensors(
@@ -73,7 +133,7 @@ export function LadderEditor({
   );
 
   // Track active drag for overlay
-  const [activeId, setActiveId] = React.useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   const onDragStart = useCallback(
     (event: Parameters<typeof handleDragStart>[0]) => {
@@ -102,18 +162,17 @@ export function LadderEditor({
     }
   }, [networks.length, addNetwork]);
 
-  const isMonitorMode = mode === 'monitor';
-
-  // Render toolbox
-  const toolbox = showToolbox && (
-    <LadderToolbox
-      disabled={isMonitorMode}
-      className={cn(
-        toolboxPosition === 'left' ? 'border-r' : 'border-l',
-        'border-neutral-700'
-      )}
-    />
+  // Handle network comment update
+  const handleUpdateComment = useCallback(
+    (comment: string) => {
+      if (currentNetworkId) {
+        updateNetwork(currentNetworkId, { comment });
+      }
+    },
+    [currentNetworkId, updateNetwork]
   );
+
+  const isMonitorMode = mode === 'monitor';
 
   return (
     <DndContext
@@ -124,67 +183,62 @@ export function LadderEditor({
       onDragCancel={onDragCancel}
     >
       <div className={cn('flex h-full bg-neutral-900', className)}>
-        {/* Toolbox (left) */}
-        {toolboxPosition === 'left' && toolbox}
+        {/* Network List Sidebar */}
+        {showNetworkList && (
+          <LadderNetworkList className="w-48 shrink-0" />
+        )}
 
         {/* Main content area */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Network tabs (optional - could be added later) */}
-          {networks.length > 1 && (
-            <div className="flex items-center gap-1 px-2 py-1 bg-neutral-800 border-b border-neutral-700 overflow-x-auto">
-              {networks.map((network, index) => (
-                <button
-                  key={network.id}
-                  onClick={() => useLadderStore.getState().selectNetwork(network.id)}
-                  className={cn(
-                    'px-3 py-1 text-sm rounded transition-colors',
-                    network.id === currentNetworkId
-                      ? 'bg-blue-600 text-white'
-                      : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-700'
-                  )}
-                >
-                  {network.label || `Network ${index + 1}`}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Toolbar */}
+          <LadderToolbar />
 
-          {/* Grid container */}
-          <div className="flex-1 overflow-auto p-4">
-            {currentNetworkId ? (
-              <LadderGrid
-                networkId={currentNetworkId}
-                readonly={isMonitorMode}
-                showRowNumbers
+          {/* Content area with toolbox and grid */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* Toolbox */}
+            {showToolbox && (
+              <LadderToolbox
+                disabled={isMonitorMode}
+                className="border-r border-neutral-700 shrink-0"
               />
-            ) : (
-              <div className="flex items-center justify-center h-full text-neutral-500">
-                No network selected
+            )}
+
+            {/* Grid area */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {/* Network comment header */}
+              {currentNetwork && (
+                <NetworkCommentHeader
+                  comment={currentNetwork.comment}
+                  onUpdateComment={handleUpdateComment}
+                  editable={!isMonitorMode}
+                />
+              )}
+
+              {/* Grid container */}
+              <div className="flex-1 overflow-auto p-4">
+                {currentNetworkId ? (
+                  <LadderGrid
+                    networkId={currentNetworkId}
+                    readonly={isMonitorMode}
+                    showRowNumbers
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-neutral-500">
+                    No network selected
+                  </div>
+                )}
               </div>
+            </div>
+
+            {/* Properties Panel */}
+            {showPropertiesPanel && (
+              <LadderPropertiesPanel className="w-64 border-l border-neutral-700 shrink-0" />
             )}
           </div>
 
           {/* Status bar */}
-          <div className="flex items-center justify-between px-3 py-1.5 bg-neutral-800 border-t border-neutral-700 text-xs text-neutral-400">
-            <div className="flex items-center gap-4">
-              <span>Mode: {mode === 'monitor' ? 'Monitor' : 'Edit'}</span>
-              {networks.length > 0 && (
-                <span>Networks: {networks.length}</span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {isMonitorMode && (
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                  Live
-                </span>
-              )}
-            </div>
-          </div>
+          <LadderStatusBar />
         </div>
-
-        {/* Toolbox (right) */}
-        {toolboxPosition === 'right' && toolbox}
       </div>
 
       {/* Drag overlay */}
@@ -194,8 +248,5 @@ export function LadderEditor({
     </DndContext>
   );
 }
-
-// Need React for useState
-import React from 'react';
 
 export default LadderEditor;

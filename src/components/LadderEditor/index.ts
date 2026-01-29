@@ -81,6 +81,10 @@ export type { LadderNetworkListProps, NetworkListItemProps } from './LadderNetwo
 export { NetworkCommentHeader } from './NetworkCommentHeader';
 export type { NetworkCommentHeaderProps } from './NetworkCommentHeader';
 
+// Toolbar
+export { LadderToolbar } from './LadderToolbar';
+export type { LadderToolbarProps } from './LadderToolbar';
+
 // Hooks
 export { useLadderKeyboardShortcuts } from './hooks';
 export type { UseLadderKeyboardShortcutsOptions } from './hooks';
