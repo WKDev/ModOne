@@ -5092,7 +5092,7 @@
         "testStrategy": "1. TypeScript compilation passes without errors\n2. All type definitions are properly exported\n3. Type guards return correct boolean values for each element type\n4. Default values are valid according to their type definitions\n5. Create unit tests in `src/types/__tests__/ladder.test.ts` to verify type guards",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -5100,9 +5100,10 @@
             "description": "Create the foundational LadderElementType union type covering all ladder diagram element categories: contacts, coils, wires, timers, counters, and comparison elements.",
             "dependencies": [],
             "details": "Create `src/types/ladder.ts` and define:\n1. `LadderElementType` union type with all element categories:\n   - Contacts: 'contact_no' | 'contact_nc' | 'contact_p' | 'contact_n'\n   - Coils: 'coil' | 'coil_set' | 'coil_reset'\n   - Timers: 'timer_ton' | 'timer_tof' | 'timer_tmr'\n   - Counters: 'counter_ctu' | 'counter_ctd' | 'counter_ctud'\n   - Comparisons: 'compare_eq' | 'compare_gt' | 'compare_lt' | 'compare_ge' | 'compare_le' | 'compare_ne'\n   - Wires: 'wire_h' | 'wire_v' | 'wire_corner' | 'wire_junction'\n   - Rails: 'power_rail' | 'neutral_rail'\n\n2. Category subset types for grouping:\n   - `ContactType` - subset of contact elements\n   - `CoilType` - subset of coil elements\n   - `TimerType` - subset of timer elements\n   - `CounterType` - subset of counter elements\n   - `CompareType` - subset of comparison elements\n   - `WireType` - subset of wire elements\n   - `RailType` - subset of rail elements\n\nFollow the discriminated union pattern established in `OneCanvas/types.ts`.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify TypeScript compilation passes. Test that LadderElementType correctly accepts all valid element strings and rejects invalid ones through type checking.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-29T01:09:23.954Z"
           },
           {
             "id": 2,
@@ -5112,9 +5113,10 @@
               1
             ],
             "details": "Add to `src/types/ladder.ts`:\n\n1. `GridPosition` interface:\n   ```typescript\n   interface GridPosition {\n     row: number;    // 0-indexed row in the grid\n     column: number; // 0-indexed column in the grid\n   }\n   ```\n\n2. `CellSize` interface:\n   ```typescript\n   interface CellSize {\n     width: number;  // Cell width in pixels\n     height: number; // Cell height in pixels\n   }\n   ```\n\n3. `GridConfig` interface:\n   ```typescript\n   interface GridConfig {\n     columns: number;    // Number of columns per rung (default: 10)\n     cellWidth: number;  // Width of each cell in pixels\n     cellHeight: number; // Height of each cell in pixels\n     showGridLines?: boolean; // Optional grid line display\n   }\n   ```\n\n4. `DEFAULT_GRID_CONFIG` constant with sensible defaults:\n   - columns: 10\n   - cellWidth: 80\n   - cellHeight: 60\n\n5. Utility type `GridSpan` for elements that span multiple cells:\n   ```typescript\n   interface GridSpan {\n     rows: number;\n     columns: number;\n   }\n   ```",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify GridPosition, CellSize, and GridConfig interfaces compile correctly. Test that DEFAULT_GRID_CONFIG constant matches the interface definition.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-29T01:09:23.972Z"
           },
           {
             "id": 3,
@@ -5125,9 +5127,10 @@
               2
             ],
             "details": "Add to `src/types/ladder.ts`:\n\n1. `ElementProperties` base interface:\n   ```typescript\n   interface ElementProperties {\n     inverted?: boolean;\n     comment?: string;\n   }\n   ```\n\n2. Specialized property interfaces:\n   - `ContactProperties` - extends ElementProperties with negated edge detection\n   - `CoilProperties` - extends ElementProperties with set/reset flags\n   - `TimerProperties` - preset time (PT), time base\n   - `CounterProperties` - preset value (PV), count direction\n   - `CompareProperties` - comparison value, data type\n\n3. `BaseLadderElement<T extends LadderElementType>` generic interface:\n   ```typescript\n   interface BaseLadderElement<T extends LadderElementType = LadderElementType> {\n     id: string;\n     type: T;\n     position: GridPosition;\n     address?: string; // Device address (e.g., 'X0', 'Y0', 'T0')\n     label?: string;\n     selected?: boolean;\n     properties: ElementProperties;\n   }\n   ```\n\n4. Specialized element interfaces using discriminated union pattern:\n   - `ContactElement` - for all contact types\n   - `CoilElement` - for all coil types\n   - `TimerElement` - for timer types with preset/elapsed time\n   - `CounterElement` - for counter types with preset/current value\n   - `CompareElement` - for comparison operations\n   - `WireElement` - for wire routing\n   - `RailElement` - for power/neutral rails\n\n5. `LadderElement` discriminated union of all element types",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify discriminated union narrowing works correctly. Test that accessing type-specific properties requires proper type guards. Verify all interfaces export correctly.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-29T01:09:23.990Z"
           },
           {
             "id": 4,
@@ -5137,9 +5140,10 @@
               3
             ],
             "details": "Add to `src/types/ladder.ts`:\n\n1. `LadderASTNodeType` union type:\n   ```typescript\n   type LadderASTNodeType = 'series' | 'parallel' | 'element';\n   ```\n\n2. `LadderASTNode` interface for IL/ST code generation:\n   ```typescript\n   interface LadderASTNode {\n     type: LadderASTNodeType;\n     element?: LadderElement; // Only for 'element' type nodes\n     children?: LadderASTNode[]; // Only for 'series' | 'parallel' nodes\n     negated?: boolean; // For NOT operations\n   }\n   ```\n\n3. `LadderWire` interface for explicit wire connections:\n   ```typescript\n   interface LadderWire {\n     id: string;\n     from: { elementId: string; port: 'left' | 'right' | 'top' | 'bottom' };\n     to: { elementId: string; port: 'left' | 'right' | 'top' | 'bottom' };\n     type: 'horizontal' | 'vertical' | 'corner';\n   }\n   ```\n\n4. `LadderNetwork` (Rung) interface:\n   ```typescript\n   interface LadderNetwork {\n     id: string;\n     label?: string;\n     comment?: string;\n     elements: Map<string, LadderElement>;\n     wires: LadderWire[];\n     ast?: LadderASTNode; // Computed AST from topology\n     enabled: boolean;\n   }\n   ```\n\n5. `LadderProgram` top-level container:\n   ```typescript\n   interface LadderProgram {\n     id: string;\n     name: string;\n     networks: LadderNetwork[];\n     metadata: LadderProgramMetadata;\n   }\n   ```\n\n6. `LadderProgramMetadata` interface with name, version, author, dates",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify AST node types support recursive structure for nested series/parallel combinations. Test LadderNetwork can hold complex rung topologies. Verify serialization compatibility.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-29T01:09:24.011Z"
           },
           {
             "id": 5,
@@ -5150,14 +5154,16 @@
               4
             ],
             "details": "Add to `src/types/ladder.ts`:\n\n1. `TimerState` interface:\n   ```typescript\n   interface TimerState {\n     et: number;      // Elapsed time\n     pt: number;      // Preset time\n     running: boolean;\n     done: boolean;\n   }\n   ```\n\n2. `CounterState` interface:\n   ```typescript\n   interface CounterState {\n     cv: number; // Current value\n     pv: number; // Preset value\n     done: boolean;\n   }\n   ```\n\n3. `LadderMonitoringState` interface:\n   ```typescript\n   interface LadderMonitoringState {\n     deviceStates: Map<string, boolean | number>;\n     forcedDevices: Set<string>;\n     energizedWires: Set<string>;\n     timerStates: Map<string, TimerState>;\n     counterStates: Map<string, CounterState>;\n   }\n   ```\n\n4. Type guards following OneCanvas pattern:\n   - `isContactElement(element): element is ContactElement`\n   - `isCoilElement(element): element is CoilElement`\n   - `isTimerElement(element): element is TimerElement`\n   - `isCounterElement(element): element is CounterElement`\n   - `isCompareElement(element): element is CompareElement`\n   - `isWireElement(element): element is WireElement`\n   - `isValidLadderElementType(type): type is LadderElementType`\n\n5. Default value constants:\n   - `DEFAULT_GRID_CONFIG`\n   - `DEFAULT_MONITORING_STATE`\n   - `DEFAULT_TIMER_STATE`\n   - `DEFAULT_COUNTER_STATE`\n\n6. Update `src/types/index.ts` to export all ladder types:\n   ```typescript\n   export * from './ladder';\n   ```",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit test all type guards return correct boolean values for each element type. Verify DEFAULT_MONITORING_STATE creates valid empty state. Test TypeScript compilation passes with all exports. Create `src/types/__tests__/ladder.test.ts` with type guard tests.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-29T01:09:24.026Z"
           }
         ],
         "complexity": 4,
         "recommendedSubtasks": 0,
-        "expansionPrompt": "Define TypeScript types for LadderEditor including LadderElement union type, GridCell, Rung, LadderProgram following OneCanvas/types.ts discriminated union patterns"
+        "expansionPrompt": "Define TypeScript types for LadderEditor including LadderElement union type, GridCell, Rung, LadderProgram following OneCanvas/types.ts discriminated union patterns",
+        "updatedAt": "2026-01-29T01:09:24.026Z"
       },
       {
         "id": "71",
@@ -7080,9 +7086,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-01-29T01:07:08.034Z",
+      "lastModified": "2026-01-29T01:09:24.026Z",
       "taskCount": 96,
-      "completedCount": 61,
+      "completedCount": 62,
       "tags": [
         "master"
       ]
