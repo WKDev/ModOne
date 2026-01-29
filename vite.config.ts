@@ -11,8 +11,9 @@ export default defineConfig(async () => ({
   // Vitest configuration
   test: {
     globals: true,
-    environment: "node",
+    environment: "jsdom",
     include: ["src/**/*.{test,spec}.{js,ts,jsx,tsx}"],
+    setupFiles: ["./src/test/setup.ts"],
   },
 
   // Path aliases matching tsconfig.json

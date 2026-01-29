@@ -28,3 +28,23 @@ export type { LadderToolboxProps, ToolboxItem } from './LadderToolbox';
 // Droppable cell (for advanced usage)
 export { DroppableCell } from './DroppableCell';
 export type { DroppableCellProps } from './DroppableCell';
+
+// Properties panel
+export {
+  LadderPropertiesPanel,
+  PropertyField,
+  ContactProperties,
+  CoilProperties,
+  TimerProperties,
+  CounterProperties,
+} from './properties';
+export type {
+  LadderPropertiesPanelProps,
+  PropertyFieldProps,
+  PropertyFieldType,
+  SelectOption,
+  ContactPropertiesProps,
+  CoilPropertiesProps,
+  TimerPropertiesProps,
+  CounterPropertiesProps,
+} from './properties';

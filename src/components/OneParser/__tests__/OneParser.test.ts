@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { OneParser, oneParser } from '../OneParser';
 import { parseDeviceAddress, formatDeviceAddress } from '../types';
 import { ModbusMapper, createDefaultMapper } from '../ModbusMapper';
-import type { LadderProgram, ContactNode, CoilNode, TimerNode } from '../types';
+import type { LadderProgram, CoilNode } from '../types';
 
 // ============================================================================
 // Sample XG5000 CSV Content
