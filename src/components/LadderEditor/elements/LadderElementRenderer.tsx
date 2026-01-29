@@ -9,6 +9,7 @@ import { Contact, type ContactType } from './Contact';
 import { Coil, type CoilType } from './Coil';
 import { Timer, type TimerType } from './Timer';
 import { Counter, type CounterType } from './Counter';
+import { Wire, type WireType as WireComponentType } from './Wire';
 import type {
   LadderElement,
   LadderElementType,
@@ -69,6 +70,14 @@ const COUNTER_TYPE_MAP: Record<string, CounterType> = {
   counter_ctu: 'ctu',
   counter_ctd: 'ctd',
   counter_ctud: 'ctud',
+};
+
+/** Map from element type to wire type */
+const WIRE_TYPE_MAP: Record<string, WireComponentType> = {
+  wire_h: 'horizontal',
+  wire_v: 'vertical',
+  wire_corner: 'corner_tl', // Default corner, should be specified more precisely
+  wire_junction: 'junction_t', // Default junction, should be specified more precisely
 };
 
 /** Check if element type is a contact */
@@ -149,10 +158,29 @@ export function LadderElementRenderer({
     );
   }
 
-  // Wire elements (will be handled separately in wire components)
+  // Wire elements
   if (type.startsWith('wire_')) {
-    // TODO: Implement wire rendering in Task 75
-    return null;
+    const wireType = WIRE_TYPE_MAP[type];
+    if (!wireType) {
+      // Unknown wire type - render as horizontal
+      return (
+        <Wire
+          type="horizontal"
+          isEnergized={isEnergized}
+          width={width}
+          height={height}
+        />
+      );
+    }
+
+    return (
+      <Wire
+        type={wireType}
+        isEnergized={isEnergized}
+        width={width}
+        height={height}
+      />
+    );
   }
 
   // Rail elements (handled by PowerRail/NeutralRail components)

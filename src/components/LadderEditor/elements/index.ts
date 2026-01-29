@@ -19,6 +19,9 @@ export { Timer, type TimerType, type TimerProps } from './Timer';
 // Counter component
 export { Counter, type CounterType, type CounterProps } from './Counter';
 
+// Wire component
+export { Wire, type WireType, type WireProps } from './Wire';
+
 // Element renderer
 export {
   LadderElementRenderer,
