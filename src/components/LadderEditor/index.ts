@@ -50,8 +50,12 @@ export type {
 } from './properties';
 
 // Dialogs
-export { DeviceSelectDialog } from './dialogs';
-export type { DeviceSelectDialogProps } from './dialogs';
+export { DeviceSelectDialog, ForceDeviceDialog } from './dialogs';
+export type { DeviceSelectDialogProps, ForceDeviceDialogProps, DeviceInfo } from './dialogs';
+
+// Panels
+export { ForcedDevicesPanel } from './panels';
+export type { ForcedDevicesPanelProps } from './panels';
 
 // Monitoring
 export { MonitoringToolbar } from './MonitoringToolbar';
