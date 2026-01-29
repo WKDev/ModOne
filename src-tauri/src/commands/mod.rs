@@ -4,6 +4,7 @@
 //! from the frontend application.
 
 pub mod canvas;
+pub mod canvas_sync;
 pub mod layout;
 pub mod logging;
 pub mod modbus;
@@ -11,6 +12,7 @@ pub mod parser;
 pub mod project;
 pub mod scenario;
 pub mod settings;
+pub mod sim;
 
 // Re-export all project commands for convenient registration in lib.rs
 pub use project::{
@@ -63,4 +65,23 @@ pub use parser::{
     parser_map_address_to_modbus, parser_map_modbus_to_address, parser_parse_csv_content,
     parser_parse_csv_file, parser_parse_csv_grouped, parser_parse_modbus_address,
     parser_program_exists, parser_save_program,
+};
+
+// Re-export canvas sync commands
+pub use canvas_sync::{
+    canvas_sync_clear_mappings, canvas_sync_force_update_outputs, canvas_sync_get_changed_blocks,
+    canvas_sync_get_mappings, canvas_sync_get_status, canvas_sync_handle_input,
+    canvas_sync_handle_inputs, canvas_sync_has_changes, canvas_sync_init,
+    canvas_sync_register_mapping, canvas_sync_register_mappings, canvas_sync_remove_mapping,
+    canvas_sync_reset_stats, canvas_sync_shutdown, canvas_sync_update_outputs,
+    CanvasSyncState,
+};
+
+// Re-export simulation commands
+pub use sim::{
+    sim_add_breakpoint, sim_add_watch, sim_continue, sim_get_breakpoints,
+    sim_get_debugger_state, sim_get_memory_snapshot, sim_get_scan_info, sim_get_status,
+    sim_get_watches, sim_pause, sim_read_device, sim_read_memory_range, sim_remove_breakpoint,
+    sim_remove_watch, sim_reset, sim_resume, sim_run, sim_step, sim_stop, sim_write_device,
+    SimState,
 };
