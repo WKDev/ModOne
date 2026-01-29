@@ -77,8 +77,10 @@ interface LadderState {
   // Selection
   /** Currently selected element IDs */
   selectedElementIds: Set<string>;
-  /** Clipboard contents */
+  /** Clipboard contents for elements */
   clipboard: LadderElement[];
+  /** Clipboard contents for network copy */
+  networkClipboard: SerializableNetwork | null;
 
   // Configuration
   /** Grid configuration */
@@ -113,6 +115,10 @@ interface LadderActions {
   updateNetwork: (id: string, updates: Partial<Pick<LadderNetwork, 'label' | 'comment' | 'enabled'>>) => void;
   /** Reorder networks */
   reorderNetworks: (fromIndex: number, toIndex: number) => void;
+  /** Copy current network to clipboard */
+  copyNetwork: (networkId?: string) => void;
+  /** Paste network from clipboard */
+  pasteNetwork: (afterNetworkId?: string) => string | null;
 
   // Element operations
   /** Add a new element to the current network */
@@ -204,6 +210,7 @@ const initialState: LadderState = {
   currentNetworkId: null,
   selectedElementIds: new Set(),
   clipboard: [],
+  networkClipboard: null,
   gridConfig: { ...DEFAULT_LADDER_GRID_CONFIG },
   mode: 'edit',
   monitoringState: null,
@@ -488,6 +495,105 @@ export const useLadderStore = create<LadderStore>()(
           false,
           `reorderNetworks/${fromIndex}->${toIndex}`
         );
+      },
+
+      copyNetwork: (networkId) => {
+        const state = get();
+        const targetId = networkId || state.currentNetworkId;
+        if (!targetId) return;
+
+        const network = state.networks.get(targetId);
+        if (!network) return;
+
+        set(
+          (state) => {
+            state.networkClipboard = serializeNetwork(network);
+          },
+          false,
+          `copyNetwork/${targetId}`
+        );
+      },
+
+      pasteNetwork: (afterNetworkId) => {
+        const state = get();
+        if (!state.networkClipboard) return null;
+
+        const newId = generateId('network');
+        const originalLabel = state.networkClipboard.label || 'Network';
+
+        set(
+          (state) => {
+            if (!state.networkClipboard) return;
+
+            // Push history
+            const snapshot = createSnapshot(state.networks, state.currentNetworkId);
+            state.history = state.history.slice(0, state.historyIndex + 1);
+            state.history.push(snapshot);
+            if (state.history.length > MAX_HISTORY_SIZE) {
+              state.history.shift();
+            } else {
+              state.historyIndex++;
+            }
+
+            // Create ID mapping for elements
+            const idMap = new Map<string, string>();
+            const newElements: Array<[string, LadderElement]> = [];
+
+            // Clone elements with new IDs
+            state.networkClipboard.elements.forEach(([oldId, element]) => {
+              const newElementId = generateId(element.type);
+              idMap.set(oldId, newElementId);
+              newElements.push([newElementId, {
+                ...cloneElementDeep(element),
+                id: newElementId,
+              }]);
+            });
+
+            // Clone wires with updated element references
+            const newWires = state.networkClipboard.wires.map((wire) => {
+              const newWire = cloneWire(wire);
+              // Update element ID references in wire endpoints
+              if (newWire.from.elementId) {
+                newWire.from.elementId = idMap.get(newWire.from.elementId) || newWire.from.elementId;
+              }
+              if (newWire.to.elementId) {
+                newWire.to.elementId = idMap.get(newWire.to.elementId) || newWire.to.elementId;
+              }
+              return newWire;
+            });
+
+            // Create new network
+            const newNetwork: LadderNetwork = {
+              id: newId,
+              label: `Copy of ${originalLabel}`,
+              comment: state.networkClipboard.comment,
+              elements: new Map(newElements),
+              wires: newWires,
+              enabled: state.networkClipboard.enabled,
+            };
+
+            // Insert at correct position
+            const networkArray = Array.from(state.networks.entries());
+            if (afterNetworkId) {
+              const afterIndex = networkArray.findIndex(([id]) => id === afterNetworkId);
+              if (afterIndex !== -1) {
+                networkArray.splice(afterIndex + 1, 0, [newId, newNetwork]);
+              } else {
+                networkArray.push([newId, newNetwork]);
+              }
+            } else {
+              networkArray.push([newId, newNetwork]);
+            }
+
+            state.networks = new Map(networkArray);
+            state.currentNetworkId = newId;
+            state.isDirty = true;
+          },
+          false,
+          `pasteNetwork/${newId}`
+        );
+
+        return newId;
       },
 
       // ========================================================================
