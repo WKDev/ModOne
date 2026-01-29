@@ -65,6 +65,8 @@ use commands::{
     sim_get_watches, sim_pause, sim_read_device, sim_read_memory_range, sim_remove_breakpoint,
     sim_remove_watch, sim_reset, sim_resume, sim_run, sim_step, sim_stop, sim_write_device,
     SimState,
+    // Explorer commands
+    list_project_files, read_file_contents, path_exists, get_file_info,
 };
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -99,6 +101,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_shell::init())
         .manage(project_manager)
         .manage(auto_save_manager)
         .manage(modbus_state)
@@ -244,6 +247,11 @@ pub fn run() {
             sim_step,
             sim_continue,
             sim_get_debugger_state,
+            // Explorer commands
+            list_project_files,
+            read_file_contents,
+            path_exists,
+            get_file_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

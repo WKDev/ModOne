@@ -8,6 +8,7 @@ import { OneCanvasPanel } from './content/OneCanvasPanel';
 import { ScenarioEditorPanel } from './content/ScenarioEditorPanel';
 import { ConsolePanel } from './content/ConsolePanel';
 import { PropertiesPanel } from './content/PropertiesPanel';
+import { CsvViewerPanel } from './content/CsvViewerPanel';
 import { TabBar } from './TabBar';
 import { TabContent } from './TabContent';
 import { TabContextMenu } from './TabContextMenu';
@@ -19,6 +20,7 @@ const panelContentMap: Record<PanelType, React.ComponentType> = {
   'scenario-editor': ScenarioEditorPanel,
   'console': ConsolePanel,
   'properties': PropertiesPanel,
+  'csv-viewer': CsvViewerPanel,
 };
 
 export interface ExtendedPanelProps extends PanelProps {
@@ -73,17 +75,13 @@ export function Panel({
 
   return (
     <div
-      className={`flex flex-col rounded overflow-hidden ${
-        isActive
-          ? 'ring-2 ring-blue-500'
-          : 'ring-1 ring-gray-700'
-      } bg-gray-800`}
-      style={{ gridArea }}
+      className="flex flex-col h-full w-full overflow-hidden"
+      style={gridArea ? { gridArea } : undefined}
       onClick={handleClick}
     >
       {/* Panel Header */}
       <div
-        className={`h-8 flex items-center justify-between px-2 flex-shrink-0 ${
+        className={`h-8 flex items-center justify-between pl-7 pr-2 flex-shrink-0 ${
           isActive ? 'bg-gray-700' : 'bg-gray-800'
         } border-b border-gray-700`}
       >

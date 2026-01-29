@@ -7,7 +7,9 @@
 
 import { useCallback, useEffect } from 'react';
 import { useProjectStore } from '../stores/projectStore';
+import { useExplorerStore } from '../stores/explorerStore';
 import { projectService } from '../services/projectService';
+import { explorerService } from '../services/explorerService';
 import type {
   PlcManufacturer,
   ProjectData,
@@ -55,6 +57,14 @@ export function useProject() {
     clearError,
     reset,
   } = useProjectStore();
+
+  // Get explorer store actions
+  const {
+    loadProjectStructure,
+    clearTree: clearExplorerTree,
+    setLoading: setExplorerLoading,
+    setError: setExplorerError,
+  } = useExplorerStore();
 
   // ============================================================================
   // Recent Projects Management
@@ -106,6 +116,31 @@ export function useProject() {
   }, [refreshRecentProjects]);
 
   // ============================================================================
+  // File Explorer Management
+  // ============================================================================
+
+  /**
+   * Load the project file tree into the explorer
+   */
+  const loadFileTree = useCallback(
+    async (projectPath: string): Promise<void> => {
+      // Get the directory containing the .mop file
+      const projectDir = projectPath.replace(/[\\/][^\\/]+\.mop$/i, '');
+
+      setExplorerLoading(true);
+      try {
+        const files = await explorerService.listProjectFiles(projectDir);
+        loadProjectStructure(projectDir, files);
+      } catch (err) {
+        const message = formatError(err);
+        setExplorerError(`Failed to load project files: ${message}`);
+        console.error('Failed to load project files:', err);
+      }
+    },
+    [loadProjectStructure, setExplorerLoading, setExplorerError]
+  );
+
+  // ============================================================================
   // Project Lifecycle Operations
   // ============================================================================
 
@@ -137,6 +172,9 @@ export function useProject() {
         const data = await projectService.openProject(info.path);
         setProject(data, info.path);
 
+        // Load file tree into explorer
+        await loadFileTree(info.path);
+
         // Refresh recent projects
         await refreshRecentProjects();
 
@@ -152,7 +190,7 @@ export function useProject() {
         setLoading(false);
       }
     },
-    [setLoading, clearError, setProject, refreshRecentProjects, setError]
+    [setLoading, clearError, setProject, loadFileTree, refreshRecentProjects, setError]
   );
 
   /**
@@ -166,6 +204,9 @@ export function useProject() {
       try {
         const data = await projectService.openProject(path);
         setProject(data, path);
+
+        // Load file tree into explorer
+        await loadFileTree(path);
 
         // Refresh recent projects
         await refreshRecentProjects();
@@ -182,7 +223,7 @@ export function useProject() {
         setLoading(false);
       }
     },
-    [setLoading, clearError, setProject, refreshRecentProjects, setError]
+    [setLoading, clearError, setProject, loadFileTree, refreshRecentProjects, setError]
   );
 
   /**
@@ -249,6 +290,9 @@ export function useProject() {
           await projectService.closeProject();
         }
 
+        // Clear explorer file tree
+        clearExplorerTree();
+
         reset();
         return true;
       } catch (err) {
@@ -259,7 +303,7 @@ export function useProject() {
         setLoading(false);
       }
     },
-    [isModified, setLoading, clearError, reset, setError]
+    [isModified, setLoading, clearError, clearExplorerTree, reset, setError]
   );
 
   /**

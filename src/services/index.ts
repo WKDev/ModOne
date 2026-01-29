@@ -6,4 +6,5 @@ export { loggingService, default as LoggingService } from './loggingService';
 export { canvasService, default as CanvasService, CanvasServiceError } from './canvasService';
 export { scenarioService, default as ScenarioService } from './scenarioService';
 export { parserService, default as ParserService } from './parserService';
+export { explorerService, default as ExplorerService, ExplorerServiceError } from './explorerService';
 export type { LogEntry } from './loggingService';

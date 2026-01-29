@@ -4,7 +4,8 @@ export type PanelType =
   | 'one-canvas'
   | 'scenario-editor'
   | 'console'
-  | 'properties';
+  | 'properties'
+  | 'csv-viewer';
 
 export interface PanelState {
   id: string;
@@ -42,6 +43,7 @@ export const PANEL_TYPE_LABELS: Record<PanelType, string> = {
   'scenario-editor': 'Scenario Editor',
   'console': 'Console',
   'properties': 'Properties',
+  'csv-viewer': 'CSV Viewer',
 };
 
 export const MIN_PANEL_SIZE = 150; // Minimum panel size in pixels

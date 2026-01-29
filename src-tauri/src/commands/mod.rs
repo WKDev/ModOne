@@ -5,6 +5,7 @@
 
 pub mod canvas;
 pub mod canvas_sync;
+pub mod explorer;
 pub mod layout;
 pub mod logging;
 pub mod modbus;
@@ -84,4 +85,9 @@ pub use sim::{
     sim_get_watches, sim_pause, sim_read_device, sim_read_memory_range, sim_remove_breakpoint,
     sim_remove_watch, sim_reset, sim_resume, sim_run, sim_step, sim_stop, sim_write_device,
     SimState,
+};
+
+// Re-export explorer commands
+pub use explorer::{
+    list_project_files, read_file_contents, path_exists, get_file_info,
 };

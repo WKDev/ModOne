@@ -44,6 +44,9 @@ interface PanelStoreActions {
   ) => boolean;
   mergePanelAsTabs: (targetPanelId: string, sourcePanelId: string) => boolean;
   removePanelFromGrid: (panelId: string) => void;
+  // File-based tab helpers
+  findTabByFilePath: (filePath: string) => { panelId: string; tab: TabState } | null;
+  getOrCreateEditorPanel: (preferredType?: PanelType) => string;
 }
 
 type PanelStore = PanelStoreState & PanelStoreActions;
@@ -631,6 +634,50 @@ export const usePanelStore = create<PanelStore>()(
           false,
           'removePanelFromGrid'
         );
+      },
+
+      // File-based tab helpers
+      findTabByFilePath: (filePath) => {
+        const { panels } = get();
+        for (const panel of panels) {
+          if (panel.tabs) {
+            const tab = panel.tabs.find((t) => t.data?.filePath === filePath);
+            if (tab) {
+              return { panelId: panel.id, tab };
+            }
+          }
+        }
+        return null;
+      },
+
+      getOrCreateEditorPanel: (preferredType) => {
+        const { panels, addPanel } = get();
+
+        // Editor panel types that can host file tabs
+        const editorTypes: PanelType[] = [
+          'ladder-editor',
+          'one-canvas',
+          'scenario-editor',
+          'csv-viewer',
+        ];
+
+        // If a preferred type is given, try to find that first
+        if (preferredType) {
+          const preferred = panels.find((p) => p.type === preferredType);
+          if (preferred) {
+            return preferred.id;
+          }
+        }
+
+        // Find any existing editor panel
+        const editorPanel = panels.find((p) => editorTypes.includes(p.type));
+        if (editorPanel) {
+          return editorPanel.id;
+        }
+
+        // Create a new panel with the preferred type or default to ladder-editor
+        const type = preferredType || 'ladder-editor';
+        return addPanel(type, '1 / 1 / 2 / 2');
       },
     }),
     { name: 'panel-store' }

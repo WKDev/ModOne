@@ -51,3 +51,4 @@ export {
   type SimulationConfig,
   type DeviceChangeEvent,
 } from './useSimulation';
+export { useFileOpen, default as UseFileOpen } from './useFileOpen';
