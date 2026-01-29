@@ -29,6 +29,28 @@ export const WORD_DEVICES: readonly WordDeviceType[] = ['D', 'R', 'Z', 'N'] as c
 /** Array of all device types */
 export const ALL_DEVICES: readonly DeviceType[] = [...BIT_DEVICES, ...WORD_DEVICES] as const;
 
+/** Device address range definition */
+export interface DeviceRange {
+  start: number;
+  end: number;
+}
+
+/** Device address ranges for LS PLC (XGK series) */
+export const DEVICE_RANGES: Record<DeviceType, DeviceRange> = {
+  // Bit devices
+  P: { start: 0, end: 2047 },    // Output relays
+  M: { start: 0, end: 8191 },    // Internal relays
+  K: { start: 0, end: 2047 },    // Keep relays
+  F: { start: 0, end: 2047 },    // Special relays
+  T: { start: 0, end: 2047 },    // Timer contacts
+  C: { start: 0, end: 2047 },    // Counter contacts
+  // Word devices
+  D: { start: 0, end: 9999 },    // Data registers
+  R: { start: 0, end: 9999 },    // Retentive data registers
+  Z: { start: 0, end: 15 },      // Index registers
+  N: { start: 0, end: 8191 },    // Constant registers
+} as const;
+
 /** Device address with optional bit index */
 export interface DeviceAddress {
   /** Device type (P, M, K, F, T, C, D, R, Z, N) */
@@ -436,6 +458,17 @@ export function isDeviceAddress(
   value: DeviceAddress | number
 ): value is DeviceAddress {
   return typeof value === 'object' && 'device' in value && 'address' in value;
+}
+
+/**
+ * Check if an address number is within valid range for a device type
+ * @param device - Device type to check
+ * @param address - Address number to validate
+ * @returns True if address is within valid range
+ */
+export function isAddressInRange(device: DeviceType, address: number): boolean {
+  const range = DEVICE_RANGES[device];
+  return address >= range.start && address <= range.end;
 }
 
 // ============================================================================

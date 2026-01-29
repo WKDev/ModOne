@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -6,6 +7,13 @@ import path from "path";
 // https://vitejs.dev/config/
 export default defineConfig(async () => ({
   plugins: [react(), tailwindcss()],
+
+  // Vitest configuration
+  test: {
+    globals: true,
+    environment: "node",
+    include: ["src/**/*.{test,spec}.{js,ts,jsx,tsx}"],
+  },
 
   // Path aliases matching tsconfig.json
   resolve: {
