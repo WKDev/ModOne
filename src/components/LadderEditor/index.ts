@@ -56,3 +56,10 @@ export type { DeviceSelectDialogProps } from './dialogs';
 // Monitoring
 export { MonitoringToolbar } from './MonitoringToolbar';
 export type { MonitoringToolbarProps } from './MonitoringToolbar';
+
+// Inline editing
+export { InlineEditPopover } from './InlineEditPopover';
+export type { InlineEditPopoverProps } from './InlineEditPopover';
+
+// Utilities
+export * from './utils';

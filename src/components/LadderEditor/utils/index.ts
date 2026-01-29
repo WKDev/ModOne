@@ -28,3 +28,16 @@ export {
   type ConversionResult,
   type ConversionOptions,
 } from './gridConverter';
+
+// Validation utilities
+export {
+  validateDeviceAddress,
+  validateDeviceAddressForType,
+  validateTimerPreset,
+  validateCounterPreset,
+  validateCompareValue,
+  validateLabel,
+  formatValidationError,
+  collectValidationErrors,
+  type ValidationResult,
+} from './validation';

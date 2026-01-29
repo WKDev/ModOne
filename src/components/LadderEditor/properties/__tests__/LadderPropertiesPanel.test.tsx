@@ -260,7 +260,15 @@ describe('LadderPropertiesPanel', () => {
   });
 
   describe('Property Updates', () => {
-    it('should update element when address changes', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should update element when address changes', async () => {
       const updateElementSpy = vi.fn();
 
       act(() => {
@@ -279,6 +287,11 @@ describe('LadderPropertiesPanel', () => {
 
       const addressInput = screen.getByDisplayValue('M0001');
       fireEvent.change(addressInput, { target: { value: 'M0002' } });
+
+      // Wait for debounce (300ms)
+      await act(async () => {
+        vi.advanceTimersByTime(300);
+      });
 
       expect(updateElementSpy).toHaveBeenCalledWith(mockContactElement.id, {
         address: 'M0002',
@@ -309,7 +322,7 @@ describe('LadderPropertiesPanel', () => {
       });
     });
 
-    it('should update element when label changes', () => {
+    it('should update element when label changes', async () => {
       const updateElementSpy = vi.fn();
 
       act(() => {
@@ -327,6 +340,11 @@ describe('LadderPropertiesPanel', () => {
 
       const labelInput = screen.getByDisplayValue('Start Button');
       fireEvent.change(labelInput, { target: { value: 'Stop Button' } });
+
+      // Wait for debounce (300ms)
+      await act(async () => {
+        vi.advanceTimersByTime(300);
+      });
 
       expect(updateElementSpy).toHaveBeenCalledWith(mockContactElement.id, {
         label: 'Stop Button',

@@ -4,8 +4,9 @@
  * Property editor for counter elements (CTU, CTD, CTUD).
  */
 
-import { useCallback } from 'react';
+import { useCallback, useState, useMemo } from 'react';
 import { PropertyField, type SelectOption } from './PropertyField';
+import { validateDeviceAddress, validateCounterPreset, validateLabel } from '../utils/validation';
 import type { CounterElement, CounterType } from '../../../types/ladder';
 
 export interface CounterPropertiesProps {
@@ -35,9 +36,28 @@ export function CounterProperties({
   disabled = false,
   onDeviceSelect,
 }: CounterPropertiesProps) {
+  // Validation error states
+  const [addressError, setAddressError] = useState<string | undefined>();
+  const [presetError, setPresetError] = useState<string | undefined>();
+  const [labelError, setLabelError] = useState<string | undefined>();
+
+  // Check if there are any validation errors
+  const hasErrors = useMemo(() => {
+    return !!addressError || !!presetError || !!labelError;
+  }, [addressError, presetError, labelError]);
+
   const handleAddressChange = useCallback(
     (value: string | number) => {
-      onUpdate({ address: String(value) });
+      const strValue = String(value);
+      const validation = validateDeviceAddress(strValue);
+
+      if (!validation.valid) {
+        setAddressError(validation.error);
+        return;
+      }
+
+      setAddressError(undefined);
+      onUpdate({ address: strValue });
     },
     [onUpdate]
   );
@@ -52,27 +72,49 @@ export function CounterProperties({
   const handlePresetValueChange = useCallback(
     (value: string | number) => {
       const numValue = typeof value === 'number' ? value : parseInt(value, 10);
-      if (!isNaN(numValue)) {
-        onUpdate({
-          properties: {
-            ...element.properties,
-            presetValue: numValue,
-          },
-        });
+      const validation = validateCounterPreset(numValue);
+
+      if (!validation.valid) {
+        setPresetError(validation.error);
+        return;
       }
+
+      setPresetError(undefined);
+      onUpdate({
+        properties: {
+          ...element.properties,
+          presetValue: numValue,
+        },
+      });
     },
     [onUpdate, element.properties]
   );
 
   const handleLabelChange = useCallback(
     (value: string | number) => {
-      onUpdate({ label: String(value) || undefined });
+      const strValue = String(value);
+      const validation = validateLabel(strValue);
+
+      if (!validation.valid) {
+        setLabelError(validation.error);
+        return;
+      }
+
+      setLabelError(undefined);
+      onUpdate({ label: strValue || undefined });
     },
     [onUpdate]
   );
 
   return (
     <div className="space-y-3">
+      {/* Error summary */}
+      {hasErrors && (
+        <div className="p-2 bg-red-900/30 border border-red-700/50 rounded text-xs text-red-300">
+          Please fix validation errors
+        </div>
+      )}
+
       <PropertyField
         label="Address"
         type="text"
@@ -80,8 +122,10 @@ export function CounterProperties({
         onChange={handleAddressChange}
         placeholder="C0000"
         disabled={disabled}
+        error={addressError}
         showDeviceButton
         onDeviceButtonClick={onDeviceSelect}
+        debounceMs={300}
       />
 
       <PropertyField
@@ -102,6 +146,7 @@ export function CounterProperties({
         max={65535}
         step={1}
         disabled={disabled}
+        error={presetError}
         debounceMs={300}
       />
 
@@ -112,6 +157,8 @@ export function CounterProperties({
         onChange={handleLabelChange}
         placeholder="Optional label"
         disabled={disabled}
+        error={labelError}
+        debounceMs={300}
       />
     </div>
   );
