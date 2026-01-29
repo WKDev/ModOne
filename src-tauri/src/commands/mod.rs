@@ -59,5 +59,8 @@ pub use scenario::{
 
 // Re-export parser commands
 pub use parser::{
-    parser_parse_csv_content, parser_parse_csv_file, parser_parse_csv_grouped,
+    parser_format_modbus_address, parser_is_read_only, parser_load_program,
+    parser_map_address_to_modbus, parser_map_modbus_to_address, parser_parse_csv_content,
+    parser_parse_csv_file, parser_parse_csv_grouped, parser_parse_modbus_address,
+    parser_program_exists, parser_save_program,
 };

@@ -762,78 +762,7 @@ pub struct ModbusAddress {
     pub address: u16,
 }
 
-/// Device to Modbus mapping rule
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MappingRule {
-    /// PLC device type
-    pub device: DeviceType,
-    /// Modbus memory type to map to
-    pub modbus_type: ModbusAddressType,
-    /// Address offset for mapping
-    pub offset: u16,
-}
-
-impl MappingRule {
-    /// Get default mapping rules for LS PLC devices
-    pub fn defaults() -> Vec<Self> {
-        vec![
-            // Bit devices to coils
-            MappingRule {
-                device: DeviceType::Bit(BitDeviceType::P),
-                modbus_type: ModbusAddressType::Coil,
-                offset: 0,
-            },
-            MappingRule {
-                device: DeviceType::Bit(BitDeviceType::M),
-                modbus_type: ModbusAddressType::Coil,
-                offset: 1000,
-            },
-            MappingRule {
-                device: DeviceType::Bit(BitDeviceType::K),
-                modbus_type: ModbusAddressType::Discrete,
-                offset: 0,
-            },
-            MappingRule {
-                device: DeviceType::Bit(BitDeviceType::F),
-                modbus_type: ModbusAddressType::Discrete,
-                offset: 1000,
-            },
-            // Timer/Counter bits
-            MappingRule {
-                device: DeviceType::Bit(BitDeviceType::T),
-                modbus_type: ModbusAddressType::Coil,
-                offset: 2000,
-            },
-            MappingRule {
-                device: DeviceType::Bit(BitDeviceType::C),
-                modbus_type: ModbusAddressType::Coil,
-                offset: 3000,
-            },
-            // Word devices to holding registers
-            MappingRule {
-                device: DeviceType::Word(WordDeviceType::D),
-                modbus_type: ModbusAddressType::Holding,
-                offset: 0,
-            },
-            MappingRule {
-                device: DeviceType::Word(WordDeviceType::R),
-                modbus_type: ModbusAddressType::Holding,
-                offset: 10000,
-            },
-            MappingRule {
-                device: DeviceType::Word(WordDeviceType::Z),
-                modbus_type: ModbusAddressType::Input,
-                offset: 0,
-            },
-            MappingRule {
-                device: DeviceType::Word(WordDeviceType::N),
-                modbus_type: ModbusAddressType::Input,
-                offset: 100,
-            },
-        ]
-    }
-}
+// Note: MappingRule is defined in modbus_mapper.rs with correct offsets
 
 // ============================================================================
 // Unit Tests
@@ -878,11 +807,5 @@ mod tests {
         let program = LadderProgram::default();
         assert_eq!(program.metadata.name, "Untitled Program");
         assert!(program.networks.is_empty());
-    }
-
-    #[test]
-    fn test_mapping_rule_defaults() {
-        let rules = MappingRule::defaults();
-        assert_eq!(rules.len(), 10);
     }
 }

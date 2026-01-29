@@ -48,7 +48,10 @@ use commands::{
     scenario_create, scenario_delete, scenario_exists, scenario_export_csv, scenario_import_csv,
     scenario_list, scenario_load, scenario_save,
     // Parser commands
-    parser_parse_csv_content, parser_parse_csv_file, parser_parse_csv_grouped,
+    parser_format_modbus_address, parser_is_read_only, parser_load_program,
+    parser_map_address_to_modbus, parser_map_modbus_to_address, parser_parse_csv_content,
+    parser_parse_csv_file, parser_parse_csv_grouped, parser_parse_modbus_address,
+    parser_program_exists, parser_save_program,
 };
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -175,6 +178,14 @@ pub fn run() {
             parser_parse_csv_file,
             parser_parse_csv_content,
             parser_parse_csv_grouped,
+            parser_map_address_to_modbus,
+            parser_map_modbus_to_address,
+            parser_is_read_only,
+            parser_format_modbus_address,
+            parser_parse_modbus_address,
+            parser_save_program,
+            parser_load_program,
+            parser_program_exists,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
