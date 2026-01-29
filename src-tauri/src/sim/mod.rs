@@ -6,6 +6,7 @@ pub mod counter;
 pub mod engine;
 pub mod executor;
 pub mod memory;
+pub mod modserver_sync;
 pub mod timer;
 pub mod types;
 
@@ -18,5 +19,6 @@ pub use executor::{
     NetworkExecutionResult, NodeType, ProgramExecutionResult, ProgramExecutor,
 };
 pub use memory::{DeviceMemory, SimMemoryError, SimMemoryResult};
+pub use modserver_sync::{ModServerSync, SyncError, SyncResult};
 pub use timer::TimerManager;
 pub use types::*;
