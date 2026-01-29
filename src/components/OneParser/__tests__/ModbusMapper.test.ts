@@ -315,8 +315,8 @@ describe('ModbusMapper', () => {
       expect(mapper.isReadOnly({ device: 'D', address: 0 })).toBe(false);
     });
 
-    it('should return false for P (Input Relay)', () => {
-      expect(mapper.isReadOnly({ device: 'P', address: 0 })).toBe(false);
+    it('should return true for P (Input Relay - maps to discrete input)', () => {
+      expect(mapper.isReadOnly({ device: 'P', address: 0 })).toBe(true);
     });
 
     it('should return false for K (Keep Relay)', () => {

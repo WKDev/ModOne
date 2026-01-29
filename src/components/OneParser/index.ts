@@ -4,6 +4,10 @@
  * Parser for LS PLC ladder logic programs from XG5000 CSV export.
  */
 
+// Export main parser
+export { OneParser, oneParser } from './OneParser';
+export type { ParseOptions, ParseResult } from './OneParser';
+
 // Export all types
 export * from './types';
 

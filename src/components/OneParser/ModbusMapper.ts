@@ -246,8 +246,9 @@ export class ModbusMapper {
    * @returns True if device is read-only
    */
   isReadOnly(deviceAddr: DeviceAddress): boolean {
-    // F (Special Relay), T (Timer Contact), C (Counter Contact) are read-only
-    return ['F', 'T', 'C'].includes(deviceAddr.device);
+    // P (Input), F (Special Relay), T (Timer Contact), C (Counter Contact) are read-only
+    // P maps to discrete inputs, which are read-only in Modbus
+    return ['P', 'F', 'T', 'C'].includes(deviceAddr.device);
   }
 
   /**

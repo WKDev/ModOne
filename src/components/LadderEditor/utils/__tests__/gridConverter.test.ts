@@ -638,8 +638,6 @@ describe('Grid to AST Conversion', () => {
   // Import Grid to AST functions
   const {
     groupElementsByRow,
-    detectParallelGroups,
-    buildASTFromGroups,
     normalizeAST,
     gridToAST,
   } = gridConverter;
