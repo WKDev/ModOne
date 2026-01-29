@@ -9,3 +9,9 @@ export * from './types';
 
 // Export CSV reader
 export { CsvReader, parseCsvContent, parseCsvGrouped } from './CsvReader';
+
+// Export utilities
+export * from './utils';
+
+// Export Instruction Parser
+export { InstructionParser } from './InstructionParser';

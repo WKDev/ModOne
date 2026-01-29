@@ -12,6 +12,7 @@ import { useLadderStore, selectCurrentNetwork, selectSelectedElementIds, selectG
 import { PowerRail } from './PowerRail';
 import { NeutralRail } from './NeutralRail';
 import { LadderCell } from './LadderCell';
+import { LadderElementRenderer } from './elements';
 import type { GridPosition, LadderElement } from '../../types/ladder';
 
 export interface LadderGridProps {
@@ -202,11 +203,13 @@ export function LadderGrid({
             onClick={handleCellClick}
             onDoubleClick={handleCellDoubleClick}
           >
-            {/* Element renderer will be added in Task 73 */}
+            {/* Element renderer */}
             {element && (
-              <div className="text-xs text-neutral-400 truncate px-1">
-                {element.type}
-              </div>
+              <LadderElementRenderer
+                element={element}
+                width={cellWidth - 4}
+                height={cellHeight - 4}
+              />
             )}
           </LadderCell>
         );

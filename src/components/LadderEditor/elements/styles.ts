@@ -34,7 +34,7 @@ export const ELEMENT_COLORS = {
     stroke: 'rgb(107, 114, 128)', // neutral-500
     strokeEnergized: 'rgb(34, 197, 94)', // green-500
   },
-} as const;
+};
 
 /** Element dimensions */
 export const ELEMENT_DIMENSIONS = {
