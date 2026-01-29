@@ -22,6 +22,14 @@ export { Counter, type CounterType, type CounterProps } from './Counter';
 // Wire component
 export { Wire, type WireType, type WireProps } from './Wire';
 
+// Comparison component
+export {
+  Comparison,
+  type ComparisonType,
+  type ComparisonProps,
+  type ComparisonOperand,
+} from './Comparison';
+
 // Element renderer
 export {
   LadderElementRenderer,

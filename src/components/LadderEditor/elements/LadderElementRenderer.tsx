@@ -10,11 +10,13 @@ import { Coil, type CoilType } from './Coil';
 import { Timer, type TimerType } from './Timer';
 import { Counter, type CounterType } from './Counter';
 import { Wire, type WireType as WireComponentType } from './Wire';
+import { Comparison, type ComparisonType, type ComparisonOperand } from './Comparison';
 import type {
   LadderElement,
   LadderElementType,
   TimerElement,
   CounterElement,
+  CompareElement,
   TimerState,
   CounterState,
 } from '../../../types/ladder';
@@ -28,6 +30,8 @@ export interface MonitoringState {
   timerState?: TimerState;
   /** Counter state for counter elements */
   counterState?: CounterState;
+  /** Comparison result for comparison elements */
+  comparisonResult?: boolean;
 }
 
 export interface LadderElementRendererProps {
@@ -80,6 +84,16 @@ const WIRE_TYPE_MAP: Record<string, WireComponentType> = {
   wire_junction: 'junction_t', // Default junction, should be specified more precisely
 };
 
+/** Map from element type to comparison type */
+const COMPARISON_TYPE_MAP: Record<string, ComparisonType> = {
+  compare_eq: 'eq',
+  compare_gt: 'gt',
+  compare_lt: 'lt',
+  compare_ge: 'ge',
+  compare_le: 'le',
+  compare_ne: 'ne',
+};
+
 /** Check if element type is a contact */
 function isContactElement(type: LadderElementType): boolean {
   return type.startsWith('contact_');
@@ -98,6 +112,11 @@ function isTimerElementType(type: LadderElementType): boolean {
 /** Check if element type is a counter */
 function isCounterElementType(type: LadderElementType): boolean {
   return type.startsWith('counter_');
+}
+
+/** Check if element type is a comparison */
+function isComparisonElementType(type: LadderElementType): boolean {
+  return type.startsWith('compare_');
 }
 
 /**
@@ -239,14 +258,36 @@ export function LadderElementRenderer({
     );
   }
 
-  // Comparison elements (will be implemented in Task 85)
-  if (type.startsWith('compare_')) {
+  // Comparison elements
+  if (isComparisonElementType(type)) {
+    const comparisonType = COMPARISON_TYPE_MAP[type];
+    if (!comparisonType) {
+      console.warn(`Unknown comparison type: ${type}`);
+      return null;
+    }
+
+    // Get comparison properties from element
+    const compareElement = element as CompareElement;
+    const compareValue = compareElement.properties?.compareValue ?? 0;
+
+    // Build operands from properties
+    const operand1: ComparisonOperand = {
+      type: 'device',
+      value: address || 'D0',
+    };
+    const operand2: ComparisonOperand = {
+      type: typeof compareValue === 'number' ? 'constant' : 'device',
+      value: compareValue,
+    };
+
     return (
-      <div className="text-xs text-neutral-400 text-center">
-        Compare
-        <br />
-        {address}
-      </div>
+      <Comparison
+        type={comparisonType}
+        operand1={operand1}
+        operand2={operand2}
+        result={monitoring?.comparisonResult}
+        onDoubleClick={onDoubleClick}
+      />
     );
   }
 
