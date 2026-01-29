@@ -47,6 +47,8 @@ use commands::{
     // Scenario commands
     scenario_create, scenario_delete, scenario_exists, scenario_export_csv, scenario_import_csv,
     scenario_list, scenario_load, scenario_save,
+    // Parser commands
+    parser_parse_csv_content, parser_parse_csv_file, parser_parse_csv_grouped,
 };
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -169,6 +171,10 @@ pub fn run() {
             scenario_list,
             scenario_delete,
             scenario_exists,
+            // Parser commands
+            parser_parse_csv_file,
+            parser_parse_csv_content,
+            parser_parse_csv_grouped,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -6,3 +6,6 @@
 
 // Export all types
 export * from './types';
+
+// Export CSV reader
+export { CsvReader, parseCsvContent, parseCsvGrouped } from './CsvReader';

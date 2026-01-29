@@ -4478,7 +4478,7 @@
         "dependencies": [
           "61"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -4486,9 +4486,10 @@
             "description": "Define the CsvRow interface in the OneParser types file to represent a single parsed row from XG5000 CSV export containing instruction data.",
             "dependencies": [],
             "details": "Create src/components/OneParser/types.ts (if not existing from task 61) and add the CsvRow interface with fields: no (number for row number), step (number for network/rung), instruction (string for instruction mnemonic), operand1 (optional string), operand2 (optional string), operand3 (optional string), comment (optional string). This type will be used by both the TypeScript CsvReader class and as the return type from Rust Tauri commands. Ensure the interface matches the CSV column structure from XG5000 exports: NO, STEP, INSTRUCTION, OPERAND1, OPERAND2, OPERAND3, COMMENT.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify TypeScript compilation with `pnpm tsc --noEmit`. Test that CsvRow interface can be instantiated with both minimal (no, step, instruction) and full field sets.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-29T01:12:36.877Z"
           },
           {
             "id": 2,
@@ -4498,9 +4499,10 @@
               1
             ],
             "details": "Create src/components/OneParser/CsvReader.ts implementing: constructor accepting csvContent string that splits by newlines and filters empty lines, skips header row if detected (contains 'no,step'), private parseLine method handling quoted fields with commas inside quotes (iterate character-by-character, toggle inQuotes flag on double-quotes, split on comma only when not inQuotes), readRow method returning CsvRow or null when exhausted, readAllRows method that iterates readRow until null. Follow the existing csvParser.ts pattern from ScenarioEditor for quoted field handling. Convert instruction to uppercase, parse no/step as integers with fallback to 0.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit test with sample XG5000 CSV content including quoted fields with embedded commas. Test header detection and skipping. Test readRow returns null at end of file. Test Korean comments in quoted fields are preserved.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-29T01:16:09.630Z"
           },
           {
             "id": 3,
@@ -4510,9 +4512,10 @@
               2
             ],
             "details": "In src/components/OneParser/CsvReader.ts, add: groupByStep method taking CsvRow[] and returning Map<number, CsvRow[]> where each step number maps to all rows in that network (allows processing ladder logic network by network), reset method that sets currentIndex back to 1 (or 0 if no header) to allow re-reading the CSV content without re-parsing. The groupByStep is essential for the LadderBuilder (task 65) which processes one network at a time. Export CsvReader class as default export.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test groupByStep correctly groups rows: rows with step=0 together, step=1 together, etc. Test reset allows reading all rows again. Test groupByStep with empty array returns empty Map.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-29T01:16:09.646Z"
           },
           {
             "id": 4,
@@ -4522,9 +4525,10 @@
               1
             ],
             "details": "Create src-tauri/src/parser/mod.rs and csv_parser.rs. Define CsvRow struct with serde derives (Serialize, Deserialize) matching TypeScript interface: no (u32), step (u32), instruction (String), operand1/2/3 (Option<String>), comment (Option<String>). Implement CsvReader<R: BufRead> with: new() constructor, read_all() returning Result<Vec<CsvRow>, CsvParseError>, parse_line() handling quoted fields, split_csv_line() utility. Add CsvParseError enum using thiserror with variants for IoError, InvalidFormat. Register parser module in lib.rs. Use existing csv crate (already in Cargo.toml) or implement manual parsing for full control over XG5000 format quirks.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Unit test Rust CSV parsing with embedded test data. Test quoted field handling. Test Unicode/Korean character preservation. Test malformed rows return appropriate errors. Test empty optional fields become None.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-29T01:16:09.662Z"
           },
           {
             "id": 5,
@@ -4534,14 +4538,16 @@
               4
             ],
             "details": "Create src-tauri/src/commands/parser.rs with Tauri commands: parse_csv_file(path: String) -> Result<Vec<CsvRow>, ModOneError> that reads file content and parses using CsvReader, parse_csv_content(content: String) -> Result<Vec<CsvRow>, ModOneError> for parsing raw string content (useful for drag-drop or clipboard paste). Register commands in lib.rs invoke_handler. Add parser commands to commands/mod.rs exports. Use std::fs::read_to_string with proper error handling for file reading. Return structured errors for file not found, permission denied, parse failures.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Integration test Tauri commands with test CSV files. Test error handling for non-existent files. Test parse_csv_content with string input. Test commands return properly serialized CsvRow arrays that TypeScript can consume.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-29T01:16:09.681Z"
           }
         ],
         "complexity": 3,
         "recommendedSubtasks": 0,
-        "expansionPrompt": "Implement CSV parsing for PLC memory export files with column detection, type inference, and error handling"
+        "expansionPrompt": "Implement CSV parsing for PLC memory export files with column detection, type inference, and error handling",
+        "updatedAt": "2026-01-29T01:16:09.681Z"
       },
       {
         "id": "63",
@@ -7092,9 +7098,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-01-29T01:12:14.409Z",
+      "lastModified": "2026-01-29T01:16:09.681Z",
       "taskCount": 96,
-      "completedCount": 63,
+      "completedCount": 64,
       "tags": [
         "master"
       ]

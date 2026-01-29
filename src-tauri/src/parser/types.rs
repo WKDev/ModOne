@@ -283,35 +283,10 @@ pub enum MathInstructionType {
 }
 
 // ============================================================================
-// CSV Row Types
-// ============================================================================
-
-/// Raw CSV row from XG5000 export
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CsvRow {
-    /// Row number in CSV
-    pub no: u32,
-    /// Network/Rung number (step)
-    pub step: u32,
-    /// Instruction mnemonic
-    pub instruction: String,
-    /// First operand (optional)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub operand1: Option<String>,
-    /// Second operand (optional)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub operand2: Option<String>,
-    /// Third operand (optional)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub operand3: Option<String>,
-    /// Comment (optional)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub comment: Option<String>,
-}
-
-// ============================================================================
 // AST Node Types
 // ============================================================================
+
+// Note: CsvRow is defined in csv_reader.rs to avoid duplication
 
 /// Time base for timer operations
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

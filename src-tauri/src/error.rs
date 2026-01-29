@@ -82,6 +82,13 @@ pub enum ModOneError {
     MemoryError(String),
 
     // ========================================================================
+    // Parser Errors
+    // ========================================================================
+    /// Parse error (CSV, ladder logic, etc.)
+    #[error("Parse error: {0}")]
+    Parse(String),
+
+    // ========================================================================
     // General Errors
     // ========================================================================
     /// Internal error (unexpected conditions)
@@ -172,6 +179,7 @@ impl ModOneError {
             ModOneError::RecoveryFailed(_) => "Recovery Failed",
             ModOneError::ModbusError(_) => "Modbus Error",
             ModOneError::MemoryError(_) => "Memory Error",
+            ModOneError::Parse(_) => "Parse Error",
             ModOneError::Internal(_) => "Internal Error",
             ModOneError::Cancelled => "Cancelled",
             ModOneError::Timeout(_) => "Timeout",
@@ -195,6 +203,7 @@ impl ModOneError {
             ModOneError::RecoveryFailed(_) => "RecoveryFailed",
             ModOneError::ModbusError(_) => "ModbusError",
             ModOneError::MemoryError(_) => "MemoryError",
+            ModOneError::Parse(_) => "Parse",
             ModOneError::Internal(_) => "Internal",
             ModOneError::Cancelled => "Cancelled",
             ModOneError::Timeout(_) => "Timeout",

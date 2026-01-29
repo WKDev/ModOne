@@ -7,6 +7,7 @@ pub mod canvas;
 pub mod layout;
 pub mod logging;
 pub mod modbus;
+pub mod parser;
 pub mod project;
 pub mod scenario;
 pub mod settings;
@@ -54,4 +55,9 @@ pub use canvas::{
 pub use scenario::{
     scenario_create, scenario_delete, scenario_exists, scenario_export_csv, scenario_import_csv,
     scenario_list, scenario_load, scenario_save,
+};
+
+// Re-export parser commands
+pub use parser::{
+    parser_parse_csv_content, parser_parse_csv_file, parser_parse_csv_grouped,
 };
