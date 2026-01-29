@@ -15,3 +15,9 @@ export * from './utils';
 
 // Export Instruction Parser
 export { InstructionParser } from './InstructionParser';
+
+// Export AST Builder
+export { AstBuilder } from './AstBuilder';
+
+// Export Grid Calculator
+export { GridCalculator } from './GridCalculator';
