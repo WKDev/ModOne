@@ -9,6 +9,7 @@ pub mod modbus;
 pub mod parser;
 pub mod project;
 pub mod scenario;
+pub mod sim;
 
 // Re-export error types for convenience
 pub use error::{ModOneError, ModOneResult};

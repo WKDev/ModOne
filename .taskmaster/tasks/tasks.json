@@ -6323,7 +6323,7 @@
         "testStrategy": "1. Verify TypeScript compilation passes with `pnpm tsc --noEmit`\n2. Test all interfaces can be instantiated with valid data\n3. Verify Rust types serialize/deserialize to match TypeScript structure\n4. Unit test type guards for device types (isBitDevice, isWordDevice)\n5. Test default values are valid according to type constraints",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -6331,9 +6331,10 @@
             "description": "Define TypeScript types for PLC device memory including BitDeviceType, BitDeviceConfig, WordDeviceType, and WordDeviceConfig with proper size configurations.",
             "dependencies": [],
             "details": "Create `src/components/OneSim/types.ts` with the following types:\n\n1. BitDeviceType union: 'P' | 'M' | 'K' | 'F' | 'T' | 'C'\n2. BitDeviceConfig interface with type, size (P:2048, M:8192, K:2048, F:2048, T:2048, C:2048), readonly flag, and description\n3. WordDeviceType union: 'D' | 'R' | 'Z' | 'N' | 'TD' | 'CD'\n4. WordDeviceConfig interface with type, size (D:10000, R:10000, Z:16, N:8192, TD:2048, CD:2048), and description\n5. Add type guards: isBitDevice(), isWordDevice()\n6. Include default configuration constants for each device type\n\nFollow the existing patterns from src/components/OneCanvas/types.ts for documentation style and structure.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify TypeScript compilation passes with `pnpm tsc --noEmit`. Test that type guards correctly identify bit vs word devices. Validate default configurations match specified sizes.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-29T01:12:14.340Z"
           },
           {
             "id": 2,
@@ -6343,9 +6344,10 @@
               1
             ],
             "details": "Add to `src/components/OneSim/types.ts`:\n\n1. TimerType union: 'TON' | 'TOF' | 'TMR'\n2. CounterType union: 'CTU' | 'CTD' | 'CTUD'\n3. TimeBase union: 'ms' | '10ms' | '100ms' | 's'\n4. TimerState interface with enabled, done, elapsed (ms), preset, timeBase fields\n5. CounterState interface with done, currentValue, preset, prevUp (for edge detection), prevDown (for CTUD)\n6. Add factory functions: createTimerState(), createCounterState() with sensible defaults\n7. Add validation functions: isValidTimerPreset(), isValidCounterPreset()\n\nEnsure elapsed time handling accounts for different time bases.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test timer state initialization with default values. Verify time base calculations are correct. Test counter edge detection state initialization.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-29T01:12:14.357Z"
           },
           {
             "id": 3,
@@ -6355,9 +6357,10 @@
               1
             ],
             "details": "Add to `src/components/OneSim/types.ts`:\n\n1. SyncMode union: 'immediate' | 'endOfScan' | 'manual'\n2. SimulationConfig interface with scanTimeMs (default: 10), watchdogTimeoutMs (default: 1000), syncMode\n3. SimulationState union: 'stopped' | 'running' | 'paused' | 'error'\n4. SimulationStatus interface with state, scanCount, lastScanTimeUs, avgScanTimeUs, maxScanTimeUs, optional error string\n5. ScanCycleInfo interface with cycleCount, lastScanTime, averageScanTime, maxScanTime, timestamp\n6. Add DEFAULT_SIMULATION_CONFIG constant\n7. Add DEFAULT_SIMULATION_STATUS constant\n\nFollow patterns from scenario.ts for status and state type definitions.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify default configurations produce valid SimulationConfig objects. Test that SimulationStatus state transitions are type-safe. Validate scan time units are consistent (microseconds).",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-29T01:12:14.375Z"
           },
           {
             "id": 4,
@@ -6367,9 +6370,10 @@
               1
             ],
             "details": "Add to `src/components/OneSim/types.ts`:\n\n1. BreakpointType union: 'network' | 'device' | 'condition' | 'scanCount'\n2. Breakpoint interface with id, type, enabled, optional networkId, optional deviceAddress, optional condition string, optional scanCount\n3. WatchVariable interface with address, currentValue (number|boolean), previousValue (number|boolean), changeCount, lastChangeTime, history array of {value, timestamp}\n4. Add type guard: isConditionalBreakpoint()\n5. Add factory functions: createBreakpoint(), createWatchVariable()\n6. Add validation: isValidBreakpointCondition() for parsing condition expressions\n\nEnsure WatchVariable history has a configurable max length to prevent memory issues.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test breakpoint creation for all breakpoint types. Verify WatchVariable tracks value changes correctly. Test history array growth and potential truncation.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-29T01:12:14.395Z"
           },
           {
             "id": 5,
@@ -6382,14 +6386,16 @@
               4
             ],
             "details": "Create `src-tauri/src/sim/types.rs` and `src-tauri/src/sim/mod.rs`:\n\n1. Add mod.rs with `pub mod types;`\n2. In types.rs, define Rust equivalents for all TypeScript types:\n   - BitDeviceType and WordDeviceType as enums with #[serde(rename_all = \"UPPERCASE\")]\n   - DeviceConfig structs with appropriate sizes\n   - TimerType, CounterType, TimeBase enums\n   - TimerState, CounterState structs with #[serde(rename_all = \"camelCase\")]\n   - SimulationConfig, SimulationStatus, ScanCycleInfo structs\n   - BreakpointType enum, Breakpoint struct, WatchVariable struct\n3. Implement Default traits for config/state structs\n4. Add the sim module to src-tauri/src/lib.rs\n\nFollow patterns from src-tauri/src/scenario/types.rs for serde attributes and Default implementations.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Test Rust types serialize/deserialize to match TypeScript interface structure. Verify camelCase field naming matches frontend expectations. Unit test roundtrip JSON serialization for all types.",
-            "parentId": "undefined"
+            "parentId": "undefined",
+            "updatedAt": "2026-01-29T01:12:14.409Z"
           }
         ],
         "complexity": 4,
         "recommendedSubtasks": 0,
-        "expansionPrompt": "Define TypeScript and Rust types for OneSim including DeviceMemory, SimulationState, ScanCycleState following existing memory.rs patterns"
+        "expansionPrompt": "Define TypeScript and Rust types for OneSim including DeviceMemory, SimulationState, ScanCycleState following existing memory.rs patterns",
+        "updatedAt": "2026-01-29T01:12:14.409Z"
       },
       {
         "id": "87",
@@ -7086,9 +7092,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-01-29T01:09:24.026Z",
+      "lastModified": "2026-01-29T01:12:14.409Z",
       "taskCount": 96,
-      "completedCount": 62,
+      "completedCount": 63,
       "tags": [
         "master"
       ]
