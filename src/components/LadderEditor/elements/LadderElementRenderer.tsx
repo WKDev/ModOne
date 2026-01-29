@@ -2,18 +2,31 @@
  * LadderElementRenderer Component
  *
  * Switch-based renderer that maps ladder element types to their
- * corresponding visual components (Contact, Coil, etc.).
+ * corresponding visual components (Contact, Coil, Timer, Counter, etc.).
  */
 
 import { Contact, type ContactType } from './Contact';
 import { Coil, type CoilType } from './Coil';
-import type { LadderElement, LadderElementType } from '../../../types/ladder';
+import { Timer, type TimerType } from './Timer';
+import { Counter, type CounterType } from './Counter';
+import type {
+  LadderElement,
+  LadderElementType,
+  TimerElement,
+  CounterElement,
+  TimerState,
+  CounterState,
+} from '../../../types/ladder';
 
 export interface MonitoringState {
   /** Whether element is energized (ON) */
   isEnergized: boolean;
   /** Whether element is forced */
   isForced: boolean;
+  /** Timer state for timer elements */
+  timerState?: TimerState;
+  /** Counter state for counter elements */
+  counterState?: CounterState;
 }
 
 export interface LadderElementRendererProps {
@@ -44,6 +57,20 @@ const COIL_TYPE_MAP: Record<string, CoilType> = {
   coil_reset: 'reset',
 };
 
+/** Map from element type to timer type */
+const TIMER_TYPE_MAP: Record<string, TimerType> = {
+  timer_ton: 'ton',
+  timer_tof: 'tof',
+  timer_tmr: 'tmr',
+};
+
+/** Map from element type to counter type */
+const COUNTER_TYPE_MAP: Record<string, CounterType> = {
+  counter_ctu: 'ctu',
+  counter_ctd: 'ctd',
+  counter_ctud: 'ctud',
+};
+
 /** Check if element type is a contact */
 function isContactElement(type: LadderElementType): boolean {
   return type.startsWith('contact_');
@@ -52,6 +79,16 @@ function isContactElement(type: LadderElementType): boolean {
 /** Check if element type is a coil */
 function isCoilElement(type: LadderElementType): boolean {
   return type.startsWith('coil');
+}
+
+/** Check if element type is a timer */
+function isTimerElementType(type: LadderElementType): boolean {
+  return type.startsWith('timer_');
+}
+
+/** Check if element type is a counter */
+function isCounterElementType(type: LadderElementType): boolean {
+  return type.startsWith('counter_');
 }
 
 /**
@@ -123,25 +160,54 @@ export function LadderElementRenderer({
     return null;
   }
 
-  // Timer elements (will be implemented in Task 74)
-  if (type.startsWith('timer_')) {
+  // Timer elements
+  if (isTimerElementType(type)) {
+    const timerType = TIMER_TYPE_MAP[type];
+    if (!timerType) {
+      console.warn(`Unknown timer type: ${type}`);
+      return null;
+    }
+
+    // Get timer properties from element
+    const timerElement = element as TimerElement;
+    const presetTime = timerElement.properties?.presetTime ?? 1000;
+    const timerState = monitoring?.timerState;
+
     return (
-      <div className="text-xs text-neutral-400 text-center">
-        Timer
-        <br />
-        {address}
-      </div>
+      <Timer
+        type={timerType}
+        address={address}
+        presetTime={presetTime}
+        elapsedTime={timerState?.et}
+        isRunning={timerState?.running}
+        isDone={timerState?.done}
+        onDoubleClick={onDoubleClick}
+      />
     );
   }
 
-  // Counter elements (will be implemented in Task 74)
-  if (type.startsWith('counter_')) {
+  // Counter elements
+  if (isCounterElementType(type)) {
+    const counterType = COUNTER_TYPE_MAP[type];
+    if (!counterType) {
+      console.warn(`Unknown counter type: ${type}`);
+      return null;
+    }
+
+    // Get counter properties from element
+    const counterElement = element as CounterElement;
+    const presetValue = counterElement.properties?.presetValue ?? 10;
+    const counterState = monitoring?.counterState;
+
     return (
-      <div className="text-xs text-neutral-400 text-center">
-        Counter
-        <br />
-        {address}
-      </div>
+      <Counter
+        type={counterType}
+        address={address}
+        presetValue={presetValue}
+        currentValue={counterState?.cv}
+        isDone={counterState?.done}
+        onDoubleClick={onDoubleClick}
+      />
     );
   }
 
