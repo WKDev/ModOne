@@ -27,7 +27,27 @@ export {
   default as UseElementMonitoring,
   type UseElementMonitoringResult,
 } from './useElementMonitoring';
+export {
+  useCanvasSync,
+  default as UseCanvasSync,
+  type PlcBlockType,
+  type PlcBlockMapping,
+  type PlcOutputUpdate,
+  type PlcOutputsEvent,
+  type PlcInputChange,
+  type CanvasSyncStatus,
+  type MappingSummary,
+  type UseCanvasSyncOptions,
+  type UseCanvasSyncResult,
+} from './useCanvasSync';
 export { useOpenProjectDialog, default as UseOpenProjectDialog } from './useOpenProjectDialog';
 export { useProject, default as UseProject } from './useProject';
 export { useTranslation, useLanguage } from './useTranslation';
 export type { SupportedLanguage } from './useTranslation';
+export {
+  useSimulation,
+  default as UseSimulation,
+  type UseSimulationResult,
+  type SimulationConfig,
+  type DeviceChangeEvent,
+} from './useSimulation';
