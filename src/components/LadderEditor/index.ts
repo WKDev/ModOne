@@ -52,3 +52,7 @@ export type {
 // Dialogs
 export { DeviceSelectDialog } from './dialogs';
 export type { DeviceSelectDialogProps } from './dialogs';
+
+// Monitoring
+export { MonitoringToolbar } from './MonitoringToolbar';
+export type { MonitoringToolbarProps } from './MonitoringToolbar';
