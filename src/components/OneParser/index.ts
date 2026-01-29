@@ -21,3 +21,13 @@ export { AstBuilder } from './AstBuilder';
 
 // Export Grid Calculator
 export { GridCalculator } from './GridCalculator';
+
+// Export Modbus Mapper
+export {
+  ModbusMapper,
+  DEFAULT_MAPPING_RULES,
+  SPECIAL_MAPPINGS,
+  formatModbusAddress,
+  parseModbusAddress,
+  createDefaultMapper,
+} from './ModbusMapper';
