@@ -7,6 +7,7 @@
 
 import type { PanelType, GridConfig } from './panel';
 import type { SidebarPanel } from '../stores/sidebarStore';
+import type { Bounds } from './window';
 
 /**
  * Configuration for a single tab within a panel (serialized form)
@@ -35,6 +36,20 @@ export interface PanelLayoutConfig {
 }
 
 /**
+ * Configuration for a floating window (serialized form)
+ */
+export interface FloatingWindowLayoutConfig {
+  /** ID of the panel in the floating window */
+  panelId: string;
+  /** Type of panel content */
+  panelType: PanelType;
+  /** Window position and size */
+  bounds: Bounds;
+  /** Window title (optional, defaults to panel title) */
+  title?: string;
+}
+
+/**
  * Configuration for sidebar state
  */
 export interface SidebarLayoutConfig {
@@ -58,6 +73,8 @@ export interface LayoutConfig {
   panels: PanelLayoutConfig[];
   /** Sidebar configuration */
   sidebar: SidebarLayoutConfig;
+  /** Array of floating window configurations */
+  floatingWindows?: FloatingWindowLayoutConfig[];
   /** Whether this is a built-in preset (cannot be deleted) */
   isBuiltIn?: boolean;
   /** Optional description of the layout */

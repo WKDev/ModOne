@@ -1,13 +1,44 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { MainLayout } from './components/layout/MainLayout';
 import { PanelContainer } from './components/panels';
 import { usePanelStore } from './stores/panelStore';
 import { useLayoutPersistenceStore } from './stores/layoutPersistenceStore';
+import { ThemeProvider } from './providers/ThemeProvider';
+import { PanelDndProvider } from './providers/PanelDndProvider';
+import { useStateSync } from './hooks/useStateSync';
+import { FloatingWindowContent } from './components/floating/FloatingWindowContent';
+import { FloatingWindowRenderer } from './components/floating/FloatingWindowRenderer';
 
-function App() {
+/**
+ * Parse URL parameters to detect floating window mode
+ */
+function useFloatingWindowParams() {
+  return useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    const isFloating = params.get('floating') === 'true';
+    const windowId = params.get('windowId');
+    const panelId = params.get('panelId');
+    const panelType = params.get('panelType');
+
+    return {
+      isFloating,
+      windowId,
+      panelId,
+      panelType,
+    };
+  }, []);
+}
+
+/**
+ * Main window content - full application with layout and panels
+ */
+function MainWindowContent() {
   const { panels, addPanel } = usePanelStore();
   const { initialize, saveLastSession, isLoading } = useLayoutPersistenceStore();
   const [isInitialized, setIsInitialized] = useState(false);
+
+  // Initialize cross-window state synchronization
+  useStateSync();
 
   // Initialize layout persistence on mount
   useEffect(() => {
@@ -48,9 +79,46 @@ function App() {
   }
 
   return (
-    <MainLayout>
-      <PanelContainer />
-    </MainLayout>
+    <PanelDndProvider>
+      <MainLayout>
+        <PanelContainer />
+      </MainLayout>
+      {/* Floating window event listener (only needed in main window) */}
+      <FloatingWindowRenderer />
+    </PanelDndProvider>
+  );
+}
+
+/**
+ * Floating window content - simplified view for detached panels
+ */
+function FloatingWindowApp({ windowId, panelId }: { windowId: string; panelId: string }) {
+  // Initialize cross-window state synchronization
+  useStateSync();
+
+  return <FloatingWindowContent windowId={windowId} panelId={panelId} />;
+}
+
+/**
+ * Root App component - routes between main and floating window modes
+ */
+function App() {
+  const { isFloating, windowId, panelId } = useFloatingWindowParams();
+
+  // Floating window mode - render simplified content
+  if (isFloating && windowId && panelId) {
+    return (
+      <ThemeProvider defaultTheme="dark">
+        <FloatingWindowApp windowId={windowId} panelId={panelId} />
+      </ThemeProvider>
+    );
+  }
+
+  // Main window mode - render full application
+  return (
+    <ThemeProvider defaultTheme="dark">
+      <MainWindowContent />
+    </ThemeProvider>
   );
 }
 

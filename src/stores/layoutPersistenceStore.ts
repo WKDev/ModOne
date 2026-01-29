@@ -7,12 +7,14 @@
 
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { LayoutConfig, LayoutPresetInfo } from '../types/layout';
+import type { LayoutConfig, LayoutPresetInfo, FloatingWindowLayoutConfig } from '../types/layout';
 import { SPECIAL_LAYOUT_NAMES, isBuiltInLayout } from '../types/layout';
 import { layoutService } from '../services/layoutService';
+import { windowService } from '../services/windowService';
 import { BUILT_IN_LAYOUTS, getPresetByName, getDefaultLayout } from '../config/layoutPresets';
 import { usePanelStore } from './panelStore';
 import { useSidebarStore } from './sidebarStore';
+import { useWindowStore } from './windowStore';
 
 interface LayoutPersistenceState {
   /** Name of the currently active layout */
@@ -39,11 +41,11 @@ interface LayoutPersistenceActions {
   /** Delete a user layout */
   deleteLayout: (name: string) => Promise<void>;
   /** Reset to the default layout */
-  resetToDefault: () => void;
+  resetToDefault: () => Promise<void>;
   /** Export the current layout as a LayoutConfig object */
   exportCurrentLayout: (name: string) => LayoutConfig;
   /** Import and apply a layout from a LayoutConfig object */
-  importLayout: (config: LayoutConfig) => void;
+  importLayout: (config: LayoutConfig) => Promise<void>;
   /** Get all available layouts (built-in + user) */
   getAvailableLayouts: () => LayoutPresetInfo[];
   /** Refresh the list of saved layouts from storage */
@@ -75,35 +77,72 @@ const initialState: LayoutPersistenceState = {
 function serializeCurrentLayout(name: string): LayoutConfig {
   const panelState = usePanelStore.getState();
   const sidebarState = useSidebarStore.getState();
+  const windowState = useWindowStore.getState();
+
+  // Get floating windows
+  const floatingWindows = windowState.getAllFloatingWindows();
+  const floatingWindowConfigs: FloatingWindowLayoutConfig[] = floatingWindows.map((fw) => {
+    const panel = panelState.panels.find((p) => p.id === fw.panelId);
+    return {
+      panelId: fw.panelId,
+      panelType: panel?.type || 'console',
+      bounds: fw.bounds,
+      title: panel?.title,
+    };
+  });
 
   return {
     name,
     grid: { ...panelState.gridConfig },
-    panels: panelState.panels.map((panel) => ({
-      id: panel.id,
-      type: panel.type,
-      gridArea: panel.gridArea,
-      tabs: panel.tabs?.map((tab) => ({
-        type: tab.panelType,
-        title: tab.title,
+    // Only include docked panels (not floating)
+    panels: panelState.panels
+      .filter((panel) => !panel.isFloating)
+      .map((panel) => ({
+        id: panel.id,
+        type: panel.type,
+        gridArea: panel.gridArea,
+        tabs: panel.tabs?.map((tab) => ({
+          type: tab.panelType,
+          title: tab.title,
+        })),
+        activeTabId: panel.activeTabId ?? undefined,
       })),
-      activeTabId: panel.activeTabId ?? undefined,
-    })),
     sidebar: {
       visible: sidebarState.isVisible,
       width: sidebarState.width,
       activePanel: sidebarState.activePanel,
     },
+    floatingWindows: floatingWindowConfigs.length > 0 ? floatingWindowConfigs : undefined,
     updatedAt: new Date().toISOString(),
   };
 }
 
 /**
+ * Close all floating windows
+ */
+async function closeAllFloatingWindows(): Promise<void> {
+  const windowState = useWindowStore.getState();
+  const floatingWindows = windowState.getAllFloatingWindows();
+
+  for (const window of floatingWindows) {
+    try {
+      await windowService.closeFloatingWindow(window.windowId);
+    } catch (error) {
+      console.error(`Failed to close floating window ${window.windowId}:`, error);
+    }
+  }
+  windowState.clearAllWindows();
+}
+
+/**
  * Apply a LayoutConfig to the panel and sidebar stores
  */
-function applyLayoutConfig(config: LayoutConfig): void {
+async function applyLayoutConfig(config: LayoutConfig): Promise<void> {
   const panelStore = usePanelStore.getState();
   const sidebarStore = useSidebarStore.getState();
+
+  // Close all existing floating windows first
+  await closeAllFloatingWindows();
 
   // Update grid config
   panelStore.updateGridConfig(config.grid);
@@ -134,6 +173,20 @@ function applyLayoutConfig(config: LayoutConfig): void {
   }
   sidebarStore.setWidth(config.sidebar.width);
   sidebarStore.setActivePanel(config.sidebar.activePanel);
+
+  // Restore floating windows
+  if (config.floatingWindows && config.floatingWindows.length > 0) {
+    for (const floatingConfig of config.floatingWindows) {
+      try {
+        // Add panel first, then undock it
+        const panelId = panelStore.addPanel(floatingConfig.panelType, '1 / 1 / 2 / 2');
+        await panelStore.undockPanel(panelId, floatingConfig.bounds);
+      } catch (error) {
+        console.error(`Failed to restore floating window for panel ${floatingConfig.panelId}:`, error);
+        // Fallback: panel is already added as docked, so we just log the error
+      }
+    }
+  }
 }
 
 export const useLayoutPersistenceStore = create<LayoutPersistenceStore>()(
@@ -166,14 +219,14 @@ export const useLayoutPersistenceStore = create<LayoutPersistenceStore>()(
                 await get().loadLayout(lastActive);
               } else {
                 // Apply default layout
-                get().resetToDefault();
+                await get().resetToDefault();
               }
             } catch {
               // If last session restore fails, use default
-              get().resetToDefault();
+              await get().resetToDefault();
             }
           } else {
-            get().resetToDefault();
+            await get().resetToDefault();
           }
         } catch (error) {
           set(
@@ -182,7 +235,7 @@ export const useLayoutPersistenceStore = create<LayoutPersistenceStore>()(
             'initialize:error'
           );
           // Apply default layout on error
-          get().resetToDefault();
+          await get().resetToDefault();
         } finally {
           set({ isLoading: false }, false, 'initialize:complete');
         }
@@ -241,7 +294,7 @@ export const useLayoutPersistenceStore = create<LayoutPersistenceStore>()(
           }
 
           // Apply the layout
-          applyLayoutConfig(config);
+          await applyLayoutConfig(config);
           await layoutService.setLastActiveLayout(name);
 
           set(
@@ -279,7 +332,7 @@ export const useLayoutPersistenceStore = create<LayoutPersistenceStore>()(
 
           // If we deleted the current layout, switch to default
           if (get().currentLayoutName === name) {
-            get().resetToDefault();
+            await get().resetToDefault();
           }
 
           set({ savedLayoutNames: savedNames }, false, 'deleteLayout:success');
@@ -295,9 +348,9 @@ export const useLayoutPersistenceStore = create<LayoutPersistenceStore>()(
         }
       },
 
-      resetToDefault: () => {
+      resetToDefault: async () => {
         const defaultLayout = getDefaultLayout();
-        applyLayoutConfig(defaultLayout);
+        await applyLayoutConfig(defaultLayout);
 
         set(
           {
@@ -313,8 +366,8 @@ export const useLayoutPersistenceStore = create<LayoutPersistenceStore>()(
         return serializeCurrentLayout(name);
       },
 
-      importLayout: (config: LayoutConfig) => {
-        applyLayoutConfig(config);
+      importLayout: async (config: LayoutConfig) => {
+        await applyLayoutConfig(config);
 
         set(
           {

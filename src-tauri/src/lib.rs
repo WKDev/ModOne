@@ -70,6 +70,11 @@ use commands::{
     SimState,
     // Explorer commands
     list_project_files, read_file_contents, path_exists, get_file_info,
+    // Window commands
+    window_create_floating, window_close_floating, window_update_bounds,
+    window_focus_floating, window_list_floating, window_get_floating_info,
+    window_minimize_floating, window_maximize_floating, window_floating_exists,
+    FloatingWindowState, FloatingWindowRegistry,
 };
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -105,6 +110,9 @@ pub fn run() {
             std::sync::Arc::new(std::sync::Mutex::new(ErrorLogger::default()))
         });
 
+    // Initialize floating window state
+    let floating_window_state: FloatingWindowState = std::sync::Mutex::new(FloatingWindowRegistry::new());
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
@@ -115,6 +123,7 @@ pub fn run() {
         .manage(canvas_sync_state)
         .manage(sim_state)
         .manage(error_logger)
+        .manage(floating_window_state)
         .setup(|app| {
             log::info!("ModOne application starting...");
             if cfg!(debug_assertions) {
@@ -266,6 +275,16 @@ pub fn run() {
             read_file_contents,
             path_exists,
             get_file_info,
+            // Window commands
+            window_create_floating,
+            window_close_floating,
+            window_update_bounds,
+            window_focus_floating,
+            window_list_floating,
+            window_get_floating_info,
+            window_minimize_floating,
+            window_maximize_floating,
+            window_floating_exists,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

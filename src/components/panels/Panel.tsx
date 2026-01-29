@@ -1,7 +1,9 @@
-import { useState } from 'react';
-import { Minus, Square, X } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { ExternalLink, Minus, Square, X } from 'lucide-react';
 import { PanelProps, PanelType } from '../../types/panel';
 import { TabState } from '../../types/tab';
+import { usePanelStore } from '../../stores/panelStore';
+import { DEFAULT_FLOATING_WINDOW_SIZE } from '../../types/window';
 import { LadderEditorPanel } from './content/LadderEditorPanel';
 import { MemoryVisualizerPanel } from './content/MemoryVisualizerPanel';
 import { OneCanvasPanel } from './content/OneCanvasPanel';
@@ -27,6 +29,8 @@ export interface ExtendedPanelProps extends PanelProps {
   tabs?: TabState[];
   activeTabId?: string | null;
   onAddTab?: () => void;
+  /** Whether the panel can be undocked */
+  canUndock?: boolean;
 }
 
 export function Panel({
@@ -42,6 +46,7 @@ export function Panel({
   tabs,
   activeTabId,
   onAddTab,
+  canUndock = true,
 }: ExtendedPanelProps) {
   const [contextMenu, setContextMenu] = useState<{
     tabId: string;
@@ -49,8 +54,25 @@ export function Panel({
     position: { x: number; y: number };
   } | null>(null);
 
+  const undockPanel = usePanelStore((state) => state.undockPanel);
+
   const hasTabs = tabs && tabs.length > 0;
   const ContentComponent = panelContentMap[type];
+
+  const handleUndock = useCallback(async () => {
+    // Calculate position relative to screen
+    const bounds = {
+      x: window.screenX + 100,
+      y: window.screenY + 100,
+      width: DEFAULT_FLOATING_WINDOW_SIZE.width,
+      height: DEFAULT_FLOATING_WINDOW_SIZE.height,
+    };
+    try {
+      await undockPanel(id, bounds);
+    } catch (error) {
+      console.error('Failed to undock panel:', error);
+    }
+  }, [id, undockPanel]);
 
   const handleClick = (e: React.MouseEvent) => {
     // Don't activate if clicking on header buttons
@@ -88,6 +110,18 @@ export function Panel({
         <span className="text-sm text-gray-300 truncate">{title}</span>
 
         <div className="flex items-center gap-1">
+          {canUndock && (
+            <button
+              className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-600 text-gray-400 hover:text-white"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleUndock();
+              }}
+              title="Undock to floating window"
+            >
+              <ExternalLink size={12} />
+            </button>
+          )}
           <button
             className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-600 text-gray-400 hover:text-white"
             onClick={(e) => {

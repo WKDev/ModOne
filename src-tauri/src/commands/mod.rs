@@ -14,6 +14,7 @@ pub mod project;
 pub mod scenario;
 pub mod settings;
 pub mod sim;
+pub mod window;
 
 // Re-export all project commands for convenient registration in lib.rs
 pub use project::{
@@ -93,4 +94,12 @@ pub use sim::{
 // Re-export explorer commands
 pub use explorer::{
     list_project_files, read_file_contents, path_exists, get_file_info,
+};
+
+// Re-export window commands and state
+pub use window::{
+    window_create_floating, window_close_floating, window_update_bounds,
+    window_focus_floating, window_list_floating, window_get_floating_info,
+    window_minimize_floating, window_maximize_floating, window_floating_exists,
+    FloatingWindowState, FloatingWindowRegistry, FloatingWindowInfo, WindowBounds,
 };

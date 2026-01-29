@@ -1,5 +1,6 @@
 import { usePanelStore } from '../../stores/panelStore';
 import { Panel } from './Panel';
+import { DraggablePanel } from './DraggablePanel';
 
 export function PanelContainer() {
   const { panels, gridConfig, activePanel, setActivePanel, removePanel, minimizePanel, maximizePanel } = usePanelStore();
@@ -27,18 +28,22 @@ export function PanelContainer() {
   return (
     <div style={gridStyle} className="p-1">
       {panels.map((panel) => (
-        <Panel
+        <DraggablePanel
           key={panel.id}
-          id={panel.id}
-          type={panel.type}
-          title={panel.title}
+          panel={panel}
           isActive={activePanel === panel.id}
-          gridArea={panel.gridArea}
-          onClose={() => removePanel(panel.id)}
-          onMinimize={() => minimizePanel(panel.id)}
-          onMaximize={() => maximizePanel(panel.id)}
-          onActivate={() => setActivePanel(panel.id)}
-        />
+        >
+          <Panel
+            id={panel.id}
+            type={panel.type}
+            title={panel.title}
+            isActive={activePanel === panel.id}
+            onClose={() => removePanel(panel.id)}
+            onMinimize={() => minimizePanel(panel.id)}
+            onMaximize={() => maximizePanel(panel.id)}
+            onActivate={() => setActivePanel(panel.id)}
+          />
+        </DraggablePanel>
       ))}
     </div>
   );

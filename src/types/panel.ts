@@ -17,6 +17,12 @@ export interface PanelState {
   tabs?: import('./tab').TabState[];
   /** ID of the currently active tab in this panel */
   activeTabId?: string | null;
+  /** Floating window ID if panel is in a floating window (null = main window) */
+  windowId?: string | null;
+  /** Whether this panel is currently floating */
+  isFloating?: boolean;
+  /** Position and size when floating */
+  floatingBounds?: import('./window').Bounds;
 }
 
 export interface GridConfig {

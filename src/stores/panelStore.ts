@@ -3,11 +3,14 @@ import { devtools } from 'zustand/middleware';
 import { PanelState, PanelType, GridConfig, PANEL_TYPE_LABELS } from '../types/panel';
 import { TabState, TabData } from '../types/tab';
 import { DropPosition } from '../types/dnd';
+import { Bounds, DEFAULT_FLOATING_WINDOW_SIZE } from '../types/window';
 import {
   splitGrid,
   parseGridArea,
   createGridArea,
 } from '../utils/gridUtils';
+import { windowService } from '../services/windowService';
+import { useWindowStore } from './windowStore';
 
 interface PanelStoreState {
   panels: PanelState[];
@@ -47,6 +50,13 @@ interface PanelStoreActions {
   // File-based tab helpers
   findTabByFilePath: (filePath: string) => { panelId: string; tab: TabState } | null;
   getOrCreateEditorPanel: (preferredType?: PanelType) => string;
+  // Floating window actions
+  undockPanel: (panelId: string, bounds?: Bounds) => Promise<string | null>;
+  dockPanel: (panelId: string, targetPanelId?: string, dropPosition?: DropPosition) => Promise<boolean>;
+  setPanelFloating: (panelId: string, isFloating: boolean, windowId?: string | null) => void;
+  updatePanelFloatingBounds: (panelId: string, bounds: Bounds) => void;
+  getFloatingPanels: () => PanelState[];
+  getDockedPanels: () => PanelState[];
 }
 
 type PanelStore = PanelStoreState & PanelStoreActions;
@@ -678,6 +688,144 @@ export const usePanelStore = create<PanelStore>()(
         // Create a new panel with the preferred type or default to ladder-editor
         const type = preferredType || 'ladder-editor';
         return addPanel(type, '1 / 1 / 2 / 2');
+      },
+
+      // Floating window actions
+      undockPanel: async (panelId, bounds) => {
+        const { panels } = get();
+        const panel = panels.find((p) => p.id === panelId);
+
+        if (!panel || panel.isFloating) {
+          return null;
+        }
+
+        // Calculate default bounds if not provided
+        const floatingBounds: Bounds = bounds || {
+          x: 100,
+          y: 100,
+          width: DEFAULT_FLOATING_WINDOW_SIZE.width,
+          height: DEFAULT_FLOATING_WINDOW_SIZE.height,
+        };
+
+        try {
+          // Create floating window via Tauri
+          const windowId = await windowService.createFloatingWindow(
+            panelId,
+            panel.type,
+            floatingBounds
+          );
+
+          // Update panel state
+          set(
+            (state) => ({
+              panels: state.panels.map((p) =>
+                p.id === panelId
+                  ? {
+                      ...p,
+                      isFloating: true,
+                      windowId,
+                      floatingBounds,
+                    }
+                  : p
+              ),
+            }),
+            false,
+            'undockPanel'
+          );
+
+          // Register in window store
+          useWindowStore.getState().registerFloatingWindow(windowId, panelId, floatingBounds);
+
+          return windowId;
+        } catch (error) {
+          console.error('Failed to undock panel:', error);
+          return null;
+        }
+      },
+
+      dockPanel: async (panelId, targetPanelId, dropPosition) => {
+        const { panels, splitPanel, mergePanelAsTabs } = get();
+        const panel = panels.find((p) => p.id === panelId);
+
+        if (!panel || !panel.isFloating || !panel.windowId) {
+          return false;
+        }
+
+        try {
+          // Close the floating window
+          await windowService.closeFloatingWindow(panel.windowId);
+
+          // Unregister from window store
+          useWindowStore.getState().unregisterFloatingWindow(panel.windowId);
+
+          // Update panel state
+          set(
+            (state) => ({
+              panels: state.panels.map((p) =>
+                p.id === panelId
+                  ? {
+                      ...p,
+                      isFloating: false,
+                      windowId: null,
+                      floatingBounds: undefined,
+                      // Restore to a default grid area if no target specified
+                      gridArea: p.gridArea || '1 / 1 / 2 / 2',
+                    }
+                  : p
+              ),
+            }),
+            false,
+            'dockPanel'
+          );
+
+          // If target panel specified, merge or split
+          if (targetPanelId && dropPosition) {
+            if (dropPosition === 'center') {
+              mergePanelAsTabs(targetPanelId, panelId);
+            } else {
+              splitPanel(targetPanelId, panelId, dropPosition);
+            }
+          }
+
+          return true;
+        } catch (error) {
+          console.error('Failed to dock panel:', error);
+          return false;
+        }
+      },
+
+      setPanelFloating: (panelId, isFloating, windowId) => {
+        set(
+          (state) => ({
+            panels: state.panels.map((p) =>
+              p.id === panelId
+                ? { ...p, isFloating, windowId: windowId ?? null }
+                : p
+            ),
+          }),
+          false,
+          'setPanelFloating'
+        );
+      },
+
+      updatePanelFloatingBounds: (panelId, bounds) => {
+        set(
+          (state) => ({
+            panels: state.panels.map((p) =>
+              p.id === panelId ? { ...p, floatingBounds: bounds } : p
+            ),
+          }),
+          false,
+          'updatePanelFloatingBounds'
+        );
+      },
+
+      getFloatingPanels: () => {
+        return get().panels.filter((p) => p.isFloating === true);
+      },
+
+      getDockedPanels: () => {
+        return get().panels.filter((p) => p.isFloating !== true);
       },
     }),
     { name: 'panel-store' }
