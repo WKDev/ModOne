@@ -2,11 +2,28 @@
  * LadderNetworkList Component
  *
  * Sidebar panel for displaying and managing ladder networks.
- * Supports selection, add, delete, and reorder operations.
+ * Supports selection, add, delete, reorder (drag-and-drop) operations.
  */
 
 import { useCallback, useState, useRef, useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { cn } from '../../lib/utils';
 import { useLadderStore } from '../../stores/ladderStore';
 import type { LadderNetwork } from '../../types/ladder';
@@ -31,6 +48,8 @@ export interface NetworkListItemProps {
   isSelected: boolean;
   /** Whether this is the only network (can't delete) */
   isOnly: boolean;
+  /** Whether the item is being dragged */
+  isDragging?: boolean;
   /** Called when network is clicked */
   onSelect: () => void;
   /** Called when delete is clicked */
@@ -39,6 +58,8 @@ export interface NetworkListItemProps {
   onInsertAfter: () => void;
   /** Called when label is updated */
   onUpdateLabel: (label: string) => void;
+  /** Drag handle attributes from useSortable */
+  dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
 }
 
 /**
@@ -49,10 +70,12 @@ function NetworkListItem({
   index,
   isSelected,
   isOnly,
+  isDragging,
   onSelect,
   onDelete,
   onInsertAfter,
   onUpdateLabel,
+  dragHandleProps,
 }: NetworkListItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editLabel, setEditLabel] = useState(network.label || '');
@@ -125,15 +148,23 @@ function NetworkListItem({
         'transition-colors',
         isSelected
           ? 'bg-blue-600 text-white'
-          : 'hover:bg-neutral-700 text-neutral-300'
+          : 'hover:bg-neutral-700 text-neutral-300',
+        isDragging && 'opacity-50 shadow-lg ring-2 ring-blue-400'
       )}
       onClick={onSelect}
       role="button"
       tabIndex={0}
       aria-selected={isSelected}
     >
-      {/* Drag handle placeholder */}
-      <div className="w-4 h-4 flex items-center justify-center text-neutral-500 opacity-0 group-hover:opacity-100">
+      {/* Drag handle */}
+      <div
+        className={cn(
+          'w-4 h-4 flex items-center justify-center cursor-grab active:cursor-grabbing',
+          'opacity-0 group-hover:opacity-100 transition-opacity',
+          isSelected ? 'text-blue-200' : 'text-neutral-500'
+        )}
+        {...dragHandleProps}
+      >
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="14"
@@ -265,6 +296,39 @@ function NetworkListItem({
 }
 
 /**
+ * SortableNetworkItem - Wrapper for NetworkListItem with drag-and-drop support
+ */
+interface SortableNetworkItemProps extends Omit<NetworkListItemProps, 'isDragging' | 'dragHandleProps'> {
+  id: string;
+}
+
+function SortableNetworkItem({ id, ...props }: SortableNetworkItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <NetworkListItem
+        {...props}
+        isDragging={isDragging}
+        dragHandleProps={listeners}
+      />
+    </div>
+  );
+}
+
+/**
  * LadderNetworkList - Network list sidebar component
  */
 export function LadderNetworkList({
@@ -280,6 +344,7 @@ export function LadderNetworkList({
     addNetwork,
     removeNetwork,
     updateNetwork,
+    reorderNetworks,
   } = useLadderStore(
     useShallow((state) => ({
       networks: state.networks,
@@ -288,7 +353,20 @@ export function LadderNetworkList({
       addNetwork: state.addNetwork,
       removeNetwork: state.removeNetwork,
       updateNetwork: state.updateNetwork,
+      reorderNetworks: state.reorderNetworks,
     }))
+  );
+
+  // Setup dnd-kit sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Start drag after 8px movement
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
   );
 
   // Convert Map to array for rendering
@@ -315,11 +393,24 @@ export function LadderNetworkList({
     const newId = addNetwork();
     if (afterIndex !== -1 && afterIndex < networkArray.length - 1) {
       // The new network is at the end, move it to after afterIndex
-      const { reorderNetworks } = useLadderStore.getState();
       reorderNetworks(networkArray.length, afterIndex + 1);
     }
     onNetworkSelect?.(newId);
-  }, [networkArray, addNetwork, onNetworkSelect]);
+  }, [networkArray, addNetwork, onNetworkSelect, reorderNetworks]);
+
+  // Handle drag end for reordering
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = networkArray.findIndex((n) => n.id === active.id);
+      const newIndex = networkArray.findIndex((n) => n.id === over.id);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        reorderNetworks(oldIndex, newIndex);
+      }
+    }
+  }, [networkArray, reorderNetworks]);
 
   // Handle delete network
   const handleDelete = useCallback((id: string) => {
@@ -353,19 +444,32 @@ export function LadderNetworkList({
             No networks
           </div>
         ) : (
-          networkArray.map((network, index) => (
-            <NetworkListItem
-              key={network.id}
-              network={network}
-              index={index + 1}
-              isSelected={network.id === currentNetworkId}
-              isOnly={networkArray.length === 1}
-              onSelect={() => handleSelect(network.id)}
-              onDelete={() => handleDelete(network.id)}
-              onInsertAfter={() => handleInsertAfter(network.id)}
-              onUpdateLabel={(label) => handleUpdateLabel(network.id, label)}
-            />
-          ))
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            modifiers={[restrictToVerticalAxis]}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={networkArray.map(n => n.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {networkArray.map((network, index) => (
+                <SortableNetworkItem
+                  key={network.id}
+                  id={network.id}
+                  network={network}
+                  index={index + 1}
+                  isSelected={network.id === currentNetworkId}
+                  isOnly={networkArray.length === 1}
+                  onSelect={() => handleSelect(network.id)}
+                  onDelete={() => handleDelete(network.id)}
+                  onInsertAfter={() => handleInsertAfter(network.id)}
+                  onUpdateLabel={(label) => handleUpdateLabel(network.id, label)}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
         )}
       </div>
 

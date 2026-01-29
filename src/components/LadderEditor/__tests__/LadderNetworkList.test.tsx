@@ -302,4 +302,128 @@ describe('LadderNetworkList', () => {
 
     expect(screen.queryByText('Add Network')).not.toBeInTheDocument();
   });
+
+  describe('Drag and Drop Reordering', () => {
+    it('renders drag handles for each network', () => {
+      const network1 = createMockNetwork('net-1', 'Network 1');
+      const network2 = createMockNetwork('net-2', 'Network 2');
+
+      act(() => {
+        useLadderStore.setState({
+          networks: new Map([
+            ['net-1', network1],
+            ['net-2', network2],
+          ]),
+          currentNetworkId: 'net-1',
+        });
+      });
+
+      render(<LadderNetworkList />);
+
+      // Drag handles contain SVG elements with grip pattern (6 circles)
+      const svgs = document.querySelectorAll('svg');
+      // Each network item has a drag handle SVG
+      expect(svgs.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('reorders networks when store action is called', () => {
+      const network1 = createMockNetwork('net-1', 'Network 1');
+      const network2 = createMockNetwork('net-2', 'Network 2');
+      const network3 = createMockNetwork('net-3', 'Network 3');
+
+      act(() => {
+        useLadderStore.setState({
+          networks: new Map([
+            ['net-1', network1],
+            ['net-2', network2],
+            ['net-3', network3],
+          ]),
+          currentNetworkId: 'net-1',
+        });
+      });
+
+      // Verify initial order
+      let networkIds = Array.from(useLadderStore.getState().networks.keys());
+      expect(networkIds).toEqual(['net-1', 'net-2', 'net-3']);
+
+      // Reorder: move network at index 0 to index 2
+      act(() => {
+        useLadderStore.getState().reorderNetworks(0, 2);
+      });
+
+      // Verify new order
+      networkIds = Array.from(useLadderStore.getState().networks.keys());
+      expect(networkIds).toEqual(['net-2', 'net-3', 'net-1']);
+    });
+
+    it('maintains selection after reorder', () => {
+      const network1 = createMockNetwork('net-1', 'Network 1');
+      const network2 = createMockNetwork('net-2', 'Network 2');
+
+      act(() => {
+        useLadderStore.setState({
+          networks: new Map([
+            ['net-1', network1],
+            ['net-2', network2],
+          ]),
+          currentNetworkId: 'net-1',
+        });
+      });
+
+      // Reorder networks
+      act(() => {
+        useLadderStore.getState().reorderNetworks(0, 1);
+      });
+
+      // Selection should be maintained
+      expect(useLadderStore.getState().currentNetworkId).toBe('net-1');
+    });
+
+    it('renders networks in correct order after reorder', () => {
+      const network1 = createMockNetwork('net-1', 'First');
+      const network2 = createMockNetwork('net-2', 'Second');
+      const network3 = createMockNetwork('net-3', 'Third');
+
+      act(() => {
+        useLadderStore.setState({
+          networks: new Map([
+            ['net-1', network1],
+            ['net-2', network2],
+            ['net-3', network3],
+          ]),
+          currentNetworkId: 'net-1',
+        });
+      });
+
+      const { rerender } = render(<LadderNetworkList />);
+
+      // Initial order - verify by text content order in DOM
+      expect(screen.getByText('First')).toBeInTheDocument();
+      expect(screen.getByText('Second')).toBeInTheDocument();
+      expect(screen.getByText('Third')).toBeInTheDocument();
+
+      // Verify DOM order
+      const container = document.body;
+      const firstPos = container.innerHTML.indexOf('First');
+      const secondPos = container.innerHTML.indexOf('Second');
+      const thirdPos = container.innerHTML.indexOf('Third');
+      expect(firstPos).toBeLessThan(secondPos);
+      expect(secondPos).toBeLessThan(thirdPos);
+
+      // Reorder: move first to last
+      act(() => {
+        useLadderStore.getState().reorderNetworks(0, 2);
+      });
+
+      rerender(<LadderNetworkList />);
+
+      // Verify new DOM order
+      const containerAfter = document.body;
+      const firstPosAfter = containerAfter.innerHTML.indexOf('First');
+      const secondPosAfter = containerAfter.innerHTML.indexOf('Second');
+      const thirdPosAfter = containerAfter.innerHTML.indexOf('Third');
+      expect(secondPosAfter).toBeLessThan(thirdPosAfter);
+      expect(thirdPosAfter).toBeLessThan(firstPosAfter);
+    });
+  });
 });
