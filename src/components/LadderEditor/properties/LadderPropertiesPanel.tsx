@@ -5,10 +5,10 @@
  * ladder element properties. Handles empty, single, and multi-select states.
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { cn } from '../../../lib/utils';
-import { useLadderStore, selectCurrentNetwork, selectMode } from '../../../stores/ladderStore';
+import { useLadderStore, selectCurrentNetwork } from '../../../stores/ladderStore';
 import {
   isContactElement,
   isCoilElement,
@@ -25,6 +25,7 @@ import { ContactProperties } from './ContactProperties';
 import { CoilProperties } from './CoilProperties';
 import { TimerProperties } from './TimerProperties';
 import { CounterProperties } from './CounterProperties';
+import { DeviceSelectDialog } from '../dialogs';
 
 export interface LadderPropertiesPanelProps {
   /** Optional class name */
@@ -115,10 +116,12 @@ function SingleElementProperties({
   element,
   onUpdate,
   disabled,
+  onDeviceSelect,
 }: {
   element: LadderElement;
   onUpdate: (updates: Partial<LadderElement>) => void;
   disabled: boolean;
+  onDeviceSelect: () => void;
 }) {
   // Render appropriate property editor based on element type
   if (isContactElement(element)) {
@@ -127,6 +130,7 @@ function SingleElementProperties({
         element={element}
         onUpdate={onUpdate as (updates: Partial<ContactElement>) => void}
         disabled={disabled}
+        onDeviceSelect={onDeviceSelect}
       />
     );
   }
@@ -137,6 +141,7 @@ function SingleElementProperties({
         element={element}
         onUpdate={onUpdate as (updates: Partial<CoilElement>) => void}
         disabled={disabled}
+        onDeviceSelect={onDeviceSelect}
       />
     );
   }
@@ -147,6 +152,7 @@ function SingleElementProperties({
         element={element}
         onUpdate={onUpdate as (updates: Partial<TimerElement>) => void}
         disabled={disabled}
+        onDeviceSelect={onDeviceSelect}
       />
     );
   }
@@ -157,6 +163,7 @@ function SingleElementProperties({
         element={element}
         onUpdate={onUpdate as (updates: Partial<CounterElement>) => void}
         disabled={disabled}
+        onDeviceSelect={onDeviceSelect}
       />
     );
   }
@@ -192,6 +199,9 @@ export function LadderPropertiesPanel({ className }: LadderPropertiesPanelProps)
     }))
   );
 
+  // Device select dialog state
+  const [isDeviceDialogOpen, setIsDeviceDialogOpen] = useState(false);
+
   // Compute selected elements from IDs and current network
   const selectedElements = useMemo(() => {
     if (!currentNetwork) return [];
@@ -209,6 +219,21 @@ export function LadderPropertiesPanel({ className }: LadderPropertiesPanelProps)
     (updates: Partial<LadderElement>) => {
       if (selectedElements.length === 1) {
         updateElement(selectedElements[0].id, updates);
+      }
+    },
+    [selectedElements, updateElement]
+  );
+
+  // Handle opening device select dialog
+  const handleOpenDeviceDialog = useCallback(() => {
+    setIsDeviceDialogOpen(true);
+  }, []);
+
+  // Handle device selection from dialog
+  const handleDeviceSelect = useCallback(
+    (address: string) => {
+      if (selectedElements.length === 1) {
+        updateElement(selectedElements[0].id, { address });
       }
     },
     [selectedElements, updateElement]
@@ -246,6 +271,7 @@ export function LadderPropertiesPanel({ className }: LadderPropertiesPanelProps)
             element={element}
             onUpdate={handleUpdate}
             disabled={isMonitorMode}
+            onDeviceSelect={handleOpenDeviceDialog}
           />
         </div>
 
@@ -276,6 +302,15 @@ export function LadderPropertiesPanel({ className }: LadderPropertiesPanelProps)
       <div className="flex-1 overflow-hidden">
         {content}
       </div>
+
+      {/* Device Select Dialog */}
+      <DeviceSelectDialog
+        isOpen={isDeviceDialogOpen}
+        onClose={() => setIsDeviceDialogOpen(false)}
+        onSelect={handleDeviceSelect}
+        initialAddress={selectedElements.length === 1 ? selectedElements[0].address : undefined}
+        title="Select Device Address"
+      />
     </div>
   );
 }

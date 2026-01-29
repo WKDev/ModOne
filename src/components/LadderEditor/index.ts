@@ -48,3 +48,7 @@ export type {
   TimerPropertiesProps,
   CounterPropertiesProps,
 } from './properties';
+
+// Dialogs
+export { DeviceSelectDialog } from './dialogs';
+export type { DeviceSelectDialogProps } from './dialogs';

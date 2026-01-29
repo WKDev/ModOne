@@ -49,15 +49,16 @@ const mockCounterElement: CounterElement = {
 };
 
 function createMockNetwork(): LadderNetwork {
+  const elements = new Map<string, ContactElement | CoilElement | TimerElement | CounterElement>();
+  elements.set(mockContactElement.id, mockContactElement);
+  elements.set(mockCoilElement.id, mockCoilElement);
+  elements.set(mockTimerElement.id, mockTimerElement);
+  elements.set(mockCounterElement.id, mockCounterElement);
+
   return {
     id: 'network-1',
     label: 'Network 1',
-    elements: new Map([
-      [mockContactElement.id, mockContactElement],
-      [mockCoilElement.id, mockCoilElement],
-      [mockTimerElement.id, mockTimerElement],
-      [mockCounterElement.id, mockCounterElement],
-    ]),
+    elements: elements as LadderNetwork['elements'],
     wires: [],
     enabled: true,
   };
@@ -264,7 +265,6 @@ describe('LadderPropertiesPanel', () => {
 
       act(() => {
         const network = createMockNetwork();
-        const store = useLadderStore.getState();
         useLadderStore.setState({
           networks: new Map([[network.id, network]]),
           currentNetworkId: network.id,
