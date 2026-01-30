@@ -7,7 +7,7 @@
 
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { LayoutConfig, LayoutPresetInfo, FloatingWindowLayoutConfig } from '../types/layout';
+import type { LayoutConfig, LayoutPresetInfo, FloatingWindowLayoutConfig, EditorAreaLayoutConfig, ToolPanelLayoutConfig } from '../types/layout';
 import { SPECIAL_LAYOUT_NAMES, isBuiltInLayout } from '../types/layout';
 import { layoutService } from '../services/layoutService';
 import { windowService } from '../services/windowService';
@@ -16,6 +16,8 @@ import { BUILT_IN_LAYOUTS, getPresetByName, getDefaultLayout } from '../config/l
 import { usePanelStore } from './panelStore';
 import { useSidebarStore } from './sidebarStore';
 import { useWindowStore } from './windowStore';
+import { useEditorAreaStore } from './editorAreaStore';
+import { useToolPanelStore } from './toolPanelStore';
 
 interface LayoutPersistenceState {
   /** Name of the currently active layout */
@@ -73,12 +75,15 @@ const initialState: LayoutPersistenceState = {
 };
 
 /**
- * Serialize the current panel and sidebar state into a LayoutConfig
+ * Serialize the current layout state into a LayoutConfig
+ * Supports both legacy grid layout and VSCode-style layout
  */
 function serializeCurrentLayout(name: string): LayoutConfig {
   const panelState = usePanelStore.getState();
   const sidebarState = useSidebarStore.getState();
   const windowState = useWindowStore.getState();
+  const editorAreaState = useEditorAreaStore.getState();
+  const toolPanelState = useToolPanelStore.getState();
 
   // Get floating windows
   const floatingWindows = windowState.getAllFloatingWindows();
@@ -92,10 +97,30 @@ function serializeCurrentLayout(name: string): LayoutConfig {
     };
   });
 
+  // Serialize editor area (VSCode-style)
+  const editorAreaConfig: EditorAreaLayoutConfig = {
+    tabs: editorAreaState.tabs.map((tab) => ({
+      type: tab.panelType,
+      title: tab.title,
+    })),
+    activeTabId: editorAreaState.activeTabId ?? undefined,
+  };
+
+  // Serialize tool panel (VSCode-style)
+  const toolPanelConfig: ToolPanelLayoutConfig = {
+    isVisible: toolPanelState.isVisible,
+    height: toolPanelState.height,
+    tabs: toolPanelState.tabs.map((tab) => ({
+      type: tab.panelType,
+      title: tab.title,
+    })),
+    activeTabId: toolPanelState.activeTabId ?? undefined,
+  };
+
   return {
     name,
+    // Legacy grid config (kept for backwards compatibility)
     grid: { ...panelState.gridConfig },
-    // Only include docked panels (not floating)
     panels: panelState.panels
       .filter((panel) => !panel.isFloating)
       .map((panel) => ({
@@ -114,6 +139,9 @@ function serializeCurrentLayout(name: string): LayoutConfig {
       activePanel: sidebarState.activePanel,
     },
     floatingWindows: floatingWindowConfigs.length > 0 ? floatingWindowConfigs : undefined,
+    // VSCode-style layout config
+    editorArea: editorAreaConfig,
+    toolPanel: toolPanelConfig,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -136,27 +164,54 @@ async function closeAllFloatingWindows(): Promise<void> {
 }
 
 /**
- * Apply a LayoutConfig to the panel and sidebar stores
+ * Apply a LayoutConfig to all stores
+ * Supports both legacy grid layout and VSCode-style layout
  */
 async function applyLayoutConfig(config: LayoutConfig): Promise<void> {
   const panelStore = usePanelStore.getState();
   const sidebarStore = useSidebarStore.getState();
+  const editorAreaStore = useEditorAreaStore.getState();
+  const toolPanelStore = useToolPanelStore.getState();
 
   // Close all existing floating windows first
   await closeAllFloatingWindows();
 
+  // Apply VSCode-style layout if present
+  if (config.editorArea || config.toolPanel) {
+    // Clear and restore editor area
+    editorAreaStore.clearTabs();
+    if (config.editorArea && config.editorArea.tabs.length > 0) {
+      config.editorArea.tabs.forEach((tabConfig) => {
+        editorAreaStore.addTab(tabConfig.type, tabConfig.title);
+      });
+      // Note: activeTabId from config won't match new IDs, so we keep the last added as active
+    }
+
+    // Restore tool panel
+    if (config.toolPanel) {
+      toolPanelStore.setState({
+        isVisible: config.toolPanel.isVisible,
+        height: config.toolPanel.height,
+      });
+      // Tool panel tabs are typically fixed (console, memory, properties)
+      // so we just initialize them if not already done
+      if (toolPanelStore.tabs.length === 0) {
+        toolPanelStore.initializeDefaultTabs();
+      }
+    }
+  }
+
+  // Legacy grid layout handling (for backwards compatibility)
   // Update grid config
   panelStore.updateGridConfig(config.grid);
 
   // Clear existing panels and add new ones
-  // Note: This is a simplified approach - a more sophisticated implementation
-  // would diff the panels and minimize changes
   const currentPanels = panelStore.panels;
   currentPanels.forEach((panel) => {
     panelStore.removePanel(panel.id);
   });
 
-  // Add panels from config
+  // Add panels from config (legacy)
   config.panels.forEach((panelConfig) => {
     const panelId = panelStore.addPanel(panelConfig.type, panelConfig.gridArea);
 
@@ -195,7 +250,6 @@ async function applyLayoutConfig(config: LayoutConfig): Promise<void> {
         await panelStore.undockPanel(panelId, correctedBounds);
       } catch (error) {
         console.error(`Failed to restore floating window for panel ${floatingConfig.panelId}:`, error);
-        // Fallback: panel is already added as docked, so we just log the error
       }
     }
   }
@@ -482,6 +536,30 @@ useSidebarStore.subscribe((state, prevState) => {
       state.isVisible !== prevState.isVisible ||
       state.width !== prevState.width ||
       state.activePanel !== prevState.activePanel
+    ) {
+      layoutStore.setLayoutModified(true);
+    }
+  }
+});
+
+// Subscribe to editor area store changes to track modifications (VSCode-style)
+useEditorAreaStore.subscribe((state, prevState) => {
+  const layoutStore = useLayoutPersistenceStore.getState();
+  if (layoutStore.currentLayoutName && !layoutStore.isLoading) {
+    if (state.tabs !== prevState.tabs || state.activeTabId !== prevState.activeTabId) {
+      layoutStore.setLayoutModified(true);
+    }
+  }
+});
+
+// Subscribe to tool panel store changes to track modifications (VSCode-style)
+useToolPanelStore.subscribe((state, prevState) => {
+  const layoutStore = useLayoutPersistenceStore.getState();
+  if (layoutStore.currentLayoutName && !layoutStore.isLoading) {
+    if (
+      state.isVisible !== prevState.isVisible ||
+      state.height !== prevState.height ||
+      state.activeTabId !== prevState.activeTabId
     ) {
       layoutStore.setLayoutModified(true);
     }

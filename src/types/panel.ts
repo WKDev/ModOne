@@ -105,3 +105,29 @@ export const PANEL_TYPE_LABELS: Record<PanelType, string> = {
  * Prevents panels from being resized below this threshold.
  */
 export const MIN_PANEL_SIZE = 150;
+
+/**
+ * Panel zone classification for VSCode-style layout.
+ * - 'editor': Panels that appear in the main editor area as tabs
+ * - 'tool': Panels that appear in the bottom tool panel
+ */
+export type PanelZone = 'editor' | 'tool';
+
+/**
+ * Panel types that belong to the tool zone (bottom panel).
+ */
+export const TOOL_PANEL_TYPES: PanelType[] = ['console', 'memory-visualizer', 'properties'];
+
+/**
+ * Panel types that belong to the editor zone (main area).
+ */
+export const EDITOR_PANEL_TYPES: PanelType[] = ['ladder-editor', 'one-canvas', 'scenario-editor', 'csv-viewer'];
+
+/**
+ * Determines which zone a panel type belongs to.
+ * @param type - The panel type to classify
+ * @returns 'editor' for editor panels, 'tool' for tool panels
+ */
+export function getPanelZone(type: PanelType): PanelZone {
+  return TOOL_PANEL_TYPES.includes(type) ? 'tool' : 'editor';
+}

@@ -1,10 +1,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { MainLayout } from './components/layout/MainLayout';
-import { PanelContainer } from './components/panels';
-import { usePanelStore } from './stores/panelStore';
 import { useLayoutPersistenceStore } from './stores/layoutPersistenceStore';
+import { useToolPanelStore } from './stores/toolPanelStore';
 import { ThemeProvider } from './providers/ThemeProvider';
-import { PanelDndProvider } from './providers/PanelDndProvider';
 import { useStateSync } from './hooks/useStateSync';
 import { useWindowClose } from './hooks/useWindowClose';
 import { FloatingWindowContent } from './components/floating/FloatingWindowContent';
@@ -34,11 +32,12 @@ function useFloatingWindowParams() {
 }
 
 /**
- * Main window content - full application with layout and panels
+ * Main window content - full application with VSCode-style layout
  */
 function MainWindowContent() {
-  const { panels, addPanel } = usePanelStore();
-  const { initialize, saveLastSession, isLoading } = useLayoutPersistenceStore();
+  const { initialize, saveLastSession } = useLayoutPersistenceStore();
+  const initializeToolPanel = useToolPanelStore((state) => state.initializeDefaultTabs);
+  const toolPanelTabs = useToolPanelStore((state) => state.tabs);
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Command palette state (useCommandPalette hook handles Ctrl+Shift+P shortcut)
@@ -69,6 +68,13 @@ function MainWindowContent() {
     initApp();
   }, [initialize]);
 
+  // Initialize tool panel tabs if not already done
+  useEffect(() => {
+    if (isInitialized && toolPanelTabs.length === 0) {
+      initializeToolPanel();
+    }
+  }, [isInitialized, toolPanelTabs.length, initializeToolPanel]);
+
   // Save session before window close
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -81,14 +87,6 @@ function MainWindowContent() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [saveLastSession]);
 
-  // Add default panels only if layout hasn't been loaded from persistence
-  useEffect(() => {
-    if (isInitialized && !isLoading && panels.length === 0) {
-      addPanel('console', '1 / 1 / 2 / 2');
-      addPanel('properties', '1 / 2 / 2 / 3');
-    }
-  }, [isInitialized, isLoading, panels.length, addPanel]);
-
   // Show loading state while initializing
   if (!isInitialized) {
     return (
@@ -100,22 +98,18 @@ function MainWindowContent() {
 
   return (
     <ProjectDialogProvider>
-      <PanelDndProvider>
-        <MainLayout>
-          <PanelContainer />
-        </MainLayout>
-        {/* Floating window event listener (only needed in main window) */}
-        <FloatingWindowRenderer />
-        {/* Command Palette */}
-        <CommandPalette isOpen={isPaletteOpen} onClose={closePalette} />
-        {/* Window Close Unsaved Changes Dialog */}
-        <UnsavedChangesDialog
-          isOpen={isWindowCloseDialogOpen}
-          onSave={handleWindowCloseSaveAll}
-          onDontSave={handleWindowCloseDontSave}
-          onCancel={handleWindowCloseCancel}
-        />
-      </PanelDndProvider>
+      <MainLayout />
+      {/* Floating window event listener (only needed in main window) */}
+      <FloatingWindowRenderer />
+      {/* Command Palette */}
+      <CommandPalette isOpen={isPaletteOpen} onClose={closePalette} />
+      {/* Window Close Unsaved Changes Dialog */}
+      <UnsavedChangesDialog
+        isOpen={isWindowCloseDialogOpen}
+        onSave={handleWindowCloseSaveAll}
+        onDontSave={handleWindowCloseDontSave}
+        onCancel={handleWindowCloseCancel}
+      />
     </ProjectDialogProvider>
   );
 }

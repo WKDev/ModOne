@@ -3,151 +3,147 @@
  *
  * Pre-configured layout arrangements for common use cases.
  * These presets cannot be deleted or overwritten by users.
+ *
+ * NOTE: Using VSCode-style layout with EditorArea and ToolPanel
  */
 
 import type { LayoutConfig } from '../types/layout';
 import { BUILT_IN_LAYOUT_NAMES } from '../types/layout';
 
 /**
- * Default Layout: 2x2 grid with main panels
- * - Top-left: Ladder Editor
- * - Top-right: Memory Visualizer
- * - Bottom-left: One Canvas
- * - Bottom-right: Console
+ * Default Layout: VSCode-style with editor area and tool panel
+ * - Editor area: Empty (files open as tabs)
+ * - Tool panel: Console, Memory Visualizer, Properties
  */
 export const DEFAULT_LAYOUT: LayoutConfig = {
   name: BUILT_IN_LAYOUT_NAMES.DEFAULT,
-  description: 'Standard 2x2 grid layout with all main panels',
-  grid: {
-    columns: ['1fr', '1fr'],
-    rows: ['1fr', '1fr'],
-  },
-  panels: [
-    {
-      id: 'panel-ladder',
-      type: 'ladder-editor',
-      gridArea: '1 / 1 / 2 / 2',
-    },
-    {
-      id: 'panel-memory',
-      type: 'memory-visualizer',
-      gridArea: '1 / 2 / 2 / 3',
-    },
-    {
-      id: 'panel-canvas',
-      type: 'one-canvas',
-      gridArea: '2 / 1 / 3 / 2',
-    },
-    {
-      id: 'panel-console',
-      type: 'console',
-      gridArea: '2 / 2 / 3 / 3',
-    },
-  ],
-  sidebar: {
-    visible: true,
-    width: 250,
-    activePanel: 'explorer',
-  },
-  isBuiltIn: true,
-};
-
-/**
- * Compact Layout: Single panel area with all panels as tabs
- * Useful for smaller screens or when focusing on one task at a time
- */
-export const COMPACT_LAYOUT: LayoutConfig = {
-  name: BUILT_IN_LAYOUT_NAMES.COMPACT,
-  description: 'Single panel with all content as tabs',
+  description: 'VSCode-style layout with editor tabs and bottom tool panel',
+  // Legacy grid config (kept for backwards compatibility)
   grid: {
     columns: ['1fr'],
     rows: ['1fr'],
   },
-  panels: [
-    {
-      id: 'panel-main',
-      type: 'ladder-editor',
-      gridArea: '1 / 1 / 2 / 2',
-      tabs: [
-        { type: 'ladder-editor', title: 'Ladder Editor' },
-        { type: 'memory-visualizer', title: 'Memory Visualizer' },
-        { type: 'one-canvas', title: 'One Canvas' },
-        { type: 'console', title: 'Console' },
-      ],
-      activeTabId: 'tab-1',
-    },
-  ],
+  panels: [],
   sidebar: {
     visible: true,
     width: 250,
     activePanel: 'explorer',
   },
+  // VSCode-style layout
+  editorArea: {
+    tabs: [],
+    activeTabId: undefined,
+  },
+  toolPanel: {
+    isVisible: true,
+    height: 200,
+    tabs: [
+      { type: 'console', title: 'Console' },
+      { type: 'memory-visualizer', title: 'Memory Visualizer' },
+      { type: 'properties', title: 'Properties' },
+    ],
+    activeTabId: undefined,
+  },
   isBuiltIn: true,
 };
 
 /**
- * Debug Layout: 2-row split with main panels on top and console expanded at bottom
+ * Compact Layout: VSCode-style with hidden tool panel
+ * Useful for smaller screens or when focusing on one task at a time
+ */
+export const COMPACT_LAYOUT: LayoutConfig = {
+  name: BUILT_IN_LAYOUT_NAMES.COMPACT,
+  description: 'Maximized editor area with collapsed tool panel',
+  grid: {
+    columns: ['1fr'],
+    rows: ['1fr'],
+  },
+  panels: [],
+  sidebar: {
+    visible: true,
+    width: 200,
+    activePanel: 'explorer',
+  },
+  editorArea: {
+    tabs: [],
+    activeTabId: undefined,
+  },
+  toolPanel: {
+    isVisible: false,
+    height: 150,
+    tabs: [
+      { type: 'console', title: 'Console' },
+      { type: 'properties', title: 'Properties' },
+    ],
+    activeTabId: undefined,
+  },
+  isBuiltIn: true,
+};
+
+/**
+ * Debug Layout: VSCode-style with expanded console
  * Useful for debugging with more console output visibility
  */
 export const DEBUG_LAYOUT: LayoutConfig = {
   name: BUILT_IN_LAYOUT_NAMES.DEBUG,
-  description: 'Two-row layout with expanded console at bottom (70/30 split)',
+  description: 'Expanded tool panel (40% height) for debugging',
   grid: {
-    columns: ['1fr', '1fr'],
-    rows: ['70fr', '30fr'],
+    columns: ['1fr'],
+    rows: ['1fr'],
   },
-  panels: [
-    {
-      id: 'panel-ladder',
-      type: 'ladder-editor',
-      gridArea: '1 / 1 / 2 / 2',
-    },
-    {
-      id: 'panel-memory',
-      type: 'memory-visualizer',
-      gridArea: '1 / 2 / 2 / 3',
-    },
-    {
-      id: 'panel-console',
-      type: 'console',
-      gridArea: '2 / 1 / 3 / 3', // Spans both columns
-    },
-  ],
+  panels: [],
   sidebar: {
     visible: true,
     width: 250,
     activePanel: 'explorer',
   },
+  editorArea: {
+    tabs: [],
+    activeTabId: undefined,
+  },
+  toolPanel: {
+    isVisible: true,
+    height: 350,
+    tabs: [
+      { type: 'console', title: 'Console' },
+      { type: 'memory-visualizer', title: 'Memory Visualizer' },
+      { type: 'properties', title: 'Properties' },
+    ],
+    activeTabId: undefined,
+  },
   isBuiltIn: true,
 };
 
 /**
- * Memory Focus Layout: Large Memory Visualizer with Properties panel
+ * Memory Focus Layout: Memory Visualizer focused tool panel
  * Useful for monitoring and editing memory values
  */
 export const MEMORY_FOCUS_LAYOUT: LayoutConfig = {
   name: BUILT_IN_LAYOUT_NAMES.MEMORY_FOCUS,
-  description: 'Large memory visualizer (80%) with properties panel',
+  description: 'Large tool panel with Memory Visualizer active',
   grid: {
-    columns: ['80fr', '20fr'],
+    columns: ['1fr'],
     rows: ['1fr'],
   },
-  panels: [
-    {
-      id: 'panel-memory',
-      type: 'memory-visualizer',
-      gridArea: '1 / 1 / 2 / 2',
-    },
-    {
-      id: 'panel-properties',
-      type: 'properties',
-      gridArea: '1 / 2 / 2 / 3',
-    },
-  ],
+  panels: [],
   sidebar: {
     visible: true,
     width: 200,
     activePanel: 'modbus',
+  },
+  editorArea: {
+    tabs: [],
+    activeTabId: undefined,
+  },
+  toolPanel: {
+    isVisible: true,
+    height: 400,
+    tabs: [
+      { type: 'memory-visualizer', title: 'Memory Visualizer' },
+      { type: 'console', title: 'Console' },
+      { type: 'properties', title: 'Properties' },
+    ],
+    activeTabId: undefined, // Will default to first tab (Memory Visualizer)
   },
   isBuiltIn: true,
 };

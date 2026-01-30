@@ -1,17 +1,20 @@
 /**
  * useFileOpen Hook
  *
- * Handles the file opening pipeline:
+ * Handles the file opening pipeline for VSCode-style layout:
  * 1. Resolves file type from path
- * 2. Checks if file is already open in a tab (or document registry)
- * 3. Creates document in registry for document-based files
- * 4. Opens file in appropriate panel or activates existing tab
+ * 2. Determines target zone (editor area vs tool panel)
+ * 3. Checks if file is already open in a tab (or document registry)
+ * 4. Creates document in registry for document-based files
+ * 5. Opens file in appropriate area or activates existing tab
  */
 
 import { useCallback } from 'react';
-import { usePanelStore } from '../stores/panelStore';
+import { useEditorAreaStore } from '../stores/editorAreaStore';
+import { useToolPanelStore } from '../stores/toolPanelStore';
 import { useDocumentRegistry } from '../stores/documentRegistry';
 import type { PanelType } from '../types/panel';
+import { getPanelZone } from '../types/panel';
 import type { ProjectFileNode } from '../types/fileTypes';
 import {
   resolveFileType,
@@ -36,67 +39,21 @@ interface UseFileOpenResult {
 
 /**
  * Hook for opening files in the appropriate editor panel.
+ * Uses VSCode-style layout with editor area and tool panel.
  */
 export function useFileOpen(): UseFileOpenResult {
-  const panels = usePanelStore((state) => state.panels);
-  const addPanel = usePanelStore((state) => state.addPanel);
-  const addTab = usePanelStore((state) => state.addTab);
-  const setActiveTab = usePanelStore((state) => state.setActiveTab);
-  const setActivePanel = usePanelStore((state) => state.setActivePanel);
+  // Editor area store for main editor tabs
+  const addEditorTab = useEditorAreaStore((state) => state.addTab);
+  const setActiveEditorTab = useEditorAreaStore((state) => state.setActiveTab);
+  const findEditorTabByFilePath = useEditorAreaStore((state) => state.findTabByFilePath);
+
+  // Tool panel store for tool tabs
+  const showAndActivateTool = useToolPanelStore((state) => state.showAndActivate);
 
   // Document registry for multi-document editing
   const createDocument = useDocumentRegistry((state) => state.createDocument);
   const getDocumentByFilePath = useDocumentRegistry((state) => state.getDocumentByFilePath);
   const setDocumentTab = useDocumentRegistry((state) => state.setDocumentTab);
-
-  /**
-   * Find a tab that has the given file path open.
-   */
-  const findTabByFilePath = useCallback(
-    (filePath: string): { panelId: string; tabId: string } | null => {
-      for (const panel of panels) {
-        if (panel.tabs) {
-          for (const tab of panel.tabs) {
-            if (tab.data?.filePath === filePath) {
-              return { panelId: panel.id, tabId: tab.id };
-            }
-          }
-        }
-      }
-      return null;
-    },
-    [panels]
-  );
-
-  /**
-   * Find or create an editor panel for a given panel type.
-   */
-  const getOrCreateEditorPanel = useCallback(
-    (panelType: PanelType): string => {
-      // First, try to find an existing panel of the same type
-      const existingPanel = panels.find((p) => p.type === panelType);
-      if (existingPanel) {
-        return existingPanel.id;
-      }
-
-      // Try to find any panel that can host tabs (editor panels)
-      const editorTypes: PanelType[] = [
-        'ladder-editor',
-        'one-canvas',
-        'scenario-editor',
-        'csv-viewer',
-      ];
-      const editorPanel = panels.find((p) => editorTypes.includes(p.type));
-      if (editorPanel) {
-        return editorPanel.id;
-      }
-
-      // Create a new panel if none exists
-      // Default to top-left grid area
-      return addPanel(panelType, '1 / 1 / 2 / 2');
-    },
-    [panels, addPanel]
-  );
 
   /**
    * Open a file in the appropriate editor.
@@ -120,18 +77,22 @@ export function useFileOpen(): UseFileOpenResult {
       }
 
       const panelType = fileInfo.panelType as PanelType;
+      const zone = getPanelZone(panelType);
 
-      // Check if the file is already open
-      const existingTab = findTabByFilePath(absolutePath);
-      if (existingTab) {
-        // Activate the existing tab
-        setActivePanel(existingTab.panelId);
-        setActiveTab(existingTab.panelId, existingTab.tabId);
+      // Handle tool panel types (console, memory-visualizer, properties)
+      if (zone === 'tool') {
+        showAndActivateTool(panelType);
         return;
       }
 
-      // Find or create an appropriate panel
-      const panelId = getOrCreateEditorPanel(panelType);
+      // Handle editor panel types (ladder-editor, one-canvas, scenario-editor, csv-viewer)
+      // Check if the file is already open in editor area
+      const existingTab = findEditorTabByFilePath(absolutePath);
+      if (existingTab) {
+        // Activate the existing tab
+        setActiveEditorTab(existingTab.id);
+        return;
+      }
 
       // Create a new tab for the file
       const title = getTabTitle(relativePath || absolutePath);
@@ -156,8 +117,8 @@ export function useFileOpen(): UseFileOpenResult {
         }
       }
 
-      // Create tab with document reference
-      const tabId = addTab(panelId, panelType, title, {
+      // Create tab in editor area with document reference
+      const tabId = addEditorTab(panelType, title, {
         filePath: absolutePath,
         relativePath: relativePath,
         fileCategory: fileInfo.category,
@@ -169,16 +130,12 @@ export function useFileOpen(): UseFileOpenResult {
       if (documentId && tabId) {
         setDocumentTab(documentId, tabId);
       }
-
-      // Ensure the panel is active
-      setActivePanel(panelId);
     },
     [
-      findTabByFilePath,
-      getOrCreateEditorPanel,
-      addTab,
-      setActiveTab,
-      setActivePanel,
+      findEditorTabByFilePath,
+      addEditorTab,
+      setActiveEditorTab,
+      showAndActivateTool,
       createDocument,
       getDocumentByFilePath,
       setDocumentTab,

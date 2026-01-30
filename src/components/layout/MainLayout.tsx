@@ -1,14 +1,11 @@
-import { ReactNode } from 'react';
 import { MenuBar } from './MenuBar';
 import { Toolbar } from './Toolbar';
 import { StatusBar } from './StatusBar';
 import { Sidebar } from './Sidebar';
+import { EditorArea } from './EditorArea';
+import { ToolPanel } from './ToolPanel';
 
-interface MainLayoutProps {
-  children?: ReactNode;
-}
-
-export function MainLayout({ children }: MainLayoutProps) {
+export function MainLayout() {
   return (
     <div data-testid="main-layout" className="h-screen w-screen overflow-hidden flex flex-col bg-gray-900 text-gray-100">
       {/* Header: Menu Bar + Toolbar */}
@@ -22,9 +19,15 @@ export function MainLayout({ children }: MainLayoutProps) {
         {/* Sidebar with Activity Bar */}
         <Sidebar />
 
-        {/* Main Content */}
-        <main data-testid="panel-container" className="flex-1 overflow-auto bg-gray-900">
-          {children}
+        {/* Main Content: Editor + Tool Panel (VSCode-style) */}
+        <main data-testid="panel-container" className="flex-1 flex flex-col overflow-hidden bg-gray-900">
+          {/* Editor Area - takes remaining space */}
+          <div className="flex-1 overflow-hidden">
+            <EditorArea />
+          </div>
+
+          {/* Tool Panel - collapsible bottom panel */}
+          <ToolPanel />
         </main>
       </div>
 

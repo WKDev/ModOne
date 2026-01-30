@@ -62,14 +62,39 @@ export interface SidebarLayoutConfig {
 }
 
 /**
+ * Configuration for editor area (VSCode-style layout)
+ */
+export interface EditorAreaLayoutConfig {
+  /** Array of tabs in the editor area */
+  tabs: TabLayoutConfig[];
+  /** ID of the active tab */
+  activeTabId?: string;
+}
+
+/**
+ * Configuration for tool panel (VSCode-style layout)
+ */
+export interface ToolPanelLayoutConfig {
+  /** Whether the tool panel is visible */
+  isVisible: boolean;
+  /** Height of the tool panel in pixels */
+  height: number;
+  /** Array of tool tabs */
+  tabs: TabLayoutConfig[];
+  /** ID of the active tab */
+  activeTabId?: string;
+}
+
+/**
  * Complete layout configuration for save/restore
+ * Supports both legacy grid layout and VSCode-style layout
  */
 export interface LayoutConfig {
   /** Name of the layout preset */
   name: string;
-  /** Grid configuration (columns and rows) */
+  /** Grid configuration (columns and rows) - legacy */
   grid: GridConfig;
-  /** Array of panel configurations */
+  /** Array of panel configurations - legacy */
   panels: PanelLayoutConfig[];
   /** Sidebar configuration */
   sidebar: SidebarLayoutConfig;
@@ -83,6 +108,10 @@ export interface LayoutConfig {
   createdAt?: string;
   /** Last modified timestamp (ISO string) */
   updatedAt?: string;
+  /** Editor area configuration (VSCode-style) */
+  editorArea?: EditorAreaLayoutConfig;
+  /** Tool panel configuration (VSCode-style) */
+  toolPanel?: ToolPanelLayoutConfig;
 }
 
 /**

@@ -3,19 +3,28 @@
  *
  * Handles safe tab closing with unsaved changes detection.
  * Shows a confirmation dialog when closing tabs with dirty documents.
+ * Supports both legacy panel store and new editor area store.
  */
 
 import { useState, useCallback } from 'react';
 import { usePanelStore } from '../stores/panelStore';
+import { useEditorAreaStore } from '../stores/editorAreaStore';
 import { useDocumentRegistry } from '../stores/documentRegistry';
 import type { TabState } from '../types/tab';
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/** Special panel ID for editor area tabs (VSCode-style layout) */
+export const EDITOR_AREA_PANEL_ID = 'editor-area';
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface PendingTabClose {
-  /** Panel ID */
+  /** Panel ID (or 'editor-area' for editor area tabs) */
   panelId: string;
   /** Tab being closed */
   tab: TabState;
@@ -49,9 +58,13 @@ export interface UseTabCloseResult {
 export function useTabClose(): UseTabCloseResult {
   const [pendingClose, setPendingClose] = useState<PendingTabClose | null>(null);
 
-  // Panel store state & actions
+  // Panel store state & actions (legacy)
   const panels = usePanelStore((state) => state.panels);
-  const removeTab = usePanelStore((state) => state.removeTab);
+  const removePanelTab = usePanelStore((state) => state.removeTab);
+
+  // Editor area store state & actions (VSCode-style layout)
+  const editorTabs = useEditorAreaStore((state) => state.tabs);
+  const removeEditorTab = useEditorAreaStore((state) => state.removeTab);
 
   // Document registry state & actions
   const getDocument = useDocumentRegistry((state) => state.getDocument);
@@ -59,14 +72,34 @@ export function useTabClose(): UseTabCloseResult {
   const markClean = useDocumentRegistry((state) => state.markClean);
 
   /**
-   * Find a tab by ID in a specific panel.
+   * Find a tab by ID in a specific panel or editor area.
    */
   const findTab = useCallback(
     (panelId: string, tabId: string): TabState | undefined => {
+      // Check if this is an editor area tab
+      if (panelId === EDITOR_AREA_PANEL_ID) {
+        return editorTabs.find((t) => t.id === tabId);
+      }
+
+      // Otherwise, look in panel store (legacy)
       const panel = panels.find((p) => p.id === panelId);
       return panel?.tabs?.find((t) => t.id === tabId);
     },
-    [panels]
+    [panels, editorTabs]
+  );
+
+  /**
+   * Remove a tab from the appropriate store.
+   */
+  const removeTab = useCallback(
+    (panelId: string, tabId: string) => {
+      if (panelId === EDITOR_AREA_PANEL_ID) {
+        removeEditorTab(tabId);
+      } else {
+        removePanelTab(panelId, tabId);
+      }
+    },
+    [removeEditorTab, removePanelTab]
   );
 
   /**
