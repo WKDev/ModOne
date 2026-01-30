@@ -4,7 +4,7 @@
  * Dispatches to the appropriate block component based on block type.
  */
 
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import type { Block } from '../types';
 import { PowerBlock } from './blocks/PowerBlock';
 import { GndBlock } from './blocks/GndBlock';
@@ -29,6 +29,8 @@ interface BlockRendererProps {
   onStartWire?: (blockId: string, portId: string) => void;
   /** Wire end handler */
   onEndWire?: (blockId: string, portId: string) => void;
+  /** Drag start handler */
+  onDragStart?: (blockId: string, event: React.MouseEvent) => void;
   /** Connected port IDs for this block */
   connectedPorts?: Set<string>;
   /** Simulation voltage at ports */
@@ -54,6 +56,7 @@ export const BlockRenderer = memo(function BlockRenderer({
   onSelect,
   onStartWire,
   onEndWire,
+  onDragStart,
   connectedPorts,
   portVoltages,
   onButtonPress,
@@ -143,8 +146,16 @@ export const BlockRenderer = memo(function BlockRenderer({
     }
   };
 
+  // Handle mouse down for drag start
+  const handleMouseDown = useCallback(
+    (event: React.MouseEvent) => {
+      onDragStart?.(block.id, event);
+    },
+    [block.id, onDragStart]
+  );
+
   return (
-    <div style={style} data-block-id={block.id}>
+    <div style={style} data-block-id={block.id} onMouseDown={handleMouseDown}>
       {renderBlock()}
     </div>
   );

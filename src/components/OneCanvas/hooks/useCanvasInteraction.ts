@@ -71,6 +71,7 @@ export function useCanvasInteraction(
   const pan = useCanvasStore((state) => state.pan);
   const setZoom = useCanvasStore((state) => state.setZoom);
   const setPan = useCanvasStore((state) => state.setPan);
+  const wireDrawing = useCanvasStore((state) => state.wireDrawing);
 
   // Interaction state
   const [isSpaceHeld, setIsSpaceHeld] = useState(false);
@@ -148,6 +149,15 @@ export function useCanvasInteraction(
     (event: MouseEvent) => {
       if (!enablePan) return;
 
+      // Don't start panning during wire drawing
+      if (wireDrawing) return;
+
+      // Don't start panning if clicking on a block or port
+      const target = event.target as HTMLElement;
+      if (target.closest('[data-block-id]') || target.closest('[data-port-id]')) {
+        return;
+      }
+
       // Middle mouse button or Space+Left click for pan
       if (event.button === 1 || (isSpaceHeld && event.button === 0)) {
         event.preventDefault();
@@ -156,7 +166,7 @@ export function useCanvasInteraction(
         panStartRef.current = { ...pan };
       }
     },
-    [isSpaceHeld, pan, enablePan]
+    [isSpaceHeld, pan, enablePan, wireDrawing]
   );
 
   const handleMouseMove = useCallback(

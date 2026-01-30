@@ -3,6 +3,7 @@
  */
 
 export { useCanvasInteraction } from './useCanvasInteraction';
+export { useBlockDrag } from './useBlockDrag';
 export { useDragDrop } from './useDragDrop';
 export { useWireDrawing } from './useWireDrawing';
 export { usePlcOutBlock, usePlcInBlock, useCoilSubscription, useDiscreteSubscription } from './usePlcBlock';

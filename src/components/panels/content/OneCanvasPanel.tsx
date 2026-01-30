@@ -9,7 +9,7 @@
  * 2. Global store editing (single document via useCanvasStore)
  */
 
-import { memo, useCallback, useRef, useState, useMemo } from 'react';
+import { memo, useCallback, useRef, useState, useMemo, useEffect } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -33,6 +33,8 @@ import {
   SelectionBox,
   useSimulation,
   useCanvasKeyboardShortcuts,
+  useBlockDrag,
+  screenToCanvas,
   type CanvasRef,
   type BlockType,
   type Position,
@@ -226,9 +228,14 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
   // Get canvas state (from document or global store)
   const { components, wires, zoom, pan, addComponent } = useCanvasState(documentId);
 
-  // Wire drawing state from global store (shared across modes for now)
+  // Wire drawing state and actions from global store
   const wireDrawing = useCanvasStore((state) => state.wireDrawing);
+  const startWireDrawing = useCanvasStore((state) => state.startWireDrawing);
+  const updateWireDrawing = useCanvasStore((state) => state.updateWireDrawing);
+  const completeWireDrawing = useCanvasStore((state) => state.completeWireDrawing);
+  const cancelWireDrawing = useCanvasStore((state) => state.cancelWireDrawing);
   const selectedIds = useCanvasStore((state) => state.selectedIds);
+  const setSelection = useCanvasStore((state) => state.setSelection);
 
   // Convert Map to Array for simulation
   const componentsArray = useMemo(() => Array.from(components.values()), [components]);
@@ -238,6 +245,94 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
 
   // Keyboard shortcuts
   useCanvasKeyboardShortcuts();
+
+  // Block drag hook - prevent drag during wire drawing
+  const { isDragging: _isDragging, handleBlockDragStart } = useBlockDrag({
+    canvasRef: canvasRef as React.RefObject<HTMLElement | null>,
+    shouldPreventDrag: useCallback(() => wireDrawing !== null, [wireDrawing]),
+  });
+
+  // Wire drawing handlers
+  const handleStartWire = useCallback(
+    (blockId: string, portId: string) => {
+      startWireDrawing({ componentId: blockId, portId });
+    },
+    [startWireDrawing]
+  );
+
+  const handleEndWire = useCallback(
+    (blockId: string, portId: string) => {
+      if (wireDrawing) {
+        completeWireDrawing({ componentId: blockId, portId });
+      }
+    },
+    [wireDrawing, completeWireDrawing]
+  );
+
+  // Handle canvas mouse move for wire preview
+  const handleCanvasMouseMove = useCallback(
+    (event: React.MouseEvent) => {
+      if (!wireDrawing) return;
+
+      const container = canvasRef.current?.getContainer();
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const screenPos = {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      };
+      const canvasPos = screenToCanvas(screenPos, pan, zoom);
+      updateWireDrawing(canvasPos);
+    },
+    [wireDrawing, pan, zoom, updateWireDrawing]
+  );
+
+  // Handle canvas mouse up for wire cancellation (when not ending on a port)
+  const handleCanvasMouseUp = useCallback(
+    (event: React.MouseEvent) => {
+      if (!wireDrawing) return;
+
+      // If clicking on empty canvas (not a port), cancel wire drawing
+      const target = event.target as HTMLElement;
+      if (!target.closest('[data-port-id]')) {
+        cancelWireDrawing();
+      }
+    },
+    [wireDrawing, cancelWireDrawing]
+  );
+
+  // Handle escape key to cancel wire drawing
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && wireDrawing) {
+        cancelWireDrawing();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [wireDrawing, cancelWireDrawing]);
+
+  // Handle block selection
+  const handleBlockSelect = useCallback(
+    (blockId: string, addToSelection: boolean) => {
+      if (addToSelection) {
+        // Toggle selection when Ctrl/Cmd is held
+        const newSelection = new Set(selectedIds);
+        if (newSelection.has(blockId)) {
+          newSelection.delete(blockId);
+        } else {
+          newSelection.add(blockId);
+        }
+        setSelection(Array.from(newSelection));
+      } else {
+        // Replace selection
+        setSelection([blockId]);
+      }
+    },
+    [selectedIds, setSelection]
+  );
 
   // Selection box state for drag-to-select
   const [selectionBox] = useState<SelectionBoxState | null>(null);
@@ -318,15 +413,24 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
 
           {/* Canvas Area */}
           <CanvasDropZone className="flex-1 relative overflow-hidden">
-            <Canvas ref={canvasRef} className="w-full h-full">
-              {/* Render blocks */}
-              {Array.from(components.values()).map((block) => (
-                <BlockRenderer
-                  key={block.id}
-                  block={block}
-                  isSelected={selectedIds.has(block.id)}
-                />
-              ))}
+            <div
+              className="w-full h-full"
+              onMouseMove={handleCanvasMouseMove}
+              onMouseUp={handleCanvasMouseUp}
+            >
+              <Canvas ref={canvasRef} className="w-full h-full">
+                {/* Render blocks */}
+                {Array.from(components.values()).map((block) => (
+                  <BlockRenderer
+                    key={block.id}
+                    block={block}
+                    isSelected={selectedIds.has(block.id)}
+                    onSelect={handleBlockSelect}
+                    onStartWire={handleStartWire}
+                    onEndWire={handleEndWire}
+                    onDragStart={handleBlockDragStart}
+                  />
+                ))}
 
               {/* Render wires */}
               {wires.map((wire) => (
@@ -378,6 +482,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
               {/* Selection box */}
               <SelectionBox box={selectionBox} />
             </Canvas>
+            </div>
           </CanvasDropZone>
         </div>
       </div>

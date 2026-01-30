@@ -37,6 +37,7 @@ export { AnimatedWire, wireAnimationStyles } from './components/AnimatedWire';
 
 // Hooks
 export { useCanvasInteraction } from './hooks/useCanvasInteraction';
+export { useBlockDrag } from './hooks/useBlockDrag';
 export { useDragDrop } from './hooks/useDragDrop';
 export type { DragState } from './hooks/useDragDrop';
 export { useWireDrawing } from './hooks/useWireDrawing';
