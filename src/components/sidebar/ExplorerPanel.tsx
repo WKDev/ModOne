@@ -30,6 +30,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useFileOpen } from '../../hooks/useFileOpen';
 import { getFolderIcon } from '../../utils/fileTypeResolver';
 import { fileDialogService } from '../../services/fileDialogService';
+import { importService } from '../../services/importService';
 import type { ProjectFileNode, FileTypeInfo } from '../../types/fileTypes';
 import {
   ExplorerContextMenu,
@@ -329,6 +330,10 @@ export function ExplorerPanel() {
 
         case 'newScenario':
           fileDialogService.requestNewScenario(node.absolutePath);
+          break;
+
+        case 'importXG5000':
+          importService.requestImportXG5000(node.absolutePath);
           break;
       }
     },

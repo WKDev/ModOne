@@ -5,6 +5,7 @@ import { useLayoutPersistenceStore } from '../../stores/layoutPersistenceStore';
 import { SaveLayoutDialog } from './SaveLayoutDialog';
 import { projectDialogService } from '../../services/projectDialogService';
 import { fileDialogService } from '../../services/fileDialogService';
+import { importService } from '../../services/importService';
 import { commandRegistry } from '../CommandPalette/commandRegistry';
 
 interface MenuItem {
@@ -70,6 +71,15 @@ const baseMenus: Menu[] = [
             label: 'New Scenario',
             shortcut: 'Ctrl+Shift+N',
             action: () => fileDialogService.requestNewScenario(),
+          },
+        ],
+      },
+      {
+        label: 'Import',
+        submenu: [
+          {
+            label: 'Import program from XG5000',
+            action: () => importService.requestImportXG5000(),
           },
         ],
       },

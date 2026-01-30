@@ -14,6 +14,7 @@ import {
   CircuitBoard,
   Workflow,
   PlayCircle,
+  Import,
 } from 'lucide-react';
 import type { ProjectFileNode } from '../../types/fileTypes';
 
@@ -26,7 +27,8 @@ export type ExplorerContextAction =
   | 'collapse'
   | 'newCanvas'
   | 'newLadder'
-  | 'newScenario';
+  | 'newScenario'
+  | 'importXG5000';
 
 interface ContextMenuItem {
   action: ExplorerContextAction;
@@ -61,6 +63,14 @@ const CONTEXT_MENU_ITEMS: ContextMenuItem[] = [
     icon: <PlayCircle size={14} />,
     showForFolder: true,
     folderFilter: ['scenario'],
+  },
+  // Import items (folder-specific)
+  {
+    action: 'importXG5000',
+    label: 'Import from XG5000',
+    icon: <Import size={14} />,
+    showForFolder: true,
+    folderFilter: ['ladder', 'plc_csv'],
   },
   // Standard items
   {
@@ -199,20 +209,23 @@ export function ExplorerContextMenu({
     return true;
   });
 
-  // Check if we have any "new" items to add a separator after them
-  const hasNewItems = filteredItems.some((item) =>
-    ['newCanvas', 'newLadder', 'newScenario'].includes(item.action)
+  // Actions that should be grouped together at the top
+  const creationActions = ['newCanvas', 'newLadder', 'newScenario', 'importXG5000'];
+
+  // Check if we have any creation/import items to add a separator after them
+  const hasCreationItems = filteredItems.some((item) =>
+    creationActions.includes(item.action)
   );
 
-  // Add separator after new items if needed
+  // Add separator after creation items if needed
   const itemsWithSeparators = filteredItems.map((item, index) => {
-    // Add separator after the last "new" item
+    // Add separator after the last creation item
     if (
-      hasNewItems &&
-      ['newCanvas', 'newLadder', 'newScenario'].includes(item.action)
+      hasCreationItems &&
+      creationActions.includes(item.action)
     ) {
       const nextItem = filteredItems[index + 1];
-      if (nextItem && !['newCanvas', 'newLadder', 'newScenario'].includes(nextItem.action)) {
+      if (nextItem && !creationActions.includes(nextItem.action)) {
         return { ...item, separator: false, needsSeparatorAfter: true };
       }
     }

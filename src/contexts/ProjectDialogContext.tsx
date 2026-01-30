@@ -8,9 +8,11 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { NewProjectDialog } from '../components/project/NewProjectDialog';
 import { NewFileDialog } from '../components/project/NewFileDialog';
+import { ImportDialog } from '../components/project/ImportDialog';
 import { useOpenProjectDialog } from '../hooks/useOpenProjectDialog';
 import { projectDialogService } from '../services/projectDialogService';
 import { fileDialogService, type NewFileRequest } from '../services/fileDialogService';
+import { importService, type ImportRequest } from '../services/importService';
 import type { ProjectInfo } from '../types/project';
 
 interface ProjectDialogContextValue {
@@ -50,6 +52,7 @@ export function ProjectDialogProvider({
 }: ProjectDialogProviderProps) {
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
   const [newFileRequest, setNewFileRequest] = useState<NewFileRequest | null>(null);
+  const [importRequest, setImportRequest] = useState<ImportRequest | null>(null);
   const { openPicker, isOpening } = useOpenProjectDialog();
 
   const openNewProjectDialog = useCallback(() => {
@@ -87,6 +90,17 @@ export function ProjectDialogProvider({
     };
   }, []);
 
+  // Subscribe to importService events
+  useEffect(() => {
+    const unsubImport = importService.on('import-plc', (request: ImportRequest) => {
+      setImportRequest(request);
+    });
+
+    return () => {
+      unsubImport();
+    };
+  }, []);
+
   const handleNewProjectClose = useCallback(() => {
     setIsNewProjectOpen(false);
   }, []);
@@ -105,6 +119,15 @@ export function ProjectDialogProvider({
   const handleFileCreated = useCallback((filePath: string) => {
     console.log('File created:', filePath);
     // Could add notification here or expand parent folder
+  }, []);
+
+  const handleImportClose = useCallback(() => {
+    setImportRequest(null);
+  }, []);
+
+  const handleFileImported = useCallback((filePath: string) => {
+    console.log('File imported:', filePath);
+    // Could add notification here or open the file
   }, []);
 
   const contextValue: ProjectDialogContextValue = {
@@ -127,6 +150,13 @@ export function ProjectDialogProvider({
         fileType={newFileRequest?.fileType ?? 'canvas'}
         targetDir={newFileRequest?.targetDir}
         onCreated={handleFileCreated}
+      />
+      <ImportDialog
+        isOpen={importRequest !== null}
+        onClose={handleImportClose}
+        vendor={importRequest?.vendor ?? 'xg5000'}
+        targetDir={importRequest?.targetDir}
+        onImported={handleFileImported}
       />
     </ProjectDialogContext.Provider>
   );
