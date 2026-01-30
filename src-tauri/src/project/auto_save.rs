@@ -198,7 +198,7 @@ impl AutoSaveManager {
 
         // Get source path for backup
         let source_path = match manager_guard.get_current_project() {
-            Some(project) => project.mop_file.source_path().map(|p| p.to_path_buf()),
+            Some(project) => project.source_path().map(|p| p.to_path_buf()),
             None => return,
         };
 

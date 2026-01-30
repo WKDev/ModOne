@@ -43,7 +43,10 @@
 
 pub mod auto_save;
 pub mod config;
+pub mod folder_project;
 pub mod layout;
+pub mod manifest;
+pub mod migration;
 pub mod mop_file;
 pub mod recovery;
 pub mod validation;
@@ -54,6 +57,9 @@ pub use config::{
     ModbusRtuSettings, ModbusSettings, ModbusTcpSettings, Parity, PlcManufacturer, PlcSettings,
     ProjectConfig, ProjectSettings,
 };
+pub use folder_project::{FolderProject, FolderProjectError, is_folder_project, is_legacy_project};
+pub use manifest::{DirectoryConfig, ProjectManifest, MANIFEST_VERSION};
+pub use migration::{migrate_project, is_legacy_zip_project, MigrationError, MigrationResult, MigrationPreview, get_migration_preview};
 pub use mop_file::{MopFile, MopFileError};
 pub use recovery::{
     find_backups, validate_mop_integrity, attempt_partial_recovery,
@@ -113,13 +119,42 @@ pub struct MemorySnapshot {
 // Project Data Structures
 // ============================================================================
 
+/// Storage backend for the project
+#[derive(Debug)]
+pub enum ProjectStorage {
+    /// New folder-based format (v2.0)
+    Folder(FolderProject),
+    /// Legacy ZIP-based format (v1.x) - will be read-only in future
+    LegacyZip(MopFile),
+}
+
+impl ProjectStorage {
+    /// Get the source path of the project
+    pub fn source_path(&self) -> Option<&std::path::Path> {
+        match self {
+            ProjectStorage::Folder(fp) => Some(fp.manifest_path()),
+            ProjectStorage::LegacyZip(mf) => mf.source_path(),
+        }
+    }
+
+    /// Check if this is a folder-based project
+    pub fn is_folder_project(&self) -> bool {
+        matches!(self, ProjectStorage::Folder(_))
+    }
+
+    /// Check if this is a legacy ZIP project
+    pub fn is_legacy_project(&self) -> bool {
+        matches!(self, ProjectStorage::LegacyZip(_))
+    }
+}
+
 /// A currently loaded project with all its associated data
 #[derive(Debug)]
 pub struct LoadedProject {
-    /// The underlying .mop archive file
-    pub mop_file: MopFile,
+    /// Storage backend (folder or legacy ZIP)
+    pub storage: ProjectStorage,
 
-    /// Parsed project configuration
+    /// Parsed project configuration (unified view)
     pub config: ProjectConfig,
 
     /// Whether the project has unsaved changes
@@ -133,6 +168,13 @@ pub struct LoadedProject {
 
     /// Modbus memory snapshot (loaded on demand)
     pub memory_snapshot: Option<MemorySnapshot>,
+}
+
+impl LoadedProject {
+    /// Get the source path of the project (manifest file path)
+    pub fn source_path(&self) -> Option<&std::path::Path> {
+        self.storage.source_path()
+    }
 }
 
 /// Information about a recently opened project
@@ -297,15 +339,24 @@ impl ProjectManager {
     ///
     /// # Arguments
     /// * `name` - The project name
-    /// * `path` - Path where the .mop file will be saved
+    /// * `project_dir` - Path to the project directory (e.g., Documents/ModOne/MyProject)
     /// * `plc` - PLC configuration settings
     ///
     /// # Returns
     /// `ProjectInfo` with the created project's details
+    ///
+    /// # Project Structure Created
+    /// ```text
+    /// project_dir/
+    /// ├── {name}.mop     # YAML manifest
+    /// ├── canvas/        # Canvas diagrams
+    /// ├── ladder/        # Ladder logic files
+    /// └── scenario/      # Scenario files
+    /// ```
     pub fn create_project(
         &mut self,
         name: String,
-        path: PathBuf,
+        project_dir: PathBuf,
         plc: PlcSettings,
     ) -> Result<ProjectInfo, ProjectError> {
         // Close any existing project first
@@ -313,30 +364,23 @@ impl ProjectManager {
             self.close_project_internal()?;
         }
 
-        // Create new .mop structure
-        let mut mop_file = MopFile::create_new()?;
+        // Create folder-based project (v2.0)
+        let folder_project = FolderProject::create_new(&project_dir, &name, plc.clone())
+            .map_err(|e| ProjectError::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))?;
 
-        // Create configuration with provided settings
-        let mut config = ProjectConfig::new(&name);
-        config.plc = plc;
+        // Get manifest path for recent projects
+        let manifest_path = folder_project.manifest_path().to_path_buf();
 
-        // Validate config before saving
-        validate_project_config(&config)?;
-
-        // Write config.yml to the mop file
-        let config_path = mop_file.config_path();
-        let config_file = File::create(&config_path)?;
-        let writer = BufWriter::new(config_file);
-        serde_yaml::to_writer(writer, &config)?;
-
-        // Save the .mop file
-        mop_file.save(&path)?;
-
+        // Convert manifest to legacy config format for compatibility
+        let config = folder_project.manifest().to_legacy_config();
         let created_at = config.project.created_at;
 
-        // Create LoadedProject
+        // Validate config
+        validate_project_config(&config)?;
+
+        // Create LoadedProject with folder storage
         let loaded_project = LoadedProject {
-            mop_file,
+            storage: ProjectStorage::Folder(folder_project),
             config,
             is_modified: false,
             canvas_data: None,
@@ -346,20 +390,24 @@ impl ProjectManager {
 
         self.current = Some(loaded_project);
 
-        // Add to recent projects
-        self.add_to_recent(name.clone(), path.clone());
+        // Add to recent projects (use manifest path)
+        self.add_to_recent(name.clone(), manifest_path.clone());
 
         Ok(ProjectInfo {
             name,
-            path,
+            path: manifest_path,
             created_at,
         })
     }
 
     /// Open an existing .mop project file
     ///
+    /// Automatically detects whether the file is:
+    /// - v2.0 folder-based project (YAML manifest)
+    /// - v1.x legacy ZIP archive
+    ///
     /// # Arguments
-    /// * `path` - Path to the .mop file
+    /// * `path` - Path to the .mop file (manifest or ZIP)
     ///
     /// # Returns
     /// `ProjectData` with the loaded project's data
@@ -369,14 +417,30 @@ impl ProjectManager {
             self.close_project_internal()?;
         }
 
-        // Open the .mop file
-        let mop_file = MopFile::open(&path)?;
+        // Detect project format
+        let (storage, config) = if is_folder_project(&path) {
+            // v2.0 folder-based project
+            let folder_project = FolderProject::open(&path)
+                .map_err(|e| ProjectError::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))?;
 
-        // Read and parse config.yml
-        let config_path = mop_file.config_path();
-        let config_file = File::open(&config_path)?;
-        let reader = BufReader::new(config_file);
-        let config: ProjectConfig = serde_yaml::from_reader(reader)?;
+            let config = folder_project.manifest().to_legacy_config();
+            (ProjectStorage::Folder(folder_project), config)
+        } else if is_legacy_project(&path) {
+            // v1.x legacy ZIP project
+            let mop_file = MopFile::open(&path)?;
+
+            // Read and parse config.yml
+            let config_path = mop_file.config_path();
+            let config_file = File::open(&config_path)?;
+            let reader = BufReader::new(config_file);
+            let config: ProjectConfig = serde_yaml::from_reader(reader)?;
+
+            (ProjectStorage::LegacyZip(mop_file), config)
+        } else {
+            return Err(ProjectError::MopFile(MopFileError::InvalidStructure(
+                "Unknown project format".to_string()
+            )));
+        };
 
         // Validate config before proceeding
         validate_project_config(&config)?;
@@ -393,7 +457,7 @@ impl ProjectManager {
 
         // Create LoadedProject
         let loaded_project = LoadedProject {
-            mop_file,
+            storage,
             config,
             is_modified: false,
             canvas_data: None,
@@ -439,46 +503,71 @@ impl ProjectManager {
     ///
     /// # Arguments
     /// * `path` - Optional new path for "Save As" operation. If None, saves to original location.
+    ///            For folder projects, this should be the new project directory path.
     pub fn save_project(&mut self, path: Option<PathBuf>) -> Result<(), ProjectError> {
         // Check if "Save As" was requested before borrowing self.current mutably
         let is_save_as = path.is_some();
 
         let project = self.current.as_mut().ok_or(ProjectError::NoProjectOpen)?;
 
-        // Determine save path
-        let save_path = match path {
-            Some(p) => p,
-            None => project
-                .mop_file
-                .source_path()
-                .ok_or(ProjectError::ProjectNotSaved)?
-                .to_path_buf(),
-        };
-
         // Update timestamp
         project.config.project.updated_at = Utc::now();
 
-        // Write config.yml
-        let config_path = project.mop_file.config_path();
-        let config_file = File::create(&config_path)?;
-        let writer = BufWriter::new(config_file);
-        serde_yaml::to_writer(writer, &project.config)?;
+        match &mut project.storage {
+            ProjectStorage::Folder(folder_project) => {
+                // Update manifest from config
+                let manifest = folder_project.manifest_mut();
+                manifest.project = project.config.project.clone();
+                manifest.plc = project.config.plc.clone();
+                manifest.modbus = project.config.modbus.clone();
+                manifest.memory_map = project.config.memory_map.clone();
+                manifest.auto_save = project.config.auto_save.clone();
 
-        // Save the .mop file
-        project.mop_file.save(&save_path)?;
+                if let Some(new_dir) = path {
+                    // Save As - to new directory
+                    folder_project.save_as(&new_dir, None)
+                        .map_err(|e| ProjectError::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))?;
+                } else {
+                    // Regular save
+                    folder_project.save()
+                        .map_err(|e| ProjectError::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))?;
+                }
+            }
+            ProjectStorage::LegacyZip(mop_file) => {
+                // Legacy ZIP format
+                let save_path = match path {
+                    Some(p) => p,
+                    None => mop_file
+                        .source_path()
+                        .ok_or(ProjectError::ProjectNotSaved)?
+                        .to_path_buf(),
+                };
+
+                // Write config.yml
+                let config_path = mop_file.config_path();
+                let config_file = File::create(&config_path)?;
+                let writer = BufWriter::new(config_file);
+                serde_yaml::to_writer(writer, &project.config)?;
+
+                // Save the .mop file
+                mop_file.save(&save_path)?;
+            }
+        }
 
         // Clear modified flag
         project.is_modified = false;
 
         // If this was a "Save As", update recent projects
-        // Extract needed data before releasing the mutable borrow
-        let project_name = project.config.project.name.clone();
-
-        // Release the mutable borrow before calling add_to_recent
-        let _ = project;
-
         if is_save_as {
-            self.add_to_recent(project_name, save_path);
+            let project_name = project.config.project.name.clone();
+            let new_path = project.storage.source_path()
+                .map(|p| p.to_path_buf())
+                .unwrap_or_default();
+
+            // Release the mutable borrow before calling add_to_recent
+            let _ = project;
+
+            self.add_to_recent(project_name, new_path);
         }
 
         Ok(())
@@ -601,11 +690,19 @@ mod tests {
 
     #[test]
     fn test_loaded_project_instantiation() {
-        let mop = MopFile::create_new().unwrap();
-        let config = ProjectConfig::new("Test");
+        let temp_dir = tempfile::tempdir().unwrap();
+        let project_dir = temp_dir.path().join("TestProject");
+
+        let folder_project = FolderProject::create_new(
+            &project_dir,
+            "Test",
+            PlcSettings::default(),
+        ).unwrap();
+
+        let config = folder_project.manifest().to_legacy_config();
 
         let project = LoadedProject {
-            mop_file: mop,
+            storage: ProjectStorage::Folder(folder_project),
             config,
             is_modified: false,
             canvas_data: None,
@@ -614,6 +711,7 @@ mod tests {
         };
 
         assert!(!project.is_modified);
+        assert!(project.storage.is_folder_project());
     }
 
     #[test]
@@ -647,15 +745,15 @@ mod tests {
     fn test_create_and_open_project() {
         let mut manager = ProjectManager::new();
 
-        // Create a temp file path for the project
+        // Create a temp directory for the project
         let temp_dir = tempfile::tempdir().unwrap();
-        let project_path = temp_dir.path().join("test_project.mop");
+        let project_dir = temp_dir.path().join("TestProject");
 
-        // Create project
+        // Create project (now takes directory, not file path)
         let info = manager
             .create_project(
                 "Test Project".to_string(),
-                project_path.clone(),
+                project_dir.clone(),
                 PlcSettings::default(),
             )
             .unwrap();
@@ -664,11 +762,20 @@ mod tests {
         assert!(manager.is_project_open());
         assert!(!manager.is_modified());
 
+        // Get the manifest path from the returned info
+        let manifest_path = info.path.clone();
+        assert!(manifest_path.exists());
+
+        // Verify folder structure
+        assert!(project_dir.join("canvas").exists());
+        assert!(project_dir.join("ladder").exists());
+        assert!(project_dir.join("scenario").exists());
+
         // Close and reopen
         manager.close_project().unwrap();
         assert!(!manager.is_project_open());
 
-        let data = manager.open_project(project_path).unwrap();
+        let data = manager.open_project(manifest_path).unwrap();
         assert_eq!(data.config.project.name, "Test Project");
         assert!(manager.is_project_open());
     }
@@ -678,13 +785,13 @@ mod tests {
         let mut manager = ProjectManager::new();
 
         let temp_dir = tempfile::tempdir().unwrap();
-        let project_path = temp_dir.path().join("test_save.mop");
+        let project_dir = temp_dir.path().join("SaveTest");
 
         // Create project
         manager
             .create_project(
                 "Save Test".to_string(),
-                project_path.clone(),
+                project_dir.clone(),
                 PlcSettings::default(),
             )
             .unwrap();
@@ -703,23 +810,24 @@ mod tests {
         let mut manager = ProjectManager::new();
 
         let temp_dir = tempfile::tempdir().unwrap();
-        let project_path = temp_dir.path().join("original.mop");
-        let save_as_path = temp_dir.path().join("save_as.mop");
+        let project_dir = temp_dir.path().join("Original");
+        let save_as_dir = temp_dir.path().join("SaveAs");
 
         // Create project
         manager
             .create_project(
                 "Save As Test".to_string(),
-                project_path,
+                project_dir,
                 PlcSettings::default(),
             )
             .unwrap();
 
-        // Save As
-        manager.save_project(Some(save_as_path.clone())).unwrap();
+        // Save As (for folder projects, provide new directory)
+        manager.save_project(Some(save_as_dir.clone())).unwrap();
 
-        // Verify the new file exists
-        assert!(save_as_path.exists());
+        // Verify the new directory and manifest exist
+        assert!(save_as_dir.exists());
+        assert!(save_as_dir.join("Save As Test.mop").exists());
     }
 
     #[test]
@@ -727,12 +835,12 @@ mod tests {
         let mut manager = ProjectManager::new();
 
         let temp_dir = tempfile::tempdir().unwrap();
-        let project_path = temp_dir.path().join("unsaved.mop");
+        let project_dir = temp_dir.path().join("UnsavedTest");
 
         manager
             .create_project(
                 "Unsaved Test".to_string(),
-                project_path,
+                project_dir,
                 PlcSettings::default(),
             )
             .unwrap();
@@ -753,21 +861,21 @@ mod tests {
         let mut manager = ProjectManager::new();
 
         let temp_dir = tempfile::tempdir().unwrap();
-        let project_path = temp_dir.path().join("recent_test.mop");
+        let project_dir = temp_dir.path().join("RecentTest");
 
         // Create project (which adds to recent)
-        manager
+        let info = manager
             .create_project(
                 "Recent Test".to_string(),
-                project_path.clone(),
+                project_dir,
                 PlcSettings::default(),
             )
             .unwrap();
 
-        // Check recent projects
+        // Check recent projects - should contain the manifest path
         let recent = manager.get_recent_projects();
         assert!(!recent.is_empty());
-        assert_eq!(recent[0].path, project_path);
+        assert_eq!(recent[0].path, info.path);
     }
 
     #[test]

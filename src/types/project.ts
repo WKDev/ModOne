@@ -60,6 +60,13 @@ export interface AutoSaveSettings {
   backup_count: number;
 }
 
+// Directory configuration for v2.0 folder-based projects
+export interface DirectoryConfig {
+  canvas: string;
+  ladder: string;
+  scenario: string;
+}
+
 // Full project configuration (matches config.yml schema)
 export interface ProjectConfig {
   version: string;

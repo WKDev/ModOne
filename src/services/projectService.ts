@@ -21,22 +21,32 @@ import type {
 export const projectService = {
   /**
    * Create a new project
+   *
+   * Creates a folder-based project (v2.0) with the following structure:
+   * ```
+   * projectDir/
+   * ├── {name}.mop     # YAML manifest
+   * ├── canvas/        # Canvas diagrams
+   * ├── ladder/        # Ladder logic files
+   * └── scenario/      # Scenario files
+   * ```
+   *
    * @param name - Project name
-   * @param path - Path where the .mop file will be saved
+   * @param projectDir - Path to the project directory (e.g., Documents/ModOne/MyProject)
    * @param plcManufacturer - PLC manufacturer (LS, Mitsubishi, Siemens)
    * @param plcModel - PLC model name
    * @param scanTimeMs - Optional scan time in milliseconds (defaults to 10)
    */
   async createProject(
     name: string,
-    path: string,
+    projectDir: string,
     plcManufacturer: PlcManufacturer,
     plcModel: string,
     scanTimeMs?: number
   ): Promise<ProjectInfo> {
     return invoke('create_project', {
       name,
-      path,
+      projectDir,
       plcManufacturer,
       plcModel,
       scanTimeMs: scanTimeMs ?? null,

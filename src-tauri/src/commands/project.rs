@@ -89,29 +89,38 @@ fn format_error(error: ProjectError) -> String {
 ///
 /// # Arguments
 /// * `name` - Project name
-/// * `path` - Path where the .mop file will be saved
+/// * `project_dir` - Path to the project directory (e.g., Documents/ModOne/MyProject)
 /// * `plc_manufacturer` - PLC manufacturer (e.g., "LS", "Mitsubishi", "Siemens")
 /// * `plc_model` - PLC model name
 /// * `scan_time_ms` - PLC scan time in milliseconds (optional, defaults to 10)
+///
+/// # Project Structure Created
+/// ```text
+/// project_dir/
+/// ├── {name}.mop     # YAML manifest
+/// ├── canvas/        # Canvas diagrams
+/// ├── ladder/        # Ladder logic files
+/// └── scenario/      # Scenario files
+/// ```
 #[tauri::command]
 pub async fn create_project(
     state: State<'_, SharedProjectManager>,
     name: String,
-    path: PathBuf,
-    plc_manufacturer: String,
-    plc_model: String,
-    scan_time_ms: Option<u32>,
+    projectDir: PathBuf,
+    plcManufacturer: String,
+    plcModel: String,
+    scanTimeMs: Option<u32>,
 ) -> Result<ProjectInfo, String> {
     // Parse PLC manufacturer
-    let manufacturer = plc_manufacturer
+    let manufacturer = plcManufacturer
         .parse()
         .map_err(|e: String| format!("Invalid PLC manufacturer: {}", e))?;
 
     // Create PLC settings
     let plc_settings = PlcSettings {
         manufacturer,
-        model: plc_model,
-        scan_time_ms: scan_time_ms.unwrap_or(10),
+        model: plcModel,
+        scan_time_ms: scanTimeMs.unwrap_or(10),
     };
 
     // Acquire lock and create project
@@ -120,7 +129,7 @@ pub async fn create_project(
         .map_err(|e| format!("Internal error: failed to acquire lock: {}", e))?;
 
     let info = manager
-        .create_project(name, path, plc_settings)
+        .create_project(name, projectDir, plc_settings)
         .map_err(format_error)?;
 
     Ok(ProjectInfo {
@@ -219,7 +228,7 @@ pub async fn get_project_status(
     let (name, path) = if let Some(project) = manager.get_current_project() {
         (
             Some(project.config.project.name.clone()),
-            project.mop_file.source_path().map(|p| p.to_path_buf()),
+            project.source_path().map(|p| p.to_path_buf()),
         )
     } else {
         (None, None)

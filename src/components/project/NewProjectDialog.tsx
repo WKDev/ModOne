@@ -268,21 +268,21 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
       setError(null);
 
       try {
-        // Construct full file path using Tauri's join API
-        const fileName = `${projectName.trim()}.mop`;
-        const fullPath = await join(savePath, fileName);
+        // For folder-based projects (v2.0), savePath IS the project directory
+        // The backend will create: savePath/{name}.mop + canvas/ + ladder/ + scenario/
+        const projectDir = savePath;
 
-        // Check if project file already exists
-        const fileExists = await exists(fullPath);
-        if (fileExists) {
-          setError('이미 동일한 이름의 프로젝트가 존재합니다. 다른 이름을 선택하세요.');
+        // Check if project directory already exists
+        const dirExists = await exists(projectDir);
+        if (dirExists) {
+          setError('이미 동일한 이름의 프로젝트 폴더가 존재합니다. 다른 이름을 선택하세요.');
           setIsSubmitting(false);
           return;
         }
 
         const info = await createProject(
           projectName.trim(),
-          fullPath,
+          projectDir,
           plcManufacturer,
           plcModel,
           scanTimeMs
@@ -363,7 +363,7 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
                 htmlFor="savePath"
                 className="block text-sm font-medium text-gray-300 mb-1"
               >
-                저장 위치 <span className="text-red-500">*</span>
+                프로젝트 폴더 <span className="text-red-500">*</span>
               </label>
               <div className="flex gap-2">
                 <input
@@ -371,7 +371,7 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
                   type="text"
                   value={savePath}
                   onChange={handleSavePathChange}
-                  placeholder="폴더를 선택하세요"
+                  placeholder="프로젝트 폴더 경로"
                   disabled={isSubmitting}
                   className={`flex-1 px-3 py-2 bg-gray-700 border rounded text-sm text-gray-100 placeholder:text-gray-500 focus:outline-none disabled:opacity-50 ${
                     savePathError ? 'border-red-500 focus:border-red-500' : 'border-gray-600 focus:border-blue-500'
@@ -390,6 +390,9 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
               {savePathError && (
                 <p className="mt-1 text-xs text-red-500">{savePathError}</p>
               )}
+              <p className="mt-1 text-xs text-gray-500">
+                이 폴더에 프로젝트 파일과 canvas, ladder, scenario 폴더가 생성됩니다.
+              </p>
             </div>
 
             {/* PLC Manufacturer */}
