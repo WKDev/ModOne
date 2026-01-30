@@ -50,6 +50,8 @@ interface EditorAreaActions {
   clearTabs: () => void;
   /** Set tabs directly (for layout restoration) */
   setTabs: (tabs: TabState[], activeTabId: string | null) => void;
+  /** Open settings tab (creates if not exists, focuses if exists) */
+  openSettingsTab: () => void;
 }
 
 type EditorAreaStore = EditorAreaState & EditorAreaActions;
@@ -244,6 +246,21 @@ export const useEditorAreaStore = create<EditorAreaStore>()(
 
       setTabs: (tabs, activeTabId) => {
         set({ tabs, activeTabId }, false, 'setTabs');
+      },
+
+      openSettingsTab: () => {
+        const { tabs, addTab, setActiveTab } = get();
+
+        // Check if settings tab already exists
+        const existingTab = tabs.find((t) => t.panelType === 'settings');
+        if (existingTab) {
+          // Focus existing settings tab
+          setActiveTab(existingTab.id);
+          return;
+        }
+
+        // Create new settings tab
+        addTab('settings', 'Settings');
       },
     }),
     { name: 'editor-area-store' }

@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { MainLayout } from './components/layout/MainLayout';
 import { useLayoutPersistenceStore } from './stores/layoutPersistenceStore';
 import { useToolPanelStore } from './stores/toolPanelStore';
-import { usePanelStore } from './stores/panelStore';
+import { useEditorAreaStore } from './stores/editorAreaStore';
 import { ThemeProvider } from './providers/ThemeProvider';
 import { useStateSync } from './hooks/useStateSync';
 import { useWindowClose } from './hooks/useWindowClose';
@@ -39,7 +39,7 @@ function MainWindowContent() {
   const { initialize, saveLastSession } = useLayoutPersistenceStore();
   const initializeToolPanel = useToolPanelStore((state) => state.initializeDefaultTabs);
   const toolPanelTabs = useToolPanelStore((state) => state.tabs);
-  const openSettingsTab = usePanelStore((state) => state.openSettingsTab);
+  const openSettingsTab = useEditorAreaStore((state) => state.openSettingsTab);
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Command palette state (useCommandPalette hook handles Ctrl+Shift+P shortcut)

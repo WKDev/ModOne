@@ -6,7 +6,7 @@
 
 import { Settings, Sun, Moon, Monitor, Keyboard } from 'lucide-react';
 import { commandRegistry } from '../commandRegistry';
-import { usePanelStore } from '../../../stores/panelStore';
+import { useEditorAreaStore } from '../../../stores/editorAreaStore';
 import type { Command } from '../types';
 
 /**
@@ -23,7 +23,7 @@ export function registerSettingsCommands(): void {
       shortcut: 'Ctrl+,',
       keywords: ['settings', 'preferences', 'options', 'configure'],
       execute: () => {
-        usePanelStore.getState().openSettingsTab();
+        useEditorAreaStore.getState().openSettingsTab();
       },
     },
     {
