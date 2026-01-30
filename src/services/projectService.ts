@@ -37,9 +37,9 @@ export const projectService = {
     return invoke('create_project', {
       name,
       path,
-      plc_manufacturer: plcManufacturer,
-      plc_model: plcModel,
-      scan_time_ms: scanTimeMs ?? null,
+      plcManufacturer,
+      plcModel,
+      scanTimeMs: scanTimeMs ?? null,
     });
   },
 
