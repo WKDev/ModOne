@@ -74,7 +74,10 @@
       "Bash(if not exist \"C:\\\\Users\\\\chanh\\\\Projects\\\\ModOne\\\\src\\\\stores\\\\__tests__\" mkdir \"C:\\\\Users\\\\chanh\\\\Projects\\\\ModOne\\\\src\\\\stores\\\\__tests__\")",
       "Bash(git checkout:*)",
       "Bash(pushd:*)",
-      "Bash(popd:*)"
+      "Bash(popd:*)",
+      "Bash(pnpm tauri build:*)",
+      "Bash(powershell -Command \"Get-Content .taskmaster/tasks/tasks.json | ConvertFrom-Json | ForEach-Object { $_master.tasks | Select-Object id, title, status | Format-Table -AutoSize }\")",
+      "Bash(timeout 15 pnpm run dev:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
