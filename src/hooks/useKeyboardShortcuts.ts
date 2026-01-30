@@ -13,6 +13,7 @@ interface KeyboardShortcutCallbacks {
   onSaveProjectAs?: () => void;
   onSaveAll?: () => void;
   onCloseProject?: () => void;
+  onOpenSettings?: () => void;
 }
 
 /**
@@ -40,6 +41,7 @@ export function useKeyboardShortcuts({
   onSaveProjectAs,
   onSaveAll,
   onCloseProject,
+  onOpenSettings,
 }: KeyboardShortcutCallbacks) {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -101,9 +103,17 @@ export function useKeyboardShortcuts({
             onCloseProject();
           }
           break;
+
+        case ',':
+          // Ctrl+,: Open Settings
+          if (onOpenSettings) {
+            e.preventDefault();
+            onOpenSettings();
+          }
+          break;
       }
     },
-    [onNewProject, onOpenProject, onSaveProject, onSaveProjectAs, onSaveAll, onCloseProject]
+    [onNewProject, onOpenProject, onSaveProject, onSaveProjectAs, onSaveAll, onCloseProject, onOpenSettings]
   );
 
   useEffect(() => {

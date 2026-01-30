@@ -1,7 +1,8 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { MainLayout } from './components/layout/MainLayout';
 import { useLayoutPersistenceStore } from './stores/layoutPersistenceStore';
 import { useToolPanelStore } from './stores/toolPanelStore';
+import { usePanelStore } from './stores/panelStore';
 import { ThemeProvider } from './providers/ThemeProvider';
 import { useStateSync } from './hooks/useStateSync';
 import { useWindowClose } from './hooks/useWindowClose';
@@ -38,10 +39,25 @@ function MainWindowContent() {
   const { initialize, saveLastSession } = useLayoutPersistenceStore();
   const initializeToolPanel = useToolPanelStore((state) => state.initializeDefaultTabs);
   const toolPanelTabs = useToolPanelStore((state) => state.tabs);
+  const openSettingsTab = usePanelStore((state) => state.openSettingsTab);
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Command palette state (useCommandPalette hook handles Ctrl+Shift+P shortcut)
   const { isOpen: isPaletteOpen, close: closePalette } = useCommandPalette();
+
+  // Handle Ctrl+, keyboard shortcut for settings
+  const handleSettingsShortcut = useCallback((e: KeyboardEvent) => {
+    const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+    if (isCtrlOrCmd && e.key === ',') {
+      e.preventDefault();
+      openSettingsTab();
+    }
+  }, [openSettingsTab]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleSettingsShortcut);
+    return () => document.removeEventListener('keydown', handleSettingsShortcut);
+  }, [handleSettingsShortcut]);
 
   // Window close handling with unsaved changes detection
   const {

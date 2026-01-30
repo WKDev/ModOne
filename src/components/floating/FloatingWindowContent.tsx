@@ -20,6 +20,7 @@ import { ScenarioEditorPanel } from '../panels/content/ScenarioEditorPanel';
 import { ConsolePanel } from '../panels/content/ConsolePanel';
 import { PropertiesPanel } from '../panels/content/PropertiesPanel';
 import { CsvViewerPanel } from '../panels/content/CsvViewerPanel';
+import { SettingsPanel } from '../panels/content/SettingsPanel';
 import type { PanelType } from '../../types/panel';
 
 const panelContentMap: Record<PanelType, React.ComponentType> = {
@@ -30,6 +31,7 @@ const panelContentMap: Record<PanelType, React.ComponentType> = {
   'console': ConsolePanel,
   'properties': PropertiesPanel,
   'csv-viewer': CsvViewerPanel,
+  'settings': SettingsPanel,
 };
 
 interface FloatingWindowContentProps {
