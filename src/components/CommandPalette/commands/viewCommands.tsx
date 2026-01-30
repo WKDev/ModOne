@@ -2,6 +2,7 @@
  * View Commands
  *
  * Commands for view operations: toggle panels, zoom, layout.
+ * Uses layoutStore for state management and layoutPersistenceStore for layouts.
  */
 
 import {
@@ -15,6 +16,8 @@ import {
   Layout,
 } from 'lucide-react';
 import { commandRegistry } from '../commandRegistry';
+import { useLayoutStore } from '../../../stores/layoutStore';
+import { useLayoutPersistenceStore } from '../../../stores/layoutPersistenceStore';
 import type { Command } from '../types';
 
 /**
@@ -31,7 +34,7 @@ export function registerViewCommands(): void {
       shortcut: 'Ctrl+B',
       keywords: ['panel', 'sidebar', 'left', 'explorer'],
       execute: () => {
-        console.log('Toggle Left Panel');
+        useLayoutStore.getState().toggleSidebar();
       },
     },
     {
@@ -43,7 +46,8 @@ export function registerViewCommands(): void {
       shortcut: 'Ctrl+Alt+B',
       keywords: ['panel', 'sidebar', 'right', 'properties'],
       execute: () => {
-        console.log('Toggle Right Panel');
+        // Right panel toggle not yet implemented in layoutStore
+        console.log('Toggle Right Panel - not yet implemented');
       },
     },
     {
@@ -55,7 +59,7 @@ export function registerViewCommands(): void {
       shortcut: 'Ctrl+J',
       keywords: ['panel', 'terminal', 'bottom', 'console'],
       execute: () => {
-        console.log('Toggle Bottom Panel');
+        useLayoutStore.getState().togglePanel();
       },
     },
     {
@@ -67,7 +71,9 @@ export function registerViewCommands(): void {
       shortcut: 'Ctrl+=',
       keywords: ['zoom', 'enlarge', 'bigger'],
       execute: () => {
-        console.log('Zoom In');
+        // Use browser's zoom functionality
+        const currentZoom = parseFloat(document.body.style.zoom || '1');
+        document.body.style.zoom = `${Math.min(currentZoom + 0.1, 2)}`;
       },
     },
     {
@@ -79,7 +85,9 @@ export function registerViewCommands(): void {
       shortcut: 'Ctrl+-',
       keywords: ['zoom', 'shrink', 'smaller'],
       execute: () => {
-        console.log('Zoom Out');
+        // Use browser's zoom functionality
+        const currentZoom = parseFloat(document.body.style.zoom || '1');
+        document.body.style.zoom = `${Math.max(currentZoom - 0.1, 0.5)}`;
       },
     },
     {
@@ -91,7 +99,7 @@ export function registerViewCommands(): void {
       shortcut: 'Ctrl+0',
       keywords: ['zoom', 'reset', 'default'],
       execute: () => {
-        console.log('Reset Zoom');
+        document.body.style.zoom = '1';
       },
     },
     {
@@ -118,7 +126,8 @@ export function registerViewCommands(): void {
       icon: <Layout size={16} />,
       keywords: ['layout', 'reset', 'default', 'arrange'],
       execute: () => {
-        console.log('Reset Layout');
+        useLayoutPersistenceStore.getState().resetToDefault();
+        useLayoutStore.getState().resetLayout();
       },
     },
   ];

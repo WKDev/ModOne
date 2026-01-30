@@ -3,6 +3,8 @@ import { Check } from 'lucide-react';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useLayoutPersistenceStore } from '../../stores/layoutPersistenceStore';
 import { SaveLayoutDialog } from './SaveLayoutDialog';
+import { projectDialogService } from '../../services/projectDialogService';
+import { commandRegistry } from '../CommandPalette/commandRegistry';
 
 interface MenuItem {
   label: string;
@@ -23,11 +25,27 @@ const baseMenus: Menu[] = [
   {
     label: 'File',
     items: [
-      { label: 'New Project', shortcut: 'Ctrl+N' },
-      { label: 'Open Project', shortcut: 'Ctrl+O' },
+      {
+        label: 'New Project',
+        shortcut: 'Ctrl+N',
+        action: () => projectDialogService.requestNewProject(),
+      },
+      {
+        label: 'Open Project',
+        shortcut: 'Ctrl+O',
+        action: () => projectDialogService.requestOpenProject(),
+      },
       { separator: true, label: '' },
-      { label: 'Save', shortcut: 'Ctrl+S' },
-      { label: 'Save As...', shortcut: 'Ctrl+Shift+S' },
+      {
+        label: 'Save',
+        shortcut: 'Ctrl+S',
+        action: () => commandRegistry.execute('file.save'),
+      },
+      {
+        label: 'Save As...',
+        shortcut: 'Ctrl+Shift+S',
+        action: () => commandRegistry.execute('file.saveAs'),
+      },
       { separator: true, label: '' },
       {
         label: 'Recent Projects',
@@ -55,32 +73,87 @@ const baseMenus: Menu[] = [
   {
     label: 'View',
     items: [
-      { label: 'Toggle Sidebar', shortcut: 'Ctrl+B' },
+      {
+        label: 'Toggle Sidebar',
+        shortcut: 'Ctrl+B',
+        action: () => commandRegistry.execute('view.toggleLeftPanel'),
+      },
       {
         label: 'Toggle Panel',
         submenu: [
-          { label: 'Output' },
-          { label: 'Problems' },
-          { label: 'Terminal' },
+          {
+            label: 'Output',
+            action: () => {
+              useLayoutStore.getState().setPanelType('output');
+              if (!useLayoutStore.getState().panelVisible) {
+                useLayoutStore.getState().togglePanel();
+              }
+            },
+          },
+          {
+            label: 'Problems',
+            action: () => {
+              useLayoutStore.getState().setPanelType('problems');
+              if (!useLayoutStore.getState().panelVisible) {
+                useLayoutStore.getState().togglePanel();
+              }
+            },
+          },
+          {
+            label: 'Terminal',
+            action: () => {
+              useLayoutStore.getState().setPanelType('terminal');
+              if (!useLayoutStore.getState().panelVisible) {
+                useLayoutStore.getState().togglePanel();
+              }
+            },
+          },
         ],
       },
       { separator: true, label: '' },
       // Layouts submenu will be injected dynamically
       { label: '__LAYOUTS_PLACEHOLDER__' },
       { separator: true, label: '' },
-      { label: 'Zoom In', shortcut: 'Ctrl++' },
-      { label: 'Zoom Out', shortcut: 'Ctrl+-' },
+      {
+        label: 'Zoom In',
+        shortcut: 'Ctrl++',
+        action: () => commandRegistry.execute('view.zoomIn'),
+      },
+      {
+        label: 'Zoom Out',
+        shortcut: 'Ctrl+-',
+        action: () => commandRegistry.execute('view.zoomOut'),
+      },
     ],
   },
   {
     label: 'Simulation',
     items: [
-      { label: 'Start', shortcut: 'F5' },
-      { label: 'Stop', shortcut: 'Shift+F5' },
-      { label: 'Pause', shortcut: 'F6' },
-      { label: 'Step', shortcut: 'F10' },
+      {
+        label: 'Start',
+        shortcut: 'F5',
+        action: () => commandRegistry.execute('simulation.start'),
+      },
+      {
+        label: 'Stop',
+        shortcut: 'Shift+F5',
+        action: () => commandRegistry.execute('simulation.stop'),
+      },
+      {
+        label: 'Pause',
+        shortcut: 'F6',
+        action: () => commandRegistry.execute('simulation.pause'),
+      },
+      {
+        label: 'Step',
+        shortcut: 'F10',
+        action: () => commandRegistry.execute('simulation.step'),
+      },
       { separator: true, label: '' },
-      { label: 'Reset' },
+      {
+        label: 'Reset',
+        action: () => commandRegistry.execute('simulation.reset'),
+      },
     ],
   },
   {
@@ -88,10 +161,28 @@ const baseMenus: Menu[] = [
     items: [
       { label: 'Server Settings' },
       { separator: true, label: '' },
-      { label: 'Start Server' },
-      { label: 'Stop Server' },
+      {
+        label: 'Start TCP Server',
+        action: () => commandRegistry.execute('modbus.startTcp'),
+      },
+      {
+        label: 'Stop TCP Server',
+        action: () => commandRegistry.execute('modbus.stopTcp'),
+      },
       { separator: true, label: '' },
-      { label: 'Connection Status' },
+      {
+        label: 'Start RTU Server',
+        action: () => commandRegistry.execute('modbus.startRtu'),
+      },
+      {
+        label: 'Stop RTU Server',
+        action: () => commandRegistry.execute('modbus.stopRtu'),
+      },
+      { separator: true, label: '' },
+      {
+        label: 'Connection Status',
+        action: () => commandRegistry.execute('modbus.status'),
+      },
     ],
   },
   {

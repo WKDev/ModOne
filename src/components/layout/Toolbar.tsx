@@ -10,6 +10,7 @@ import {
   PanelBottom,
 } from 'lucide-react';
 import { useLayoutStore } from '../../stores/layoutStore';
+import { commandRegistry } from '../CommandPalette/commandRegistry';
 
 interface ToolbarButtonProps {
   icon: React.ReactNode;
@@ -45,7 +46,6 @@ function ToolbarSeparator() {
 export function Toolbar() {
   const {
     simulationStatus,
-    setSimulationStatus,
     sidebarVisible,
     toggleSidebar,
     panelVisible,
@@ -62,15 +62,17 @@ export function Toolbar() {
       <ToolbarButton
         icon={<FilePlus size={18} />}
         tooltip="New Project (Ctrl+N)"
+        onClick={() => commandRegistry.execute('file.new')}
       />
       <ToolbarButton
         icon={<FolderOpen size={18} />}
         tooltip="Open Project (Ctrl+O)"
+        onClick={() => commandRegistry.execute('file.open')}
       />
       <ToolbarButton
         icon={<Save size={18} />}
         tooltip="Save (Ctrl+S)"
-        disabled={true} // Disabled until project is modified
+        onClick={() => commandRegistry.execute('file.save')}
       />
 
       <ToolbarSeparator />
@@ -78,26 +80,33 @@ export function Toolbar() {
       {/* Simulation Group */}
       <ToolbarButton
         icon={<Play size={18} />}
-        tooltip="Start Simulation (F5)"
+        tooltip={isPaused ? 'Resume Simulation (F6)' : 'Start Simulation (F5)'}
         disabled={isRunning}
-        onClick={() => setSimulationStatus('running')}
+        onClick={() => {
+          if (isPaused) {
+            commandRegistry.execute('simulation.resume');
+          } else {
+            commandRegistry.execute('simulation.start');
+          }
+        }}
       />
       <ToolbarButton
         icon={<Pause size={18} />}
         tooltip="Pause Simulation (F6)"
         disabled={isStopped || isPaused}
-        onClick={() => setSimulationStatus('paused')}
+        onClick={() => commandRegistry.execute('simulation.pause')}
       />
       <ToolbarButton
         icon={<Square size={18} />}
         tooltip="Stop Simulation (Shift+F5)"
         disabled={isStopped}
-        onClick={() => setSimulationStatus('stopped')}
+        onClick={() => commandRegistry.execute('simulation.stop')}
       />
       <ToolbarButton
         icon={<StepForward size={18} />}
         tooltip="Step (F10)"
-        disabled={isRunning}
+        disabled={!isPaused}
+        onClick={() => commandRegistry.execute('simulation.step')}
       />
 
       <ToolbarSeparator />

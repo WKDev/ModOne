@@ -2,16 +2,14 @@
  * Simulation Commands
  *
  * Commands for simulation control: start, stop, pause, step.
+ * Uses simulationService for Tauri backend integration and state management.
  */
 
 import { Play, Square, Pause, SkipForward, RefreshCw } from 'lucide-react';
-import { invoke } from '@tauri-apps/api/core';
 import { commandRegistry } from '../commandRegistry';
+import { simulationService } from '../../../services/simulationService';
+import { useLayoutStore } from '../../../stores/layoutStore';
 import type { Command } from '../types';
-
-// Simple state check (will be replaced with actual store integration)
-let simRunning = false;
-let simPaused = false;
 
 /**
  * Register all simulation-related commands.
@@ -26,12 +24,10 @@ export function registerSimulationCommands(): void {
       icon: <Play size={16} />,
       shortcut: 'F5',
       keywords: ['run', 'start', 'execute', 'simulation'],
-      when: () => !simRunning,
+      when: () => useLayoutStore.getState().simulationStatus !== 'running',
       execute: async () => {
         try {
-          await invoke('sim_run');
-          simRunning = true;
-          simPaused = false;
+          await simulationService.start();
         } catch (error) {
           console.error('Failed to start simulation:', error);
         }
@@ -45,12 +41,10 @@ export function registerSimulationCommands(): void {
       icon: <Square size={16} />,
       shortcut: 'Shift+F5',
       keywords: ['stop', 'halt', 'end', 'simulation'],
-      when: () => simRunning || simPaused,
+      when: () => useLayoutStore.getState().simulationStatus !== 'stopped',
       execute: async () => {
         try {
-          await invoke('sim_stop');
-          simRunning = false;
-          simPaused = false;
+          await simulationService.stop();
         } catch (error) {
           console.error('Failed to stop simulation:', error);
         }
@@ -64,11 +58,10 @@ export function registerSimulationCommands(): void {
       icon: <Pause size={16} />,
       shortcut: 'F6',
       keywords: ['pause', 'freeze', 'simulation'],
-      when: () => simRunning && !simPaused,
+      when: () => useLayoutStore.getState().simulationStatus === 'running',
       execute: async () => {
         try {
-          await invoke('sim_pause');
-          simPaused = true;
+          await simulationService.pause();
         } catch (error) {
           console.error('Failed to pause simulation:', error);
         }
@@ -82,11 +75,10 @@ export function registerSimulationCommands(): void {
       icon: <Play size={16} />,
       shortcut: 'F6',
       keywords: ['resume', 'continue', 'simulation'],
-      when: () => simPaused,
+      when: () => useLayoutStore.getState().simulationStatus === 'paused',
       execute: async () => {
         try {
-          await invoke('sim_resume');
-          simPaused = false;
+          await simulationService.resume();
         } catch (error) {
           console.error('Failed to resume simulation:', error);
         }
@@ -100,10 +92,10 @@ export function registerSimulationCommands(): void {
       icon: <SkipForward size={16} />,
       shortcut: 'F10',
       keywords: ['step', 'single', 'cycle', 'scan'],
-      when: () => simPaused,
+      when: () => useLayoutStore.getState().simulationStatus === 'paused',
       execute: async () => {
         try {
-          await invoke('sim_step');
+          await simulationService.step();
         } catch (error) {
           console.error('Failed to step simulation:', error);
         }
@@ -119,9 +111,7 @@ export function registerSimulationCommands(): void {
       keywords: ['reset', 'clear', 'restart'],
       execute: async () => {
         try {
-          await invoke('sim_reset');
-          simRunning = false;
-          simPaused = false;
+          await simulationService.reset();
         } catch (error) {
           console.error('Failed to reset simulation:', error);
         }

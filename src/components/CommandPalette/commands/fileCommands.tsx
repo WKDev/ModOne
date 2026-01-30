@@ -2,10 +2,14 @@
  * File Commands
  *
  * Commands for file operations: new, open, save, save as, close.
+ * Uses projectService for Tauri backend integration and projectStore for state.
  */
 
 import { FileText, FolderOpen, Save, X } from 'lucide-react';
 import { commandRegistry } from '../commandRegistry';
+import { projectDialogService } from '../../../services/projectDialogService';
+import { projectService } from '../../../services/projectService';
+import { useProjectStore } from '../../../stores/projectStore';
 import type { Command } from '../types';
 
 /**
@@ -22,8 +26,7 @@ export function registerFileCommands(): void {
       shortcut: 'Ctrl+N',
       keywords: ['create', 'project', 'new'],
       execute: async () => {
-        // This will be wired up to projectService
-        console.log('New Project command executed');
+        projectDialogService.requestNewProject();
       },
     },
     {
@@ -35,7 +38,7 @@ export function registerFileCommands(): void {
       shortcut: 'Ctrl+O',
       keywords: ['load', 'open', 'project'],
       execute: async () => {
-        console.log('Open Project command executed');
+        projectDialogService.requestOpenProject();
       },
     },
     {
@@ -47,7 +50,25 @@ export function registerFileCommands(): void {
       shortcut: 'Ctrl+S',
       keywords: ['save', 'write'],
       execute: async () => {
-        console.log('Save command executed');
+        const { currentProjectPath, setLoading, setError, setModified } =
+          useProjectStore.getState();
+
+        // If no project is open, do nothing
+        if (!currentProjectPath) {
+          // Optionally trigger Save As for unsaved projects
+          projectDialogService.requestSaveAs();
+          return;
+        }
+
+        try {
+          setLoading(true, 'save');
+          await projectService.saveProject();
+          setModified(false);
+          setLoading(false);
+        } catch (error) {
+          console.error('Failed to save project:', error);
+          setError(error instanceof Error ? error.message : 'Failed to save project');
+        }
       },
     },
     {
@@ -59,7 +80,7 @@ export function registerFileCommands(): void {
       shortcut: 'Ctrl+Shift+S',
       keywords: ['save', 'export', 'copy'],
       execute: async () => {
-        console.log('Save As command executed');
+        projectDialogService.requestSaveAs();
       },
     },
     {
@@ -70,8 +91,27 @@ export function registerFileCommands(): void {
       icon: <X size={16} />,
       shortcut: 'Ctrl+W',
       keywords: ['close', 'exit'],
+      when: () => useProjectStore.getState().currentProject !== null,
       execute: async () => {
-        console.log('Close Project command executed');
+        const { isModified, setLoading, setError, setProject } = useProjectStore.getState();
+
+        try {
+          setLoading(true, 'close');
+
+          if (isModified) {
+            // For now, force close. In a full implementation,
+            // this would show a "Save changes?" dialog
+            await projectService.closeProjectForce();
+          } else {
+            await projectService.closeProject();
+          }
+
+          setProject(null, null);
+          setLoading(false);
+        } catch (error) {
+          console.error('Failed to close project:', error);
+          setError(error instanceof Error ? error.message : 'Failed to close project');
+        }
       },
     },
   ];

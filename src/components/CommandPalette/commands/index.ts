@@ -9,6 +9,7 @@ import { registerFileCommands } from './fileCommands';
 import { registerEditCommands } from './editCommands';
 import { registerViewCommands } from './viewCommands';
 import { registerSimulationCommands } from './simulationCommands';
+import { registerModbusCommands } from './modbusCommands';
 import { registerLadderCommands } from './ladderCommands';
 import { registerSettingsCommands } from './settingsCommands';
 import { registerHelpCommands } from './helpCommands';
@@ -30,6 +31,7 @@ export function registerAllCommands(): void {
   registerEditCommands();
   registerViewCommands();
   registerSimulationCommands();
+  registerModbusCommands();
   registerLadderCommands();
   registerSettingsCommands();
   registerHelpCommands();
@@ -51,6 +53,7 @@ export {
   registerEditCommands,
   registerViewCommands,
   registerSimulationCommands,
+  registerModbusCommands,
   registerLadderCommands,
   registerSettingsCommands,
   registerHelpCommands,
