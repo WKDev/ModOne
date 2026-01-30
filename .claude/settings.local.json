@@ -58,11 +58,28 @@
       "Bash(findstr:*)",
       "Bash(pnpm task-master:*)",
       "Bash(pnpm list:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(pnpm run check:*)",
+      "Bash(git -C /c/Users/chanh/Projects/ModOne log --oneline -15)",
+      "WebSearch",
+      "WebFetch(domain:www.manualslib.com)",
+      "WebFetch(domain:cdn.automationdirect.com)",
+      "Bash(python3:*)",
+      "Bash(pnpm test:*)",
+      "Bash(node -e:*)",
+      "Bash(pnpm run typecheck:*)",
+      "Bash(timeout 10 pnpm run dev:*)",
+      "mcp__task-master-ai__update_subtask",
+      "Bash(pnpm exec madge:*)",
+      "Bash(if not exist \"C:\\\\Users\\\\chanh\\\\Projects\\\\ModOne\\\\src\\\\stores\\\\__tests__\" mkdir \"C:\\\\Users\\\\chanh\\\\Projects\\\\ModOne\\\\src\\\\stores\\\\__tests__\")",
+      "Bash(git checkout:*)",
+      "Bash(pushd:*)",
+      "Bash(popd:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "task-master-ai"
-  ]
+  ],
+  "outputStyle": "default"
 }
