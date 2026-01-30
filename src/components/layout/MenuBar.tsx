@@ -104,7 +104,11 @@ const baseMenus: Menu[] = [
       { label: 'Copy', shortcut: 'Ctrl+C' },
       { label: 'Paste', shortcut: 'Ctrl+V' },
       { separator: true, label: '' },
-      { label: 'Preferences' },
+      {
+        label: 'Preferences',
+        shortcut: 'Ctrl+,',
+        action: () => commandRegistry.execute('settings.open'),
+      },
     ],
   },
   {
