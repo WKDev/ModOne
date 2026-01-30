@@ -128,6 +128,11 @@ impl MopFile {
 
     /// Save the temporary directory contents to a .mop file
     pub fn save(&mut self, path: &Path) -> Result<(), MopFileError> {
+        // Create parent directories if they don't exist
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
         let file = File::create(path)?;
         let writer = BufWriter::new(file);
         let mut zip = ZipWriter::new(writer);
