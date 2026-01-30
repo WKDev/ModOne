@@ -58,3 +58,8 @@ export {
   type PendingTabClose,
   type UseTabCloseResult,
 } from './useTabClose';
+export {
+  useWindowClose,
+  default as UseWindowClose,
+  type UseWindowCloseResult,
+} from './useWindowClose';

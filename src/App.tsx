@@ -6,9 +6,12 @@ import { useLayoutPersistenceStore } from './stores/layoutPersistenceStore';
 import { ThemeProvider } from './providers/ThemeProvider';
 import { PanelDndProvider } from './providers/PanelDndProvider';
 import { useStateSync } from './hooks/useStateSync';
+import { useWindowClose } from './hooks/useWindowClose';
 import { FloatingWindowContent } from './components/floating/FloatingWindowContent';
 import { FloatingWindowRenderer } from './components/floating/FloatingWindowRenderer';
 import { CommandPalette, useCommandPalette, registerAllCommands } from './components/CommandPalette';
+import { ProjectDialogProvider } from './contexts/ProjectDialogContext';
+import { UnsavedChangesDialog } from './components/project/UnsavedChangesDialog';
 
 /**
  * Parse URL parameters to detect floating window mode
@@ -40,6 +43,14 @@ function MainWindowContent() {
 
   // Command palette state (useCommandPalette hook handles Ctrl+Shift+P shortcut)
   const { isOpen: isPaletteOpen, close: closePalette } = useCommandPalette();
+
+  // Window close handling with unsaved changes detection
+  const {
+    isDialogOpen: isWindowCloseDialogOpen,
+    handleSaveAll: handleWindowCloseSaveAll,
+    handleDontSave: handleWindowCloseDontSave,
+    handleCancel: handleWindowCloseCancel,
+  } = useWindowClose();
 
   // Initialize cross-window state synchronization
   useStateSync();
@@ -88,15 +99,24 @@ function MainWindowContent() {
   }
 
   return (
-    <PanelDndProvider>
-      <MainLayout>
-        <PanelContainer />
-      </MainLayout>
-      {/* Floating window event listener (only needed in main window) */}
-      <FloatingWindowRenderer />
-      {/* Command Palette */}
-      <CommandPalette isOpen={isPaletteOpen} onClose={closePalette} />
-    </PanelDndProvider>
+    <ProjectDialogProvider>
+      <PanelDndProvider>
+        <MainLayout>
+          <PanelContainer />
+        </MainLayout>
+        {/* Floating window event listener (only needed in main window) */}
+        <FloatingWindowRenderer />
+        {/* Command Palette */}
+        <CommandPalette isOpen={isPaletteOpen} onClose={closePalette} />
+        {/* Window Close Unsaved Changes Dialog */}
+        <UnsavedChangesDialog
+          isOpen={isWindowCloseDialogOpen}
+          onSave={handleWindowCloseSaveAll}
+          onDontSave={handleWindowCloseDontSave}
+          onCancel={handleWindowCloseCancel}
+        />
+      </PanelDndProvider>
+    </ProjectDialogProvider>
   );
 }
 
