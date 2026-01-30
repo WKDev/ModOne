@@ -3,12 +3,14 @@
  *
  * Handles the file opening pipeline:
  * 1. Resolves file type from path
- * 2. Checks if file is already open in a tab
- * 3. Opens file in appropriate panel or activates existing tab
+ * 2. Checks if file is already open in a tab (or document registry)
+ * 3. Creates document in registry for document-based files
+ * 4. Opens file in appropriate panel or activates existing tab
  */
 
 import { useCallback } from 'react';
 import { usePanelStore } from '../stores/panelStore';
+import { useDocumentRegistry } from '../stores/documentRegistry';
 import type { PanelType } from '../types/panel';
 import type { ProjectFileNode } from '../types/fileTypes';
 import {
@@ -17,6 +19,11 @@ import {
   isProjectFile,
   getTabTitle,
 } from '../utils/fileTypeResolver';
+import {
+  getDocumentTypeFromPath,
+  shouldUseDocumentMode,
+  getFileNameWithoutExtension,
+} from '../utils/documentFactory';
 
 interface UseFileOpenResult {
   /** Open a file by its path */
@@ -36,6 +43,11 @@ export function useFileOpen(): UseFileOpenResult {
   const addTab = usePanelStore((state) => state.addTab);
   const setActiveTab = usePanelStore((state) => state.setActiveTab);
   const setActivePanel = usePanelStore((state) => state.setActivePanel);
+
+  // Document registry for multi-document editing
+  const createDocument = useDocumentRegistry((state) => state.createDocument);
+  const getDocumentByFilePath = useDocumentRegistry((state) => state.getDocumentByFilePath);
+  const setDocumentTab = useDocumentRegistry((state) => state.setDocumentTab);
 
   /**
    * Find a tab that has the given file path open.
@@ -123,11 +135,40 @@ export function useFileOpen(): UseFileOpenResult {
 
       // Create a new tab for the file
       const title = getTabTitle(relativePath || absolutePath);
-      addTab(panelId, panelType, title, {
+
+      // Check if this file type supports document-based editing
+      const documentType = getDocumentTypeFromPath(absolutePath);
+      const useDocumentMode = shouldUseDocumentMode(absolutePath);
+
+      let documentId: string | undefined;
+
+      if (useDocumentMode && documentType) {
+        // Check if document already exists in registry
+        const existingDoc = getDocumentByFilePath(absolutePath);
+        if (existingDoc) {
+          documentId = existingDoc.id;
+        } else {
+          // Create a new document in the registry
+          const docName = getFileNameWithoutExtension(absolutePath);
+          documentId = createDocument(documentType, docName);
+          // TODO: Load actual file content into document
+          // This will be handled when we implement file loading service
+        }
+      }
+
+      // Create tab with document reference
+      const tabId = addTab(panelId, panelType, title, {
         filePath: absolutePath,
         relativePath: relativePath,
         fileCategory: fileInfo.category,
+        documentId: documentId,
+        documentType: documentType || undefined,
       });
+
+      // Link document to tab if document was created
+      if (documentId && tabId) {
+        setDocumentTab(documentId, tabId);
+      }
 
       // Ensure the panel is active
       setActivePanel(panelId);
@@ -138,6 +179,9 @@ export function useFileOpen(): UseFileOpenResult {
       addTab,
       setActiveTab,
       setActivePanel,
+      createDocument,
+      getDocumentByFilePath,
+      setDocumentTab,
     ]
   );
 

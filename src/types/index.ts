@@ -68,3 +68,39 @@ export {
   MIN_FLOATING_WINDOW_SIZE,
   FLOATING_WINDOW_CASCADE_OFFSET,
 } from './window';
+
+// Document types (Multi-Document Editing)
+export type {
+  DocumentType,
+  DocumentStatus,
+  DocumentMeta,
+  HistorySnapshot,
+  CanvasHistoryData,
+  CanvasDocumentData,
+  CanvasDocumentState,
+  LadderHistoryData,
+  LadderDocumentData,
+  LadderDocumentState,
+  ScenarioHistoryData,
+  ScenarioDocumentData,
+  ScenarioDocumentState,
+  DocumentState,
+  DocumentActions,
+  DocumentInfo,
+  SerializableLadderNetwork,
+} from './document';
+
+export {
+  isCanvasDocument,
+  isLadderDocument,
+  isScenarioDocument,
+  DEFAULT_CANVAS_DATA,
+  DEFAULT_LADDER_DATA,
+  DEFAULT_SCENARIO_DATA,
+  generateDocumentId,
+  createDocumentMeta,
+  createEmptyCanvasDocument,
+  createEmptyLadderDocument,
+  createEmptyScenarioDocument,
+  getDocumentInfo,
+} from './document';

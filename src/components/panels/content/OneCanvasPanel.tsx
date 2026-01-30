@@ -3,9 +3,13 @@
  *
  * Panel content for the OneCanvas circuit simulation canvas.
  * Integrates SimulationToolbar, Toolbox, Canvas with blocks/wires, and DnD support.
+ *
+ * Supports both:
+ * 1. Document-based editing (multi-document via DocumentContext)
+ * 2. Global store editing (single document via useCanvasStore)
  */
 
-import { memo, useCallback, useRef, useState } from 'react';
+import { memo, useCallback, useRef, useState, useMemo } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -17,6 +21,8 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { useCanvasStore } from '../../../stores/canvasStore';
+import { useDocumentContext } from '../../../contexts/DocumentContext';
+import { useCanvasDocument } from '../../../stores/hooks/useCanvasDocument';
 import {
   Canvas,
   Toolbox,
@@ -32,6 +38,7 @@ import {
   type Position,
   type SelectionBoxState,
 } from '../../OneCanvas';
+import type { Wire as WireData } from '../../OneCanvas/types';
 
 // Import simulation styles
 import '../../OneCanvas/styles/simulation.css';
@@ -157,26 +164,77 @@ const WireRenderer = memo(function WireRenderer({
 });
 
 // ============================================================================
+// Canvas State Hook (Document or Global)
+// ============================================================================
+
+/**
+ * Hook that returns canvas state from either document registry or global store.
+ * This allows OneCanvasPanel to work in both modes seamlessly.
+ */
+function useCanvasState(documentId: string | null) {
+  // Try document-based state first
+  const documentState = useCanvasDocument(documentId);
+
+  // Global store state (used when no document)
+  const globalComponents = useCanvasStore((state) => state.components);
+  const globalWires = useCanvasStore((state) => state.wires);
+  const globalZoom = useCanvasStore((state) => state.zoom);
+  const globalPan = useCanvasStore((state) => state.pan);
+  const globalAddComponent = useCanvasStore((state) => state.addComponent);
+
+  // Return document state if available, otherwise global state
+  return useMemo(() => {
+    if (documentState) {
+      return {
+        components: documentState.components,
+        wires: documentState.wires,
+        zoom: documentState.zoom,
+        pan: documentState.pan,
+        addComponent: documentState.addComponent,
+        isDocumentMode: true,
+      };
+    }
+
+    return {
+      components: globalComponents,
+      wires: globalWires,
+      zoom: globalZoom,
+      pan: globalPan,
+      addComponent: globalAddComponent,
+      isDocumentMode: false,
+    };
+  }, [
+    documentState,
+    globalComponents,
+    globalWires,
+    globalZoom,
+    globalPan,
+    globalAddComponent,
+  ]);
+}
+
+// ============================================================================
 // Component
 // ============================================================================
 
 export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPanelProps) {
   const canvasRef = useRef<CanvasRef>(null);
 
-  // Store selectors
-  const components = useCanvasStore((state) => state.components);
-  const wires = useCanvasStore((state) => state.wires);
+  // Get document context (may be null if not in document mode)
+  const { documentId } = useDocumentContext();
+
+  // Get canvas state (from document or global store)
+  const { components, wires, zoom, pan, addComponent } = useCanvasState(documentId);
+
+  // Wire drawing state from global store (shared across modes for now)
   const wireDrawing = useCanvasStore((state) => state.wireDrawing);
   const selectedIds = useCanvasStore((state) => state.selectedIds);
-  const zoom = useCanvasStore((state) => state.zoom);
-  const pan = useCanvasStore((state) => state.pan);
-  const addComponent = useCanvasStore((state) => state.addComponent);
 
   // Convert Map to Array for simulation
-  const componentsArray = Array.from(components.values());
+  const componentsArray = useMemo(() => Array.from(components.values()), [components]);
 
   // Simulation hook
-  const simulation = useSimulation(componentsArray, wires);
+  const simulation = useSimulation(componentsArray, wires as WireData[]);
 
   // Keyboard shortcuts
   useCanvasKeyboardShortcuts();
