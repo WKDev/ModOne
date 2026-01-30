@@ -7,4 +7,7 @@ export { canvasService, default as CanvasService, CanvasServiceError } from './c
 export { scenarioService, default as ScenarioService } from './scenarioService';
 export { parserService, default as ParserService } from './parserService';
 export { explorerService, default as ExplorerService, ExplorerServiceError } from './explorerService';
+export { projectDialogService, default as ProjectDialogService } from './projectDialogService';
+export { fileDialogService, default as FileDialogService } from './fileDialogService';
 export type { LogEntry } from './loggingService';
+export type { FileType, NewFileRequest } from './fileDialogService';

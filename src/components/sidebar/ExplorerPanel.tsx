@@ -29,6 +29,7 @@ import { useExplorerStore } from '../../stores/explorerStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useFileOpen } from '../../hooks/useFileOpen';
 import { getFolderIcon } from '../../utils/fileTypeResolver';
+import { fileDialogService } from '../../services/fileDialogService';
 import type { ProjectFileNode, FileTypeInfo } from '../../types/fileTypes';
 import {
   ExplorerContextMenu,
@@ -316,6 +317,18 @@ export function ExplorerPanel() {
           } catch (err) {
             console.error('Failed to open file explorer:', err);
           }
+          break;
+
+        case 'newCanvas':
+          fileDialogService.requestNewCanvas(node.absolutePath);
+          break;
+
+        case 'newLadder':
+          fileDialogService.requestNewLadder(node.absolutePath);
+          break;
+
+        case 'newScenario':
+          fileDialogService.requestNewScenario(node.absolutePath);
           break;
       }
     },

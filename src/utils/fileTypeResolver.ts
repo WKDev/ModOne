@@ -95,7 +95,23 @@ const FILE_TYPE_MAP: Record<string, FileTypeInfo> = {
  * Context-aware file type overrides based on parent directory.
  */
 const CONTEXT_OVERRIDES: Record<string, Partial<FileTypeInfo>> = {
-  // Files in one_canvas directory
+  // Files in canvas directory (v2.0 folder-based projects)
+  'canvas/.yaml': {
+    category: 'canvas',
+    panelType: 'one-canvas',
+    icon: 'CircuitBoard',
+    color: 'text-cyan-500',
+    description: 'Circuit Canvas',
+  },
+  'canvas/.yml': {
+    category: 'canvas',
+    panelType: 'one-canvas',
+    icon: 'CircuitBoard',
+    color: 'text-cyan-500',
+    description: 'Circuit Canvas',
+  },
+
+  // Files in one_canvas directory (legacy projects)
   'one_canvas/.yaml': {
     category: 'canvas',
     panelType: 'one-canvas',
@@ -119,8 +135,24 @@ const CONTEXT_OVERRIDES: Record<string, Partial<FileTypeInfo>> = {
     color: 'text-pink-500',
     description: 'Test Scenario',
   },
+  'scenario/.csv': {
+    category: 'scenario',
+    panelType: 'scenario-editor',
+    icon: 'PlayCircle',
+    color: 'text-pink-500',
+    description: 'Test Scenario',
+  },
 
-  // Files in plc_csv directory
+  // Files in ladder directory (v2.0 folder-based projects)
+  'ladder/.csv': {
+    category: 'ladder',
+    panelType: 'ladder-editor',
+    icon: 'Workflow',
+    color: 'text-blue-500',
+    description: 'Ladder Logic Program',
+  },
+
+  // Files in plc_csv directory (legacy projects)
   'plc_csv/.csv': {
     category: 'memory-map',
     panelType: 'csv-viewer',
@@ -134,10 +166,13 @@ const CONTEXT_OVERRIDES: Record<string, Partial<FileTypeInfo>> = {
  * Folder icons by name.
  */
 export const FOLDER_ICONS: Record<string, { icon: string; color: string }> = {
-  one_canvas: { icon: 'CircuitBoard', color: 'text-cyan-500' },
-  scenario: { icon: 'PlayCircle', color: 'text-pink-500' },
-  plc_csv: { icon: 'Database', color: 'text-violet-500' },
+  // v2.0 folder-based project directories
+  canvas: { icon: 'CircuitBoard', color: 'text-cyan-500' },
   ladder: { icon: 'Workflow', color: 'text-blue-500' },
+  scenario: { icon: 'PlayCircle', color: 'text-pink-500' },
+  // Legacy project directories
+  one_canvas: { icon: 'CircuitBoard', color: 'text-cyan-500' },
+  plc_csv: { icon: 'Database', color: 'text-violet-500' },
 };
 
 /**

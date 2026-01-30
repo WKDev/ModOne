@@ -3,8 +3,12 @@
 //! This module provides commands for listing and exploring project file structures.
 
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::fs::{self, File};
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use tauri::State;
+
+use crate::project::SharedProjectManager;
 
 // ============================================================================
 // Types
@@ -199,4 +203,114 @@ pub async fn get_file_info(path: String) -> Result<FileNode, String> {
         is_dir,
         children: None,
     })
+}
+
+// ============================================================================
+// File Creation Commands
+// ============================================================================
+
+/// Default template content for canvas YAML files
+const CANVAS_TEMPLATE: &str = r#"# ModOne Canvas File
+# Version: 1.0
+version: "1.0"
+blocks: []
+wires: []
+"#;
+
+/// Default template content for ladder CSV files
+const LADDER_TEMPLATE: &str = "Address,Symbol,Comment\n";
+
+/// Default template content for scenario CSV files
+const SCENARIO_TEMPLATE: &str = "Time,Address,Value,Comment\n";
+
+/// Create a new project file (canvas, ladder, or scenario)
+///
+/// # Arguments
+/// * `state` - Shared project manager state
+/// * `file_type` - Type of file to create: "canvas", "ladder", or "scenario"
+/// * `file_name` - Name for the new file (without extension)
+/// * `target_dir` - Optional target directory path (if not specified, uses the default directory for the file type)
+///
+/// # Returns
+/// The full path to the created file
+#[tauri::command]
+pub async fn create_project_file(
+    state: State<'_, SharedProjectManager>,
+    file_type: String,
+    file_name: String,
+    target_dir: Option<String>,
+) -> Result<String, String> {
+    // Validate file type
+    let (extension, template, default_dir) = match file_type.as_str() {
+        "canvas" => (".yaml", CANVAS_TEMPLATE, "canvas"),
+        "ladder" => (".csv", LADDER_TEMPLATE, "ladder"),
+        "scenario" => (".csv", SCENARIO_TEMPLATE, "scenario"),
+        _ => return Err(format!("Invalid file type: {}. Must be 'canvas', 'ladder', or 'scenario'", file_type)),
+    };
+
+    // Validate file name
+    if file_name.is_empty() {
+        return Err("File name cannot be empty".to_string());
+    }
+
+    // Check for invalid characters in file name
+    let invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
+    if file_name.chars().any(|c| invalid_chars.contains(&c)) {
+        return Err(format!("File name contains invalid characters: {:?}", invalid_chars));
+    }
+
+    // Get the project manager
+    let manager = state.lock().map_err(|e| format!("Failed to lock project manager: {}", e))?;
+
+    // Get the current project
+    let project = manager.get_current_project().ok_or("No project is currently open")?;
+
+    // Determine the target directory
+    let target_path = if let Some(dir) = target_dir {
+        PathBuf::from(dir)
+    } else {
+        // Use the default directory based on project storage
+        match &project.storage {
+            crate::project::ProjectStorage::Folder(folder_project) => {
+                match file_type.as_str() {
+                    "canvas" => folder_project.canvas_dir(),
+                    "ladder" => folder_project.ladder_dir(),
+                    "scenario" => folder_project.scenario_dir(),
+                    _ => unreachable!(),
+                }
+            }
+            crate::project::ProjectStorage::LegacyZip(mop_file) => {
+                // For legacy projects, use the root path + default dir name
+                mop_file.root_path().join(default_dir)
+            }
+        }
+    };
+
+    // Ensure the target directory exists
+    if !target_path.exists() {
+        fs::create_dir_all(&target_path)
+            .map_err(|e| format!("Failed to create directory: {}", e))?;
+    }
+
+    // Construct the full file path
+    let file_name_with_ext = if file_name.ends_with(extension) {
+        file_name
+    } else {
+        format!("{}{}", file_name, extension)
+    };
+    let file_path = target_path.join(&file_name_with_ext);
+
+    // Check if file already exists
+    if file_path.exists() {
+        return Err(format!("File already exists: {}", file_path.display()));
+    }
+
+    // Create the file with template content
+    let mut file = File::create(&file_path)
+        .map_err(|e| format!("Failed to create file: {}", e))?;
+
+    file.write_all(template.as_bytes())
+        .map_err(|e| format!("Failed to write file content: {}", e))?;
+
+    Ok(file_path.to_string_lossy().to_string())
 }

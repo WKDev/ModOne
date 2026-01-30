@@ -8,6 +8,7 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import type { ProjectFileNode, FileNodeResult } from '../types/fileTypes';
 import { resolveFileType } from '../utils/fileTypeResolver';
+import { explorerService } from '../services/explorerService';
 
 interface ExplorerState {
   /** The file tree structure */
@@ -27,6 +28,8 @@ interface ExplorerState {
 interface ExplorerActions {
   /** Load the file structure from a project directory */
   loadProjectStructure: (projectRoot: string, files: FileNodeResult[]) => void;
+  /** Refresh the file tree from the current project root */
+  refreshFileTree: () => Promise<void>;
   /** Toggle a folder's expanded state */
   toggleFolder: (path: string) => void;
   /** Expand a specific folder */
@@ -123,6 +126,40 @@ export const useExplorerStore = create<ExplorerStore>()(
           false,
           'loadProjectStructure'
         );
+      },
+
+      refreshFileTree: async () => {
+        const { projectRoot, expandedPaths } = get();
+        if (!projectRoot) {
+          return;
+        }
+
+        set({ isLoading: true }, false, 'refreshFileTree:start');
+
+        try {
+          const files = await explorerService.listProjectFiles(projectRoot);
+          const fileTree = files.map(convertFileNode);
+
+          // Preserve expanded state
+          set(
+            {
+              fileTree,
+              isLoading: false,
+              error: null,
+              // Keep the existing expanded paths
+              expandedPaths,
+            },
+            false,
+            'refreshFileTree:success'
+          );
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Failed to refresh file tree';
+          set(
+            { error: message, isLoading: false },
+            false,
+            'refreshFileTree:error'
+          );
+        }
       },
 
       toggleFolder: (path) => {

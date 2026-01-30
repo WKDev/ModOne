@@ -24,6 +24,15 @@ class CommandRegistry {
   /** Subscribers for registry changes */
   private subscribers: Set<() => void> = new Set();
 
+  /** Cached snapshot of all commands (for useSyncExternalStore) */
+  private cachedAllCommands: Command[] | null = null;
+
+  /** Cached snapshot of recent commands base array */
+  private cachedRecentCommands: Command[] | null = null;
+
+  /** Cached sliced recent commands by limit (for useSyncExternalStore) */
+  private cachedRecentByLimit: Map<number, Command[]> = new Map();
+
   /**
    * Register a command with the registry.
    * @param command The command to register
@@ -64,12 +73,16 @@ class CommandRegistry {
 
   /**
    * Get all available commands (filtered by when() condition).
+   * Returns a cached snapshot to prevent infinite loops with useSyncExternalStore.
    * @returns Array of all available commands
    */
   getAll(): Command[] {
-    return Array.from(this.commands.values()).filter(
-      (cmd) => !cmd.when || cmd.when()
-    );
+    if (this.cachedAllCommands === null) {
+      this.cachedAllCommands = Array.from(this.commands.values()).filter(
+        (cmd) => !cmd.when || cmd.when()
+      );
+    }
+    return this.cachedAllCommands;
   }
 
   /**
@@ -230,14 +243,29 @@ class CommandRegistry {
 
   /**
    * Get recently executed commands.
+   * Returns a cached snapshot to prevent infinite loops with useSyncExternalStore.
    * @param limit Maximum number of recent commands to return
    * @returns Array of recent commands (most recent first)
    */
   getRecent(limit = 5): Command[] {
-    return this.recentCommands
-      .slice(0, limit)
-      .map((id) => this.commands.get(id))
-      .filter((cmd): cmd is Command => cmd !== undefined && (!cmd.when || cmd.when()));
+    // Check if we have a cached slice for this limit
+    const cachedSlice = this.cachedRecentByLimit.get(limit);
+    if (cachedSlice !== undefined) {
+      return cachedSlice;
+    }
+
+    // Build base cache if needed
+    if (this.cachedRecentCommands === null) {
+      this.cachedRecentCommands = this.recentCommands
+        .slice(0, this.MAX_RECENT)
+        .map((id) => this.commands.get(id))
+        .filter((cmd): cmd is Command => cmd !== undefined && (!cmd.when || cmd.when()));
+    }
+
+    // Cache and return the sliced version
+    const sliced = this.cachedRecentCommands.slice(0, limit);
+    this.cachedRecentByLimit.set(limit, sliced);
+    return sliced;
   }
 
   /**
@@ -262,8 +290,13 @@ class CommandRegistry {
 
   /**
    * Notify all subscribers of a change.
+   * Invalidates caches to ensure fresh data on next snapshot.
    */
   private notifySubscribers(): void {
+    // Invalidate caches when data changes
+    this.cachedAllCommands = null;
+    this.cachedRecentCommands = null;
+    this.cachedRecentByLimit.clear();
     this.subscribers.forEach((callback) => callback());
   }
 
@@ -289,6 +322,9 @@ class CommandRegistry {
   clear(): void {
     this.commands.clear();
     this.recentCommands = [];
+    this.cachedAllCommands = null;
+    this.cachedRecentCommands = null;
+    this.cachedRecentByLimit.clear();
     this.notifySubscribers();
   }
 }

@@ -105,6 +105,37 @@ export const explorerService = {
       );
     }
   },
+
+  /**
+   * Create a new project file (canvas, ladder, or scenario).
+   *
+   * @param fileType - Type of file to create: 'canvas', 'ladder', or 'scenario'
+   * @param fileName - Name for the new file (without extension)
+   * @param targetDir - Optional target directory path
+   * @returns Full path to the created file
+   * @throws ExplorerServiceError if creation fails
+   */
+  async createProjectFile(
+    fileType: 'canvas' | 'ladder' | 'scenario',
+    fileName: string,
+    targetDir?: string
+  ): Promise<string> {
+    try {
+      return await invoke<string>('create_project_file', {
+        fileType,
+        fileName,
+        targetDir,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      throw new ExplorerServiceError(
+        `Failed to create ${fileType} file: ${message}`,
+        'createProjectFile',
+        targetDir,
+        error instanceof Error ? error : undefined
+      );
+    }
+  },
 };
 
 export default explorerService;

@@ -47,6 +47,12 @@ interface PanelStoreActions {
     dropPosition: DropPosition
   ) => boolean;
   mergePanelAsTabs: (targetPanelId: string, sourcePanelId: string) => boolean;
+  /** Merge docked panels - handles both center (tab merge) and edge (split) drops */
+  mergeDockedPanels: (
+    targetPanelId: string,
+    sourcePanelId: string,
+    dropPosition: DropPosition
+  ) => boolean;
   removePanelFromGrid: (panelId: string) => void;
   // File-based tab helpers
   findTabByFilePath: (filePath: string) => { panelId: string; tab: TabState } | null;
@@ -645,6 +651,30 @@ export const usePanelStore = create<PanelStore>()(
           false,
           'removePanelFromGrid'
         );
+      },
+
+      mergeDockedPanels: (targetPanelId, sourcePanelId, dropPosition) => {
+        const { panels, splitPanel, mergePanelAsTabs } = get();
+        const targetPanel = panels.find((p) => p.id === targetPanelId);
+        const sourcePanel = panels.find((p) => p.id === sourcePanelId);
+
+        // Both panels must exist and be docked (not floating)
+        if (!targetPanel || !sourcePanel) {
+          return false;
+        }
+
+        // Don't merge a panel with itself
+        if (targetPanelId === sourcePanelId) {
+          return false;
+        }
+
+        if (dropPosition === 'center') {
+          // Merge as tabs
+          return mergePanelAsTabs(targetPanelId, sourcePanelId);
+        } else {
+          // Split operation for edge drops
+          return splitPanel(targetPanelId, sourcePanelId, dropPosition);
+        }
       },
 
       // File-based tab helpers

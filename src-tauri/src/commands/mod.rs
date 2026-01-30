@@ -97,7 +97,7 @@ pub use sim::{
 
 // Re-export explorer commands
 pub use explorer::{
-    list_project_files, read_file_contents, path_exists, get_file_info,
+    list_project_files, read_file_contents, path_exists, get_file_info, create_project_file,
 };
 
 // Re-export window commands and state

@@ -130,33 +130,42 @@ export function PanelDndProvider({ children }: PanelDndProviderProps) {
   }, []);
 
   const handleDragMove = useCallback((event: DragMoveEvent) => {
-    // Track pointer position during drag
-    const pointerEvent = event.activatorEvent as PointerEvent;
-    if (pointerEvent) {
+    // Track pointer position during drag using activator + delta
+    const activatorEvent = event.activatorEvent as PointerEvent;
+    const { delta } = event;
+
+    if (activatorEvent && delta) {
       lastPointerPosition.current = {
-        clientX: pointerEvent.clientX,
-        clientY: pointerEvent.clientY,
+        clientX: activatorEvent.clientX + delta.x,
+        clientY: activatorEvent.clientY + delta.y,
       };
     }
   }, []);
 
   const handleDragOver = useCallback((event: DragOverEvent) => {
-    const { over, active } = event;
-    const pointerEvent = event.activatorEvent as PointerEvent;
+    const { over, active, delta } = event;
+    const activatorEvent = event.activatorEvent as PointerEvent;
 
-    // Update last pointer position
-    if (pointerEvent) {
+    // Calculate current pointer position from activator event + delta
+    // The activatorEvent is the initial event, delta is the movement since
+    let currentX = 0;
+    let currentY = 0;
+
+    if (activatorEvent && delta) {
+      currentX = activatorEvent.clientX + delta.x;
+      currentY = activatorEvent.clientY + delta.y;
       lastPointerPosition.current = {
-        clientX: pointerEvent.clientX,
-        clientY: pointerEvent.clientY,
+        clientX: currentX,
+        clientY: currentY,
       };
+    } else if (lastPointerPosition.current) {
+      currentX = lastPointerPosition.current.clientX;
+      currentY = lastPointerPosition.current.clientY;
     }
 
     // Check if outside main window using current pointer position
-    const clientX = lastPointerPosition.current?.clientX ?? 0;
-    const clientY = lastPointerPosition.current?.clientY ?? 0;
-    const isOutside = checkPosition(clientX, clientY);
-    const screenPos = getScreenPosition(clientX, clientY);
+    const isOutside = checkPosition(currentX, currentY);
+    const screenPos = getScreenPosition(currentX, currentY);
 
     if (isOutside) {
       setDragState((prev) => ({
@@ -194,14 +203,14 @@ export function PanelDndProvider({ children }: PanelDndProviderProps) {
       return;
     }
 
-    // Calculate drop position from pointer position
+    // Calculate drop position from current pointer position
     const overRect = over.rect;
 
     let dropPosition: DropPosition = 'center';
-    if (overRect && pointerEvent) {
+    if (overRect && currentX !== 0 && currentY !== 0) {
       dropPosition = getDropPosition(
-        pointerEvent.clientX,
-        pointerEvent.clientY,
+        currentX,
+        currentY,
         overRect as unknown as DOMRect
       );
     }

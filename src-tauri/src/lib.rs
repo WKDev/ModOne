@@ -74,7 +74,7 @@ use commands::{
     sim_remove_watch, sim_reset, sim_resume, sim_run, sim_step, sim_stop, sim_write_device,
     SimState,
     // Explorer commands
-    list_project_files, read_file_contents, path_exists, get_file_info,
+    list_project_files, read_file_contents, path_exists, get_file_info, create_project_file,
     // Window commands
     window_create_floating, window_close_floating, window_update_bounds,
     window_focus_floating, window_list_floating, window_get_floating_info,
@@ -298,6 +298,7 @@ pub fn run() {
             read_file_contents,
             path_exists,
             get_file_info,
+            create_project_file,
             // Window commands
             window_create_floating,
             window_close_floating,
