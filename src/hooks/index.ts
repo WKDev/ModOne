@@ -52,3 +52,9 @@ export {
   type DeviceChangeEvent,
 } from './useSimulation';
 export { useFileOpen, default as UseFileOpen } from './useFileOpen';
+export {
+  useTabClose,
+  default as UseTabClose,
+  type PendingTabClose,
+  type UseTabCloseResult,
+} from './useTabClose';

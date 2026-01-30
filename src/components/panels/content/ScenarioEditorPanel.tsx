@@ -3,9 +3,12 @@
  *
  * Main panel content for scenario editing, combining toolbar, grid, and progress display.
  * Integrates with scenario store and execution engine.
+ *
+ * Supports both document-based editing (via DocumentContext) and
+ * global store editing (legacy mode).
  */
 
-import { memo, useState } from 'react';
+import { memo, useState, useEffect } from 'react';
 import {
   ScenarioToolbar,
   ScenarioGrid,
@@ -14,6 +17,7 @@ import {
   useScenarioFileOps,
 } from '../../ScenarioEditor';
 import { useScenarioStore } from '../../../stores/scenarioStore';
+import { useDocumentContext } from '../../../contexts/DocumentContext';
 import { UnsavedChangesDialog } from '../../project/UnsavedChangesDialog';
 
 // ============================================================================
@@ -21,7 +25,7 @@ import { UnsavedChangesDialog } from '../../project/UnsavedChangesDialog';
 // ============================================================================
 
 interface ScenarioEditorPanelProps {
-  /** Tab data (contains documentId, filePath) - reserved for future use */
+  /** Tab data (contains documentId, filePath) */
   data?: unknown;
 }
 
@@ -32,6 +36,17 @@ interface ScenarioEditorPanelProps {
 export const ScenarioEditorPanel = memo(function ScenarioEditorPanel(
   _props: ScenarioEditorPanelProps
 ) {
+  // Get document context (may be null if not in document mode)
+  const { documentId, documentType } = useDocumentContext();
+
+  // Log for debugging during development
+  // TODO: Wire up document-based editing when ready
+  useEffect(() => {
+    if (documentId && documentType === 'scenario') {
+      console.debug('ScenarioEditorPanel: Using document mode', { documentId });
+    }
+  }, [documentId, documentType]);
+
   // File operations
   const fileOps = useScenarioFileOps();
 

@@ -3,6 +3,8 @@ import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Tab } from './Tab';
 import { TabState } from '../../types/tab';
 import { usePanelStore } from '../../stores/panelStore';
+import { useTabClose } from '../../hooks/useTabClose';
+import { UnsavedChangesDialog } from '../project/UnsavedChangesDialog';
 
 export interface TabBarProps {
   panelId: string;
@@ -25,7 +27,16 @@ export function TabBar({
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
-  const { setActiveTab, removeTab, reorderTabs } = usePanelStore();
+  const { setActiveTab, reorderTabs } = usePanelStore();
+
+  // Tab close handling with unsaved changes support
+  const {
+    isDialogOpen,
+    requestClose,
+    handleSave,
+    handleDontSave,
+    handleCancel,
+  } = useTabClose();
 
   // Check scroll state
   const updateScrollState = useCallback(() => {
@@ -61,7 +72,10 @@ export function TabBar({
   };
 
   const handleTabClose = (tabId: string) => {
-    removeTab(panelId, tabId);
+    const tab = tabs.find((t) => t.id === tabId);
+    if (tab) {
+      requestClose(panelId, tab);
+    }
   };
 
   const handleTabContextMenu = (tabId: string, e: React.MouseEvent) => {
@@ -199,6 +213,14 @@ export function TabBar({
           <Plus size={14} />
         </button>
       )}
+
+      {/* Unsaved Changes Dialog */}
+      <UnsavedChangesDialog
+        isOpen={isDialogOpen}
+        onSave={handleSave}
+        onDontSave={handleDontSave}
+        onCancel={handleCancel}
+      />
     </div>
   );
 }

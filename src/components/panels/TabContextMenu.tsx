@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import { X, XCircle, Trash2, ArrowRight, Copy, ExternalLink } from 'lucide-react';
 import { TabContextAction, TAB_CONTEXT_MENU_ITEMS } from '../../types/tab';
 import { usePanelStore } from '../../stores/panelStore';
+import { useTabClose } from '../../hooks/useTabClose';
+import { UnsavedChangesDialog } from '../project/UnsavedChangesDialog';
 
 export interface TabContextMenuProps {
   panelId: string;
@@ -30,8 +32,17 @@ export function TabContextMenu({
   onClose,
 }: TabContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
-  const { removeTab, closeOtherTabs, closeAllTabs, closeTabsToRight, duplicateTab, moveTabToNewPanel } =
+  const { closeOtherTabs, closeAllTabs, closeTabsToRight, duplicateTab, moveTabToNewPanel } =
     usePanelStore();
+
+  // Tab close handling with unsaved changes support
+  const {
+    isDialogOpen,
+    requestCloseById,
+    handleSave,
+    handleDontSave,
+    handleCancel,
+  } = useTabClose();
 
   // Close on outside click or Escape
   useEffect(() => {
@@ -82,15 +93,19 @@ export function TabContextMenu({
   const handleAction = (action: TabContextAction) => {
     switch (action) {
       case 'close':
-        removeTab(panelId, tabId);
+        // Use safe close which checks for dirty documents
+        requestCloseById(panelId, tabId);
         break;
       case 'closeOthers':
+        // TODO: Implement batch close with dirty check
         closeOtherTabs(panelId, tabId);
         break;
       case 'closeAll':
+        // TODO: Implement batch close with dirty check
         closeAllTabs(panelId);
         break;
       case 'closeToRight':
+        // TODO: Implement batch close with dirty check
         closeTabsToRight(panelId, tabId);
         break;
       case 'duplicate':
@@ -115,39 +130,49 @@ export function TabContextMenu({
   };
 
   return (
-    <div
-      ref={menuRef}
-      className="fixed z-50 min-w-[180px] py-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl"
-      style={{ left: position.x, top: position.y }}
-    >
-      {TAB_CONTEXT_MENU_ITEMS.map((item, index) => {
-        const disabled = isActionDisabled(item.action);
+    <>
+      <div
+        ref={menuRef}
+        className="fixed z-50 min-w-[180px] py-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl"
+        style={{ left: position.x, top: position.y }}
+      >
+        {TAB_CONTEXT_MENU_ITEMS.map((item, index) => {
+          const disabled = isActionDisabled(item.action);
 
-        return (
-          <div key={item.action}>
-            {item.separator && index > 0 && (
-              <div className="my-1 border-t border-gray-700" />
-            )}
-            <button
-              className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left
-                ${disabled
-                  ? 'text-gray-500 cursor-not-allowed'
-                  : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                }`}
-              onClick={() => !disabled && handleAction(item.action)}
-              disabled={disabled}
-            >
-              <span className="w-4 h-4 flex items-center justify-center text-gray-400">
-                {ACTION_ICONS[item.action]}
-              </span>
-              <span className="flex-1">{item.label}</span>
-              {item.shortcut && (
-                <span className="text-xs text-gray-500">{item.shortcut}</span>
+          return (
+            <div key={item.action}>
+              {item.separator && index > 0 && (
+                <div className="my-1 border-t border-gray-700" />
               )}
-            </button>
-          </div>
-        );
-      })}
-    </div>
+              <button
+                className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left
+                  ${disabled
+                    ? 'text-gray-500 cursor-not-allowed'
+                    : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                  }`}
+                onClick={() => !disabled && handleAction(item.action)}
+                disabled={disabled}
+              >
+                <span className="w-4 h-4 flex items-center justify-center text-gray-400">
+                  {ACTION_ICONS[item.action]}
+                </span>
+                <span className="flex-1">{item.label}</span>
+                {item.shortcut && (
+                  <span className="text-xs text-gray-500">{item.shortcut}</span>
+                )}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Unsaved Changes Dialog */}
+      <UnsavedChangesDialog
+        isOpen={isDialogOpen}
+        onSave={handleSave}
+        onDontSave={handleDontSave}
+        onCancel={handleCancel}
+      />
+    </>
   );
 }
