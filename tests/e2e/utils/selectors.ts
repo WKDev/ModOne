@@ -144,6 +144,16 @@ export const selectors = {
   errorMessage: '[data-testid="error-message"]',
   loadingSpinner: '[data-testid="loading-spinner"]',
   notification: '[data-testid="notification"]',
+
+  // Floating Windows
+  panelUndockBtn: (panelId: string) => `[data-testid="panel-undock-${panelId}"]`,
+  floatingWindow: '[data-floating-window]',
+  floatingWindowHeader: '[data-testid="floating-window-header"]',
+  floatingWindowDockBtn: '[data-testid="floating-dock-btn"]',
+  floatingWindowMinBtn: '[data-testid="floating-minimize-btn"]',
+  floatingWindowMaxBtn: '[data-testid="floating-maximize-btn"]',
+  floatingWindowCloseBtn: '[data-testid="floating-close-btn"]',
+  floatingWindowDragHandle: '[data-testid="floating-drag-handle"]',
 } as const;
 
 export type SelectorKey = keyof typeof selectors;

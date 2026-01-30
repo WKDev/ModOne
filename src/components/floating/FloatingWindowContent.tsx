@@ -107,6 +107,8 @@ export function FloatingWindowContent({
     <div className="h-screen w-screen flex flex-col bg-gray-900 overflow-hidden">
       <FloatingWindowHeader
         title={panel.title}
+        windowId={windowId}
+        panelId={panelId}
         onDock={handleDock}
         onMinimize={handleMinimize}
         onMaximize={handleMaximize}

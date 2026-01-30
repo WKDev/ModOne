@@ -2,14 +2,30 @@
  * Floating Window Header
  *
  * Header component for floating windows with title bar and control buttons.
- * Supports Tauri drag region for window movement.
+ * Supports Tauri drag region for window movement and HTML5 drag for dock-to-main.
  */
 
-import { ArrowDownLeft, Minus, Square, X } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { ArrowDownLeft, Minus, Square, X, GripVertical } from 'lucide-react';
+
+/** Data transferred when dragging a floating panel to dock */
+export interface FloatingPanelDragData {
+  windowId: string;
+  panelId: string;
+  type: 'floating-to-dock';
+  title: string;
+}
+
+/** MIME type for floating panel drag data */
+export const FLOATING_PANEL_MIME_TYPE = 'application/x-floating-panel';
 
 interface FloatingWindowHeaderProps {
   /** Window title */
   title: string;
+  /** ID of the Tauri window */
+  windowId: string;
+  /** ID of the panel in this window */
+  panelId: string;
   /** Callback to dock the window back to main */
   onDock: () => void;
   /** Callback to minimize the window */
@@ -22,19 +38,54 @@ interface FloatingWindowHeaderProps {
 
 export function FloatingWindowHeader({
   title,
+  windowId,
+  panelId,
   onDock,
   onMinimize,
   onMaximize,
   onClose,
 }: FloatingWindowHeaderProps) {
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragStart = useCallback(
+    (e: React.DragEvent) => {
+      const dragData: FloatingPanelDragData = {
+        windowId,
+        panelId,
+        type: 'floating-to-dock',
+        title,
+      };
+      e.dataTransfer.setData(FLOATING_PANEL_MIME_TYPE, JSON.stringify(dragData));
+      e.dataTransfer.effectAllowed = 'move';
+      setIsDragging(true);
+    },
+    [windowId, panelId, title]
+  );
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
   return (
     <div
-      className="h-8 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-2 select-none flex-shrink-0"
-      data-tauri-drag-region
+      className={`h-8 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-2 select-none flex-shrink-0 ${
+        isDragging ? 'opacity-50' : ''
+      }`}
     >
-      {/* Title - clickable area for dragging */}
+      {/* Drag handle for dock-to-main */}
+      <div
+        draggable
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        className="flex items-center justify-center w-6 h-full cursor-grab hover:bg-gray-700 rounded transition-colors"
+        title="Drag to dock in main window"
+      >
+        <GripVertical size={14} className="text-gray-400" />
+      </div>
+
+      {/* Title - Tauri drag region for window movement */}
       <span
-        className="text-sm text-gray-200 truncate flex-1"
+        className="text-sm text-gray-200 truncate flex-1 ml-1"
         data-tauri-drag-region
       >
         {title}

@@ -9,3 +9,4 @@ export { usePlcOutBlock, usePlcInBlock, useCoilSubscription, useDiscreteSubscrip
 export { useSimulation } from './useSimulation';
 export { useCanvasKeyboardShortcuts } from './useCanvasKeyboardShortcuts';
 export { useSelectionHandler } from './useSelectionHandler';
+export { useScopeData } from './useScopeData';

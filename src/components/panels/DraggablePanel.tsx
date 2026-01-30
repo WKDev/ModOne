@@ -1,9 +1,15 @@
+import { useCallback, useState } from 'react';
 import { useDraggable, useDroppable, DraggableAttributes } from '@dnd-kit/core';
 import { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 import { GripVertical } from 'lucide-react';
-import { PanelDragData } from '../../types/dnd';
+import { PanelDragData, DropPosition } from '../../types/dnd';
 import { PanelState } from '../../types/panel';
 import { usePanelDnd } from '../../providers/PanelDndProvider';
+import { usePanelStore } from '../../stores/panelStore';
+import {
+  FLOATING_PANEL_MIME_TYPE,
+  type FloatingPanelDragData,
+} from '../floating/FloatingWindowHeader';
 
 export interface DraggablePanelProps {
   panel: PanelState;
@@ -17,6 +23,11 @@ export function DraggablePanel({
   children,
 }: DraggablePanelProps) {
   const { dragState, isDragging: isAnyDragging } = usePanelDnd();
+  const { dockPanel } = usePanelStore();
+
+  // State for floating panel drag-to-dock
+  const [floatingDragOver, setFloatingDragOver] = useState(false);
+  const [floatingDropPosition, setFloatingDropPosition] = useState<DropPosition | null>(null);
 
   // Set up draggable
   const dragData: PanelDragData = {
@@ -41,6 +52,81 @@ export function DraggablePanel({
     id: panel.id,
   });
 
+  // Calculate drop position based on cursor position within the panel
+  const calculateDropPosition = useCallback(
+    (e: React.DragEvent): DropPosition => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const width = rect.width;
+      const height = rect.height;
+
+      // Calculate relative position (0-1)
+      const relX = x / width;
+      const relY = y / height;
+
+      // Center zone for merge (inner 50%)
+      const centerZone = 0.25;
+      if (relX > centerZone && relX < 1 - centerZone && relY > centerZone && relY < 1 - centerZone) {
+        return 'center';
+      }
+
+      // Determine edge zone
+      if (relY < centerZone) return 'top';
+      if (relY > 1 - centerZone) return 'bottom';
+      if (relX < centerZone) return 'left';
+      if (relX > 1 - centerZone) return 'right';
+
+      return 'center';
+    },
+    []
+  );
+
+  // Handle floating panel drag events
+  const handleFloatingDragOver = useCallback(
+    (e: React.DragEvent) => {
+      if (e.dataTransfer.types.includes(FLOATING_PANEL_MIME_TYPE)) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+        setFloatingDragOver(true);
+        setFloatingDropPosition(calculateDropPosition(e));
+      }
+    },
+    [calculateDropPosition]
+  );
+
+  const handleFloatingDragLeave = useCallback((e: React.DragEvent) => {
+    // Only reset if leaving the panel itself, not entering a child
+    const relatedTarget = e.relatedTarget as HTMLElement | null;
+    if (!e.currentTarget.contains(relatedTarget)) {
+      setFloatingDragOver(false);
+      setFloatingDropPosition(null);
+    }
+  }, []);
+
+  const handleFloatingDrop = useCallback(
+    async (e: React.DragEvent) => {
+      const data = e.dataTransfer.getData(FLOATING_PANEL_MIME_TYPE);
+      if (data) {
+        e.preventDefault();
+        e.stopPropagation();
+        setFloatingDragOver(false);
+        setFloatingDropPosition(null);
+
+        try {
+          const { panelId } = JSON.parse(data) as FloatingPanelDragData;
+          const dropPos = calculateDropPosition(e);
+          // Dock to this panel with the calculated position
+          await dockPanel(panelId, panel.id, dropPos);
+        } catch (error) {
+          console.error('Failed to dock floating panel:', error);
+        }
+      }
+    },
+    [calculateDropPosition, dockPanel, panel.id]
+  );
+
   // Combine refs
   const setRefs = (node: HTMLDivElement | null) => {
     setDraggableRef(node);
@@ -51,6 +137,11 @@ export function DraggablePanel({
   const isDropTarget = isOver && dragState.overPanel === panel.id;
   const dropPosition = isDropTarget ? dragState.overPosition : null;
 
+  // Show drop zones for either dnd-kit dragging or floating panel dragging
+  const showDropZones = (isAnyDragging && !isDragging) || floatingDragOver;
+  const effectiveDropPosition = floatingDragOver ? floatingDropPosition : dropPosition;
+  const effectiveIsOver = floatingDragOver || isDropTarget;
+
   return (
     <div
       ref={setRefs}
@@ -60,6 +151,9 @@ export function DraggablePanel({
           : 'ring-1 ring-gray-700'
       } bg-gray-800 ${isDragging ? 'opacity-50 shadow-2xl z-50' : ''}`}
       style={{ gridArea: panel.gridArea }}
+      onDragOver={handleFloatingDragOver}
+      onDragLeave={handleFloatingDragLeave}
+      onDrop={handleFloatingDrop}
     >
       {/* Drag handle overlay in header area */}
       <DragHandle
@@ -68,11 +162,12 @@ export function DraggablePanel({
         isDragging={isDragging}
       />
 
-      {/* Drop zone overlays when dragging another panel */}
-      {isAnyDragging && !isDragging && (
+      {/* Drop zone overlays when dragging another panel (dnd-kit or floating) */}
+      {showDropZones && (
         <DropZoneOverlay
-          isOver={isDropTarget}
-          dropPosition={dropPosition}
+          isOver={effectiveIsOver}
+          dropPosition={effectiveDropPosition}
+          isFloatingDrag={floatingDragOver}
         />
       )}
 
@@ -106,29 +201,34 @@ function DragHandle({ attributes, listeners, isDragging }: DragHandleProps) {
 interface DropZoneOverlayProps {
   isOver: boolean;
   dropPosition: string | null;
+  isFloatingDrag?: boolean;
 }
 
-function DropZoneOverlay({ isOver, dropPosition }: DropZoneOverlayProps) {
+function DropZoneOverlay({ isOver, dropPosition, isFloatingDrag = false }: DropZoneOverlayProps) {
   if (!isOver) {
     return (
       <div className="absolute inset-0 z-40 pointer-events-none">
         {/* Semi-transparent overlay to indicate valid drop target */}
-        <div className="absolute inset-0 border-2 border-dashed border-gray-600/50 rounded" />
+        <div className={`absolute inset-0 border-2 border-dashed rounded ${
+          isFloatingDrag ? 'border-purple-500/50' : 'border-gray-600/50'
+        }`} />
       </div>
     );
   }
 
   // Render highlighted drop zone based on position
+  // Use purple for floating drags, blue for regular dnd-kit drags
   const getPositionStyles = (): string => {
+    const color = isFloatingDrag ? 'purple' : 'blue';
     switch (dropPosition) {
       case 'top':
-        return 'top-0 left-0 right-0 h-1/4 bg-blue-500/30 border-b-2 border-blue-500';
+        return `top-0 left-0 right-0 h-1/4 bg-${color}-500/30 border-b-2 border-${color}-500`;
       case 'bottom':
-        return 'bottom-0 left-0 right-0 h-1/4 bg-blue-500/30 border-t-2 border-blue-500';
+        return `bottom-0 left-0 right-0 h-1/4 bg-${color}-500/30 border-t-2 border-${color}-500`;
       case 'left':
-        return 'top-1/4 bottom-1/4 left-0 w-1/4 bg-blue-500/30 border-r-2 border-blue-500';
+        return `top-1/4 bottom-1/4 left-0 w-1/4 bg-${color}-500/30 border-r-2 border-${color}-500`;
       case 'right':
-        return 'top-1/4 bottom-1/4 right-0 w-1/4 bg-blue-500/30 border-l-2 border-blue-500';
+        return `top-1/4 bottom-1/4 right-0 w-1/4 bg-${color}-500/30 border-l-2 border-${color}-500`;
       case 'center':
         return 'top-1/4 bottom-1/4 left-1/4 right-1/4 bg-green-500/30 border-2 border-dashed border-green-500';
       default:

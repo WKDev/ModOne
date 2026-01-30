@@ -2,6 +2,7 @@
 //!
 //! This is the main library crate for the ModOne Tauri application.
 
+pub mod canvas;
 pub mod commands;
 pub mod error;
 pub mod logging;
@@ -44,6 +45,10 @@ use commands::{
     // Canvas commands
     canvas_circuit_exists, canvas_create_circuit, canvas_delete_circuit, canvas_list_circuits,
     canvas_load_circuit, canvas_save_circuit,
+    // Scope commands
+    scope_create, scope_get_data, scope_update_settings, scope_add_sample, scope_add_samples,
+    scope_run_stop, scope_reset, scope_arm_trigger, scope_delete, scope_list, scope_exists,
+    ScopeState,
     // Canvas sync commands
     canvas_sync_clear_mappings, canvas_sync_force_update_outputs, canvas_sync_get_changed_blocks,
     canvas_sync_get_mappings, canvas_sync_get_status, canvas_sync_handle_input,
@@ -56,7 +61,7 @@ use commands::{
     scenario_list, scenario_load, scenario_save,
     // Scenario execution commands
     scenario_run, scenario_pause, scenario_resume, scenario_stop, scenario_get_status,
-    scenario_get_state, ScenarioExecutorState,
+    scenario_get_state, scenario_seek, ScenarioExecutorState,
     // Parser commands
     parser_format_modbus_address, parser_is_read_only, parser_load_program,
     parser_map_address_to_modbus, parser_map_modbus_to_address, parser_parse_csv_content,
@@ -113,6 +118,9 @@ pub fn run() {
     // Initialize floating window state
     let floating_window_state: FloatingWindowState = std::sync::Mutex::new(FloatingWindowRegistry::new());
 
+    // Initialize scope state
+    let scope_state = ScopeState::default();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
@@ -124,6 +132,7 @@ pub fn run() {
         .manage(sim_state)
         .manage(error_logger)
         .manage(floating_window_state)
+        .manage(scope_state)
         .setup(|app| {
             log::info!("ModOne application starting...");
             if cfg!(debug_assertions) {
@@ -205,6 +214,18 @@ pub fn run() {
             canvas_list_circuits,
             canvas_delete_circuit,
             canvas_circuit_exists,
+            // Scope commands
+            scope_create,
+            scope_get_data,
+            scope_update_settings,
+            scope_add_sample,
+            scope_add_samples,
+            scope_run_stop,
+            scope_reset,
+            scope_arm_trigger,
+            scope_delete,
+            scope_list,
+            scope_exists,
             // Canvas sync commands
             canvas_sync_init,
             canvas_sync_shutdown,
@@ -237,6 +258,7 @@ pub fn run() {
             scenario_stop,
             scenario_get_status,
             scenario_get_state,
+            scenario_seek,
             // Parser commands
             parser_parse_csv_file,
             parser_parse_csv_content,

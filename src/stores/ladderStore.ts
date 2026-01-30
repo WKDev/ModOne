@@ -8,6 +8,10 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
+import { enableMapSet } from 'immer';
+
+// Enable Immer's MapSet plugin for Map and Set support
+enableMapSet();
 import type {
   LadderElement,
   LadderElementType,
@@ -357,6 +361,23 @@ function cloneElement(element: LadderElement, newId: string): LadderElement {
   return cloned;
 }
 
+/**
+ * Push current state to history for undo support.
+ * Clears any redo history and enforces MAX_HISTORY_SIZE limit.
+ */
+function pushHistorySnapshot(state: LadderState): void {
+  const snapshot = createSnapshot(state.networks, state.currentNetworkId);
+  // Clear any redo history (slice to current position + 1)
+  state.history = state.history.slice(0, state.historyIndex + 1);
+  state.history.push(snapshot);
+  // Enforce max history size
+  if (state.history.length > MAX_HISTORY_SIZE) {
+    state.history.shift();
+  } else {
+    state.historyIndex++;
+  }
+}
+
 // ============================================================================
 // Store
 // ============================================================================
@@ -377,15 +398,7 @@ export const useLadderStore = create<LadderStore>()(
 
         set(
           (state) => {
-            // Push history before modification
-            const snapshot = createSnapshot(state.networks, state.currentNetworkId);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             state.networks.set(id, newNetwork);
             state.currentNetworkId = id;
@@ -405,15 +418,7 @@ export const useLadderStore = create<LadderStore>()(
             if (!state.networks.has(id)) return;
             if (state.networks.size <= 1) return; // Keep at least one network
 
-            // Push history
-            const snapshot = createSnapshot(state.networks, state.currentNetworkId);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             state.networks.delete(id);
 
@@ -449,15 +454,7 @@ export const useLadderStore = create<LadderStore>()(
             const network = state.networks.get(id);
             if (!network) return;
 
-            // Push history
-            const snapshot = createSnapshot(state.networks, state.currentNetworkId);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             if (updates.label !== undefined) network.label = updates.label;
             if (updates.comment !== undefined) network.comment = updates.comment;
@@ -477,15 +474,7 @@ export const useLadderStore = create<LadderStore>()(
             if (fromIndex < 0 || fromIndex >= networkArray.length) return;
             if (toIndex < 0 || toIndex >= networkArray.length) return;
 
-            // Push history
-            const snapshot = createSnapshot(state.networks, state.currentNetworkId);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             const [removed] = networkArray.splice(fromIndex, 1);
             networkArray.splice(toIndex, 0, removed);
@@ -525,15 +514,7 @@ export const useLadderStore = create<LadderStore>()(
           (state) => {
             if (!state.networkClipboard) return;
 
-            // Push history
-            const snapshot = createSnapshot(state.networks, state.currentNetworkId);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             // Create ID mapping for elements
             const idMap = new Map<string, string>();
@@ -623,15 +604,7 @@ export const useLadderStore = create<LadderStore>()(
 
         set(
           (state) => {
-            // Push history
-            const snapshot = createSnapshot(state.networks, state.currentNetworkId);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             const currentNetwork = state.networks.get(state.currentNetworkId!);
             if (currentNetwork) {
@@ -653,15 +626,7 @@ export const useLadderStore = create<LadderStore>()(
             const network = state.networks.get(state.currentNetworkId);
             if (!network || !network.elements.has(id)) return;
 
-            // Push history
-            const snapshot = createSnapshot(state.networks, state.currentNetworkId);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             network.elements.delete(id);
 
@@ -693,15 +658,7 @@ export const useLadderStore = create<LadderStore>()(
 
         set(
           (state) => {
-            // Push history
-            const snapshot = createSnapshot(state.networks, state.currentNetworkId);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             const currentNetwork = state.networks.get(state.currentNetworkId!);
             const element = currentNetwork?.elements.get(id);
@@ -723,15 +680,7 @@ export const useLadderStore = create<LadderStore>()(
             const element = network?.elements.get(id);
             if (!element) return;
 
-            // Push history
-            const snapshot = createSnapshot(state.networks, state.currentNetworkId);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             // Apply updates
             if (updates.address !== undefined) {
@@ -782,15 +731,7 @@ export const useLadderStore = create<LadderStore>()(
 
         set(
           (state) => {
-            // Push history
-            const snapshot = createSnapshot(state.networks, state.currentNetworkId);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             const currentNetwork = state.networks.get(state.currentNetworkId!);
             if (currentNetwork) {
@@ -918,15 +859,7 @@ export const useLadderStore = create<LadderStore>()(
             const network = state.networks.get(state.currentNetworkId);
             if (!network) return;
 
-            // Push history
-            const snapshot = createSnapshot(state.networks, state.currentNetworkId);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             // Remove selected elements
             state.selectedElementIds.forEach((id) => {
@@ -967,15 +900,7 @@ export const useLadderStore = create<LadderStore>()(
             const currentNetwork = state.networks.get(state.currentNetworkId);
             if (!currentNetwork) return;
 
-            // Push history
-            const snapshot = createSnapshot(state.networks, state.currentNetworkId);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             const newIds: string[] = [];
 
@@ -1035,10 +960,13 @@ export const useLadderStore = create<LadderStore>()(
       redo: () => {
         set(
           (state) => {
-            if (state.historyIndex >= state.history.length - 1) return;
+            // Can only redo if there's a snapshot beyond current position
+            // After undo, history[historyIndex] is what we're at, history[historyIndex+1] and beyond are for redo
+            const nextSnapshotIndex = state.historyIndex + 2;
+            if (nextSnapshotIndex >= state.history.length) return;
 
             state.historyIndex++;
-            const snapshot = state.history[state.historyIndex + 1];
+            const snapshot = state.history[nextSnapshotIndex];
             if (snapshot) {
               const restored = restoreSnapshot(snapshot);
               state.networks = restored.networks;
@@ -1055,14 +983,7 @@ export const useLadderStore = create<LadderStore>()(
       pushHistory: () => {
         set(
           (state) => {
-            const snapshot = createSnapshot(state.networks, state.currentNetworkId);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
           },
           false,
           'pushHistory'
@@ -1244,15 +1165,7 @@ export const useLadderStore = create<LadderStore>()(
       clearAll: () => {
         set(
           (state) => {
-            // Push history
-            const snapshot = createSnapshot(state.networks, state.currentNetworkId);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             // Create one empty network
             const newNetwork = createEmptyNetwork(generateId('network'), 'Network 1');
@@ -1364,7 +1277,7 @@ export const selectCanUndo = (state: LadderStore) => state.historyIndex >= 0;
 
 /** Select whether redo is available */
 export const selectCanRedo = (state: LadderStore) =>
-  state.historyIndex < state.history.length - 1;
+  state.historyIndex + 2 < state.history.length;
 
 /** Select whether there are unsaved changes */
 export const selectIsDirty = (state: LadderStore) => state.isDirty;
@@ -1391,5 +1304,25 @@ export const selectWires = (state: LadderStore) => {
   const network = selectCurrentNetwork(state);
   return network?.wires ?? [];
 };
+
+// ============================================================================
+// Custom Hooks
+// ============================================================================
+
+/**
+ * Hook to check if undo is available.
+ * Provides a cleaner API for components that need to track undo availability.
+ */
+export function useCanUndo(): boolean {
+  return useLadderStore(selectCanUndo);
+}
+
+/**
+ * Hook to check if redo is available.
+ * Provides a cleaner API for components that need to track redo availability.
+ */
+export function useCanRedo(): boolean {
+  return useLadderStore(selectCanRedo);
+}
 
 export default useLadderStore;

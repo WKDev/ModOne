@@ -1,285 +1,253 @@
 {
 	"meta": {
-		"generatedAt": "2026-01-28T08:09:01.316Z",
-		"tasksAnalyzed": 34,
-		"totalTasks": 60,
-		"analysisCount": 34,
+		"generatedAt": "2026-01-29T18:01:23.164Z",
+		"tasksAnalyzed": 30,
+		"totalTasks": 126,
+		"analysisCount": 30,
 		"thresholdScore": 5,
 		"projectName": "Taskmaster",
 		"usedResearch": true
 	},
 	"complexityAnalysis": [
 		{
-			"taskId": 27,
-			"taskTitle": "Create Memory Visualizer Type Definitions and Utility Functions",
-			"complexityScore": 3,
-			"recommendedSubtasks": 3,
-			"expansionPrompt": "Break down into: 1) Define TypeScript interfaces for MemoryVisualizer types (DisplayFormat, MemoryViewConfig, FavoriteItem, ContextMenuPosition, CellSelection) in types.ts. 2) Implement formatters.ts with formatValue(), parseInputValue(), and formatFloat32() functions with proper validation and error handling. 3) Implement addressUtils.ts with formatAddress(), getModbusAddressPrefix(), calculateRowCount(), and getAddressForCell() utility functions.",
-			"reasoning": "This task involves creating pure TypeScript types and utility functions with no React components or Tauri integration. The codebase already has similar patterns in src/types/modbus.ts (143 lines) which can serve as a template. The formatter functions are straightforward arithmetic/string operations. Low complexity because it's mostly type definitions and pure functions without side effects or state management."
-		},
-		{
-			"taskId": 28,
-			"taskTitle": "Implement Memory Table Core Component with Grid Layout",
-			"complexityScore": 6,
-			"recommendedSubtasks": 4,
-			"expansionPrompt": "Break down into: 1) Create the basic MemoryTable component structure with props interface and grid layout using CSS grid or HTML table. 2) Implement row/cell generation logic using useMemo for performance optimization. 3) Add sticky header functionality and proper scrolling behavior. 4) Integrate with MemoryCell component for cell rendering and handle click/context menu events propagation.",
-			"reasoning": "This is a medium-complexity UI component requiring virtualized rendering considerations for large datasets (up to 1000 cells). Requires understanding of CSS grid/table layouts, useMemo optimization patterns, and proper event handling. The existing codebase doesn't have similar grid components, so this is greenfield. The component must coordinate with multiple child components (MemoryCell) and handle both boolean and number value types."
-		},
-		{
-			"taskId": 29,
-			"taskTitle": "Implement MemoryCell Component with Coil Toggle and Register Display",
-			"complexityScore": 4,
-			"recommendedSubtasks": 3,
-			"expansionPrompt": "Break down into: 1) Create base MemoryCell component with props interface and memo wrapper for performance. 2) Implement boolean cell rendering for coils/discrete inputs with toggle button styling and ON/OFF states. 3) Implement register cell rendering with format-aware value display and tooltip showing multiple format representations.",
-			"reasoning": "A focused UI component with clear requirements. Uses React.memo for optimization which is a standard pattern. The dual rendering logic (boolean vs number) is straightforward conditional rendering. Tooltip implementation and event handlers are standard React patterns. Moderate complexity due to the need to handle multiple display formats and interaction states."
-		},
-		{
-			"taskId": 30,
-			"taskTitle": "Implement Number Input Popover with Numpad Component",
-			"complexityScore": 5,
-			"recommendedSubtasks": 4,
-			"expansionPrompt": "Break down into: 1) Create Numpad component with configurable key layout (0-9 and hex keys A-F). 2) Create NumberInputPopover component with positioning and DEC/HEX mode toggle. 3) Implement input value parsing and validation with format conversion between modes. 4) Add keyboard event handling (Enter to apply, Escape to cancel) and focus management.",
-			"reasoning": "Involves creating two interconnected components with state synchronization. The hex/decimal mode toggle requires real-time value conversion. Keyboard event handling at the window level requires proper cleanup. Positioning logic for the popover needs viewport boundary checks. The parseInputValue utility already exists from task 27, reducing some complexity."
-		},
-		{
-			"taskId": 31,
-			"taskTitle": "Implement MemoryToolbar with View Configuration Controls",
-			"complexityScore": 3,
-			"recommendedSubtasks": 2,
-			"expansionPrompt": "Break down into: 1) Create MemoryToolbar component with layout structure containing memory type dropdown, address inputs, column selector, and format toggle. 2) Implement input validation and change handlers that call onConfigChange with partial updates.",
-			"reasoning": "This is a relatively simple toolbar component with standard form inputs (select, number input, button group). The codebase has existing toolbar patterns to follow. No complex state management - it simply calls onConfigChange callbacks. Input validation is basic bounds checking. The refresh button with loading state is a standard pattern using lucide-react icons."
-		},
-		{
-			"taskId": 32,
-			"taskTitle": "Implement Favorites Panel with CRUD Operations",
-			"complexityScore": 5,
-			"recommendedSubtasks": 4,
-			"expansionPrompt": "Break down into: 1) Create useFavorites hook with localStorage persistence, add/update/remove/reorder operations. 2) Create FavoriteItem component displaying label, address, current value, and action buttons. 3) Create FavoritesPanel component with collapsible section and empty state handling. 4) Implement drag-and-drop reordering functionality for favorites list.",
-			"reasoning": "Requires a custom hook with localStorage persistence (load on mount, save on change pattern). The FavoriteItem component needs real-time value display from the memory visualizer context. Drag-and-drop reordering adds complexity. The codebase uses @dnd-kit for drag-drop which is already a dependency. Multiple interconnected components (hook + panel + item) require careful state coordination."
-		},
-		{
-			"taskId": 33,
-			"taskTitle": "Implement Context Menus for Table Cells and Favorites",
-			"complexityScore": 5,
-			"recommendedSubtasks": 4,
-			"expansionPrompt": "Break down into: 1) Create reusable ContextMenu component with positioning, click-outside handling, and keyboard navigation. 2) Implement buildCellMenuItems helper function generating menu items for table cells. 3) Implement buildFavoriteMenuItems helper function generating menu items for favorites. 4) Add clipboard operations (navigator.clipboard API) and Modbus write integrations.",
-			"reasoning": "Context menus require careful handling of positioning (viewport boundaries), click-outside detection, and keyboard events (Escape). Building menu items dynamically based on context (cell vs favorite, read-only vs writable) adds conditional logic. Clipboard operations use async browser APIs. Integration with Modbus write operations requires error handling."
-		},
-		{
-			"taskId": 34,
-			"taskTitle": "Assemble Main MemoryVisualizer Panel Component",
+			"taskId": 97,
+			"taskTitle": "Implement ScenarioExecutor Core Structure in Rust",
 			"complexityScore": 7,
-			"recommendedSubtasks": 5,
-			"expansionPrompt": "Break down into: 1) Set up component structure with state management for config, popover, and context menu. 2) Integrate useModbusMemory hook for real-time memory data subscription. 3) Implement cell click handling distinguishing between coil toggle and register edit. 4) Implement context menu handling with Add to Favorites and write operations. 5) Wire up all sub-components (Toolbar, Table, Favorites, Popover, ContextMenu) with proper data flow.",
-			"reasoning": "This is the orchestration component that ties together all Memory Visualizer sub-components. It must manage multiple pieces of local state (config, popover, context menu), integrate with the existing modbusStore and modbusService, handle multiple interaction patterns (click, right-click, keyboard), and coordinate data flow between 5+ child components. The useModbusMemory hook integration for real-time updates adds reactive complexity. This is the most complex task in the Memory Visualizer unit."
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "Task 97 is already fully implemented with all 5 subtasks marked as done. The ScenarioExecutor with ScenarioState enum, ScheduledEvent with BinaryHeap ordering, PendingRelease struct, ScenarioStatus, and core methods (new(), load(), get_status()) are all implemented in src-tauri/src/scenario/executor.rs (868 lines). No further expansion needed.",
+			"reasoning": "Verified in executor.rs: ScenarioState (lines 23-43), ScheduledEvent with Ord/PartialOrd (lines 49-78), PendingRelease (lines 84-93), ScenarioStatus (lines 99-133), and ScenarioExecutor with all required fields and methods. All 5 subtasks are done - this task is complete."
 		},
 		{
-			"taskId": 35,
-			"taskTitle": "Define OneCanvas Type System and Data Structures",
-			"complexityScore": 4,
-			"recommendedSubtasks": 4,
-			"expansionPrompt": "Break down into: 1) Define base types (BlockType, Position, Port, BaseBlock) with discriminated union for block types. 2) Define specialized block property interfaces (PlcOutBlockProps, PlcInBlockProps, LedBlockProps, ButtonBlockProps, ScopeBlockProps). 3) Define wire and connection types (WireEndpoint, Wire, CircuitState). 4) Define simulation state types and YAML schema types for serialization.",
-			"reasoning": "This task defines the entire type system for a circuit diagram editor. It requires designing a discriminated union type system for blocks which is moderately complex. The YAML schema types must be compatible with serialization requirements. The type hierarchy (BaseBlock -> specialized blocks) needs careful design for extensibility. Similar to task 27 but more complex due to the hierarchical block type system."
-		},
-		{
-			"taskId": 36,
-			"taskTitle": "Implement Canvas State Management Store",
-			"complexityScore": 7,
-			"recommendedSubtasks": 5,
-			"expansionPrompt": "Break down into: 1) Define state interface with components, wires, selection, viewport, grid, and history arrays. 2) Implement component CRUD actions (add, remove, update) with proper Map handling. 3) Implement wire management actions with connection validation. 4) Implement selection operations (single, multi, range, clear) and viewport controls (zoom, pan). 5) Implement undo/redo history management with state snapshots.",
-			"reasoning": "This is a complex Zustand store managing circuit editor state. The existing modbusStore (297 lines) provides a pattern, but this store has significantly more actions. Key complexity: Map-based component storage, undo/redo history management (requiring deep cloning of state snapshots), viewport calculations, and coordinating multiple state pieces. The history feature alone requires careful implementation to avoid memory issues. This is comparable to panelStore in complexity."
-		},
-		{
-			"taskId": 37,
-			"taskTitle": "Create Base Canvas Component with Pan/Zoom/Grid",
-			"complexityScore": 6,
-			"recommendedSubtasks": 4,
-			"expansionPrompt": "Break down into: 1) Create GridBackground component with SVG pattern that scales with zoom. 2) Create Canvas component with CSS transform-based pan/zoom rendering. 3) Implement wheel event handler for zoom (Ctrl+wheel) and pan (wheel) with smooth transitions. 4) Create coordinate transformation utilities (screenToCanvas, canvasToScreen, snapToGrid) and implement touch/trackpad pinch-to-zoom support.",
-			"reasoning": "Implementing infinite canvas with pan/zoom requires understanding of CSS transforms, coordinate transformations, and event handling. The grid background must scale correctly with zoom level. Wheel event handling needs to distinguish between pan and zoom gestures. Pinch-to-zoom for trackpads adds platform-specific complexity. The coordinate transformation functions are mathematically involved (inverse transforms)."
-		},
-		{
-			"taskId": 38,
-			"taskTitle": "Implement Block Rendering System and Port Component",
-			"complexityScore": 6,
-			"recommendedSubtasks": 5,
-			"expansionPrompt": "Break down into: 1) Create Port component with visual styling based on state (connected, disconnected, hover) and wire interaction handlers. 2) Create BlockRenderer component that dispatches to specific block components based on type. 3) Implement PowerBlock and GndBlock components with voltage display and single port. 4) Implement LedBlock component with configurable color and glow effect based on voltage. 5) Add common block styling (selection ring, drag handle) and interaction handlers.",
-			"reasoning": "Creating a component dispatch system for multiple block types requires careful architecture. Each block type has different visual representation and port configurations. The Port component is critical for wire connections and needs precise positioning. LED glow effect requires CSS animations. Selection visual feedback and drag handle interaction patterns add to complexity."
-		},
-		{
-			"taskId": 39,
-			"taskTitle": "Implement Block Drag-and-Drop from Toolbox",
-			"complexityScore": 6,
-			"recommendedSubtasks": 4,
-			"expansionPrompt": "Break down into: 1) Create Toolbox component with categorized block items and collapsible sections. 2) Implement draggable toolbox items using @dnd-kit with drag preview. 3) Implement canvas drop handler with coordinate transformation and grid snapping. 4) Add existing component drag-to-move functionality with multi-select drag support and snap-line feedback.",
-			"reasoning": "Drag-and-drop from toolbox to canvas requires coordinate transformation from screen to canvas space. The @dnd-kit library is already in dependencies which helps. Multi-select drag must maintain relative positions. Snap-line feedback during drag adds visual complexity. The drop handler must create new components with proper default configurations."
-		},
-		{
-			"taskId": 40,
-			"taskTitle": "Implement Wire Drawing and Connection System",
-			"complexityScore": 7,
-			"recommendedSubtasks": 5,
-			"expansionPrompt": "Break down into: 1) Create Wire component with SVG path rendering supporting straight/bezier modes and color coding by type. 2) Create useWireDrawing hook managing wire creation state (start, preview, end). 3) Implement connection validation logic (port direction, same-component check, duplicate wire check). 4) Implement wire path calculation from component/port positions. 5) Add temporary wire preview rendering during draw operation with valid target highlighting.",
-			"reasoning": "Wire drawing is one of the most complex interactions in a circuit editor. It requires: SVG path rendering, temporary preview during drawing, hit detection for port targets, connection validation logic, and real-time path recalculation as components move. The wire routing algorithm (orthogonal or bezier) adds mathematical complexity. Animation for current flow requires CSS animations. This is a critical feature that affects the entire canvas interaction model."
-		},
-		{
-			"taskId": 41,
-			"taskTitle": "Implement PLC I/O Blocks with ModServer Integration",
-			"complexityScore": 6,
-			"recommendedSubtasks": 4,
-			"expansionPrompt": "Break down into: 1) Create PlcOutBlock component displaying Modbus address and NO/NC state, reading from modbusStore. 2) Create PlcInBlock component that writes to discrete input based on circuit voltage. 3) Implement address formatting (M0001 format) and properties panel integration. 4) Set up real-time subscription to modbus:memory-changed events for instant updates.",
-			"reasoning": "These blocks bridge the circuit simulation with the existing Modbus infrastructure. PlcOutBlock reads from modbusStore (already exists), but PlcInBlock must write to discrete inputs based on simulation state - this creates a bidirectional data flow. The NO/NC logic with inverted flag has multiple combinations to handle correctly. Integration with the existing modbusService and event system adds coordination complexity."
-		},
-		{
-			"taskId": 42,
-			"taskTitle": "Implement Circuit Simulation Engine",
-			"complexityScore": 9,
-			"recommendedSubtasks": 6,
-			"expansionPrompt": "Break down into: 1) Implement circuit graph builder that converts components and wires into traversable graph structure. 2) Implement path finding algorithm (BFS/DFS) to find all paths from power sources to ground. 3) Implement switch state evaluation (open/closed based on PLC output and button states). 4) Implement voltage propagation through closed switches. 5) Create useSimulation hook with 20Hz update loop using requestAnimationFrame. 6) Add current flow animation system for powered wires.",
-			"reasoning": "This is the most algorithmically complex task in OneCanvas. It requires implementing graph algorithms (building circuit graph, finding current paths), handling switch state logic, and running a simulation loop at 20Hz. The graph must handle branching circuits and multiple power sources without interference. Performance is critical - must handle 100+ components. This is essentially a simple circuit simulator which is non-trivial to implement correctly."
-		},
-		{
-			"taskId": 43,
-			"taskTitle": "Implement Button Block with Interaction States",
-			"complexityScore": 5,
-			"recommendedSubtasks": 4,
-			"expansionPrompt": "Break down into: 1) Define contact configuration types and port generation function for each config (1a, 1b, 1a1b, 2a, 2b, 2a2b, 3a3b). 2) Implement ButtonBlock component with momentary (mousedown/mouseup) and toggle (click) modes. 3) Implement contact state logic (NO contacts close on press, NC contacts open on press). 4) Add Tauri command integration for external button control and visual feedback for pressed state.",
-			"reasoning": "The button block has multiple contact configurations (7 types) each requiring different port layouts. The momentary vs toggle behavior affects interaction handling. Contact logic (NO/NC) must correctly reflect the physical behavior of industrial buttons. Integration with Tauri commands for external control adds backend coordination. Visual feedback must clearly show button state."
-		},
-		{
-			"taskId": 44,
-			"taskTitle": "Implement Properties Panel for Component Editing",
-			"complexityScore": 5,
-			"recommendedSubtasks": 4,
-			"expansionPrompt": "Break down into: 1) Create PropertiesPanel router that renders appropriate editor based on selected component type. 2) Create common property fields (ID, position, label) shared across all blocks. 3) Create type-specific property editors (PlcOutProperties, LedProperties, ButtonProperties) with validation. 4) Implement form state binding with debounced updates to canvasStore.",
-			"reasoning": "This involves creating multiple form components for different block types. Each block type has different properties requiring different form controls. Form state management with validation and error messages requires careful handling. The router pattern for selecting appropriate editor based on type is straightforward. Multi-select case (showing count instead of properties) adds a branch."
-		},
-		{
-			"taskId": 45,
-			"taskTitle": "Implement Circuit YAML Serialization and Tauri Commands",
-			"complexityScore": 6,
-			"recommendedSubtasks": 5,
-			"expansionPrompt": "Break down into: 1) Add yaml package dependency and create circuitToYaml serialization function. 2) Create yamlToCircuit deserialization function with validation. 3) Implement Rust Tauri commands (canvas_save_circuit, canvas_load_circuit, canvas_create_circuit). 4) Create frontend canvasService wrapping Tauri commands. 5) Integrate with project system for circuit file management.",
-			"reasoning": "Serialization involves converting between runtime Map-based data structures and YAML-compatible objects. Rust backend commands follow existing patterns but require new file in commands/canvas.rs. Validation during deserialization must handle malformed files gracefully. Integration with project system requires understanding the existing project structure. Round-trip serialization must preserve all component properties."
-		},
-		{
-			"taskId": 46,
-			"taskTitle": "Implement Selection, Copy/Paste, and Keyboard Shortcuts",
-			"complexityScore": 6,
-			"recommendedSubtasks": 5,
-			"expansionPrompt": "Break down into: 1) Create SelectionBox component for drag-to-select with rectangle rendering. 2) Implement selection modes (click, shift+click, ctrl+click, drag select) in canvas interaction handler. 3) Create useCanvasKeyboardShortcuts hook with all canvas-specific shortcuts. 4) Implement clipboard operations (copy/paste/cut/duplicate) with component serialization and offset positioning. 5) Implement undo/redo keyboard shortcuts integrated with canvas store history.",
-			"reasoning": "Selection handling has multiple modes with different behaviors. Keyboard shortcut handling requires proper event interception and checking for input focus. Clipboard operations involve serializing components to a transferable format and deserializing with new IDs and offset positions. The SelectionBox requires coordinate calculations for the selection rectangle. Integration with undo/redo requires proper history stack management."
-		},
-		{
-			"taskId": 47,
-			"taskTitle": "Implement Simulation Controls and State Management",
-			"complexityScore": 5,
-			"recommendedSubtasks": 4,
-			"expansionPrompt": "Break down into: 1) Create SimulationToolbar component with play/pause/stop buttons and status indicator. 2) Implement Tauri commands for simulation state control and event emission. 3) Create CSS animations for current flow visualization (animated dashes). 4) Add visual indicators for powered components and switch states.",
-			"reasoning": "The toolbar UI is straightforward with button state management. Tauri command integration follows existing patterns. CSS animations for current flow are standard keyframe animations. The main complexity is coordinating UI state with simulation engine state. Visual indicators require conditional styling based on simulation results."
-		},
-		{
-			"taskId": 48,
-			"taskTitle": "Integrate OneCanvas into Panel System",
-			"complexityScore": 6,
-			"recommendedSubtasks": 5,
-			"expansionPrompt": "Break down into: 1) Update OneCanvasPanel component to include SimulationToolbar, Toolbox, and Canvas in proper layout. 2) Implement tab integration for multiple circuit files with modified indicator. 3) Set up Properties panel communication for selected component editing. 4) Implement file operations (New, Open, Save) with menu/keyboard shortcuts. 5) Manage per-tab canvas store instances for multi-document support.",
-			"reasoning": "Integration into the existing panel system requires understanding panelStore patterns. Tab management for multiple circuits adds document-switching logic. Properties panel communication needs context awareness (what component is selected in active canvas). Per-tab store instances require dynamic store creation/destruction. File operations must coordinate with the project system and show dialogs."
-		},
-		{
-			"taskId": 49,
-			"taskTitle": "Define Scenario Editor TypeScript Types and Data Models",
-			"complexityScore": 3,
-			"recommendedSubtasks": 2,
-			"expansionPrompt": "Break down into: 1) Define core types (ScenarioEvent, ScenarioMetadata, ScenarioSettings, ScenarioStatus, Scenario) with all required fields. 2) Define execution state types (ScenarioExecutionState) and address format types with validation patterns.",
-			"reasoning": "Pure TypeScript type definitions following existing patterns in src/types/. The Scenario structure is well-defined in the PRD with clear field requirements. Address format types are straightforward string unions. Similar to task 27 in complexity, this is primarily type definition work without complex logic."
-		},
-		{
-			"taskId": 50,
-			"taskTitle": "Implement Address Parser Utility",
-			"complexityScore": 4,
-			"recommendedSubtasks": 3,
-			"expansionPrompt": "Break down into: 1) Implement address prefix parsing for standard formats (C:, DI:, H:, IR:) with hex and decimal support. 2) Implement PLC alias pattern matching (M0001 -> C:0x0001, D12345 -> H:0x3039). 3) Create validation and conversion utilities (parseAddress, formatAddress, isValidAddress, addressToMemoryType).",
-			"reasoning": "String parsing with multiple format support requires regex patterns and conditional logic. PLC alias conversion needs pattern matching and arithmetic conversion. The codebase already has MemoryType defined which simplifies integration. Error handling for invalid inputs is important. Unit test strategy covers the main edge cases."
-		},
-		{
-			"taskId": 51,
-			"taskTitle": "Create Scenario Zustand Store",
-			"complexityScore": 5,
-			"recommendedSubtasks": 4,
-			"expansionPrompt": "Break down into: 1) Define state interface with scenario, execution state, and selection state following modbusStore patterns. 2) Implement scenario CRUD actions (newScenario, loadScenario, updateMetadata, updateSettings). 3) Implement event CRUD actions (addEvent, updateEvent, removeEvent, duplicateEvent) with auto-sorting by time. 4) Implement selection and bulk operations (selectEvent, selectRange, removeSelectedEvents, enable/disable selected).",
-			"reasoning": "Following established Zustand patterns from modbusStore and panelStore. The store manages multiple state concerns (scenario data, execution state, selection). Auto-sorting events by time on modification adds logic. Bulk operations on selected items require iterating over selection. The devtools middleware pattern is well-established."
-		},
-		{
-			"taskId": 52,
-			"taskTitle": "Build ScenarioGrid Spreadsheet Component",
-			"complexityScore": 7,
-			"recommendedSubtasks": 5,
-			"expansionPrompt": "Break down into: 1) Create grid layout with fixed-width columns matching PRD spec using CSS grid. 2) Implement keyboard navigation (arrow keys, Tab, Enter) with cell focus management. 3) Implement row rendering with execution state highlighting (completed, current, disabled, error). 4) Add multi-select support (Shift+click, Ctrl+click) with visual feedback. 5) Implement context menu and add row functionality.",
-			"reasoning": "Building a spreadsheet-like grid with keyboard navigation is complex. Cell focus management requires careful state tracking. Multi-select with Shift/Ctrl modifiers needs proper event handling. Execution state highlighting requires integration with execution engine. The virtualized rendering consideration for large datasets adds performance concerns. This is similar in complexity to implementing a basic data grid."
-		},
-		{
-			"taskId": 53,
-			"taskTitle": "Implement Cell Editor Components",
-			"complexityScore": 5,
-			"recommendedSubtasks": 4,
-			"expansionPrompt": "Break down into: 1) Create TimeCell with number input, formatting (0.000s), and auto-sort trigger on blur. 2) Create AddressCell with autocomplete, real-time validation, and type icon display. 3) Create ValueCell with conditional rendering (toggle for coils, number input for registers). 4) Create PersistCell, DurationCell, and NoteCell with their specific behaviors and keyboard navigation support.",
-			"reasoning": "Six cell components each with specific behavior. AddressCell with autocomplete and validation is the most complex. TimeCell auto-sorting on blur requires parent communication. Keyboard navigation (Tab, Enter, Escape) must work consistently across all cells. The PersistCell/DurationCell interaction (duration disabled when persist=true) adds conditional logic."
-		},
-		{
-			"taskId": 54,
-			"taskTitle": "Create ScenarioToolbar Component",
-			"complexityScore": 4,
-			"recommendedSubtasks": 3,
-			"expansionPrompt": "Break down into: 1) Create toolbar layout with execution buttons (Play/Pause/Stop) using lucide-react icons with proper enable/disable states. 2) Implement loop toggle, time display (mm:ss.fff format), and file dropdown menu. 3) Create ScenarioSettingsDialog for loop configuration (count, delay, auto-start).",
-			"reasoning": "Standard toolbar component with button state logic based on execution state. The enable/disable state machine (run enabled when idle/stopped/paused, etc.) is straightforward. Time display formatting is simple string manipulation. File dropdown menu follows existing patterns using @tauri-apps/plugin-dialog. Settings dialog is a basic form modal."
-		},
-		{
-			"taskId": 55,
-			"taskTitle": "Implement CSV Parser and Generator",
-			"complexityScore": 4,
-			"recommendedSubtasks": 3,
-			"expansionPrompt": "Break down into: 1) Implement parseScenarioCsv with line parsing, delimiter detection, and quoted field handling. 2) Implement error/warning collection for invalid data (bad addresses, out-of-range values). 3) Implement generateScenarioCsv with proper formatting, escaping, and persist logic for duration field.",
-			"reasoning": "CSV parsing is a well-understood problem. The format is simple (6 columns). Delimiter detection (comma vs semicolon) adds minor complexity. Quoted field handling for notes with special characters requires string state machine. Error collection for invalid data is straightforward validation. Round-trip parsing test ensures correctness."
-		},
-		{
-			"taskId": 56,
-			"taskTitle": "Implement Tauri Backend Scenario Commands",
-			"complexityScore": 4,
-			"recommendedSubtasks": 3,
-			"expansionPrompt": "Break down into: 1) Define Rust types (ScenarioEvent, Scenario, ScenarioMetadata, ScenarioSettings) with Serialize/Deserialize. 2) Implement file I/O commands (scenario_load, scenario_save) with JSON serialization. 3) Implement CSV import/export commands with error handling.",
-			"reasoning": "Following existing command patterns from src-tauri/src/commands/project.rs. Rust types mirror TypeScript types with serde derives. File I/O is standard std::fs operations. The main work is registering commands in lib.rs and proper error handling. The command signatures are well-defined in the task details."
-		},
-		{
-			"taskId": 57,
-			"taskTitle": "Implement Scenario Execution Engine",
+			"taskId": 98,
+			"taskTitle": "Implement Scenario Execution Engine Run/Stop Logic",
 			"complexityScore": 8,
-			"recommendedSubtasks": 6,
-			"expansionPrompt": "Break down into: 1) Create useScenarioExecution hook with requestAnimationFrame-based timing loop. 2) Implement event scheduling logic that finds events to execute based on elapsed time. 3) Implement Modbus write integration using existing modbusService for coils and registers. 4) Implement persist=false auto-release logic with setTimeout scheduling. 5) Implement loop handling with iteration counting, delay, and reset. 6) Add event emission for UI updates (scenario:event-executed, scenario:status-changed).",
-			"reasoning": "The execution engine is the most complex task in Scenario Editor. Precise timing using requestAnimationFrame is critical. Event scheduling must handle edge cases (events at same time, skipped events on pause/resume). The persist auto-release requires tracking scheduled timeouts. Loop handling with delay and iteration counting adds state complexity. Integration with modbusService for writes must handle errors. This is real-time scheduling code requiring careful implementation."
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "Task 98 is already fully implemented. The run() async method (lines 424-557), execute_event() (lines 559-592), stop() (lines 376-409), parse_modbus_address() (lines 684-711), process_releases() (lines 594-617), and read/write_from_memory() (lines 619-677) are all implemented. The 5 subtasks are still marked pending but the code is complete.",
+			"reasoning": "Analysis of executor.rs shows complete implementation: run() handles main execution loop with elapsed time calculation, event processing via BinaryHeap, Tauri event emission for 'scenario:event-executed' and 'scenario:status-changed', loop handling with restart logic, and proper async/await patterns. All 5 subtasks describe functionality that is already present in the codebase."
 		},
 		{
-			"taskId": 58,
-			"taskTitle": "Create ExecutionProgress Component",
+			"taskId": 99,
+			"taskTitle": "Implement Scenario Pause/Resume and Loop Execution",
+			"complexityScore": 6,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "Task 99 is already implemented. pause() (lines 339-353), resume() (lines 355-374), loop handling in run() (lines 511-542), and process_releases() (lines 594-617) are all present. Pause/resume properly track paused_duration, and loop logic correctly reloads event queue and emits loop-completed events.",
+			"reasoning": "Verified in executor.rs: pause() validates Running state, records pause_time; resume() calculates paused_duration; run() loop checks for loop_enabled/loop_count and handles loop iteration with delay. PendingRelease tracking for persist=false events is implemented in execute_event(). The 5 subtasks describe already-implemented functionality."
+		},
+		{
+			"taskId": 100,
+			"taskTitle": "Create Scenario Execution Tauri Commands",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Implement Tauri commands in src-tauri/src/commands/scenario.rs: 1) Create ScenarioExecutorState struct with Arc<Mutex<Option<ScenarioExecutor>>> following SimState pattern. 2) Implement scenario_run command that initializes executor, loads scenario, and spawns async run task. 3) Implement scenario_pause, scenario_resume, scenario_stop commands with state access. 4) Implement scenario_get_status returning ScenarioStatus. 5) Register commands and state in lib.rs invoke_handler and .manage(). Reference existing sim.rs commands for patterns.",
+			"reasoning": "Partially implemented - commands/scenario.rs exists (490 lines) but needs verification of ScenarioExecutorState integration. Following established patterns from sim.rs (SimState), modbus commands, and other Tauri command modules. Medium complexity as it builds on existing infrastructure with well-defined patterns."
+		},
+		{
+			"taskId": 101,
+			"taskTitle": "Create useScenarioExecution React Hook",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Create src/components/ScenarioEditor/hooks/useScenarioExecution.ts: 1) Define TypeScript types for ScenarioStatus matching Rust struct. 2) Implement Tauri event listeners using listen() for scenario:status-changed, scenario:event-executed, scenario:completed, scenario:error with proper cleanup via UnlistenFn refs. 3) Implement run/pause/resume/stop/seek functions using invoke() calls. 4) Add computed properties (isRunning, isPaused, isCompleted) derived from status.state. 5) Update ScenarioToolbar and ExecutionProgress components to consume the hook. Follow useSimulation.ts pattern (479 lines) for event listener setup.",
+			"reasoning": "A useScenarioExecution.ts may already exist but needs Tauri integration. The pattern is well-established in useSimulation.ts which uses listen() for events, invoke() for commands, useRef for cleanup, and useState for status. Medium complexity with clear template to follow."
+		},
+		{
+			"taskId": 102,
+			"taskTitle": "Integrate Scenario Execution with ScenarioToolbar UI",
+			"complexityScore": 4,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Update src/components/ScenarioEditor/ScenarioToolbar.tsx: 1) Import and use useScenarioExecution hook to get isRunning, isPaused, run, pause, resume, stop, error. 2) Modify play button to call run() when idle, pause() when running, resume() when paused. 3) Add stop button that calls stop() and is enabled only when running or paused. 4) Add status display showing elapsed time, events executed/total, and loop count from status. 5) Add error display for execution errors with red styling. Integrate with existing toolbar button patterns.",
+			"reasoning": "Straightforward UI integration task. ScenarioToolbar.tsx exists and the execution hook provides all needed state and actions. Following existing toolbar patterns from other editors. Lower complexity as it's primarily connecting hook outputs to UI elements."
+		},
+		{
+			"taskId": 103,
+			"taskTitle": "Implement Undo/Redo System for Ladder Editor",
+			"complexityScore": 4,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Review and enhance ladderStore.ts undo/redo: 1) Audit undo() implementation (lines 1015-1037) - fix boundary check logic and snapshot restoration. 2) Audit redo() implementation (lines 1039-1057) - verify index calculation and snapshot access order. 3) Refactor repeated history push pattern (13+ occurrences) into reusable pushHistorySnapshot() helper. 4) Create useCanUndo/useCanRedo custom hooks wrapping selectors for cleaner component consumption. 5) Add comprehensive integration tests for all undo/redo scenarios including edge cases. Note: History system already exists (lines 99-108, 161-167), this task is about verification and enhancement.",
+			"reasoning": "Undo/redo is ALREADY IMPLEMENTED in ladderStore.ts (1371 lines). History snapshots (line 53-69), history state (lines 99-108), undo/redo actions (lines 1015-1057), pushHistory pattern (13+ occurrences), and canUndo/canRedo selectors (lines 1366-1371) all exist. Task is about auditing, fixing potential issues, and adding tests - not building from scratch."
+		},
+		{
+			"taskId": 104,
+			"taskTitle": "Implement Command Registry and Palette Core",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Create src/components/CommandPalette/ directory: 1) Create types.ts with CommandCategory union type and Command interface (id, category, label, description, icon, shortcut, keywords, when, execute). 2) Implement CommandRegistry class in commandRegistry.ts with Map storage, register/unregister/get/getAll methods. 3) Add recent commands tracking with addToRecent(), getRecent() and MAX_RECENT=10 limit. 4) Implement search() method with fuzzy matching on label, keywords, category, description. 5) Create useCommandRegistry hook with subscription support for React component re-rendering on registry changes. Consider using fuse.js for advanced fuzzy search.",
+			"reasoning": "No CommandPalette exists in codebase (glob returned empty). New feature requiring command pattern implementation with registry, search, and recent tracking. Common pattern but requires careful design for extensibility. Medium-high complexity for greenfield feature."
+		},
+		{
+			"taskId": 105,
+			"taskTitle": "Create CommandPalette UI Component",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Build CommandPalette React components: 1) Create CommandItem.tsx subcomponent with icon, label, shortcut display, hover/selected states matching neutral-700/600 styling. 2) Create CommandSection.tsx for grouped display with category headers (Recent, File, Edit, etc.). 3) Build main CommandPalette.tsx modal with backdrop (bg-black/50), search input with Search icon, 600px width, 400px max-height. 4) Implement keyboard navigation: ArrowUp/Down for selection, Enter for execution, Escape for close, with scrollIntoView for selected item. 5) Implement useMemo-based search filtering and command grouping by category, showing recent commands when query is empty.",
+			"reasoning": "Standard modal component with established patterns from SettingsDialog and SearchPanel. Requires keyboard navigation, fuzzy search integration, and category grouping. Medium complexity with clear design requirements."
+		},
+		{
+			"taskId": 106,
+			"taskTitle": "Register Application Commands and Global Shortcut",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Register commands across the application: 1) Create fileCommands.ts with file.new, file.open, file.save, file.close commands using projectService. 2) Create editCommands.ts with edit.undo, edit.redo, edit.cut, edit.copy, edit.paste referencing ladderStore/canvasStore. 3) Create simulationCommands.ts with simulation.start (F5), stop, pause, step using sim Tauri commands with when() conditions. 4) Create viewCommands.ts, ladderCommands.ts, canvasCommands.ts, scenarioCommands.ts, etc. 5) Create commands/index.ts with registerAllCommands() and integrate in App.tsx with global Ctrl+Shift+P keydown listener opening command palette.",
+			"reasoning": "Integration task requiring coordination across multiple stores and services. Commands need to reference existing actions from ladderStore, canvasStore, panelStore, and Tauri commands. Medium complexity due to breadth of integration points but each command follows simple pattern."
+		},
+		{
+			"taskId": 107,
+			"taskTitle": "Implement ScopeEngine in Rust Backend",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Create src-tauri/src/canvas/scope.rs: 1) Define TriggerMode, TriggerEdge, RunMode enums and ScopeSettings struct with serde serialization. 2) Implement ChannelBuffer with VecDeque for ring buffer samples and TriggerState for trigger detection state machine. 3) Create ScopeEngine struct with channels Vec, settings, sample_rate, buffer_size, trigger_state and implement new() constructor. 4) Implement add_sample() with ring buffer management and check_trigger() with rising/falling edge detection based on trigger_level. 5) Implement get_display_data() returning ScopeDisplayData with normalized points, min/max/average calculations, and trigger info. Update canvas/mod.rs to export module.",
+			"reasoning": "New subsystem requiring real-time signal processing concepts: ring buffers, trigger detection, waveform display. No existing scope.rs in codebase. High complexity due to precision timing requirements and signal processing logic, but well-defined mathematical operations."
+		},
+		{
+			"taskId": 108,
+			"taskTitle": "Create Scope Tauri Commands and Canvas Integration",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Implement scope commands in src-tauri/src/commands/canvas.rs: 1) Create ScopeState with RwLock<HashMap<String, ScopeEngine>> for multi-scope management. 2) Implement scope_create, scope_get_data commands following existing command patterns. 3) Implement scope_update_settings, scope_add_sample, scope_run_stop commands. 4) Extend canvas_sync.rs with scope_mappings to feed voltage samples from circuit ports to scope engines during simulation. 5) Register commands and ScopeState in mod.rs and lib.rs invoke_handler. Follow SimState and CanvasSyncState patterns.",
+			"reasoning": "Integration task connecting ScopeEngine to Tauri command system and canvas simulation. Follows established patterns from other state-managed commands. Medium-high complexity due to real-time sample feeding integration with canvas_sync."
+		},
+		{
+			"taskId": 109,
+			"taskTitle": "Enhance ScopeBlock Component with Real-time Waveform Display",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Update src/components/OneCanvas/components/blocks/ScopeBlock.tsx: 1) Define ScopeDisplayData TypeScript types matching Rust structs in types/onesim.ts. 2) Create useScopeData hook that polls scope_get_data at 20 FPS (50ms interval) when simulation is running, with proper cleanup. 3) Implement waveformRenderer.ts with drawGrid(), drawChannel(), drawTriggerMarker(), drawWaveform() canvas functions using CHANNEL_COLORS. 4) Replace SVG rendering with Canvas element and useEffect for drawing when displayData updates. 5) Add ScopeExpandedView modal for double-click expand with larger canvas and detailed controls.",
+			"reasoning": "ScopeBlock.tsx exists (uses SVG currently). Need to add Canvas 2D rendering with polling hook. Medium complexity - Canvas API work with established polling patterns from other hooks. Real-time update at 20 FPS is straightforward."
+		},
+		{
+			"taskId": 110,
+			"taskTitle": "Create ScopeExpandedView Modal Component",
+			"complexityScore": 4,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Create src/components/OneCanvas/components/blocks/ScopeExpandedView.tsx: 1) Define props and types for expanded view including scopeId, settings, onClose. 2) Implement waveform drawing utility reusing waveformRenderer.ts functions with larger canvas (640x480). 3) Create ChannelControl subcomponent with scale selector, offset control, coupling toggle, color indicator. 4) Build main modal with toolbar (Run/Stop, time base, trigger mode selectors), canvas area, channel sidebar (40px wide), measurements bar. 5) Add Tauri integration for polling data and updating settings via invoke(), with useEffect for data polling and cleanup.",
+			"reasoning": "Extension of ScopeBlock with more controls. Modal pattern exists in SettingsDialog. Medium complexity as it reuses waveform rendering and follows established modal patterns. Primarily UI composition work."
+		},
+		{
+			"taskId": 111,
+			"taskTitle": "Create Tauri Window Commands Module",
+			"complexityScore": 3,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "Task 111 is ALREADY FULLY IMPLEMENTED. src-tauri/src/commands/window.rs exists (286 lines) with: WindowBounds struct, FloatingWindowInfo struct, FloatingWindowRegistry with register/unregister/get/update_bounds/list methods, and all Tauri commands: window_create_floating, window_close_floating, window_update_bounds, window_focus_floating, window_list_floating, window_get_floating_info, window_minimize_floating, window_maximize_floating, window_floating_exists. Event emissions for floating-window-created, floating-window-closed, floating-window-focused are implemented.",
+			"reasoning": "Verified complete implementation in window.rs: WindowBounds (lines 12-19), FloatingWindowInfo (lines 21-28), FloatingWindowRegistry class (lines 30-68), FloatingWindowState type (line 71), and all 9 Tauri commands (lines 73-285). No expansion needed - task is complete."
+		},
+		{
+			"taskId": 112,
+			"taskTitle": "Implement Tauri Window Event System",
 			"complexityScore": 2,
 			"recommendedSubtasks": 0,
-			"expansionPrompt": "This task is simple enough to implement without subtasks. Create a progress bar component that reads from scenarioStore to display percentage completion, event counts, and optional loop iteration indicator with appropriate color changes based on execution state.",
-			"reasoning": "A simple presentational component that reads from store state and renders a progress bar. Percentage calculation is basic math (completed/total). The UI is a styled div with width percentage. Loop iteration display is optional additional text. Color changes based on state are simple conditional class names. This is the simplest task in the Scenario Editor unit."
+			"expansionPrompt": "Task 112 is ALREADY IMPLEMENTED as part of Task 111. Event emissions exist in window.rs: floating-window-created (line 120), floating-window-closed (line 152), floating-window-focused (line 201). Window resize event listener setup can be added to lib.rs setup if needed, but core event system is complete.",
+			"reasoning": "Event emissions are already in window.rs commands. The Tauri event system is integrated via app.emit() calls in window_create_floating, window_close_floating, and window_focus_floating. This task's requirements are satisfied by the existing implementation."
 		},
 		{
-			"taskId": 59,
-			"taskTitle": "Assemble ScenarioEditor Main Component",
-			"complexityScore": 5,
-			"recommendedSubtasks": 4,
-			"expansionPrompt": "Break down into: 1) Create directory structure and index.ts exports for all ScenarioEditor components. 2) Assemble ScenarioEditorPanel component with toolbar, grid, and progress bar layout. 3) Wire up useScenarioExecution hook and connect run/pause/stop handlers to toolbar. 4) Implement component coordination ensuring proper data flow between grid, store, and execution engine.",
-			"reasoning": "This is an assembly task that combines previously built components. The main complexity is ensuring proper data flow and component coordination. The directory structure organization is straightforward. Wiring up the execution hook to toolbar handlers is direct prop passing. Less complex than task 34 (MemoryVisualizer assembly) because it has fewer components and interaction patterns."
+			"taskId": 113,
+			"taskTitle": "Create Window Types and State Management Types",
+			"complexityScore": 2,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "Task 113 is PARTIALLY IMPLEMENTED. src/types/window.ts exists (116 lines) with Bounds, FloatingWindowState, WindowRegistryState interfaces. src/types/panel.ts exists (56 lines). Need to verify and potentially add windowId, isFloating, floatingBounds properties to PanelState in panel.ts, and add FloatingWindowLayoutConfig to layout.ts for layout persistence.",
+			"reasoning": "Core types exist in types/window.ts (Bounds, FloatingWindowState). PanelState extension and layout types need verification. Minor enhancement task rather than greenfield development."
 		},
 		{
-			"taskId": 60,
-			"taskTitle": "Implement File Operations and Dialog Integration",
+			"taskId": 114,
+			"taskTitle": "Implement windowStore for Floating Window State Management",
+			"complexityScore": 3,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "Task 114 is ALREADY IMPLEMENTED. src/stores/windowStore.ts exists (209 lines) with: floatingWindows Map, focusedWindowId, nextZIndex state; registerFloatingWindow, unregisterFloatingWindow, updateWindowBounds, setFocusedWindow, setWindowMinimized, setWindowMaximized, getWindowByPanelId, getAllFloatingWindows, clearAllWindows actions. Uses Zustand with devtools middleware.",
+			"reasoning": "Verified windowStore.ts exists with complete implementation including Map-based window tracking, z-index management, and all CRUD operations. Task is complete."
+		},
+		{
+			"taskId": 115,
+			"taskTitle": "Extend panelStore with Floating Window Actions",
 			"complexityScore": 5,
-			"recommendedSubtasks": 4,
-			"expansionPrompt": "Break down into: 1) Create useScenarioFileOps hook with open, save, saveAs functions using @tauri-apps/plugin-dialog. 2) Implement CSV import/export functions with merge/replace option for import. 3) Implement dirty state tracking and unsaved changes prompt using existing UnsavedChangesDialog pattern. 4) Integrate file operations with toolbar dropdown menu handlers.",
-			"reasoning": "File operations follow existing patterns from useProject hook. Dialog integration uses @tauri-apps/plugin-dialog which is established in the codebase. Dirty state tracking is standard form pattern. The CSV import merge/replace option adds a decision dialog. Unsaved changes prompt can reuse existing UnsavedChangesDialog component. Integration with toolbar is straightforward event handlers."
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Extend src/stores/panelStore.ts: 1) Add undockPanel(panelId, bounds?) action that calls window_create_floating Tauri command, updates panel isFloating and windowId properties, removes from grid layout. 2) Add dockPanel(panelId, targetPanelId?, dropPosition?) that closes floating window, resets panel floating state, uses splitPanel or mergePanelAsTabs for placement. 3) Add updatePanelFloatingBounds(panelId, bounds) for tracking. 4) Add setPanelFloating(panelId, isFloating, windowId?) helper. 5) Add getFloatingPanels() and getDockedPanels() selectors filtering by isFloating property.",
+			"reasoning": "panelStore.ts exists (686 lines) with extensive panel management. Need to add floating window integration connecting to windowStore and Tauri commands. Medium complexity due to coordination between stores and Tauri backend."
+		},
+		{
+			"taskId": 116,
+			"taskTitle": "Create Window Service for Tauri Communication",
+			"complexityScore": 4,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Create src/services/windowService.ts: 1) Implement createFloatingWindow, closeFloatingWindow, updateFloatingWindowBounds, focusFloatingWindow, listFloatingWindows functions wrapping Tauri invoke() calls. 2) Add event listeners onWindowCreated, onWindowClosed, onWindowMoved, onWindowFocused using Tauri listen() returning UnlistenFn. 3) Handle event payload transformation from Tauri format to TypeScript types. 4) Export windowService object with all methods. 5) Add error handling and logging for failed invocations.",
+			"reasoning": "Service layer following established pattern from modbusService, projectService. Straightforward wrapper around Tauri invoke() and listen() calls. Medium complexity with clear implementation pattern."
+		},
+		{
+			"taskId": 117,
+			"taskTitle": "Implement Window Boundary Detection Hook",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Create src/hooks/useWindowBoundary.ts: 1) Use Tauri Window API (getCurrent, innerPosition, innerSize) to get main window bounds on mount. 2) Add event listeners for window move/resize events to update bounds. 3) Implement checkPosition(clientX, clientY) that returns true if coordinates are outside main window bounds. 4) Implement getPositionRelativeToScreen(clientX, clientY) converting client coords to screen coords using main window position. 5) Return isOutsideMainWindow state, mainWindowBounds, checkPosition, getPositionRelativeToScreen. Handle async Tauri API calls properly.",
+			"reasoning": "New hook requiring Tauri Window API integration for boundary detection. Uses availableMonitors, Window.getCurrent(), innerPosition/innerSize. Medium complexity due to coordinate system handling and async Tauri APIs."
+		},
+		{
+			"taskId": 118,
+			"taskTitle": "Extend PanelDndProvider for Floating Window Creation",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Update src/providers/PanelDndProvider.tsx: 1) Import and use useWindowBoundary hook to get checkPosition and getPositionRelativeToScreen. 2) Extend DragState with isOutsideMainWindow and screenPosition fields. 3) Modify handleDragOver to check window boundaries using checkPosition, update dragState when outside. 4) Modify handleDragEnd to call undockPanel with screen position when isOutsideMainWindow is true. 5) Update DragOverlay styling to show different border color (purple) when outside main window. Reset drag state on completion.",
+			"reasoning": "Integration of boundary detection with existing drag-drop system. PanelDndProvider exists with established drag handling. Medium-high complexity due to coordinate handling and integration with undock flow."
+		},
+		{
+			"taskId": 119,
+			"taskTitle": "Create Floating Window React Components",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Create src/components/floating/ directory: 1) Create FloatingWindowHeader.tsx with title, dock, minimize, maximize, close buttons using lucide-react icons, data-tauri-drag-region for dragging. 2) Create FloatingWindowContent.tsx that retrieves panel from panelStore by panelId, renders PanelContent component, handles dock and close actions. 3) Create FloatingWindowRenderer.tsx that sets up windowService event listeners (onWindowCreated, onWindowClosed, onWindowMoved, onWindowFocused) to sync with windowStore. 4) Add proper cleanup for all event listeners. 5) Create index.ts exporting all components.",
+			"reasoning": "Component layer for floating windows. FloatingWindowHeader provides window controls, FloatingWindowContent renders panel, FloatingWindowRenderer manages event sync. Medium complexity following established component patterns."
+		},
+		{
+			"taskId": 120,
+			"taskTitle": "Add Undock Button to Panel Header",
+			"complexityScore": 3,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Update panel header component: 1) Import ExternalLink icon from lucide-react and usePanelStore. 2) Add onUndock prop and canUndock prop (default true) to PanelHeaderProps. 3) Add Undock button in header action buttons area with ExternalLink icon, hover:bg-gray-700 styling, tooltip 'Undock to floating window'. 4) In Panel component, create handleUndock function that calculates default bounds (window.screenX + 100, window.screenY + 100, 600x400) and calls undockPanel. 5) Conditionally render Undock button when canUndock && !isFloating.",
+			"reasoning": "Simple UI addition to existing panel header. Low-medium complexity as it's adding a button and connecting to existing undockPanel action."
+		},
+		{
+			"taskId": 121,
+			"taskTitle": "Implement Floating Window Entry Point and Routing",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Update src/main.tsx for floating window routing: 1) Parse URL query params to detect floating=true, windowId, panelId using URLSearchParams. 2) Create FloatingWindowProvider.tsx with minimal providers (ThemeProvider) needed for floating windows. 3) If floating window, render FloatingWindowContent with windowId and panelId props instead of MainApp. 4) Consider state synchronization between windows using Zustand persist or Tauri events. 5) Test that floating windows render correct panel content based on panelId.",
+			"reasoning": "Entry point modification for separate window rendering. Query param routing is straightforward but state synchronization adds complexity. Medium complexity overall."
+		},
+		{
+			"taskId": 122,
+			"taskTitle": "Extend Layout Persistence for Floating Windows",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Extend layout persistence: 1) Add floatingWindows array to getCurrentLayout() in layoutService collecting FloatingWindowLayoutConfig from windowStore. 2) In restoreLayout(), iterate floatingWindowConfigs and call undockPanel for each with stored bounds. 3) Add error handling with fallback to docked panel if floating restoration fails. 4) Implement closeAllFloatingWindows() helper to clean up before layout switch. 5) Update Rust layout commands if needed to serialize/deserialize floatingWindows field.",
+			"reasoning": "Extension of existing layout persistence system. layoutPersistenceStore exists. Medium complexity integrating floating window state into save/restore flow."
+		},
+		{
+			"taskId": 123,
+			"taskTitle": "Implement Multi-Monitor Support and Screen Boundary Handling",
+			"complexityScore": 4,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Create src/utils/screenUtils.ts: 1) Implement getAvailableScreenBounds() using Tauri availableMonitors() API returning Bounds array. 2) Implement isPositionOnScreen(x, y) checking if point is within any screen bounds. 3) Implement correctWindowPosition(bounds) that checks visibility (50px minimum visible) and moves to primary screen if not visible. 4) Integrate correctWindowPosition into undockPanel and layout restore for floating windows. 5) Handle edge case of disconnected monitor where saved bounds are off-screen.",
+			"reasoning": "Utility functions for multi-monitor handling using Tauri availableMonitors API. Medium complexity with straightforward geometry calculations but requires handling edge cases."
+		},
+		{
+			"taskId": 124,
+			"taskTitle": "Add Drag-to-Dock Functionality for Floating Windows",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Implement floating-to-dock drag: 1) In FloatingWindowHeader, make header draggable with onDragStart setting application/x-floating-panel data transfer type. 2) In MainLayout, add handleDragOver checking for floating-panel type and preventDefault to enable drop. 3) Add handleDrop parsing JSON payload and calling dockPanel with target position. 4) Integrate with existing drop zone visualization to show dock positions when dragging from floating window. 5) Alternative: use Tauri window startDragging() with detection of main window proximity.",
+			"reasoning": "Reverse of undock flow using HTML5 drag API or Tauri window dragging. Medium complexity coordinating between floating window and main window drop handling."
+		},
+		{
+			"taskId": 125,
+			"taskTitle": "Implement State Synchronization Between Windows",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Create src/utils/stateSync.ts: 1) Define STATE_SYNC_EVENT constant and StateSyncPayload type with storeName, state, sourceWindowId. 2) Implement setupStateSync(storeName, getState, setState) using Tauri emit/listen for cross-window communication. 3) Integrate with panelStore wrapping actions to broadcast changes via stateSync. 4) Alternative: use Zustand persist with BroadcastChannel for same-origin window sync. 5) Add cleanup for state sync listeners and test bidirectional sync between main and floating windows.",
+			"reasoning": "Complex synchronization problem - each Tauri window has separate JS context. Requires event-based sync or shared storage. High complexity due to race conditions, consistency, and cleanup requirements."
+		},
+		{
+			"taskId": 126,
+			"taskTitle": "Write Comprehensive Tests for Floating Window System",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Create tests for floating window system: 1) Unit tests for windowStore (register/unregister, bounds updates, zIndex management) in __tests__/windowStore.test.ts. 2) Component tests for FloatingWindowHeader (button clicks, callbacks) using React Testing Library. 3) Integration tests mocking Tauri invoke for panelStore undock/dock actions. 4) E2E tests using Playwright for undock button click, drag outside to create floating, layout save/restore with floating windows. 5) Add test utilities for mocking Tauri Window and invoke APIs.",
+			"reasoning": "Comprehensive testing across unit, integration, and E2E levels. Medium complexity with established testing patterns but requires Tauri API mocking."
 		}
 	]
 }

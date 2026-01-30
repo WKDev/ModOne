@@ -47,3 +47,24 @@ export * from './ladder';
 
 // OneSim types
 export * from './onesim';
+
+// Window types
+export type {
+  Bounds,
+  FloatingWindowState,
+  FloatingWindowInfo,
+  WindowRegistryState,
+  WindowBounds,
+  CreateFloatingWindowOptions,
+  WindowCreatedEvent,
+  WindowClosedEvent,
+  WindowMovedEvent,
+  WindowResizedEvent,
+  WindowFocusedEvent,
+} from './window';
+
+export {
+  DEFAULT_FLOATING_WINDOW_SIZE,
+  MIN_FLOATING_WINDOW_SIZE,
+  FLOATING_WINDOW_CASCADE_OFFSET,
+} from './window';

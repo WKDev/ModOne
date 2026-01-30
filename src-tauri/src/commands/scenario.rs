@@ -6,11 +6,12 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use tauri::{AppHandle, State};
-use tokio::sync::Mutex;
+use tauri::{AppHandle, Emitter, State};
+use tokio::sync::{mpsc, Mutex};
 
 use crate::scenario::{
-    CsvEventRow, Scenario, ScenarioEvent, ScenarioExecutor, ScenarioState, ScenarioStatus,
+    CsvEventRow, ExecutorCommand, Scenario, ScenarioEvent, ScenarioExecutor, ScenarioState,
+    ScenarioStatus,
 };
 
 /// Load a scenario from a JSON file
@@ -230,17 +231,20 @@ pub async fn scenario_exists(path: String) -> Result<bool, String> {
 /// Managed state for scenario execution
 pub struct ScenarioExecutorState {
     /// The scenario executor (protected by async mutex for execution control)
-    pub executor: Mutex<Option<ScenarioExecutor>>,
+    pub executor: Arc<Mutex<Option<ScenarioExecutor>>>,
     /// Reference to Modbus memory for executor initialization
     pub modbus_memory: Arc<crate::modbus::ModbusMemory>,
+    /// Command channel sender for controlling execution
+    pub command_tx: Mutex<Option<mpsc::Sender<ExecutorCommand>>>,
 }
 
 impl ScenarioExecutorState {
     /// Create a new executor state with the given Modbus memory
     pub fn new(modbus_memory: Arc<crate::modbus::ModbusMemory>) -> Self {
         Self {
-            executor: Mutex::new(None),
+            executor: Arc::new(Mutex::new(None)),
             modbus_memory,
+            command_tx: Mutex::new(None),
         }
     }
 }
@@ -248,6 +252,7 @@ impl ScenarioExecutorState {
 /// Start scenario execution
 ///
 /// Loads the scenario and begins executing events in order.
+/// This command returns immediately after spawning the execution task.
 #[tauri::command]
 pub async fn scenario_run(
     scenario: Scenario,
@@ -262,21 +267,40 @@ pub async fn scenario_run(
     // Load the scenario
     executor.load(scenario)?;
 
+    // Create command channel for controlling execution
+    let command_tx = executor.create_command_channel();
+
+    // Store the command sender
+    {
+        let mut tx_guard = state.command_tx.lock().await;
+        *tx_guard = Some(command_tx);
+    }
+
     // Store the executor
     {
         let mut guard = state.executor.lock().await;
         *guard = Some(executor);
     }
 
-    // Get the executor and run it
-    let mut guard = state.executor.lock().await;
-    if let Some(ref mut executor) = *guard {
-        // Clone app handle for the async execution
-        let handle = app_handle.clone();
+    // Clone the executor Arc for the spawned task
+    let executor_arc = Arc::clone(&state.executor);
+    let handle = app_handle.clone();
 
-        // Run the executor (this is async and will execute the scenario)
-        executor.run(handle).await?;
-    }
+    // Spawn the execution task and return immediately
+    tokio::spawn(async move {
+        let mut guard = executor_arc.lock().await;
+        if let Some(ref mut executor) = *guard {
+            if let Err(e) = executor.run(handle.clone()).await {
+                log::error!("Scenario execution error: {}", e);
+                let _ = handle.emit(
+                    "scenario:error",
+                    serde_json::json!({ "message": e, "eventId": null }),
+                );
+            }
+        }
+        // Clear executor when done
+        *guard = None;
+    });
 
     Ok(())
 }
@@ -286,9 +310,11 @@ pub async fn scenario_run(
 pub async fn scenario_pause(state: State<'_, ScenarioExecutorState>) -> Result<(), String> {
     log::info!("Pausing scenario execution");
 
-    let mut guard = state.executor.lock().await;
-    if let Some(ref mut executor) = *guard {
-        executor.pause()?;
+    let tx_guard = state.command_tx.lock().await;
+    if let Some(ref tx) = *tx_guard {
+        tx.send(ExecutorCommand::Pause)
+            .await
+            .map_err(|e| format!("Failed to send pause command: {}", e))?;
     } else {
         return Err("No scenario executor running".into());
     }
@@ -301,9 +327,11 @@ pub async fn scenario_pause(state: State<'_, ScenarioExecutorState>) -> Result<(
 pub async fn scenario_resume(state: State<'_, ScenarioExecutorState>) -> Result<(), String> {
     log::info!("Resuming scenario execution");
 
-    let mut guard = state.executor.lock().await;
-    if let Some(ref mut executor) = *guard {
-        executor.resume()?;
+    let tx_guard = state.command_tx.lock().await;
+    if let Some(ref tx) = *tx_guard {
+        tx.send(ExecutorCommand::Resume)
+            .await
+            .map_err(|e| format!("Failed to send resume command: {}", e))?;
     } else {
         return Err("No scenario executor running".into());
     }
@@ -316,13 +344,20 @@ pub async fn scenario_resume(state: State<'_, ScenarioExecutorState>) -> Result<
 pub async fn scenario_stop(state: State<'_, ScenarioExecutorState>) -> Result<(), String> {
     log::info!("Stopping scenario execution");
 
-    let mut guard = state.executor.lock().await;
-    if let Some(ref mut executor) = *guard {
-        executor.stop()?;
+    // Send stop command through the channel
+    {
+        let tx_guard = state.command_tx.lock().await;
+        if let Some(ref tx) = *tx_guard {
+            // Ignore send error - execution might have already stopped
+            let _ = tx.send(ExecutorCommand::Stop).await;
+        }
     }
 
-    // Clear the executor
-    *guard = None;
+    // Clear the command sender
+    {
+        let mut tx_guard = state.command_tx.lock().await;
+        *tx_guard = None;
+    }
 
     Ok(())
 }
@@ -352,6 +387,28 @@ pub async fn scenario_get_state(
     } else {
         Ok(ScenarioState::Idle)
     }
+}
+
+/// Seek to a specific time position in the scenario
+///
+/// This allows jumping to a specific point in the scenario timeline.
+/// Events before the seek time are skipped, and execution continues
+/// from the seek position.
+#[tauri::command]
+pub async fn scenario_seek(
+    time_secs: f64,
+    state: State<'_, ScenarioExecutorState>,
+) -> Result<(), String> {
+    log::info!("Seeking scenario to {:.2}s", time_secs);
+
+    let mut guard = state.executor.lock().await;
+    if let Some(ref mut executor) = *guard {
+        executor.seek(time_secs)?;
+    } else {
+        return Err("No scenario loaded".into());
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

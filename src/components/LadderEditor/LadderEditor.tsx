@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import {
   DndContext,
   DragOverlay,
@@ -15,14 +16,7 @@ import {
   KeyboardSensor,
 } from '@dnd-kit/core';
 import { cn } from '../../lib/utils';
-import {
-  useLadderStore,
-  selectCurrentNetworkId,
-  selectCurrentNetwork,
-  selectMode,
-  selectNetworksArray,
-  selectSelectedElementIds,
-} from '../../stores/ladderStore';
+import { useLadderStore } from '../../stores/ladderStore';
 import { LadderGrid } from './LadderGrid';
 import { LadderToolbox } from './LadderToolbox';
 import { LadderToolbar } from './LadderToolbar';
@@ -71,10 +65,14 @@ function DragOverlayContent({ activeId }: { activeId: string | null }) {
  * LadderStatusBar - Status bar at the bottom of the editor
  */
 function LadderStatusBar() {
-  const mode = useLadderStore(selectMode);
-  const networks = useLadderStore(selectNetworksArray);
-  const selectedElementIds = useLadderStore(selectSelectedElementIds);
-  const currentNetwork = useLadderStore(selectCurrentNetwork);
+  const { mode, networks, selectedElementIds, currentNetwork } = useLadderStore(
+    useShallow((state) => ({
+      mode: state.mode,
+      networks: state.networks,
+      selectedElementIds: state.selectedElementIds,
+      currentNetwork: state.currentNetworkId ? state.networks.get(state.currentNetworkId) : null,
+    }))
+  );
 
   const isMonitorMode = mode === 'monitor';
   const selectedCount = selectedElementIds.size;
@@ -84,7 +82,7 @@ function LadderStatusBar() {
     <div className="flex items-center justify-between px-3 py-1.5 bg-neutral-800 border-t border-neutral-700 text-xs text-neutral-400">
       <div className="flex items-center gap-4">
         <span>Mode: {isMonitorMode ? 'Monitor' : 'Edit'}</span>
-        <span>Networks: {networks.length}</span>
+        <span>Networks: {networks.size}</span>
         <span>Elements: {elementCount}</span>
         {selectedCount > 0 && <span>{selectedCount} selected</span>}
       </div>
@@ -109,12 +107,23 @@ export function LadderEditor({
   showNetworkList = true,
   showPropertiesPanel = true,
 }: LadderEditorProps) {
-  const currentNetworkId = useLadderStore(selectCurrentNetworkId);
-  const currentNetwork = useLadderStore(selectCurrentNetwork);
-  const mode = useLadderStore(selectMode);
-  const networks = useLadderStore(selectNetworksArray);
-  const addNetwork = useLadderStore((state) => state.addNetwork);
-  const updateNetwork = useLadderStore((state) => state.updateNetwork);
+  const {
+    currentNetworkId,
+    currentNetwork,
+    mode,
+    networks,
+    addNetwork,
+    updateNetwork,
+  } = useLadderStore(
+    useShallow((state) => ({
+      currentNetworkId: state.currentNetworkId,
+      currentNetwork: state.currentNetworkId ? state.networks.get(state.currentNetworkId) : null,
+      mode: state.mode,
+      networks: state.networks,
+      addNetwork: state.addNetwork,
+      updateNetwork: state.updateNetwork,
+    }))
+  );
 
   // Drag and drop handlers
   const { handleDragStart, handleDragOver, handleDragEnd } = useLadderDragDrop();
@@ -157,10 +166,10 @@ export function LadderEditor({
 
   // Create a default network if none exists
   useEffect(() => {
-    if (networks.length === 0) {
+    if (networks.size === 0) {
       addNetwork('Network 1');
     }
-  }, [networks.length, addNetwork]);
+  }, [networks.size, addNetwork]);
 
   // Handle network comment update
   const handleUpdateComment = useCallback(

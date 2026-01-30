@@ -9,6 +9,7 @@ import {
   parseGridArea,
   createGridArea,
 } from '../utils/gridUtils';
+import { correctWindowPosition } from '../utils/screenUtils';
 import { windowService } from '../services/windowService';
 import { useWindowStore } from './windowStore';
 
@@ -700,12 +701,20 @@ export const usePanelStore = create<PanelStore>()(
         }
 
         // Calculate default bounds if not provided
-        const floatingBounds: Bounds = bounds || {
+        let floatingBounds: Bounds = bounds || {
           x: 100,
           y: 100,
           width: DEFAULT_FLOATING_WINDOW_SIZE.width,
           height: DEFAULT_FLOATING_WINDOW_SIZE.height,
         };
+
+        // Correct position if window is off-screen (handles multi-monitor scenarios)
+        try {
+          floatingBounds = await correctWindowPosition(floatingBounds);
+        } catch (error) {
+          // Fallback to original bounds if position correction fails
+          console.debug('Failed to correct window position:', error);
+        }
 
         try {
           // Create floating window via Tauri

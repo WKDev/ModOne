@@ -11,6 +11,7 @@ import type { LayoutConfig, LayoutPresetInfo, FloatingWindowLayoutConfig } from 
 import { SPECIAL_LAYOUT_NAMES, isBuiltInLayout } from '../types/layout';
 import { layoutService } from '../services/layoutService';
 import { windowService } from '../services/windowService';
+import { correctWindowPosition } from '../utils/screenUtils';
 import { BUILT_IN_LAYOUTS, getPresetByName, getDefaultLayout } from '../config/layoutPresets';
 import { usePanelStore } from './panelStore';
 import { useSidebarStore } from './sidebarStore';
@@ -178,9 +179,20 @@ async function applyLayoutConfig(config: LayoutConfig): Promise<void> {
   if (config.floatingWindows && config.floatingWindows.length > 0) {
     for (const floatingConfig of config.floatingWindows) {
       try {
+        // Correct position if saved bounds are off-screen (e.g., disconnected monitor)
+        let correctedBounds = floatingConfig.bounds;
+        try {
+          correctedBounds = await correctWindowPosition(floatingConfig.bounds);
+          if (correctedBounds.x !== floatingConfig.bounds.x || correctedBounds.y !== floatingConfig.bounds.y) {
+            console.debug(`Corrected floating window position from saved layout (was on disconnected monitor)`);
+          }
+        } catch (posError) {
+          console.debug('Failed to correct window position during layout restore:', posError);
+        }
+
         // Add panel first, then undock it
         const panelId = panelStore.addPanel(floatingConfig.panelType, '1 / 1 / 2 / 2');
-        await panelStore.undockPanel(panelId, floatingConfig.bounds);
+        await panelStore.undockPanel(panelId, correctedBounds);
       } catch (error) {
         console.error(`Failed to restore floating window for panel ${floatingConfig.panelId}:`, error);
         // Fallback: panel is already added as docked, so we just log the error

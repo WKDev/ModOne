@@ -408,6 +408,73 @@ impl ScenarioExecutor {
         Ok(())
     }
 
+    /// Seek to a specific time position in the scenario
+    ///
+    /// This adjusts the execution timeline to the specified time:
+    /// - Events before the seek time are considered "executed"
+    /// - Events at or after the seek time remain in the queue
+    /// - The elapsed time is adjusted to match the seek position
+    pub fn seek(&mut self, time_secs: f64) -> Result<(), String> {
+        // Can only seek when paused or running
+        if self.state == ScenarioState::Idle {
+            return Err("Cannot seek: no scenario loaded".into());
+        }
+
+        let seek_duration = Duration::from_secs_f64(time_secs);
+
+        // Rebuild the event queue with only events at or after seek time
+        self.event_queue.clear();
+
+        if let Some(ref scenario) = self.scenario {
+            let mut events_before = 0;
+
+            for event in scenario.events.iter().filter(|e| e.enabled) {
+                let execute_at = Duration::from_secs_f64(event.time);
+
+                if execute_at >= seek_duration {
+                    // Event is at or after seek position, keep it in queue
+                    self.event_queue.push(ScheduledEvent {
+                        event: event.clone(),
+                        execute_at,
+                    });
+                } else {
+                    // Event is before seek position, count as executed
+                    events_before += 1;
+                }
+            }
+
+            self.executed_count = events_before;
+        }
+
+        // Adjust timing to match seek position
+        // If we're running or paused, we need to adjust start_time so that
+        // calculate_elapsed() returns the seek time
+        if self.start_time.is_some() {
+            let now = Instant::now();
+
+            // If paused, account for pause time
+            if self.state == ScenarioState::Paused {
+                if let Some(pause_time) = self.pause_time {
+                    // Calculate total paused duration up to now
+                    self.paused_duration += now.duration_since(pause_time);
+                    self.pause_time = Some(now);
+                }
+            }
+
+            // Adjust start_time so that: now - start_time - paused_duration = seek_duration
+            // Therefore: start_time = now - paused_duration - seek_duration
+            self.start_time = Some(now - self.paused_duration - seek_duration);
+        }
+
+        log::info!(
+            "Seeked to {:.2}s, {} events remaining in queue",
+            time_secs,
+            self.event_queue.len()
+        );
+
+        Ok(())
+    }
+
     /// Release all pending values immediately
     fn release_all_pending(&mut self) -> Result<(), String> {
         // Take ownership of pending releases to avoid borrow conflicts
@@ -863,5 +930,155 @@ mod tests {
         let state = ScenarioState::Error("Test error".to_string());
         let json = serde_json::to_string(&state).unwrap();
         assert!(json.contains("error"));
+    }
+
+    #[test]
+    fn test_executor_seek_idle_fails() {
+        let memory = create_test_memory();
+        let mut executor = ScenarioExecutor::new(memory);
+
+        // Seek should fail when idle (no scenario loaded)
+        let result = executor.seek(5.0);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("no scenario loaded"));
+    }
+
+    #[test]
+    fn test_executor_seek_forward() {
+        let memory = create_test_memory();
+        let mut executor = ScenarioExecutor::new(memory);
+
+        let scenario = Scenario {
+            metadata: crate::scenario::ScenarioMetadata::default(),
+            settings: crate::scenario::ScenarioSettings::default(),
+            events: vec![
+                ScenarioEvent {
+                    id: "1".to_string(),
+                    time: 0.0,
+                    address: "C:0x0001".to_string(),
+                    value: 1,
+                    persist: true,
+                    persist_duration: None,
+                    note: String::new(),
+                    enabled: true,
+                },
+                ScenarioEvent {
+                    id: "2".to_string(),
+                    time: 1.0,
+                    address: "C:0x0002".to_string(),
+                    value: 1,
+                    persist: true,
+                    persist_duration: None,
+                    note: String::new(),
+                    enabled: true,
+                },
+                ScenarioEvent {
+                    id: "3".to_string(),
+                    time: 2.0,
+                    address: "C:0x0003".to_string(),
+                    value: 1,
+                    persist: true,
+                    persist_duration: None,
+                    note: String::new(),
+                    enabled: true,
+                },
+            ],
+        };
+
+        executor.load(scenario).unwrap();
+
+        // Manually set state to Paused so seek works
+        executor.state = ScenarioState::Paused;
+        executor.start_time = Some(std::time::Instant::now());
+
+        // Initially 3 events in queue
+        assert_eq!(executor.event_queue.len(), 3);
+
+        // Seek to 1.5 seconds - should skip first 2 events (0.0s and 1.0s)
+        executor.seek(1.5).unwrap();
+
+        // Only 1 event should remain (at 2.0s)
+        assert_eq!(executor.event_queue.len(), 1);
+        assert_eq!(executor.executed_count, 2); // 2 events were "skipped"
+    }
+
+    #[test]
+    fn test_executor_seek_to_beginning() {
+        let memory = create_test_memory();
+        let mut executor = ScenarioExecutor::new(memory);
+
+        let scenario = Scenario {
+            metadata: crate::scenario::ScenarioMetadata::default(),
+            settings: crate::scenario::ScenarioSettings::default(),
+            events: vec![
+                ScenarioEvent {
+                    id: "1".to_string(),
+                    time: 1.0,
+                    address: "C:0x0001".to_string(),
+                    value: 1,
+                    persist: true,
+                    persist_duration: None,
+                    note: String::new(),
+                    enabled: true,
+                },
+                ScenarioEvent {
+                    id: "2".to_string(),
+                    time: 2.0,
+                    address: "C:0x0002".to_string(),
+                    value: 1,
+                    persist: true,
+                    persist_duration: None,
+                    note: String::new(),
+                    enabled: true,
+                },
+            ],
+        };
+
+        executor.load(scenario).unwrap();
+
+        // Manually set state to Paused so seek works
+        executor.state = ScenarioState::Paused;
+        executor.start_time = Some(std::time::Instant::now());
+
+        // Seek to 0 - all events should be in queue
+        executor.seek(0.0).unwrap();
+
+        assert_eq!(executor.event_queue.len(), 2);
+        assert_eq!(executor.executed_count, 0);
+    }
+
+    #[test]
+    fn test_executor_seek_past_end() {
+        let memory = create_test_memory();
+        let mut executor = ScenarioExecutor::new(memory);
+
+        let scenario = Scenario {
+            metadata: crate::scenario::ScenarioMetadata::default(),
+            settings: crate::scenario::ScenarioSettings::default(),
+            events: vec![
+                ScenarioEvent {
+                    id: "1".to_string(),
+                    time: 1.0,
+                    address: "C:0x0001".to_string(),
+                    value: 1,
+                    persist: true,
+                    persist_duration: None,
+                    note: String::new(),
+                    enabled: true,
+                },
+            ],
+        };
+
+        executor.load(scenario).unwrap();
+
+        // Manually set state to Paused so seek works
+        executor.state = ScenarioState::Paused;
+        executor.start_time = Some(std::time::Instant::now());
+
+        // Seek past all events
+        executor.seek(100.0).unwrap();
+
+        assert_eq!(executor.event_queue.len(), 0);
+        assert_eq!(executor.executed_count, 1);
     }
 }

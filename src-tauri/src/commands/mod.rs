@@ -53,6 +53,10 @@ pub use modbus::{
 pub use canvas::{
     canvas_circuit_exists, canvas_create_circuit, canvas_delete_circuit, canvas_list_circuits,
     canvas_load_circuit, canvas_save_circuit,
+    // Scope commands and state
+    scope_create, scope_get_data, scope_update_settings, scope_add_sample, scope_add_samples,
+    scope_run_stop, scope_reset, scope_arm_trigger, scope_delete, scope_list, scope_exists,
+    ScopeState,
 };
 
 // Re-export scenario commands and state
@@ -61,7 +65,7 @@ pub use scenario::{
     scenario_list, scenario_load, scenario_save,
     // Execution commands
     scenario_run, scenario_pause, scenario_resume, scenario_stop, scenario_get_status,
-    scenario_get_state, ScenarioExecutorState,
+    scenario_get_state, scenario_seek, ScenarioExecutorState,
 };
 
 // Re-export parser commands

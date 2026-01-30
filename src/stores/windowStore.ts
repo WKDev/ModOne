@@ -6,13 +6,9 @@
 
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { FloatingWindowState, Bounds } from '../types/window';
+import type { FloatingWindowState, Bounds, WindowRegistryState } from '../types/window';
 
-interface WindowStoreState {
-  /** Map of window ID to floating window state */
-  floatingWindows: Map<string, FloatingWindowState>;
-  /** Currently focused floating window ID */
-  focusedWindowId: string | null;
+interface WindowStoreState extends WindowRegistryState {
   /** Next z-index for stacking order */
   nextZIndex: number;
 }

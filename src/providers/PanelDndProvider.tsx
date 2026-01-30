@@ -24,11 +24,26 @@ interface ExtendedDragState extends DragState {
   screenPosition: { x: number; y: number } | null;
 }
 
+interface FloatingDragState {
+  /** Whether a floating panel drag is active (HTML5 drag) */
+  isFloatingDragActive: boolean;
+  /** Panel ID being dragged from floating window */
+  floatingPanelId: string | null;
+  /** Window ID of the floating window */
+  floatingWindowId: string | null;
+}
+
 interface PanelDndContextValue {
   /** Current drag state */
   dragState: ExtendedDragState;
   /** Whether a drag operation is in progress */
   isDragging: boolean;
+  /** Floating drag state for HTML5 drag from floating windows */
+  floatingDragState: FloatingDragState;
+  /** Notify that a floating panel drag has started */
+  notifyFloatingDragStart: (panelId: string, windowId: string) => void;
+  /** Notify that a floating panel drag has ended */
+  notifyFloatingDragEnd: () => void;
 }
 
 const PanelDndContext = createContext<PanelDndContextValue | null>(null);
@@ -60,6 +75,28 @@ export function PanelDndProvider({ children }: PanelDndProviderProps) {
     isOutsideMainWindow: false,
     screenPosition: null,
   });
+
+  const [floatingDragState, setFloatingDragState] = useState<FloatingDragState>({
+    isFloatingDragActive: false,
+    floatingPanelId: null,
+    floatingWindowId: null,
+  });
+
+  const notifyFloatingDragStart = useCallback((panelId: string, windowId: string) => {
+    setFloatingDragState({
+      isFloatingDragActive: true,
+      floatingPanelId: panelId,
+      floatingWindowId: windowId,
+    });
+  }, []);
+
+  const notifyFloatingDragEnd = useCallback(() => {
+    setFloatingDragState({
+      isFloatingDragActive: false,
+      floatingPanelId: null,
+      floatingWindowId: null,
+    });
+  }, []);
 
   // Track the last known pointer position for drag end
   const lastPointerPosition = useRef<{ clientX: number; clientY: number } | null>(null);
@@ -233,8 +270,11 @@ export function PanelDndProvider({ children }: PanelDndProviderProps) {
     () => ({
       dragState,
       isDragging: dragState.activePanel !== null,
+      floatingDragState,
+      notifyFloatingDragStart,
+      notifyFloatingDragEnd,
     }),
-    [dragState]
+    [dragState, floatingDragState, notifyFloatingDragStart, notifyFloatingDragEnd]
   );
 
   return (

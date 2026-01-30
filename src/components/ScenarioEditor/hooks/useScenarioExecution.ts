@@ -46,6 +46,8 @@ export interface UseScenarioExecutionReturn {
   resume: () => Promise<void>;
   /** Stop execution and reset time */
   stop: () => Promise<void>;
+  /** Seek to a specific time position in seconds */
+  seek: (timeSecs: number) => Promise<void>;
   /** Clear any error */
   clearError: () => void;
 }
@@ -251,6 +253,16 @@ export function useScenarioExecution(): UseScenarioExecutionReturn {
     }
   }, [setExecutionState]);
 
+  const seek = useCallback(async (timeSecs: number) => {
+    try {
+      await invoke('scenario_seek', { timeSecs });
+      // Status will be updated via the status-changed event
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+    }
+  }, []);
+
   const clearError = useCallback(() => {
     setError(null);
   }, []);
@@ -280,6 +292,7 @@ export function useScenarioExecution(): UseScenarioExecutionReturn {
     pause,
     resume,
     stop,
+    seek,
     clearError,
   };
 }

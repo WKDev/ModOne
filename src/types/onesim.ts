@@ -192,3 +192,33 @@ export interface ScanCompletePayload {
   /** Scan duration in milliseconds */
   duration: number;
 }
+
+// ============================================================================
+// Scope Display Types
+// ============================================================================
+
+/** Channel display data from scope engine */
+export interface ChannelDisplayData {
+  /** Channel index (0-based) */
+  index: number;
+  /** Waveform points as [x, y] tuples where x is 0-1 normalized time, y is voltage */
+  points: [number, number][];
+  /** Minimum voltage in buffer */
+  min: number;
+  /** Maximum voltage in buffer */
+  max: number;
+  /** Average voltage in buffer */
+  average: number;
+}
+
+/** Complete scope display data from Rust backend */
+export interface ScopeDisplayData {
+  /** Channel data array */
+  channels: ChannelDisplayData[];
+  /** Whether trigger condition was met */
+  triggered: boolean;
+  /** Trigger position as 0-1 normalized value */
+  triggerPosition: number;
+  /** Time per division in ms */
+  timePerDiv: number;
+}

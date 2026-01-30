@@ -8,6 +8,7 @@ import { PanelDndProvider } from './providers/PanelDndProvider';
 import { useStateSync } from './hooks/useStateSync';
 import { FloatingWindowContent } from './components/floating/FloatingWindowContent';
 import { FloatingWindowRenderer } from './components/floating/FloatingWindowRenderer';
+import { CommandPalette, useCommandPalette, registerAllCommands } from './components/CommandPalette';
 
 /**
  * Parse URL parameters to detect floating window mode
@@ -37,8 +38,16 @@ function MainWindowContent() {
   const { initialize, saveLastSession, isLoading } = useLayoutPersistenceStore();
   const [isInitialized, setIsInitialized] = useState(false);
 
+  // Command palette state (useCommandPalette hook handles Ctrl+Shift+P shortcut)
+  const { isOpen: isPaletteOpen, close: closePalette } = useCommandPalette();
+
   // Initialize cross-window state synchronization
   useStateSync();
+
+  // Register all commands on mount
+  useEffect(() => {
+    registerAllCommands();
+  }, []);
 
   // Initialize layout persistence on mount
   useEffect(() => {
@@ -85,6 +94,8 @@ function MainWindowContent() {
       </MainLayout>
       {/* Floating window event listener (only needed in main window) */}
       <FloatingWindowRenderer />
+      {/* Command Palette */}
+      <CommandPalette isOpen={isPaletteOpen} onClose={closePalette} />
     </PanelDndProvider>
   );
 }
