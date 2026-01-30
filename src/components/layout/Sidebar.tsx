@@ -4,7 +4,6 @@ import { ActivityBar } from './ActivityBar';
 import { ExplorerPanel } from '../sidebar/ExplorerPanel';
 import { SearchPanel } from '../sidebar/SearchPanel';
 import { ModbusPanel } from '../sidebar/ModbusPanel';
-import { SettingsPanel } from '../sidebar/SettingsPanel';
 
 export function Sidebar() {
   const { activePanel, isVisible, width, setWidth } = useSidebarStore();
@@ -54,8 +53,6 @@ export function Sidebar() {
         return <SearchPanel />;
       case 'modbus':
         return <ModbusPanel />;
-      case 'settings':
-        return <SettingsPanel />;
       default:
         return null;
     }

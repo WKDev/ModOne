@@ -40,6 +40,8 @@ interface PanelStoreActions {
   closeAllTabs: (panelId: string) => void;
   duplicateTab: (panelId: string, tabId: string) => string | null;
   moveTabToNewPanel: (panelId: string, tabId: string) => string | null;
+  // Settings tab action
+  openSettingsTab: () => void;
   // Panel drag-and-drop actions
   splitPanel: (
     targetPanelId: string,
@@ -719,6 +721,39 @@ export const usePanelStore = create<PanelStore>()(
         // Create a new panel with the preferred type or default to ladder-editor
         const type = preferredType || 'ladder-editor';
         return addPanel(type, '1 / 1 / 2 / 2');
+      },
+
+      openSettingsTab: () => {
+        const { panels, addTab, setActiveTab } = get();
+
+        // Check if settings tab already exists
+        for (const panel of panels) {
+          if (panel.tabs) {
+            const existingTab = panel.tabs.find((t) => t.panelType === 'settings');
+            if (existingTab) {
+              // Focus existing settings tab
+              setActiveTab(panel.id, existingTab.id);
+              return;
+            }
+          }
+        }
+
+        // Find an editor panel to add the settings tab to
+        const editorTypes: PanelType[] = [
+          'ladder-editor',
+          'one-canvas',
+          'scenario-editor',
+          'csv-viewer',
+        ];
+        const editorPanel = panels.find((p) => editorTypes.includes(p.type));
+
+        if (editorPanel) {
+          // Add settings tab to existing editor panel
+          addTab(editorPanel.id, 'settings', 'Settings');
+        } else if (panels.length > 0) {
+          // Add to first available panel
+          addTab(panels[0].id, 'settings', 'Settings');
+        }
       },
 
       // Floating window actions
