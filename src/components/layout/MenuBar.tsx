@@ -4,6 +4,7 @@ import { useLayoutStore } from '../../stores/layoutStore';
 import { useLayoutPersistenceStore } from '../../stores/layoutPersistenceStore';
 import { SaveLayoutDialog } from './SaveLayoutDialog';
 import { projectDialogService } from '../../services/projectDialogService';
+import { fileDialogService } from '../../services/fileDialogService';
 import { commandRegistry } from '../CommandPalette/commandRegistry';
 
 interface MenuItem {
@@ -45,6 +46,32 @@ const baseMenus: Menu[] = [
         label: 'Save As...',
         shortcut: 'Ctrl+Shift+S',
         action: () => commandRegistry.execute('file.saveAs'),
+      },
+      {
+        label: 'Save All',
+        shortcut: 'Ctrl+Alt+S',
+        action: () => commandRegistry.execute('file.saveAll'),
+      },
+      { separator: true, label: '' },
+      {
+        label: 'Add',
+        submenu: [
+          {
+            label: 'New Canvas',
+            shortcut: 'Ctrl+Shift+C',
+            action: () => fileDialogService.requestNewCanvas(),
+          },
+          {
+            label: 'New Ladder',
+            shortcut: 'Ctrl+Shift+L',
+            action: () => fileDialogService.requestNewLadder(),
+          },
+          {
+            label: 'New Scenario',
+            shortcut: 'Ctrl+Shift+N',
+            action: () => fileDialogService.requestNewScenario(),
+          },
+        ],
       },
       { separator: true, label: '' },
       {

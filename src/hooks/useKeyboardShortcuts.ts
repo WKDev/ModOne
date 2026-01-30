@@ -11,6 +11,7 @@ interface KeyboardShortcutCallbacks {
   onOpenProject?: () => void;
   onSaveProject?: () => void;
   onSaveProjectAs?: () => void;
+  onSaveAll?: () => void;
   onCloseProject?: () => void;
 }
 
@@ -37,6 +38,7 @@ export function useKeyboardShortcuts({
   onOpenProject,
   onSaveProject,
   onSaveProjectAs,
+  onSaveAll,
   onCloseProject,
 }: KeyboardShortcutCallbacks) {
   const handleKeyDown = useCallback(
@@ -71,7 +73,13 @@ export function useKeyboardShortcuts({
           break;
 
         case 's':
-          if (e.shiftKey) {
+          if (e.altKey) {
+            // Ctrl+Alt+S: Save All
+            if (onSaveAll) {
+              e.preventDefault();
+              onSaveAll();
+            }
+          } else if (e.shiftKey) {
             // Ctrl+Shift+S: Save As
             if (onSaveProjectAs) {
               e.preventDefault();
@@ -95,7 +103,7 @@ export function useKeyboardShortcuts({
           break;
       }
     },
-    [onNewProject, onOpenProject, onSaveProject, onSaveProjectAs, onCloseProject]
+    [onNewProject, onOpenProject, onSaveProject, onSaveProjectAs, onSaveAll, onCloseProject]
   );
 
   useEffect(() => {

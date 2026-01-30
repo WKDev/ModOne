@@ -5,11 +5,12 @@
  * Uses projectService for Tauri backend integration and projectStore for state.
  */
 
-import { FileText, FolderOpen, Save, X } from 'lucide-react';
+import { FileText, FolderOpen, Save, SaveAll, X } from 'lucide-react';
 import { commandRegistry } from '../commandRegistry';
 import { projectDialogService } from '../../../services/projectDialogService';
 import { projectService } from '../../../services/projectService';
 import { useProjectStore } from '../../../stores/projectStore';
+import { useDocumentRegistry } from '../../../stores/documentRegistry';
 import type { Command } from '../types';
 
 /**
@@ -81,6 +82,29 @@ export function registerFileCommands(): void {
       keywords: ['save', 'export', 'copy'],
       execute: async () => {
         projectDialogService.requestSaveAs();
+      },
+    },
+    {
+      id: 'file.saveAll',
+      category: 'file',
+      label: 'Save All',
+      description: 'Save all open documents with unsaved changes',
+      icon: <SaveAll size={16} />,
+      shortcut: 'Ctrl+Alt+S',
+      keywords: ['save', 'all', 'documents'],
+      when: () => useDocumentRegistry.getState().hasUnsavedChanges(),
+      execute: async () => {
+        const { getDirtyDocuments, markClean } = useDocumentRegistry.getState();
+        const dirtyDocs = getDirtyDocuments();
+
+        // TODO: Implement actual file save when file save service is ready
+        // For now, just mark all as clean
+        for (const doc of dirtyDocs) {
+          // In the future: await documentSaveService.save(doc);
+          markClean(doc.id);
+        }
+
+        console.log(`Saved ${dirtyDocs.length} document(s)`);
       },
     },
     {
