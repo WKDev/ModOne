@@ -82,7 +82,7 @@ export function circuitToYamlSchema(state: CircuitState): YamlCircuitSchema {
   }
 
   return {
-    version: '1.0',
+    version: '1.1',
     metadata: {
       name: state.metadata.name,
       description: state.metadata.description,

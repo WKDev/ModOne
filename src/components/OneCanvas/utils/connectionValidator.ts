@@ -6,6 +6,7 @@
 
 import type { Block, Wire, WireEndpoint, PortEndpoint, PortType } from '../types';
 import { isPortEndpoint } from '../types';
+import { wireExists as wireExistsHelper } from './canvasHelpers';
 
 // ============================================================================
 // Types
@@ -59,14 +60,6 @@ export function arePortTypesCompatible(
   return false;
 }
 
-/** Get a unique key for a wire endpoint for comparison */
-function endpointKey(ep: WireEndpoint): string {
-  if (isPortEndpoint(ep)) {
-    return `port:${ep.componentId}:${ep.portId}`;
-  }
-  return `junction:${ep.junctionId}`;
-}
-
 /**
  * Check if a wire already exists between two endpoints
  */
@@ -75,13 +68,7 @@ export function wireExists(
   from: WireEndpoint,
   to: WireEndpoint
 ): boolean {
-  const fromKey = endpointKey(from);
-  const toKey = endpointKey(to);
-  return wires.some(
-    (wire) =>
-      (endpointKey(wire.from) === fromKey && endpointKey(wire.to) === toKey) ||
-      (endpointKey(wire.from) === toKey && endpointKey(wire.to) === fromKey)
-  );
+  return wireExistsHelper(wires, from, to);
 }
 
 /**

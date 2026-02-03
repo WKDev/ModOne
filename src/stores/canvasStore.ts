@@ -23,12 +23,19 @@ import type {
 } from '../components/OneCanvas/types';
 import { isPortEndpoint } from '../components/OneCanvas/types';
 import {
-  getPortRelativePosition,
-  calculateWireBendPoints,
-} from '../components/OneCanvas/utils/wirePathCalculator';
-import {
   getBlockSize,
+  getDefaultPorts as getDefaultPortsFromDefs,
+  getDefaultBlockProps as getDefaultBlockPropsFromDefs,
 } from '../components/OneCanvas/blockDefinitions';
+import {
+  generateId,
+  snapToGridPosition,
+  endpointKey,
+  isValidEndpoint,
+  wireExists,
+  findHandleInsertIndex,
+  computeWireBendPoints,
+} from '../components/OneCanvas/utils/canvasHelpers';
 
 // ============================================================================
 // Types
@@ -238,21 +245,8 @@ const initialState: CanvasState = {
 };
 
 // ============================================================================
-// Helper Functions
+// Helper Functions (non-shared, canvasStore-specific)
 // ============================================================================
-
-/** Generate unique ID for components */
-function generateId(type: string): string {
-  return `${type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
-
-/** Snap position to grid */
-function snapToGridPosition(position: Position, gridSize: number): Position {
-  return {
-    x: Math.round(position.x / gridSize) * gridSize,
-    y: Math.round(position.y / gridSize) * gridSize,
-  };
-}
 
 /** Create a deep clone of circuit state for history */
 function createSnapshot(components: Map<string, Block>, wires: Wire[], junctions?: Map<string, Junction>): HistorySnapshot {
@@ -293,63 +287,9 @@ function restoreSnapshot(snapshot: HistorySnapshot): {
   };
 }
 
-/** Validate wire endpoint exists */
-function isValidEndpoint(
-  endpoint: WireEndpoint,
-  components: Map<string, Block>,
-  junctions?: Map<string, Junction>
-): boolean {
-  if (isPortEndpoint(endpoint)) {
-    const component = components.get(endpoint.componentId);
-    if (!component) return false;
-    return component.ports.some((port) => port.id === endpoint.portId);
-  } else {
-    // Junction endpoint
-    return junctions ? junctions.has(endpoint.junctionId) : false;
-  }
-}
-
-/** Get a unique key for a wire endpoint for comparison */
-function endpointKey(ep: WireEndpoint): string {
-  if (isPortEndpoint(ep)) {
-    return `port:${ep.componentId}:${ep.portId}`;
-  }
-  return `junction:${ep.junctionId}`;
-}
-
-/** Check if wire already exists (in either direction) */
-function wireExists(wires: Wire[], from: WireEndpoint, to: WireEndpoint): boolean {
-  const fromKey = endpointKey(from);
-  const toKey = endpointKey(to);
-  return wires.some(
-    (wire) =>
-      (endpointKey(wire.from) === fromKey && endpointKey(wire.to) === toKey) ||
-      (endpointKey(wire.from) === toKey && endpointKey(wire.to) === fromKey)
-  );
-}
-
-/** Get default properties for a block type */
+/** Wrapper to get default block props from blockDefinitions */
 function getDefaultBlockProps(type: BlockType): Partial<Block> {
-  switch (type) {
-    case 'power_24v':
-      return { maxCurrent: 1000 };
-    case 'power_12v':
-      return { maxCurrent: 1000 };
-    case 'gnd':
-      return {};
-    case 'plc_out':
-      return { address: 'C:0x0000', normallyOpen: true, inverted: false };
-    case 'plc_in':
-      return { address: 'DI:0x0000', thresholdVoltage: 12, inverted: false };
-    case 'led':
-      return { color: 'red', forwardVoltage: 2.0, lit: false };
-    case 'button':
-      return { mode: 'momentary', contactConfig: '1a', pressed: false };
-    case 'scope':
-      return { channels: 1, triggerMode: 'auto', timeBase: 100, voltageScale: 5 };
-    default:
-      return {};
-  }
+  return getDefaultBlockPropsFromDefs(type) as Partial<Block>;
 }
 
 /** Threshold in pixels before direction is detected */
@@ -373,141 +313,9 @@ function detectDragDirection(startPos: Position, currentPos: Position): PortPosi
   return dy > 0 ? 'bottom' : 'top';
 }
 
-/** Helper to get port relative position without importing from wirePathCalculator (avoid circular) */
-function getPortRelativePos(
-  portPosition: PortPosition,
-  portOffset: number,
-  blockSize: { width: number; height: number }
-): Position {
-  switch (portPosition) {
-    case 'top': return { x: blockSize.width * portOffset, y: 0 };
-    case 'bottom': return { x: blockSize.width * portOffset, y: blockSize.height };
-    case 'left': return { x: 0, y: blockSize.height * portOffset };
-    case 'right': return { x: blockSize.width, y: blockSize.height * portOffset };
-    default: return { x: blockSize.width / 2, y: blockSize.height / 2 };
-  }
-}
-
-/**
- * Find where to insert a new handle in the points array based on path order.
- * Uses distance from the wire's from-port to determine ordering along the path.
- */
-function findHandleInsertIndex(wire: Wire, position: Position, components: Map<string, Block>): number {
-  if (!wire.handles || wire.handles.length === 0) {
-    return 0;
-  }
-
-  // Get from port position as reference point for ordering
-  let fromPos: Position = { x: 0, y: 0 };
-  const wireFrom = wire.from;
-  const fromBlock = isPortEndpoint(wireFrom) ? components.get(wireFrom.componentId) : undefined;
-  if (fromBlock && isPortEndpoint(wireFrom)) {
-    const fromPort = fromBlock.ports.find((p) => p.id === wireFrom.portId);
-    if (fromPort) {
-      const blockSize = fromBlock.size;
-      const relPos = getPortRelativePos(fromPort.position, fromPort.offset ?? 0.5, blockSize);
-      fromPos = { x: fromBlock.position.x + relPos.x, y: fromBlock.position.y + relPos.y };
-    }
-  }
-
-  // Calculate distance from fromPort for each existing handle and the new position
-  const distFromStart = (p: Position) =>
-    Math.sqrt(Math.pow(p.x - fromPos.x, 2) + Math.pow(p.y - fromPos.y, 2));
-
-  const newDist = distFromStart(position);
-
-  // Find the correct insertion index to maintain order by distance from start
-  for (let i = 0; i < wire.handles.length; i++) {
-    if (newDist < distFromStart(wire.handles[i].position)) {
-      return i;
-    }
-  }
-
-  return wire.handles.length;
-}
-
-/**
- * Compute auto-generated bend points for a wire based on port directions.
- * Returns the points and constraints, or undefined if no bends needed.
- */
-function computeWireBendPoints(
-  from: WireEndpoint,
-  to: WireEndpoint,
-  components: Map<string, Block>,
-  fromExitDirection?: PortPosition,
-  toExitDirection?: PortPosition
-): WireHandle[] | undefined {
-  // Only compute bend points for port-to-port wires
-  if (!isPortEndpoint(from) || !isPortEndpoint(to)) return undefined;
-
-  const fromBlock = components.get(from.componentId);
-  const toBlock = components.get(to.componentId);
-  if (!fromBlock || !toBlock) return undefined;
-
-  const fromPort = fromBlock.ports.find((p) => p.id === from.portId);
-  const toPort = toBlock.ports.find((p) => p.id === to.portId);
-  if (!fromPort || !toPort) return undefined;
-
-  const fromSize = fromBlock.size;
-  const toSize = toBlock.size;
-
-  const fromRelPos = getPortRelativePosition(fromPort.position, fromPort.offset ?? 0.5, fromSize);
-  const toRelPos = getPortRelativePosition(toPort.position, toPort.offset ?? 0.5, toSize);
-
-  const fromPos = { x: fromBlock.position.x + fromRelPos.x, y: fromBlock.position.y + fromRelPos.y };
-  const toPos = { x: toBlock.position.x + toRelPos.x, y: toBlock.position.y + toRelPos.y };
-
-  const fromDir = fromExitDirection || fromPort.position;
-  const toDir = toExitDirection || toPort.position;
-
-  const result = calculateWireBendPoints(fromPos, toPos, fromDir, toDir);
-  if (result.points.length === 0) return undefined;
-
-  return result.points.map((p, i) => ({
-    position: p,
-    constraint: result.constraints[i],
-    source: 'auto' as const,
-  }));
-}
-
-/** Get default ports for a block type */
+/** Get default ports for a block type (delegates to blockDefinitions) */
 function getDefaultPorts(type: BlockType): Block['ports'] {
-  switch (type) {
-    case 'power_24v':
-    case 'power_12v':
-      return [{ id: 'out', type: 'output', label: '+', position: 'bottom' }];
-    case 'gnd':
-      return [{ id: 'in', type: 'input', label: 'GND', position: 'top' }];
-    case 'plc_out':
-      return [
-        { id: 'in', type: 'input', label: 'IN', position: 'left' },
-        { id: 'out', type: 'output', label: 'OUT', position: 'right' },
-      ];
-    case 'plc_in':
-      return [
-        { id: 'in', type: 'input', label: 'IN', position: 'left' },
-        { id: 'out', type: 'output', label: 'OUT', position: 'right' },
-      ];
-    case 'led':
-      return [
-        { id: 'anode', type: 'input', label: '+', position: 'top' },
-        { id: 'cathode', type: 'output', label: '-', position: 'bottom' },
-      ];
-    case 'button':
-      return [
-        { id: 'in', type: 'input', label: 'IN', position: 'left' },
-        { id: 'out', type: 'output', label: 'OUT', position: 'right' },
-      ];
-    case 'scope':
-      return [
-        { id: 'ch1', type: 'input', label: 'CH1', position: 'left', offset: 0.25 },
-        { id: 'ch2', type: 'input', label: 'CH2', position: 'left', offset: 0.5 },
-        { id: 'ch3', type: 'input', label: 'CH3', position: 'left', offset: 0.75 },
-        { id: 'ch4', type: 'input', label: 'CH4', position: 'left', offset: 1.0 },
-      ];
-    default:
-      return [];
-  }
+  return getDefaultPortsFromDefs(type);
 }
 
 // ============================================================================
