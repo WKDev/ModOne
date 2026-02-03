@@ -2,9 +2,11 @@
  * Wire Drawing Hook
  *
  * Manages the wire drawing interaction state.
+ * Delegates to the canvas store for wire drawing state (single source of truth)
+ * while keeping UI-specific logic (valid targets computation) in the hook.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useCanvasStore } from '../../../stores/canvasStore';
 import { isValidConnection, getValidTargets } from '../utils/connectionValidator';
 import { getPortAbsolutePosition } from '../utils/wirePathCalculator';
@@ -47,14 +49,36 @@ interface UseWireDrawingReturn {
 // ============================================================================
 
 export function useWireDrawing(): UseWireDrawingReturn {
-  const [drawing, setDrawing] = useState<WireDrawingState | null>(null);
+  // Valid targets are UI-only state computed when wire drawing starts
+  const [validTargets, setValidTargets] = useState<Set<string>>(new Set());
 
-  // Store access
+  // Store access - use store as single source of truth for wire drawing state
   const components = useCanvasStore((state) => state.components);
   const wires = useCanvasStore((state) => state.wires);
-  const addWire = useCanvasStore((state) => state.addWire);
+  const storeWireDrawing = useCanvasStore((state) => state.wireDrawing);
+  const startWireDrawing = useCanvasStore((state) => state.startWireDrawing);
+  const updateWireDrawingStore = useCanvasStore((state) => state.updateWireDrawing);
+  const completeWireDrawing = useCanvasStore((state) => state.completeWireDrawing);
+  const cancelWireDrawing = useCanvasStore((state) => state.cancelWireDrawing);
 
-  // Check if currently drawing
+  // Derive drawing state from store + local valid targets
+  const drawing = useMemo((): WireDrawingState | null => {
+    if (!storeWireDrawing) return null;
+
+    const block = components.get(storeWireDrawing.from.componentId);
+    if (!block) return null;
+
+    const fromPosition = getPortAbsolutePosition(block, storeWireDrawing.from.portId);
+    if (!fromPosition) return null;
+
+    return {
+      from: storeWireDrawing.from,
+      fromPosition,
+      tempPosition: storeWireDrawing.tempPosition,
+      validTargets,
+    };
+  }, [storeWireDrawing, components, validTargets]);
+
   const isDrawing = drawing !== null;
 
   // Start drawing a wire from a port
@@ -63,60 +87,53 @@ export function useWireDrawing(): UseWireDrawingReturn {
       const block = components.get(blockId);
       if (!block) return;
 
-      // Get port absolute position
       const fromPosition = getPortAbsolutePosition(block, portId);
       if (!fromPosition) return;
 
-      // Get valid targets
+      // Compute valid targets (UI logic)
       const from: WireEndpoint = { componentId: blockId, portId };
       const targets = getValidTargets(from, components, wires);
-      const validTargets = new Set(
-        targets.map((t) => `${t.componentId}:${t.portId}`)
-      );
+      setValidTargets(new Set(targets.map((t) => `${t.componentId}:${t.portId}`)));
 
-      setDrawing({
-        from,
-        fromPosition,
-        tempPosition: fromPosition,
-        validTargets,
-      });
+      // Delegate to store
+      startWireDrawing(from, { startPosition: fromPosition });
     },
-    [components, wires]
+    [components, wires, startWireDrawing]
   );
 
   // Update wire preview position
-  const updateWirePreview = useCallback((mousePosition: Position) => {
-    setDrawing((prev) => {
-      if (!prev) return null;
-      return { ...prev, tempPosition: mousePosition };
-    });
-  }, []);
+  const updateWirePreview = useCallback(
+    (mousePosition: Position) => {
+      updateWireDrawingStore(mousePosition);
+    },
+    [updateWireDrawingStore]
+  );
 
   // Complete the wire at a target port
   const endWire = useCallback(
     (blockId: string, portId: string): boolean => {
-      if (!drawing) return false;
+      if (!storeWireDrawing) return false;
 
       const to: WireEndpoint = { componentId: blockId, portId };
-      const validation = isValidConnection(drawing.from, to, components, wires);
+      const validation = isValidConnection(storeWireDrawing.from, to, components, wires);
 
       if (validation.valid) {
-        addWire(drawing.from, to);
-        setDrawing(null);
+        completeWireDrawing(to);
+        setValidTargets(new Set());
         return true;
       }
 
-      // Invalid connection - keep drawing or cancel
       console.warn('Invalid wire connection:', validation.reason);
       return false;
     },
-    [drawing, components, wires, addWire]
+    [storeWireDrawing, components, wires, completeWireDrawing]
   );
 
   // Cancel wire drawing
   const cancelWire = useCallback(() => {
-    setDrawing(null);
-  }, []);
+    cancelWireDrawing();
+    setValidTargets(new Set());
+  }, [cancelWireDrawing]);
 
   // Check if a port is a valid target
   const isValidTarget = useCallback(

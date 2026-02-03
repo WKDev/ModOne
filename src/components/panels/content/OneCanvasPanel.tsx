@@ -115,7 +115,7 @@ interface WireRendererProps {
   isSelected: boolean;
   onAddHandle?: (wireId: string, position: Position) => void;
   onContextMenu?: (wireId: string, position: Position, screenPos: { x: number; y: number }) => void;
-  onHandleDragStart?: (wireId: string, handleIndex: number, constraint: HandleConstraint, e: React.MouseEvent) => void;
+  onHandleDragStart?: (wireId: string, handleIndex: number, constraint: HandleConstraint, e: React.MouseEvent, handlePosition: Position) => void;
   onHandleContextMenu?: (wireId: string, handleIndex: number, e: React.MouseEvent) => void;
 }
 
@@ -296,7 +296,6 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     zoom,
     pan,
     addComponent,
-    addWire,
     moveComponent,
     removeWire,
     createJunctionOnWire,
@@ -309,6 +308,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
   const wireDrawing = useCanvasStore((state) => state.wireDrawing);
   const startWireDrawing = useCanvasStore((state) => state.startWireDrawing);
   const updateWireDrawing = useCanvasStore((state) => state.updateWireDrawing);
+  const completeWireDrawing = useCanvasStore((state) => state.completeWireDrawing);
   const cancelWireDrawing = useCanvasStore((state) => state.cancelWireDrawing);
   const selectedIds = useCanvasStore((state) => state.selectedIds);
   const setSelection = useCanvasStore((state) => state.setSelection);
@@ -435,12 +435,11 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
   const handleEndWire = useCallback(
     (blockId: string, portId: string) => {
       if (wireDrawing) {
-        // Use document-aware addWire function
-        addWire(wireDrawing.from, { componentId: blockId, portId });
-        cancelWireDrawing();
+        // Use completeWireDrawing to properly record exit directions
+        completeWireDrawing({ componentId: blockId, portId });
       }
     },
-    [wireDrawing, addWire, cancelWireDrawing]
+    [wireDrawing, completeWireDrawing]
   );
 
   // Handle canvas mouse move for wire preview
@@ -639,22 +638,25 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
                   if (!fromComponent) return null;
 
                   const fromPort = fromComponent.ports.find((p) => p.id === wireDrawing.from.portId);
-                  const blockSize = 60;
-                  let fromPos: Position = { x: fromComponent.position.x + blockSize / 2, y: fromComponent.position.y + blockSize / 2 };
+                  const fromBlockSize = getBlockSize(fromComponent.type);
+                  const portOffset = fromPort?.offset ?? 0.5;
+                  let fromPos: Position = { x: fromComponent.position.x + fromBlockSize.width / 2, y: fromComponent.position.y + fromBlockSize.height / 2 };
+                  let defaultFromDir: PortPosition | undefined;
 
                   if (fromPort) {
+                    defaultFromDir = fromPort.position as PortPosition;
                     switch (fromPort.position) {
                       case 'top':
-                        fromPos = { x: fromComponent.position.x + blockSize / 2, y: fromComponent.position.y };
+                        fromPos = { x: fromComponent.position.x + fromBlockSize.width * portOffset, y: fromComponent.position.y };
                         break;
                       case 'bottom':
-                        fromPos = { x: fromComponent.position.x + blockSize / 2, y: fromComponent.position.y + blockSize };
+                        fromPos = { x: fromComponent.position.x + fromBlockSize.width * portOffset, y: fromComponent.position.y + fromBlockSize.height };
                         break;
                       case 'left':
-                        fromPos = { x: fromComponent.position.x, y: fromComponent.position.y + blockSize / 2 };
+                        fromPos = { x: fromComponent.position.x, y: fromComponent.position.y + fromBlockSize.height * portOffset };
                         break;
                       case 'right':
-                        fromPos = { x: fromComponent.position.x + blockSize, y: fromComponent.position.y + blockSize / 2 };
+                        fromPos = { x: fromComponent.position.x + fromBlockSize.width, y: fromComponent.position.y + fromBlockSize.height * portOffset };
                         break;
                     }
                   }
@@ -663,6 +665,8 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
                     <WirePreview
                       from={fromPos}
                       to={wireDrawing.tempPosition}
+                      fromExitDirection={wireDrawing.exitDirection}
+                      defaultFromDirection={defaultFromDir}
                     />
                   );
                 })()}

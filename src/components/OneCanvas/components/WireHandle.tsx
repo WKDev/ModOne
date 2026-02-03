@@ -26,7 +26,8 @@ interface WireHandleProps {
     wireId: string,
     handleIndex: number,
     constraint: HandleConstraint,
-    e: React.MouseEvent
+    e: React.MouseEvent,
+    handlePosition: Position
   ) => void;
   /** Called when handle is right-clicked (for removal) */
   onContextMenu?: (
@@ -67,7 +68,7 @@ export const WireHandle = memo(function WireHandle({
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    onDragStart(wireId, handleIndex, constraint, e);
+    onDragStart(wireId, handleIndex, constraint, e, position);
   };
 
   const handleRightClick = (e: React.MouseEvent) => {

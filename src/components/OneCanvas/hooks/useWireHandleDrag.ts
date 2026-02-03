@@ -5,7 +5,7 @@
  * Handles are constrained to move only horizontally or vertically.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { Position, HandleConstraint } from '../types';
 
 // ============================================================================
@@ -22,7 +22,7 @@ interface DragState {
 
 interface UseWireHandleDragOptions {
   /** Function to update handle position in store */
-  updateWireHandle: (wireId: string, handleIndex: number, position: Position) => void;
+  updateWireHandle: (wireId: string, handleIndex: number, position: Position, isFirstMove?: boolean) => void;
   /** Current zoom level */
   zoom: number;
   /** Callback when drag ends */
@@ -35,7 +35,8 @@ interface UseWireHandleDragResult {
     wireId: string,
     handleIndex: number,
     constraint: HandleConstraint,
-    e: React.MouseEvent
+    e: React.MouseEvent,
+    handlePosition: Position
   ) => void;
   /** Whether currently dragging a handle */
   isDragging: boolean;
@@ -61,6 +62,7 @@ export function useWireHandleDrag({
   onDragEnd,
 }: UseWireHandleDragOptions): UseWireHandleDragResult {
   const [dragging, setDragging] = useState<DragState | null>(null);
+  const isFirstMoveRef = useRef(false);
 
   // Start drag operation
   const handleDragStart = useCallback(
@@ -68,20 +70,19 @@ export function useWireHandleDrag({
       wireId: string,
       handleIndex: number,
       constraint: HandleConstraint,
-      e: React.MouseEvent
+      e: React.MouseEvent,
+      handlePosition: Position
     ) => {
       e.preventDefault();
       e.stopPropagation();
 
-      // We need to get the current handle position from somewhere
-      // For now, we'll use the mouse position as the starting point
-      // and calculate delta from there
+      isFirstMoveRef.current = true;
       setDragging({
         wireId,
         handleIndex,
         constraint,
         startMouse: { x: e.clientX, y: e.clientY },
-        startHandle: { x: e.clientX, y: e.clientY }, // Will be updated in effect
+        startHandle: handlePosition,
       });
     },
     []
@@ -109,7 +110,8 @@ export function useWireHandleDrag({
               y: dragging.startHandle.y + delta.y,
             };
 
-      updateWireHandle(dragging.wireId, dragging.handleIndex, newPos);
+      updateWireHandle(dragging.wireId, dragging.handleIndex, newPos, isFirstMoveRef.current);
+      isFirstMoveRef.current = false;
     };
 
     const handleUp = () => {

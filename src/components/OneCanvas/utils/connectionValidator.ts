@@ -161,29 +161,6 @@ export function isValidConnection(
 }
 
 /**
- * Check if a port can accept more connections
- */
-export function canAcceptConnection(
-  block: Block,
-  portId: string,
-  existingWires: Wire[]
-): boolean {
-  const port = block.ports.find((p) => p.id === portId);
-  if (!port) return false;
-
-  // Count existing connections to this port
-  const connectionCount = existingWires.filter(
-    (wire) =>
-      (wire.from.componentId === block.id && wire.from.portId === portId) ||
-      (wire.to.componentId === block.id && wire.to.portId === portId)
-  ).length;
-
-  // For now, allow unlimited connections (branching)
-  // In future, could limit based on port configuration
-  return connectionCount < 100; // Reasonable limit
-}
-
-/**
  * Get all valid target ports for a wire from a given source
  */
 export function getValidTargets(

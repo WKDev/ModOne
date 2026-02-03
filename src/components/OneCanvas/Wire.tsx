@@ -8,6 +8,7 @@
 import { memo, useCallback } from 'react';
 import type { Position, HandleConstraint, PortPosition } from './types';
 import { calculateWirePath, calculatePathWithHandles, calculatePathWithExitDirections } from './utils/wirePathCalculator';
+import { getClosestPointOnPath } from './utils/wireHitTest';
 import { WireHandle } from './components/WireHandle';
 
 // ============================================================================
@@ -51,7 +52,8 @@ interface WireProps {
     wireId: string,
     handleIndex: number,
     constraint: HandleConstraint,
-    e: React.MouseEvent
+    e: React.MouseEvent,
+    handlePosition: Position
   ) => void;
   /** Handler for handle right-click (removal) */
   onHandleContextMenu?: (wireId: string, handleIndex: number, e: React.MouseEvent) => void;
@@ -147,7 +149,7 @@ export const Wire = memo(function Wire({
   const strokeColor = isSelected ? SELECTED_COLOR : isHovered ? HOVER_COLOR : baseColor;
   const strokeWidth = isSelected ? WIRE_WIDTH_SELECTED : WIRE_WIDTH;
 
-  // Calculate click position on wire from mouse event
+  // Calculate click position on wire from mouse event using wireHitTest utility
   const getClickPosition = useCallback((e: React.MouseEvent<SVGPathElement>): Position | null => {
     const pathElement = e.currentTarget;
     const svgElement = pathElement.ownerSVGElement;
@@ -160,25 +162,8 @@ export const Wire = memo(function Wire({
     if (!ctm) return null;
     const svgPoint = point.matrixTransform(ctm.inverse());
 
-    // Find closest point on path
-    const totalLength = pathElement.getTotalLength();
-    let closestPoint = { x: 0, y: 0 };
-    let closestDistance = Infinity;
-
-    for (let i = 0; i <= 100; i++) {
-      const t = i / 100;
-      const length = t * totalLength;
-      const p = pathElement.getPointAtLength(length);
-      const distance = Math.sqrt(
-        Math.pow(p.x - svgPoint.x, 2) + Math.pow(p.y - svgPoint.y, 2)
-      );
-      if (distance < closestDistance) {
-        closestDistance = distance;
-        closestPoint = { x: p.x, y: p.y };
-      }
-    }
-
-    return closestPoint;
+    const result = getClosestPointOnPath(pathElement, { x: svgPoint.x, y: svgPoint.y });
+    return result.point;
   }, []);
 
   // Handle click
@@ -315,6 +300,10 @@ interface WirePreviewProps {
   isValidTarget?: boolean;
   /** Path mode */
   pathMode?: 'straight' | 'bezier';
+  /** Direction wire exits from source port (user drag direction) */
+  fromExitDirection?: PortPosition;
+  /** Default from direction based on port position */
+  defaultFromDirection?: PortPosition;
 }
 
 /**
@@ -325,8 +314,14 @@ export const WirePreview = memo(function WirePreview({
   to,
   isValidTarget = false,
   pathMode = 'straight',
+  fromExitDirection,
+  defaultFromDirection,
 }: WirePreviewProps) {
-  const pathD = calculateWirePath(from, to, pathMode);
+  // Use exit-direction-aware path when available, matching actual wire rendering
+  const fromDir = fromExitDirection || defaultFromDirection;
+  const pathD = fromDir
+    ? calculatePathWithExitDirections(from, to, fromExitDirection, undefined, defaultFromDirection, undefined)
+    : calculateWirePath(from, to, pathMode);
 
   return (
     <g className="wire-preview">
