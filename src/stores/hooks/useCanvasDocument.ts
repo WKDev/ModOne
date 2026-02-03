@@ -253,8 +253,8 @@ function computeWireBendPoints(
   const toPort = toBlock.ports.find((p) => p.id === to.portId);
   if (!fromPort || !toPort) return undefined;
 
-  const fromSize = fromBlock.size || getBlockSize(fromBlock.type);
-  const toSize = toBlock.size || getBlockSize(toBlock.type);
+  const fromSize = fromBlock.size;
+  const toSize = toBlock.size;
 
   const fromRelPos = getPortRelativePosition(fromPort.position, fromPort.offset ?? 0.5, fromSize);
   const toRelPos = getPortRelativePosition(toPort.position, toPort.offset ?? 0.5, toSize);

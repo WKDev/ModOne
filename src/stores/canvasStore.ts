@@ -404,7 +404,7 @@ function findHandleInsertIndex(wire: Wire, position: Position, components: Map<s
   if (fromBlock && isPortEndpoint(wireFrom)) {
     const fromPort = fromBlock.ports.find((p) => p.id === wireFrom.portId);
     if (fromPort) {
-      const blockSize = fromBlock.size || { width: 60, height: 60 };
+      const blockSize = fromBlock.size;
       const relPos = getPortRelativePos(fromPort.position, fromPort.offset ?? 0.5, blockSize);
       fromPos = { x: fromBlock.position.x + relPos.x, y: fromBlock.position.y + relPos.y };
     }
@@ -448,8 +448,8 @@ function computeWireBendPoints(
   const toPort = toBlock.ports.find((p) => p.id === to.portId);
   if (!fromPort || !toPort) return undefined;
 
-  const fromSize = fromBlock.size || getBlockSize(fromBlock.type);
-  const toSize = toBlock.size || getBlockSize(toBlock.type);
+  const fromSize = fromBlock.size;
+  const toSize = toBlock.size;
 
   const fromRelPos = getPortRelativePosition(fromPort.position, fromPort.offset ?? 0.5, fromSize);
   const toRelPos = getPortRelativePosition(toPort.position, toPort.offset ?? 0.5, toSize);
@@ -1104,9 +1104,8 @@ export const useCanvasStore = create<CanvasStore>()(
         state.components.forEach((component) => {
           minX = Math.min(minX, component.position.x);
           minY = Math.min(minY, component.position.y);
-          // Assume default component size of 100x80
-          maxX = Math.max(maxX, component.position.x + 100);
-          maxY = Math.max(maxY, component.position.y + 80);
+          maxX = Math.max(maxX, component.position.x + component.size.width);
+          maxY = Math.max(maxY, component.position.y + component.size.height);
         });
 
         const contentWidth = maxX - minX + padding * 2;
@@ -1515,8 +1514,8 @@ export const selectBoundingBox = (state: CanvasStore) => {
   state.components.forEach((component) => {
     minX = Math.min(minX, component.position.x);
     minY = Math.min(minY, component.position.y);
-    maxX = Math.max(maxX, component.position.x + 100);
-    maxY = Math.max(maxY, component.position.y + 80);
+    maxX = Math.max(maxX, component.position.x + component.size.width);
+    maxY = Math.max(maxY, component.position.y + component.size.height);
   });
 
   return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };

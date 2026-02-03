@@ -7,35 +7,8 @@
 import type { Block, Position, PortPosition, HandleConstraint } from '../types';
 
 // ============================================================================
-// Constants
-// ============================================================================
-
-// Default block sizes (can be overridden by block-specific sizes)
-const DEFAULT_BLOCK_WIDTH = 60;
-const DEFAULT_BLOCK_HEIGHT = 60;
-
-// Block sizes by type
-const BLOCK_SIZES: Record<string, { width: number; height: number }> = {
-  power_24v: { width: 60, height: 40 },
-  power_12v: { width: 60, height: 40 },
-  gnd: { width: 40, height: 50 },
-  plc_out: { width: 80, height: 50 },
-  plc_in: { width: 80, height: 50 },
-  led: { width: 40, height: 60 },
-  button: { width: 60, height: 60 },
-  scope: { width: 100, height: 80 },
-};
-
-// ============================================================================
 // Position Calculations
 // ============================================================================
-
-/**
- * Get block dimensions
- */
-export function getBlockSize(blockType: string): { width: number; height: number } {
-  return BLOCK_SIZES[blockType] ?? { width: DEFAULT_BLOCK_WIDTH, height: DEFAULT_BLOCK_HEIGHT };
-}
 
 /**
  * Calculate port position relative to block origin
@@ -71,7 +44,7 @@ export function getPortAbsolutePosition(
   const port = block.ports.find((p) => p.id === portId);
   if (!port) return null;
 
-  const blockSize = getBlockSize(block.type);
+  const blockSize = block.size;
   const relativePos = getPortRelativePosition(
     port.position,
     port.offset ?? 0.5,

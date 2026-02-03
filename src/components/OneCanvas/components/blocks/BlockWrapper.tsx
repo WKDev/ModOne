@@ -29,13 +29,6 @@ interface BlockWrapperProps {
 }
 
 // ============================================================================
-// Constants
-// ============================================================================
-
-const MIN_WIDTH = 60;
-const MIN_HEIGHT = 60;
-
-// ============================================================================
 // Component
 // ============================================================================
 
@@ -48,8 +41,8 @@ export const BlockWrapper = memo(function BlockWrapper({
   children,
   onSelect,
   className = '',
-  width = MIN_WIDTH,
-  height = MIN_HEIGHT,
+  width = 60,
+  height = 60,
 }: BlockWrapperProps) {
   // Handle click for selection
   const handleClick = useCallback(
@@ -69,8 +62,8 @@ export const BlockWrapper = memo(function BlockWrapper({
         ${className}
       `}
       style={{
-        width: Math.max(width, MIN_WIDTH),
-        height: Math.max(height, MIN_HEIGHT),
+        width,
+        height,
       }}
       onClick={handleClick}
       data-block-id={blockId}

@@ -45,7 +45,7 @@ import { isPortEndpoint } from '../../OneCanvas/types';
 import { WireContextMenu, type WireContextMenuAction } from '../../OneCanvas/components/WireContextMenu';
 import { JunctionDot } from '../../OneCanvas/components/JunctionDot';
 import { useWireHandleDrag } from '../../OneCanvas/hooks/useWireHandleDrag';
-import { getBlockSize } from '../../OneCanvas/utils/wirePathCalculator';
+
 
 // Import simulation styles
 import '../../OneCanvas/styles/simulation.css';
@@ -112,7 +112,7 @@ const CanvasDropZone = memo(function CanvasDropZone({ children, className }: Can
 
 interface WireRendererProps {
   wire: WireData;
-  components: Map<string, { type: string; position: Position; ports: Array<{ id: string; position: string; offset?: number }> }>;
+  components: Map<string, { type: string; position: Position; size: { width: number; height: number }; ports: Array<{ id: string; position: string; offset?: number }> }>;
   isSelected: boolean;
   onAddHandle?: (wireId: string, position: Position) => void;
   onContextMenu?: (wireId: string, position: Position, screenPos: { x: number; y: number }) => void;
@@ -142,14 +142,13 @@ const WireRenderer = memo(function WireRenderer({
 
   // Calculate port positions using actual block sizes
   const getPortPosition = (
-    component: { type: string; position: Position; ports: Array<{ id: string; position: string; offset?: number }> },
+    component: { type: string; position: Position; size: { width: number; height: number }; ports: Array<{ id: string; position: string; offset?: number }> },
     portId: string
   ): { position: Position; direction: PortPosition } => {
     const port = component.ports.find((p) => p.id === portId);
     const basePos = component.position;
 
-    const blockSize = getBlockSize(component.type as BlockType);
-    const { width: blockWidth, height: blockHeight } = blockSize;
+    const { width: blockWidth, height: blockHeight } = component.size;
 
     if (!port) {
       return {
@@ -368,24 +367,23 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
       let startPosition: Position | undefined;
 
       if (port) {
-        const blockSize = getBlockSize(block.type);
         const offset = port.offset ?? 0.5;
         let portRelativePos: Position;
         switch (port.position) {
           case 'top':
-            portRelativePos = { x: blockSize.width * offset, y: 0 };
+            portRelativePos = { x: block.size.width * offset, y: 0 };
             break;
           case 'bottom':
-            portRelativePos = { x: blockSize.width * offset, y: blockSize.height };
+            portRelativePos = { x: block.size.width * offset, y: block.size.height };
             break;
           case 'left':
-            portRelativePos = { x: 0, y: blockSize.height * offset };
+            portRelativePos = { x: 0, y: block.size.height * offset };
             break;
           case 'right':
-            portRelativePos = { x: blockSize.width, y: blockSize.height * offset };
+            portRelativePos = { x: block.size.width, y: block.size.height * offset };
             break;
           default:
-            portRelativePos = { x: blockSize.width / 2, y: blockSize.height / 2 };
+            portRelativePos = { x: block.size.width / 2, y: block.size.height / 2 };
         }
         startPosition = {
           x: block.position.x + portRelativePos.x,
@@ -649,7 +647,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
                   <WireRenderer
                     key={wire.id}
                     wire={wire}
-                    components={components as Map<string, { type: string; position: Position; ports: Array<{ id: string; position: string; offset?: number }> }>}
+                    components={components as Map<string, { type: string; position: Position; size: { width: number; height: number }; ports: Array<{ id: string; position: string; offset?: number }> }>}
                     isSelected={selectedIds.has(wire.id)}
                     onAddHandle={addWireHandle}
                     onContextMenu={handleWireContextMenu}
@@ -681,25 +679,24 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
                   if (!fromComponent) return null;
 
                   const fromPort = fromComponent.ports.find((p) => p.id === drawingFrom.portId);
-                  const fromBlockSize = getBlockSize(fromComponent.type);
                   const portOffset = fromPort?.offset ?? 0.5;
-                  let fromPos: Position = { x: fromComponent.position.x + fromBlockSize.width / 2, y: fromComponent.position.y + fromBlockSize.height / 2 };
+                  let fromPos: Position = { x: fromComponent.position.x + fromComponent.size.width / 2, y: fromComponent.position.y + fromComponent.size.height / 2 };
                   let defaultFromDir: PortPosition | undefined;
 
                   if (fromPort) {
                     defaultFromDir = fromPort.position as PortPosition;
                     switch (fromPort.position) {
                       case 'top':
-                        fromPos = { x: fromComponent.position.x + fromBlockSize.width * portOffset, y: fromComponent.position.y };
+                        fromPos = { x: fromComponent.position.x + fromComponent.size.width * portOffset, y: fromComponent.position.y };
                         break;
                       case 'bottom':
-                        fromPos = { x: fromComponent.position.x + fromBlockSize.width * portOffset, y: fromComponent.position.y + fromBlockSize.height };
+                        fromPos = { x: fromComponent.position.x + fromComponent.size.width * portOffset, y: fromComponent.position.y + fromComponent.size.height };
                         break;
                       case 'left':
-                        fromPos = { x: fromComponent.position.x, y: fromComponent.position.y + fromBlockSize.height * portOffset };
+                        fromPos = { x: fromComponent.position.x, y: fromComponent.position.y + fromComponent.size.height * portOffset };
                         break;
                       case 'right':
-                        fromPos = { x: fromComponent.position.x + fromBlockSize.width, y: fromComponent.position.y + fromBlockSize.height * portOffset };
+                        fromPos = { x: fromComponent.position.x + fromComponent.size.width, y: fromComponent.position.y + fromComponent.size.height * portOffset };
                         break;
                     }
                   }

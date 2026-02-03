@@ -39,9 +39,6 @@ interface ScopeBlockProps {
 // Constants
 // ============================================================================
 
-const BLOCK_WIDTH = 100;
-const BLOCK_HEIGHT = 80;
-
 // Canvas dimensions for inline display
 const CANVAS_WIDTH = 88;
 const CANVAS_HEIGHT = 52;
@@ -162,8 +159,8 @@ export const ScopeBlock = memo(function ScopeBlock({
         blockId={block.id}
         isSelected={isSelected}
         onSelect={onSelect}
-        width={BLOCK_WIDTH}
-        height={BLOCK_HEIGHT}
+        width={block.size.width}
+        height={block.size.height}
       >
         {/* Block body */}
         <div
@@ -203,7 +200,7 @@ export const ScopeBlock = memo(function ScopeBlock({
             key={port.id}
             port={port}
             blockId={block.id}
-            blockSize={{ width: BLOCK_WIDTH, height: BLOCK_HEIGHT }}
+            blockSize={{ width: block.size.width, height: block.size.height }}
             isConnected={connectedPorts?.has(port.id)}
             onStartWire={onStartWire}
             onEndWire={onEndWire}

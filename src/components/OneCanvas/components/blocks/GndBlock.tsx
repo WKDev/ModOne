@@ -29,13 +29,6 @@ interface GndBlockProps {
 }
 
 // ============================================================================
-// Constants
-// ============================================================================
-
-const BLOCK_WIDTH = 40;
-const BLOCK_HEIGHT = 50;
-
-// ============================================================================
 // Component
 // ============================================================================
 
@@ -55,8 +48,8 @@ export const GndBlock = memo(function GndBlock({
       blockId={block.id}
       isSelected={isSelected}
       onSelect={onSelect}
-      width={BLOCK_WIDTH}
-      height={BLOCK_HEIGHT}
+      width={block.size.width}
+      height={block.size.height}
     >
       {/* Ground symbol SVG */}
       <svg
@@ -120,7 +113,7 @@ export const GndBlock = memo(function GndBlock({
           key={port.id}
           port={port}
           blockId={block.id}
-          blockSize={{ width: BLOCK_WIDTH, height: BLOCK_HEIGHT }}
+          blockSize={{ width: block.size.width, height: block.size.height }}
           isConnected={connectedPorts?.has(port.id)}
           onStartWire={onStartWire}
           onEndWire={onEndWire}
