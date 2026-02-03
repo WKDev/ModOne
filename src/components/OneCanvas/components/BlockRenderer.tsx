@@ -13,7 +13,7 @@ import { PlcOutBlock } from './blocks/PlcOutBlock';
 import { PlcInBlock } from './blocks/PlcInBlock';
 import { ButtonBlock } from './blocks/ButtonBlock';
 import { ScopeBlock } from './blocks/ScopeBlock';
-import { JunctionBlock } from './blocks/JunctionBlock';
+// JunctionBlock is now rendered as SVG dot in the wire layer (JunctionDot.tsx)
 
 // ============================================================================
 // Types
@@ -136,7 +136,8 @@ export const BlockRenderer = memo(function BlockRenderer({
         );
 
       case 'junction':
-        return <JunctionBlock block={block} {...commonProps} />;
+        // Junctions are rendered as SVG dots in the wire layer, not as HTML blocks
+        return null;
 
       default:
         // Unknown block type - render a placeholder

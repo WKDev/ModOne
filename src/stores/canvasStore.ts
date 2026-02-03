@@ -19,6 +19,11 @@ import type {
   CircuitMetadata,
   SerializableCircuitState,
 } from '../components/OneCanvas/types';
+import {
+  getBlockSize,
+  getPortRelativePosition,
+  calculateWireBendPoints,
+} from '../components/OneCanvas/utils/wirePathCalculator';
 
 // ============================================================================
 // Types
@@ -347,63 +352,6 @@ function detectDragDirection(startPos: Position, currentPos: Position): PortPosi
   return dy > 0 ? 'bottom' : 'top';
 }
 
-/**
- * Determine handle constraint based on wire path direction at insertion point.
- * If wire is moving horizontally at that point, the handle should move vertically
- * (to shift the horizontal segment up/down), and vice versa.
- */
-function determineHandleConstraint(
-  wire: Wire,
-  _position: Position,
-  insertIndex: number,
-  components: Map<string, Block>
-): HandleConstraint {
-  // Build the sequence of points: [fromPort, ...existingHandles, toPort]
-  const points: Position[] = [];
-
-  // Get from port position
-  const fromBlock = components.get(wire.from.componentId);
-  if (fromBlock) {
-    const fromPort = fromBlock.ports.find((p) => p.id === wire.from.portId);
-    if (fromPort) {
-      const blockSize = { width: 60, height: 60 }; // Approximate; exact doesn't matter for direction
-      const relPos = getPortRelativePos(fromPort.position, fromPort.offset ?? 0.5, blockSize);
-      points.push({ x: fromBlock.position.x + relPos.x, y: fromBlock.position.y + relPos.y });
-    }
-  }
-
-  // Add existing handles
-  if (wire.points) {
-    points.push(...wire.points);
-  }
-
-  // Get to port position
-  const toBlock = components.get(wire.to.componentId);
-  if (toBlock) {
-    const toPort = toBlock.ports.find((p) => p.id === wire.to.portId);
-    if (toPort) {
-      const blockSize = { width: 60, height: 60 };
-      const relPos = getPortRelativePos(toPort.position, toPort.offset ?? 0.5, blockSize);
-      points.push({ x: toBlock.position.x + relPos.x, y: toBlock.position.y + relPos.y });
-    }
-  }
-
-  if (points.length < 2) return 'horizontal';
-
-  // The new handle will be inserted at insertIndex in the handles array,
-  // which corresponds to insertIndex+1 in the full points array (since index 0 is fromPort).
-  // The segment it sits on goes from points[insertIndex] to points[insertIndex+1].
-  const segStart = points[Math.min(insertIndex, points.length - 1)];
-  const segEnd = points[Math.min(insertIndex + 1, points.length - 1)];
-
-  const dx = Math.abs(segEnd.x - segStart.x);
-  const dy = Math.abs(segEnd.y - segStart.y);
-
-  // If segment is more horizontal, handle should move vertically (to shift it up/down)
-  // If segment is more vertical, handle should move horizontally
-  return dx >= dy ? 'vertical' : 'horizontal';
-}
-
 /** Helper to get port relative position without importing from wirePathCalculator (avoid circular) */
 function getPortRelativePos(
   portPosition: PortPosition,
@@ -454,6 +402,43 @@ function findHandleInsertIndex(wire: Wire, position: Position, components: Map<s
   }
 
   return wire.points.length;
+}
+
+/**
+ * Compute auto-generated bend points for a wire based on port directions.
+ * Returns the points and constraints, or undefined if no bends needed.
+ */
+function computeWireBendPoints(
+  from: WireEndpoint,
+  to: WireEndpoint,
+  components: Map<string, Block>,
+  fromExitDirection?: PortPosition,
+  toExitDirection?: PortPosition
+): { points: Position[]; handleConstraints: HandleConstraint[] } | undefined {
+  const fromBlock = components.get(from.componentId);
+  const toBlock = components.get(to.componentId);
+  if (!fromBlock || !toBlock) return undefined;
+
+  const fromPort = fromBlock.ports.find((p) => p.id === from.portId);
+  const toPort = toBlock.ports.find((p) => p.id === to.portId);
+  if (!fromPort || !toPort) return undefined;
+
+  const fromSize = getBlockSize(fromBlock.type);
+  const toSize = getBlockSize(toBlock.type);
+
+  const fromRelPos = getPortRelativePosition(fromPort.position, fromPort.offset ?? 0.5, fromSize);
+  const toRelPos = getPortRelativePosition(toPort.position, toPort.offset ?? 0.5, toSize);
+
+  const fromPos = { x: fromBlock.position.x + fromRelPos.x, y: fromBlock.position.y + fromRelPos.y };
+  const toPos = { x: toBlock.position.x + toRelPos.x, y: toBlock.position.y + toRelPos.y };
+
+  const fromDir = fromExitDirection || fromPort.position;
+  const toDir = toExitDirection || toPort.position;
+
+  const result = calculateWireBendPoints(fromPos, toPos, fromDir, toDir);
+  if (result.points.length === 0) return undefined;
+
+  return { points: result.points, handleConstraints: result.constraints };
 }
 
 /** Get default ports for a block type */
@@ -666,6 +651,17 @@ export const useCanvasStore = create<CanvasStore>()(
             if (options?.toExitDirection) {
               newWire.toExitDirection = options.toExitDirection;
             }
+
+            // Auto-generate bend points
+            const bendData = computeWireBendPoints(
+              from, to, state.components,
+              options?.fromExitDirection, options?.toExitDirection
+            );
+            if (bendData) {
+              newWire.points = bendData.points;
+              newWire.handleConstraints = bendData.handleConstraints;
+            }
+
             state.wires.push(newWire);
             state.isDirty = true;
           },
@@ -709,11 +705,11 @@ export const useCanvasStore = create<CanvasStore>()(
           return null;
         }
 
-        // Create junction component (centered at click position)
+        // Create junction component (position = center point)
         const junctionId = generateId('junction');
         const junctionPosition = {
-          x: position.x - 6, // Center the 12x12 junction
-          y: position.y - 6,
+          x: position.x,
+          y: position.y,
         };
 
         const junctionBlock: Block = {
@@ -768,54 +764,23 @@ export const useCanvasStore = create<CanvasStore>()(
               wire2.toExitDirection = originalWire.toExitDirection;
             }
 
-            // Split handles between the two wires based on junction position
-            if (originalWire.points && originalWire.points.length > 0) {
-              // Simple split: handles before junction go to wire1, after go to wire2
-              const wire1Points: Position[] = [];
-              const wire1Constraints: HandleConstraint[] = [];
-              const wire2Points: Position[] = [];
-              const wire2Constraints: HandleConstraint[] = [];
+            // Auto-generate bend points for both new wires
+            const bend1 = computeWireBendPoints(
+              wire1.from, wire1.to, state.components,
+              wire1.fromExitDirection, undefined
+            );
+            if (bend1) {
+              wire1.points = bend1.points;
+              wire1.handleConstraints = bend1.handleConstraints;
+            }
 
-              // Use distance from "from" port to determine which side each handle is on
-              const fromBlock = state.components.get(originalWire.from.componentId);
-              let fromPortPos: Position = position; // fallback
-              if (fromBlock) {
-                const fromPort = fromBlock.ports.find((p) => p.id === originalWire.from.portId);
-                if (fromPort) {
-                  const bSize = { width: 60, height: 60 };
-                  const relP = getPortRelativePos(fromPort.position, fromPort.offset ?? 0.5, bSize);
-                  fromPortPos = { x: fromBlock.position.x + relP.x, y: fromBlock.position.y + relP.y };
-                }
-              }
-
-              const jDist = Math.sqrt(
-                Math.pow(position.x - fromPortPos.x, 2) +
-                Math.pow(position.y - fromPortPos.y, 2)
-              );
-
-              for (let i = 0; i < originalWire.points.length; i++) {
-                const pt = originalWire.points[i];
-                const ptDist = Math.sqrt(
-                  Math.pow(pt.x - fromPortPos.x, 2) +
-                  Math.pow(pt.y - fromPortPos.y, 2)
-                );
-                if (ptDist < jDist) {
-                  wire1Points.push(pt);
-                  wire1Constraints.push(originalWire.handleConstraints?.[i] || 'horizontal');
-                } else {
-                  wire2Points.push(pt);
-                  wire2Constraints.push(originalWire.handleConstraints?.[i] || 'horizontal');
-                }
-              }
-
-              if (wire1Points.length > 0) {
-                wire1.points = wire1Points;
-                wire1.handleConstraints = wire1Constraints;
-              }
-              if (wire2Points.length > 0) {
-                wire2.points = wire2Points;
-                wire2.handleConstraints = wire2Constraints;
-              }
+            const bend2 = computeWireBendPoints(
+              wire2.from, wire2.to, state.components,
+              undefined, wire2.toExitDirection
+            );
+            if (bend2) {
+              wire2.points = bend2.points;
+              wire2.handleConstraints = bend2.handleConstraints;
             }
 
             state.wires.push(wire1);
@@ -942,8 +907,8 @@ export const useCanvasStore = create<CanvasStore>()(
             // Insert handle at correct position in points array
             const insertIndex = findHandleInsertIndex(wire, position, state.components);
 
-            // Determine constraint based on wire path direction at insertion point
-            const constraint = determineHandleConstraint(wire, position, insertIndex, state.components);
+            // Manually added handles default to 'free' constraint
+            const constraint: HandleConstraint = 'free';
 
             wire.points.splice(insertIndex, 0, position);
             wire.handleConstraints.splice(insertIndex, 0, constraint);
@@ -977,9 +942,13 @@ export const useCanvasStore = create<CanvasStore>()(
             const original = wire.points[handleIndex];
 
             // Apply constraint - only allow movement in constrained direction
-            wire.points[handleIndex] = constraint === 'horizontal'
-              ? { x: position.x, y: original.y }
-              : { x: original.x, y: position.y };
+            if (constraint === 'free') {
+              wire.points[handleIndex] = { x: position.x, y: position.y };
+            } else {
+              wire.points[handleIndex] = constraint === 'horizontal'
+                ? { x: position.x, y: original.y }
+                : { x: original.x, y: position.y };
+            }
 
             state.isDirty = true;
           },
@@ -1275,6 +1244,20 @@ export const useCanvasStore = create<CanvasStore>()(
         set(
           (state) => {
             state.components = new Map(Object.entries(data.components));
+
+            // Migrate existing junction positions from corner-based to center-based
+            for (const [, block] of state.components) {
+              if (block.type === 'junction') {
+                // Old format stored top-left corner (position.x - 6, position.y - 6)
+                // New format stores center point. Detect old format by checking
+                // if position was offset (heuristic: if junction exists, migrate it)
+                block.position = {
+                  x: block.position.x + 6,
+                  y: block.position.y + 6,
+                };
+              }
+            }
+
             state.wires = data.wires.map((wire) => ({
               ...wire,
               from: { ...wire.from },

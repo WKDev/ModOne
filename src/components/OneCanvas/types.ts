@@ -191,7 +191,7 @@ export interface WireEndpoint {
 }
 
 /** Wire handle constraint direction */
-export type HandleConstraint = 'horizontal' | 'vertical';
+export type HandleConstraint = 'horizontal' | 'vertical' | 'free';
 
 /** Wire connection between two ports */
 export interface Wire {

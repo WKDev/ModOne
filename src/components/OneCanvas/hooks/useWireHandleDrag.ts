@@ -99,16 +99,23 @@ export function useWireHandleDrag({
       };
 
       // Apply constraint - calculate new position based on constraint direction
-      const newPos: Position =
-        dragging.constraint === 'horizontal'
-          ? {
-              x: dragging.startHandle.x + delta.x,
-              y: dragging.startHandle.y,
-            }
-          : {
-              x: dragging.startHandle.x,
-              y: dragging.startHandle.y + delta.y,
-            };
+      let newPos: Position;
+      if (dragging.constraint === 'free') {
+        newPos = {
+          x: dragging.startHandle.x + delta.x,
+          y: dragging.startHandle.y + delta.y,
+        };
+      } else if (dragging.constraint === 'horizontal') {
+        newPos = {
+          x: dragging.startHandle.x + delta.x,
+          y: dragging.startHandle.y,
+        };
+      } else {
+        newPos = {
+          x: dragging.startHandle.x,
+          y: dragging.startHandle.y + delta.y,
+        };
+      }
 
       updateWireHandle(dragging.wireId, dragging.handleIndex, newPos, isFirstMoveRef.current);
       isFirstMoveRef.current = false;

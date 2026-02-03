@@ -19,6 +19,11 @@ import type {
   HandleConstraint,
   CircuitMetadata,
 } from '../../components/OneCanvas/types';
+import {
+  getBlockSize,
+  getPortRelativePosition,
+  calculateWireBendPoints,
+} from '../../components/OneCanvas/utils/wirePathCalculator';
 
 // ============================================================================
 // Types
@@ -196,11 +201,6 @@ function wireExists(wires: Wire[], from: WireEndpoint, to: WireEndpoint): boolea
   );
 }
 
-/** Determine handle constraint based on wire path */
-function determineHandleConstraint(): HandleConstraint {
-  return 'horizontal';
-}
-
 /** Find where to insert a new handle */
 function findHandleInsertIndex(wire: Wire, position: Position): number {
   if (!wire.points || wire.points.length === 0) {
@@ -219,6 +219,42 @@ function findHandleInsertIndex(wire: Wire, position: Position): number {
     }
   }
   return closestIndex + 1;
+}
+
+/**
+ * Compute auto-generated bend points for a wire based on port directions.
+ */
+function computeWireBendPoints(
+  from: WireEndpoint,
+  to: WireEndpoint,
+  components: Map<string, Block>,
+  fromExitDirection?: PortPosition,
+  toExitDirection?: PortPosition
+): { points: Position[]; handleConstraints: HandleConstraint[] } | undefined {
+  const fromBlock = components.get(from.componentId);
+  const toBlock = components.get(to.componentId);
+  if (!fromBlock || !toBlock) return undefined;
+
+  const fromPort = fromBlock.ports.find((p) => p.id === from.portId);
+  const toPort = toBlock.ports.find((p) => p.id === to.portId);
+  if (!fromPort || !toPort) return undefined;
+
+  const fromSize = getBlockSize(fromBlock.type);
+  const toSize = getBlockSize(toBlock.type);
+
+  const fromRelPos = getPortRelativePosition(fromPort.position, fromPort.offset ?? 0.5, fromSize);
+  const toRelPos = getPortRelativePosition(toPort.position, toPort.offset ?? 0.5, toSize);
+
+  const fromPos = { x: fromBlock.position.x + fromRelPos.x, y: fromBlock.position.y + fromRelPos.y };
+  const toPos = { x: toBlock.position.x + toRelPos.x, y: toBlock.position.y + toRelPos.y };
+
+  const fromDir = fromExitDirection || fromPort.position;
+  const toDir = toExitDirection || toPort.position;
+
+  const result = calculateWireBendPoints(fromPos, toPos, fromDir, toDir);
+  if (result.points.length === 0) return undefined;
+
+  return { points: result.points, handleConstraints: result.constraints };
 }
 
 /** Get default ports for junction */
@@ -371,6 +407,17 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         if (options?.toExitDirection) {
           newWire.toExitDirection = options.toExitDirection;
         }
+
+        // Auto-generate bend points
+        const bendData = computeWireBendPoints(
+          from, to, docData.components,
+          options?.fromExitDirection, options?.toExitDirection
+        );
+        if (bendData) {
+          newWire.points = bendData.points;
+          newWire.handleConstraints = bendData.handleConstraints;
+        }
+
         docData.wires.push(newWire);
       });
 
@@ -403,8 +450,8 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
 
       const junctionId = generateId('junction');
       const junctionPosition = {
-        x: position.x - 6,
-        y: position.y - 6,
+        x: position.x,
+        y: position.y,
       };
 
       const junctionBlock: Block = {
@@ -430,17 +477,45 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         const wire1Id = generateId('wire');
         const wire2Id = generateId('wire');
 
-        docData.wires.push({
+        const wire1: Wire = {
           id: wire1Id,
           from: { ...originalWire.from },
           to: { componentId: junctionId, portId: 'hub' },
-        });
+        };
+        if (originalWire.fromExitDirection) {
+          wire1.fromExitDirection = originalWire.fromExitDirection;
+        }
 
-        docData.wires.push({
+        const wire2: Wire = {
           id: wire2Id,
           from: { componentId: junctionId, portId: 'hub' },
           to: { ...originalWire.to },
-        });
+        };
+        if (originalWire.toExitDirection) {
+          wire2.toExitDirection = originalWire.toExitDirection;
+        }
+
+        // Auto-generate bend points for both new wires
+        const bend1 = computeWireBendPoints(
+          wire1.from, wire1.to, docData.components,
+          wire1.fromExitDirection, undefined
+        );
+        if (bend1) {
+          wire1.points = bend1.points;
+          wire1.handleConstraints = bend1.handleConstraints;
+        }
+
+        const bend2 = computeWireBendPoints(
+          wire2.from, wire2.to, docData.components,
+          undefined, wire2.toExitDirection
+        );
+        if (bend2) {
+          wire2.points = bend2.points;
+          wire2.handleConstraints = bend2.handleConstraints;
+        }
+
+        docData.wires.push(wire1);
+        docData.wires.push(wire2);
       });
 
       return junctionId;
@@ -460,7 +535,8 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         const targetWire = docData.wires.find((w) => w.id === wireId);
         if (!targetWire) return;
 
-        const constraint = determineHandleConstraint();
+        // Manually added handles default to 'free' constraint
+        const constraint: HandleConstraint = 'free';
         targetWire.points = targetWire.points || [];
         targetWire.handleConstraints = targetWire.handleConstraints || [];
 
@@ -483,9 +559,13 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         const constraint = wire.handleConstraints?.[handleIndex] || 'horizontal';
         const original = wire.points[handleIndex];
 
-        wire.points[handleIndex] = constraint === 'horizontal'
-          ? { x: position.x, y: original.y }
-          : { x: original.x, y: position.y };
+        if (constraint === 'free') {
+          wire.points[handleIndex] = { x: position.x, y: position.y };
+        } else {
+          wire.points[handleIndex] = constraint === 'horizontal'
+            ? { x: position.x, y: original.y }
+            : { x: original.x, y: position.y };
+        }
       });
     },
     [documentId, updateCanvasData]

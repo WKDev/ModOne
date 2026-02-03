@@ -4,7 +4,7 @@
  * Utilities for calculating wire paths and port positions.
  */
 
-import type { Block, Position, PortPosition } from '../types';
+import type { Block, Position, PortPosition, HandleConstraint } from '../types';
 
 // ============================================================================
 // Constants
@@ -24,7 +24,7 @@ const BLOCK_SIZES: Record<string, { width: number; height: number }> = {
   led: { width: 40, height: 60 },
   button: { width: 60, height: 60 },
   scope: { width: 100, height: 80 },
-  junction: { width: 12, height: 12 },
+  junction: { width: 0, height: 0 },
 };
 
 // ============================================================================
@@ -71,6 +71,11 @@ export function getPortAbsolutePosition(
 ): Position | null {
   const port = block.ports.find((p) => p.id === portId);
   if (!port) return null;
+
+  // Junction: position is the center point (no block size offset)
+  if (block.type === 'junction') {
+    return { x: block.position.x, y: block.position.y };
+  }
 
   const blockSize = getBlockSize(block.type);
   const relativePos = getPortRelativePosition(
@@ -432,4 +437,60 @@ export function calculatePathWithExitDirections(
   const toDir = toExitDirection || defaultToDirection;
 
   return calculateOrthogonalPath(from, to, fromDir, toDir, cornerRadius);
+}
+
+// ============================================================================
+// Auto-Generated Bend Points
+// ============================================================================
+
+/**
+ * Calculate wire bend points for auto-generated control handles.
+ * Reuses existing routing logic to compute intermediate bend positions
+ * and their movement constraints.
+ *
+ * @param from - Source port absolute position
+ * @param to - Target port absolute position
+ * @param fromDirection - Direction wire exits source port
+ * @param toDirection - Direction wire enters target port
+ * @returns Bend points and their constraints, or empty arrays if no bends needed
+ */
+export function calculateWireBendPoints(
+  from: Position,
+  to: Position,
+  fromDirection?: PortPosition,
+  toDirection?: PortPosition
+): { points: Position[]; constraints: HandleConstraint[] } {
+  if (!fromDirection || !toDirection) {
+    return { points: [], constraints: [] };
+  }
+
+  const fromExit = getExitPoint(from, fromDirection, PORT_EXIT_DISTANCE);
+  const toExit = getExitPoint(to, toDirection, PORT_EXIT_DISTANCE);
+
+  const routePoints = calculateOrthogonalRoute(fromExit, toExit, fromDirection, toDirection);
+
+  if (routePoints.length === 0) {
+    return { points: [], constraints: [] };
+  }
+
+  // Determine constraint for each route point:
+  // Build full segment sequence: [fromExit, ...routePoints, toExit]
+  const allPoints = [fromExit, ...routePoints, toExit];
+  const constraints: HandleConstraint[] = [];
+
+  for (let i = 0; i < routePoints.length; i++) {
+    // Route point is at index i+1 in allPoints
+    const prev = allPoints[i];
+    const curr = allPoints[i + 1];
+
+    // The incoming segment direction determines the constraint:
+    // If incoming segment is horizontal (same y), handle moves vertically (shifts segment up/down)
+    // If incoming segment is vertical (same x), handle moves horizontally
+    const dx = Math.abs(curr.x - prev.x);
+    const dy = Math.abs(curr.y - prev.y);
+
+    constraints.push(dx >= dy ? 'vertical' : 'horizontal');
+  }
+
+  return { points: routePoints, constraints };
 }

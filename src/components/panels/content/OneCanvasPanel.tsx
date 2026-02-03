@@ -40,8 +40,9 @@ import {
   type Position,
   type SelectionBoxState,
 } from '../../OneCanvas';
-import type { Wire as WireData, HandleConstraint, PortPosition } from '../../OneCanvas/types';
+import type { Wire as WireData, HandleConstraint, PortPosition, JunctionBlock as JunctionBlockType } from '../../OneCanvas/types';
 import { WireContextMenu, type WireContextMenuAction } from '../../OneCanvas/components/WireContextMenu';
+import { JunctionDot } from '../../OneCanvas/components/JunctionDot';
 import { useWireHandleDrag } from '../../OneCanvas/hooks/useWireHandleDrag';
 import { getBlockSize } from '../../OneCanvas/utils/wirePathCalculator';
 
@@ -143,6 +144,15 @@ const WireRenderer = memo(function WireRenderer({
   ): { position: Position; direction: PortPosition } => {
     const port = component.ports.find((p) => p.id === portId);
     const basePos = component.position;
+
+    // Junction: position is center-based, port = position directly
+    if (component.type === 'junction') {
+      return {
+        position: { x: basePos.x, y: basePos.y },
+        direction: (port?.position as PortPosition) || 'right',
+      };
+    }
+
     const blockSize = getBlockSize(component.type);
     const { width: blockWidth, height: blockHeight } = blockSize;
 
@@ -357,7 +367,11 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
       // Calculate port position for exit direction detection
       const port = block.ports.find((p) => p.id === portId);
       let startPosition: Position | undefined;
-      if (port) {
+
+      if (block.type === 'junction') {
+        // Junction: position is center-based
+        startPosition = { x: block.position.x, y: block.position.y };
+      } else if (port) {
         const blockSize = getBlockSize(block.type);
         const offset = port.offset ?? 0.5;
         let portRelativePos: Position;
@@ -615,18 +629,20 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
               onMouseUp={handleCanvasMouseUp}
             >
               <Canvas ref={canvasRef} className="w-full h-full">
-                {/* Render blocks */}
-                {Array.from(components.values()).map((block) => (
-                  <BlockRenderer
-                    key={block.id}
-                    block={block}
-                    isSelected={selectedIds.has(block.id)}
-                    onSelect={handleBlockSelect}
-                    onStartWire={handleStartWire}
-                    onEndWire={handleEndWire}
-                    onDragStart={handleBlockDragStart}
-                  />
-                ))}
+                {/* Render blocks (junctions are rendered as SVG dots below) */}
+                {Array.from(components.values())
+                  .filter((block) => block.type !== 'junction')
+                  .map((block) => (
+                    <BlockRenderer
+                      key={block.id}
+                      block={block}
+                      isSelected={selectedIds.has(block.id)}
+                      onSelect={handleBlockSelect}
+                      onStartWire={handleStartWire}
+                      onEndWire={handleEndWire}
+                      onDragStart={handleBlockDragStart}
+                    />
+                  ))}
 
               {/* SVG layer for wires - must wrap SVG elements */}
               <svg
@@ -647,11 +663,38 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
                   />
                 ))}
 
+                {/* Render junction dots in SVG layer */}
+                {Array.from(components.values())
+                  .filter((block): block is JunctionBlockType => block.type === 'junction')
+                  .map((junction) => (
+                    <JunctionDot
+                      key={junction.id}
+                      block={junction}
+                      isSelected={selectedIds.has(junction.id)}
+                      onSelect={handleBlockSelect}
+                      onStartWire={handleStartWire}
+                      onEndWire={handleEndWire}
+                      onDragStart={handleBlockDragStart}
+                      isWireDrawing={wireDrawing !== null}
+                    />
+                  ))}
+
                 {/* Wire preview during drawing */}
                 {wireDrawing && (() => {
                   // Calculate the from position from the endpoint
                   const fromComponent = components.get(wireDrawing.from.componentId);
                   if (!fromComponent) return null;
+
+                  // Junction: position is center-based
+                  if (fromComponent.type === 'junction') {
+                    return (
+                      <WirePreview
+                        from={fromComponent.position}
+                        to={wireDrawing.tempPosition}
+                        fromExitDirection={wireDrawing.exitDirection}
+                      />
+                    );
+                  }
 
                   const fromPort = fromComponent.ports.find((p) => p.id === wireDrawing.from.portId);
                   const fromBlockSize = getBlockSize(fromComponent.type);
