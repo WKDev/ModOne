@@ -5,7 +5,7 @@
  * path finding, and voltage propagation to determine which components are powered.
  */
 
-import type { Block, Wire } from '../types';
+import type { Block, Wire, Junction } from '../types';
 import {
   buildCircuitGraph,
   type CircuitGraph,
@@ -24,6 +24,7 @@ import {
   type RuntimeState,
   type SwitchStateMap,
 } from './switchEvaluator';
+import { buildNets, type Net } from './netBuilder';
 
 // ============================================================================
 // Types
@@ -59,6 +60,8 @@ export interface SimulationResult {
   shortCircuits: ShortCircuit[];
   /** Switch states used in this simulation */
   switchStates: SwitchStateMap;
+  /** Electrical nets (groups of connected endpoints) */
+  nets: Net[];
   /** The circuit graph used */
   graph: CircuitGraph;
   /** Whether simulation completed successfully */
@@ -211,6 +214,7 @@ export function detectShortCircuits(paths: CurrentPath[]): ShortCircuit[] {
  *
  * @param components - Array of circuit blocks
  * @param wires - Array of wire connections
+ * @param junctions - Array of junction points
  * @param runtimeState - Runtime state from PLC and user interaction
  * @param options - Simulation options
  * @returns Complete simulation result
@@ -218,12 +222,13 @@ export function detectShortCircuits(paths: CurrentPath[]): ShortCircuit[] {
 export function simulateCircuit(
   components: Block[],
   wires: Wire[],
+  junctions: Junction[],
   runtimeState: RuntimeState,
   options: SimulationOptions = {}
 ): SimulationResult {
   try {
-    // 1. Build the circuit graph
-    const baseGraph = buildCircuitGraph(components, wires);
+    // 1. Build the circuit graph (including junction nodes)
+    const baseGraph = buildCircuitGraph(components, wires, junctions);
 
     // 2. Evaluate switch states
     const switchStates = evaluateSwitchStates(components, runtimeState);
@@ -254,6 +259,11 @@ export function simulateCircuit(
     // 8. Detect short circuits
     const shortCircuits = detectShortCircuits(currentPaths);
 
+    // 9. Build nets (union-find grouping of connected endpoints)
+    const componentsMap = new Map(components.map((c) => [c.id, c]));
+    const junctionsMap = new Map(junctions.map((j) => [j.id, j]));
+    const nets = buildNets(wires, componentsMap, junctionsMap);
+
     return {
       nodeVoltages,
       currentPaths,
@@ -261,6 +271,7 @@ export function simulateCircuit(
       poweredWires,
       wireDirections,
       shortCircuits,
+      nets,
       switchStates,
       graph,
       success: true,
@@ -274,6 +285,7 @@ export function simulateCircuit(
       poweredWires: new Set(),
       wireDirections: new Map(),
       shortCircuits: [],
+      nets: [],
       switchStates: { states: new Map() },
       graph: {
         nodes: new Map(),

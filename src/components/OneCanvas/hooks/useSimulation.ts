@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { Block, Wire } from '../types';
+import type { Block, Wire, Junction } from '../types';
 import {
   simulateCircuit,
   type SimulationResult,
@@ -86,12 +86,14 @@ const MIN_UPDATE_INTERVAL = 16; // ~60fps max
  *
  * @param components - Array of circuit blocks
  * @param wires - Array of wire connections
+ * @param junctions - Array of junction points
  * @param options - Simulation options
  * @returns Simulation control interface
  */
 export function useSimulation(
   components: Block[],
   wires: Wire[],
+  junctions: Junction[] = [],
   options: UseSimulationOptions = {}
 ): UseSimulationReturn {
   const {
@@ -131,11 +133,12 @@ export function useSimulation(
     const newResult = simulateCircuit(
       components,
       wires,
+      junctions,
       runtimeState,
       simulationOptions
     );
     setResult(newResult);
-  }, [components, wires, runtimeState, simulationOptions]);
+  }, [components, wires, junctions, runtimeState, simulationOptions]);
 
   // Animation loop
   useEffect(() => {

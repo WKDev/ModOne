@@ -334,11 +334,12 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     zoom,
   });
 
-  // Convert Map to Array for simulation
+  // Convert Maps to Arrays for simulation
   const componentsArray = useMemo(() => Array.from(components.values()), [components]);
+  const junctionsArray = useMemo(() => Array.from(junctions.values()), [junctions]);
 
   // Simulation hook
-  const simulation = useSimulation(componentsArray, wires as WireData[]);
+  const simulation = useSimulation(componentsArray, wires as WireData[], junctionsArray);
 
   // Keyboard shortcuts
   useCanvasKeyboardShortcuts();

@@ -5,8 +5,8 @@
  * suitable for circuit simulation.
  */
 
-import type { Block, Wire, Port } from '../types';
-import { isPortEndpoint } from '../types';
+import type { Block, Wire, Port, Junction } from '../types';
+import { isPortEndpoint, isJunctionEndpoint } from '../types';
 
 // ============================================================================
 // Types
@@ -139,13 +139,14 @@ export function isSwitchBlock(blockType: Block['type']): boolean {
 // ============================================================================
 
 /**
- * Build a circuit graph from components and wires.
+ * Build a circuit graph from components, wires, and junctions.
  *
  * @param components - Array of circuit blocks
  * @param wires - Array of wire connections
+ * @param junctions - Array of junction points (default: empty)
  * @returns The constructed circuit graph
  */
-export function buildCircuitGraph(components: Block[], wires: Wire[]): CircuitGraph {
+export function buildCircuitGraph(components: Block[], wires: Wire[], junctions: Junction[] = []): CircuitGraph {
   const nodes = new Map<string, CircuitNode>();
   const edges = new Map<string, CircuitEdge[]>();
   const powerNodes: string[] = [];
@@ -247,16 +248,39 @@ export function buildCircuitGraph(components: Block[], wires: Wire[]): CircuitGr
     }
   }
 
-  // Create edges from wires
+  // Create junction nodes
+  for (const junction of junctions) {
+    const nodeId = `junction:${junction.id}`;
+    const node: CircuitNode = {
+      id: nodeId,
+      componentId: junction.id,
+      portId: 'junction',
+      type: 'junction',
+    };
+    nodes.set(nodeId, node);
+    edges.set(nodeId, []);
+  }
+
+  // Create edges from wires (handles both port and junction endpoints)
   for (const wire of wires) {
-    // Only port-to-port wires create edges (junction wires handled separately in future)
-    if (!isPortEndpoint(wire.from) || !isPortEndpoint(wire.to)) continue;
+    // Resolve from endpoint node ID
+    let fromId: string | null = null;
+    if (isPortEndpoint(wire.from)) {
+      fromId = makeNodeId(wire.from.componentId, wire.from.portId);
+    } else if (isJunctionEndpoint(wire.from)) {
+      fromId = `junction:${wire.from.junctionId}`;
+    }
 
-    const fromId = makeNodeId(wire.from.componentId, wire.from.portId);
-    const toId = makeNodeId(wire.to.componentId, wire.to.portId);
+    // Resolve to endpoint node ID
+    let toId: string | null = null;
+    if (isPortEndpoint(wire.to)) {
+      toId = makeNodeId(wire.to.componentId, wire.to.portId);
+    } else if (isJunctionEndpoint(wire.to)) {
+      toId = `junction:${wire.to.junctionId}`;
+    }
 
-    // Skip if nodes don't exist (invalid wire)
-    if (!nodes.has(fromId) || !nodes.has(toId)) {
+    // Skip if either endpoint couldn't be resolved or nodes don't exist
+    if (!fromId || !toId || !nodes.has(fromId) || !nodes.has(toId)) {
       continue;
     }
 

@@ -80,6 +80,60 @@ export function wireExists(wires: Wire[], from: WireEndpoint, to: WireEndpoint):
 }
 
 // ============================================================================
+// Wire Connection Queries
+// ============================================================================
+
+/**
+ * Get all wires connected to a component (where either endpoint references the component).
+ */
+export function getWiresConnectedToComponent(wires: Wire[], componentId: string): Wire[] {
+  return wires.filter(
+    (wire) =>
+      (isPortEndpoint(wire.from) && wire.from.componentId === componentId) ||
+      (isPortEndpoint(wire.to) && wire.to.componentId === componentId)
+  );
+}
+
+/**
+ * Get all wires connected to a junction.
+ */
+export function getWiresConnectedToJunction(wires: Wire[], junctionId: string): Wire[] {
+  return wires.filter(
+    (wire) =>
+      (!isPortEndpoint(wire.from) && wire.from.junctionId === junctionId) ||
+      (!isPortEndpoint(wire.to) && wire.to.junctionId === junctionId)
+  );
+}
+
+/**
+ * Recalculate auto-generated handles for a wire.
+ * - If any user handle exists, remove all auto handles (user is manually controlling routing).
+ * - Otherwise, recompute auto handles via computeWireBendPoints.
+ * Returns the new handles array, or undefined if no handles needed.
+ */
+export function recalculateAutoHandles(
+  wire: Wire,
+  components: Map<string, Block>
+): WireHandle[] | undefined {
+  const hasUserHandles = wire.handles?.some((h) => h.source === 'user') ?? false;
+
+  if (hasUserHandles) {
+    // Preserve only user handles; discard auto handles
+    const userHandles = wire.handles!.filter((h) => h.source === 'user');
+    return userHandles.length > 0 ? userHandles : undefined;
+  }
+
+  // Recompute auto handles from scratch
+  return computeWireBendPoints(
+    wire.from,
+    wire.to,
+    components,
+    wire.fromExitDirection,
+    wire.toExitDirection
+  );
+}
+
+// ============================================================================
 // Wire Handle Utilities
 // ============================================================================
 

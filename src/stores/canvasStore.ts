@@ -35,6 +35,8 @@ import {
   wireExists,
   findHandleInsertIndex,
   computeWireBendPoints,
+  getWiresConnectedToComponent,
+  recalculateAutoHandles,
 } from '../components/OneCanvas/utils/canvasHelpers';
 
 // ============================================================================
@@ -265,6 +267,21 @@ function createSnapshot(components: Map<string, Block>, wires: Wire[], junctions
   };
 }
 
+/**
+ * Push a history snapshot of the current state.
+ * Truncates any redo history, adds current snapshot, and caps at MAX_HISTORY_SIZE.
+ */
+function pushHistorySnapshot(state: CanvasState): void {
+  const snapshot = createSnapshot(state.components, state.wires, state.junctions);
+  state.history = state.history.slice(0, state.historyIndex + 1);
+  state.history.push(snapshot);
+  if (state.history.length > MAX_HISTORY_SIZE) {
+    state.history.shift();
+  } else {
+    state.historyIndex++;
+  }
+}
+
 /** Restore circuit state from history snapshot */
 function restoreSnapshot(snapshot: HistorySnapshot): {
   components: Map<string, Block>;
@@ -351,15 +368,7 @@ export const useCanvasStore = create<CanvasStore>()(
 
         set(
           (state) => {
-            // Push history before modification
-            const snapshot = createSnapshot(state.components, state.wires, state.junctions);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             state.components.set(id, newBlock);
             state.isDirty = true;
@@ -376,15 +385,7 @@ export const useCanvasStore = create<CanvasStore>()(
           (state) => {
             if (!state.components.has(id)) return;
 
-            // Push history
-            const snapshot = createSnapshot(state.components, state.wires, state.junctions);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             // Remove component
             state.components.delete(id);
@@ -411,15 +412,7 @@ export const useCanvasStore = create<CanvasStore>()(
             const component = state.components.get(id);
             if (!component) return;
 
-            // Push history
-            const snapshot = createSnapshot(state.components, state.wires, state.junctions);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             state.components.set(id, { ...component, ...updates } as Block);
             state.isDirty = true;
@@ -434,7 +427,30 @@ export const useCanvasStore = create<CanvasStore>()(
         const finalPosition = state.snapToGrid
           ? snapToGridPosition(position, state.gridSize)
           : position;
-        get().updateComponent(id, { position: finalPosition });
+
+        set(
+          (state) => {
+            const component = state.components.get(id);
+            if (!component) return;
+
+            pushHistorySnapshot(state);
+
+            state.components.set(id, { ...component, position: finalPosition } as Block);
+
+            // Recalculate auto handles on connected wires
+            const connectedWires = getWiresConnectedToComponent(state.wires, id);
+            for (const wire of connectedWires) {
+              const target = state.wires.find((w) => w.id === wire.id);
+              if (target) {
+                target.handles = recalculateAutoHandles(target, state.components);
+              }
+            }
+
+            state.isDirty = true;
+          },
+          false,
+          `moveComponent/${id}`
+        );
       },
 
       // ========================================================================
@@ -476,15 +492,7 @@ export const useCanvasStore = create<CanvasStore>()(
 
         set(
           (state) => {
-            // Push history
-            const snapshot = createSnapshot(state.components, state.wires, state.junctions);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             const newWire: Wire = { id, from, to };
             if (options?.fromExitDirection) {
@@ -519,15 +527,7 @@ export const useCanvasStore = create<CanvasStore>()(
             const wireIndex = state.wires.findIndex((w) => w.id === id);
             if (wireIndex === -1) return;
 
-            // Push history
-            const snapshot = createSnapshot(state.components, state.wires, state.junctions);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             state.wires.splice(wireIndex, 1);
             state.selectedIds.delete(id);
@@ -555,15 +555,7 @@ export const useCanvasStore = create<CanvasStore>()(
 
         set(
           (state) => {
-            // Push history
-            const snapshot = createSnapshot(state.components, state.wires, state.junctions);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             // Find and remove original wire
             const wireIndex = state.wires.findIndex((w) => w.id === wireId);
@@ -706,15 +698,7 @@ export const useCanvasStore = create<CanvasStore>()(
             const wire = state.wires.find((w) => w.id === wireId);
             if (!wire) return;
 
-            // Push history
-            const snapshot = createSnapshot(state.components, state.wires, state.junctions);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             // Initialize array if needed
             wire.handles = wire.handles || [];
@@ -745,14 +729,7 @@ export const useCanvasStore = create<CanvasStore>()(
 
             // Push history on first move of a drag so Undo reverts the whole drag
             if (isFirstMove) {
-              const snapshot = createSnapshot(state.components, state.wires, state.junctions);
-              state.history = state.history.slice(0, state.historyIndex + 1);
-              state.history.push(snapshot);
-              if (state.history.length > MAX_HISTORY_SIZE) {
-                state.history.shift();
-              } else {
-                state.historyIndex++;
-              }
+              pushHistorySnapshot(state);
             }
 
             const handle = wire.handles[handleIndex];
@@ -781,15 +758,7 @@ export const useCanvasStore = create<CanvasStore>()(
             const wire = state.wires.find((w) => w.id === wireId);
             if (!wire?.handles?.[handleIndex]) return;
 
-            // Push history
-            const snapshot = createSnapshot(state.components, state.wires, state.junctions);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             wire.handles.splice(handleIndex, 1);
 
@@ -1174,15 +1143,7 @@ export const useCanvasStore = create<CanvasStore>()(
       clearCanvas: () => {
         set(
           (state) => {
-            // Push history
-            const snapshot = createSnapshot(state.components, state.wires, state.junctions);
-            state.history = state.history.slice(0, state.historyIndex + 1);
-            state.history.push(snapshot);
-            if (state.history.length > MAX_HISTORY_SIZE) {
-              state.history.shift();
-            } else {
-              state.historyIndex++;
-            }
+            pushHistorySnapshot(state);
 
             state.components = new Map();
             state.junctions = new Map();

@@ -17,10 +17,7 @@ import { type SelectionBoxState, doesRectIntersectBox } from '../components/Sele
 // Types
 // ============================================================================
 
-interface UseSelectionHandlerOptions {
-  /** Default block size for hit testing (width, height) */
-  blockSize?: { width: number; height: number };
-}
+interface UseSelectionHandlerOptions {}
 
 interface SelectionHandlerResult {
   /** Current selection box state (null when not dragging) */
@@ -49,7 +46,6 @@ interface SelectionHandlerResult {
 // Constants
 // ============================================================================
 
-const DEFAULT_BLOCK_SIZE = { width: 60, height: 60 };
 const DRAG_THRESHOLD = 5; // Pixels to move before starting drag-select
 
 // ============================================================================
@@ -57,9 +53,8 @@ const DRAG_THRESHOLD = 5; // Pixels to move before starting drag-select
 // ============================================================================
 
 export function useSelectionHandler(
-  options: UseSelectionHandlerOptions = {}
+  _options: UseSelectionHandlerOptions = {}
 ): SelectionHandlerResult {
-  const { blockSize = DEFAULT_BLOCK_SIZE } = options;
 
   // Selection box state
   const [selectionBox, setSelectionBox] = useState<SelectionBoxState | null>(null);
@@ -132,8 +127,8 @@ export function useSelectionHandler(
           const rect = {
             x: component.position.x,
             y: component.position.y,
-            width: blockSize.width,
-            height: blockSize.height,
+            width: component.size.width,
+            height: component.size.height,
           };
 
           if (doesRectIntersectBox(rect, selectionBox)) {
@@ -157,7 +152,7 @@ export function useSelectionHandler(
       setSelectionBox(null);
       setIsDragSelecting(false);
     },
-    [selectionBox, isDragSelecting, components, blockSize, setSelection, addToSelection]
+    [selectionBox, isDragSelecting, components, setSelection, addToSelection]
   );
 
   // Handle click on a component

@@ -33,6 +33,8 @@ import {
   wireExists,
   findHandleInsertIndex,
   computeWireBendPoints,
+  getWiresConnectedToComponent,
+  recalculateAutoHandles,
 } from '../../components/OneCanvas/utils/canvasHelpers';
 
 // ============================================================================
@@ -233,6 +235,15 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         const component = docData.components.get(id);
         if (component) {
           docData.components.set(id, { ...component, position: finalPosition } as Block);
+
+          // Recalculate auto handles on connected wires
+          const connectedWires = getWiresConnectedToComponent(docData.wires, id);
+          for (const wire of connectedWires) {
+            const target = docData.wires.find((w) => w.id === wire.id);
+            if (target) {
+              target.handles = recalculateAutoHandles(target, docData.components);
+            }
+          }
         }
       });
     },
