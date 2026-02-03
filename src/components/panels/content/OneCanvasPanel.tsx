@@ -45,6 +45,7 @@ import { isPortEndpoint } from '../../OneCanvas/types';
 import { WireContextMenu, type WireContextMenuAction } from '../../OneCanvas/components/WireContextMenu';
 import { JunctionDot } from '../../OneCanvas/components/JunctionDot';
 import { useWireHandleDrag } from '../../OneCanvas/hooks/useWireHandleDrag';
+import { useWireSegmentDrag } from '../../OneCanvas/hooks/useWireSegmentDrag';
 
 
 // Import simulation styles
@@ -118,6 +119,7 @@ interface WireRendererProps {
   onContextMenu?: (wireId: string, position: Position, screenPos: { x: number; y: number }) => void;
   onHandleDragStart?: (wireId: string, handleIndex: number, constraint: HandleConstraint, e: React.MouseEvent, handlePosition: Position) => void;
   onHandleContextMenu?: (wireId: string, handleIndex: number, e: React.MouseEvent) => void;
+  onSegmentDragStart?: (wireId: string, handleIndexA: number, handleIndexB: number, orientation: 'horizontal' | 'vertical', e: React.MouseEvent, startPositionA: Position, startPositionB: Position) => void;
 }
 
 const WireRenderer = memo(function WireRenderer({
@@ -128,6 +130,7 @@ const WireRenderer = memo(function WireRenderer({
   onContextMenu,
   onHandleDragStart,
   onHandleContextMenu,
+  onSegmentDragStart,
 }: WireRendererProps) {
   const { id: wireId, from, to, handles, fromExitDirection, toExitDirection } = wire;
 
@@ -200,6 +203,7 @@ const WireRenderer = memo(function WireRenderer({
       onContextMenu={onContextMenu}
       onHandleDragStart={onHandleDragStart}
       onHandleContextMenu={onHandleContextMenu}
+      onSegmentDragStart={onSegmentDragStart}
     />
   );
 });
@@ -231,6 +235,7 @@ function useCanvasState(documentId: string | null) {
   const globalAddWireHandle = useCanvasStore((state) => state.addWireHandle);
   const globalUpdateWireHandle = useCanvasStore((state) => state.updateWireHandle);
   const globalRemoveWireHandle = useCanvasStore((state) => state.removeWireHandle);
+  const globalMoveWireSegment = useCanvasStore((state) => state.moveWireSegment);
 
   // Return document state if available, otherwise global state
   return useMemo(() => {
@@ -250,6 +255,7 @@ function useCanvasState(documentId: string | null) {
         addWireHandle: documentState.addWireHandle,
         updateWireHandle: documentState.updateWireHandle,
         removeWireHandle: documentState.removeWireHandle,
+        moveWireSegment: documentState.moveWireSegment,
         isDocumentMode: true,
       };
     }
@@ -269,6 +275,7 @@ function useCanvasState(documentId: string | null) {
       addWireHandle: globalAddWireHandle,
       updateWireHandle: globalUpdateWireHandle,
       removeWireHandle: globalRemoveWireHandle,
+      moveWireSegment: globalMoveWireSegment,
       isDocumentMode: false,
     };
   }, [
@@ -287,6 +294,7 @@ function useCanvasState(documentId: string | null) {
     globalAddWireHandle,
     globalUpdateWireHandle,
     globalRemoveWireHandle,
+    globalMoveWireSegment,
   ]);
 }
 
@@ -316,6 +324,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     addWireHandle,
     updateWireHandle,
     removeWireHandle,
+    moveWireSegment,
   } = useCanvasState(documentId);
 
   // Wire drawing state and selection from global store (shared across modes)
@@ -336,6 +345,12 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
   // Wire handle drag hook
   const { handleDragStart: handleWireHandleDragStart } = useWireHandleDrag({
     updateWireHandle,
+    zoom,
+  });
+
+  // Wire segment drag hook
+  const { handleSegmentDragStart } = useWireSegmentDrag({
+    moveWireSegment,
     zoom,
   });
 
@@ -661,6 +676,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
                     onContextMenu={handleWireContextMenu}
                     onHandleDragStart={handleWireHandleDragStart}
                     onHandleContextMenu={handleWireHandleContextMenu}
+                    onSegmentDragStart={handleSegmentDragStart}
                   />
                 ))}
 

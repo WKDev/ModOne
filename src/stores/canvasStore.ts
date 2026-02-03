@@ -153,6 +153,8 @@ interface CanvasActions {
   updateWireHandle: (wireId: string, handleIndex: number, position: Position, isFirstMove?: boolean) => void;
   /** Remove handle from wire */
   removeWireHandle: (wireId: string, handleIndex: number) => void;
+  /** Move a wire segment (two adjacent handles) by delta. Set isFirstMove=true on drag start to record history. */
+  moveWireSegment: (wireId: string, handleIndexA: number, handleIndexB: number, delta: Position, isFirstMove?: boolean) => void;
 
   // Selection operations
   /** Set selection to specific IDs (replaces current) */
@@ -806,6 +808,35 @@ export const useCanvasStore = create<CanvasStore>()(
           },
           false,
           `removeWireHandle/${wireId}/${handleIndex}`
+        );
+      },
+
+      moveWireSegment: (wireId, handleIndexA, handleIndexB, delta, isFirstMove) => {
+        set(
+          (state) => {
+            const wire = state.wires.find((w) => w.id === wireId);
+            if (!wire?.handles?.[handleIndexA] || !wire?.handles?.[handleIndexB]) return;
+
+            if (isFirstMove) {
+              pushHistorySnapshot(state);
+            }
+
+            const handleA = wire.handles[handleIndexA];
+            const handleB = wire.handles[handleIndexB];
+
+            handleA.position = {
+              x: handleA.position.x + delta.x,
+              y: handleA.position.y + delta.y,
+            };
+            handleB.position = {
+              x: handleB.position.x + delta.x,
+              y: handleB.position.y + delta.y,
+            };
+
+            state.isDirty = true;
+          },
+          false,
+          `moveWireSegment/${wireId}/${handleIndexA}-${handleIndexB}`
         );
       },
 

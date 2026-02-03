@@ -55,6 +55,16 @@ interface WireProps {
   ) => void;
   /** Handler for handle right-click (removal) */
   onHandleContextMenu?: (wireId: string, handleIndex: number, e: React.MouseEvent) => void;
+  /** Handler for starting segment drag (two adjacent handles) */
+  onSegmentDragStart?: (
+    wireId: string,
+    handleIndexA: number,
+    handleIndexB: number,
+    orientation: 'horizontal' | 'vertical',
+    e: React.MouseEvent,
+    startPositionA: Position,
+    startPositionB: Position
+  ) => void;
   /** Direction wire exits from source port */
   fromExitDirection?: PortPosition;
   /** Direction wire enters target port */
@@ -107,6 +117,7 @@ export const Wire = memo(function Wire({
   handles,
   onHandleDragStart,
   onHandleContextMenu,
+  onSegmentDragStart,
   fromExitDirection,
   toExitDirection,
   defaultFromDirection,
@@ -266,6 +277,34 @@ export const Wire = memo(function Wire({
           className="pointer-events-none"
         />
       )}
+
+      {/* Segment drag hit areas (between adjacent handles) */}
+      {isSelected && handles && handles.length >= 2 && onSegmentDragStart &&
+        handles.slice(0, -1).map((handle, i) => {
+          const next = handles[i + 1];
+          const dx = Math.abs(handle.position.x - next.position.x);
+          const dy = Math.abs(handle.position.y - next.position.y);
+          // Skip diagonal segments
+          if (dx > 5 && dy > 5) return null;
+          const orientation = dx <= 5 ? 'vertical' : 'horizontal';
+          const cursor = orientation === 'vertical' ? 'ew-resize' : 'ns-resize';
+          return (
+            <line
+              key={`seg-${i}`}
+              x1={handle.position.x} y1={handle.position.y}
+              x2={next.position.x} y2={next.position.y}
+              stroke="transparent" strokeWidth={12}
+              style={{ pointerEvents: 'auto', cursor }}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onSegmentDragStart(id, i, i + 1, orientation, e,
+                  handle.position, next.position);
+              }}
+            />
+          );
+        })
+      }
 
       {/* Render handles when wire is selected */}
       {isSelected && handles && handles.length > 0 && onHandleDragStart && (

@@ -82,6 +82,7 @@ export interface UseCanvasDocumentReturn {
   addWireHandle: (wireId: string, position: Position) => void;
   updateWireHandle: (wireId: string, handleIndex: number, position: Position) => void;
   removeWireHandle: (wireId: string, handleIndex: number) => void;
+  moveWireSegment: (wireId: string, handleIndexA: number, handleIndexB: number, delta: Position, isFirstMove?: boolean) => void;
 
   // Viewport operations
   setZoom: (zoom: number) => void;
@@ -468,6 +469,33 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
     [documentId, pushHistory, updateCanvasData]
   );
 
+  const moveWireSegment = useCallback(
+    (wireId: string, handleIndexA: number, handleIndexB: number, delta: Position, isFirstMove?: boolean) => {
+      if (!documentId) return;
+
+      if (isFirstMove) {
+        pushHistory(documentId);
+      }
+      updateCanvasData(documentId, (docData) => {
+        const wire = docData.wires.find((w) => w.id === wireId);
+        if (!wire?.handles?.[handleIndexA] || !wire?.handles?.[handleIndexB]) return;
+
+        const handleA = wire.handles[handleIndexA];
+        const handleB = wire.handles[handleIndexB];
+
+        handleA.position = {
+          x: handleA.position.x + delta.x,
+          y: handleA.position.y + delta.y,
+        };
+        handleB.position = {
+          x: handleB.position.x + delta.x,
+          y: handleB.position.y + delta.y,
+        };
+      });
+    },
+    [documentId, pushHistory, updateCanvasData]
+  );
+
   // Viewport operations
   const setZoom = useCallback(
     (zoom: number) => {
@@ -607,6 +635,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       addWireHandle,
       updateWireHandle,
       removeWireHandle,
+      moveWireSegment,
 
       // Viewport operations
       setZoom,
@@ -643,6 +672,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
     addWireHandle,
     updateWireHandle,
     removeWireHandle,
+    moveWireSegment,
     setZoom,
     setPan,
     resetViewport,
