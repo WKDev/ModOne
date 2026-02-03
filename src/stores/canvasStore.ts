@@ -14,6 +14,8 @@ import type {
   Wire,
   WireEndpoint,
   Position,
+  PortPosition,
+  HandleConstraint,
   CircuitMetadata,
   SerializableCircuitState,
 } from '../components/OneCanvas/types';
@@ -31,6 +33,10 @@ export interface WireDrawingState {
   from: WireEndpoint;
   /** Current mouse position for visual feedback */
   tempPosition: Position;
+  /** Starting port position for direction detection */
+  startPosition?: Position;
+  /** Detected exit direction from initial drag */
+  exitDirection?: PortPosition;
 }
 
 /** History snapshot for undo/redo */
@@ -98,17 +104,27 @@ interface CanvasActions {
 
   // Wire operations
   /** Add a wire connection between two ports */
-  addWire: (from: WireEndpoint, to: WireEndpoint) => string | null;
+  addWire: (from: WireEndpoint, to: WireEndpoint, options?: { fromExitDirection?: PortPosition; toExitDirection?: PortPosition }) => string | null;
   /** Remove a wire by ID */
   removeWire: (id: string) => void;
+  /** Create a junction on an existing wire, splitting it into two wires */
+  createJunctionOnWire: (wireId: string, position: Position) => string | null;
   /** Start drawing a wire from an endpoint */
-  startWireDrawing: (from: WireEndpoint) => void;
+  startWireDrawing: (from: WireEndpoint, options?: { skipValidation?: boolean; startPosition?: Position }) => void;
   /** Update temporary wire position during drawing */
   updateWireDrawing: (position: Position) => void;
   /** Complete wire drawing to an endpoint */
   completeWireDrawing: (to: WireEndpoint) => string | null;
   /** Cancel wire drawing */
   cancelWireDrawing: () => void;
+
+  // Wire handle operations
+  /** Add handle to wire at position */
+  addWireHandle: (wireId: string, position: Position) => void;
+  /** Update handle position (constrained) */
+  updateWireHandle: (wireId: string, handleIndex: number, position: Position) => void;
+  /** Remove handle from wire */
+  removeWireHandle: (wireId: string, handleIndex: number) => void;
 
   // Selection operations
   /** Set selection to specific IDs (replaces current) */
@@ -235,6 +251,7 @@ function createSnapshot(components: Map<string, Block>, wires: Wire[]): HistoryS
       from: { ...wire.from },
       to: { ...wire.to },
       points: wire.points ? [...wire.points] : undefined,
+      handleConstraints: wire.handleConstraints ? [...wire.handleConstraints] : undefined,
     })),
   };
 }
@@ -253,6 +270,7 @@ function restoreSnapshot(snapshot: HistorySnapshot): {
       from: { ...wire.from },
       to: { ...wire.to },
       points: wire.points ? [...wire.points] : undefined,
+      handleConstraints: wire.handleConstraints ? [...wire.handleConstraints] : undefined,
     })),
   };
 }
@@ -301,9 +319,71 @@ function getDefaultBlockProps(type: BlockType): Partial<Block> {
       return { mode: 'momentary', contactConfig: '1a', pressed: false };
     case 'scope':
       return { channels: 1, triggerMode: 'auto', timeBase: 100, voltageScale: 5 };
+    case 'junction':
+      return {};
     default:
       return {};
   }
+}
+
+/** Threshold in pixels before direction is detected */
+const DIRECTION_THRESHOLD = 15;
+
+/**
+ * Detect drag direction from start position to current position.
+ * Returns null if below threshold.
+ */
+function detectDragDirection(startPos: Position, currentPos: Position): PortPosition | null {
+  const dx = currentPos.x - startPos.x;
+  const dy = currentPos.y - startPos.y;
+
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < DIRECTION_THRESHOLD) {
+    return null;
+  }
+
+  if (Math.abs(dx) > Math.abs(dy)) {
+    return dx > 0 ? 'right' : 'left';
+  }
+  return dy > 0 ? 'bottom' : 'top';
+}
+
+/**
+ * Determine handle constraint based on wire path direction at insertion point.
+ * If wire is moving horizontally at that point, new handle should be vertical.
+ */
+function determineHandleConstraint(
+  _wire: Wire,
+  _position: Position
+): HandleConstraint {
+  // Default to horizontal constraint (handle moves horizontally)
+  // In the future, could analyze the wire path to determine
+  return 'horizontal';
+}
+
+/**
+ * Find where to insert a new handle in the points array based on position.
+ */
+function findHandleInsertIndex(wire: Wire, position: Position): number {
+  if (!wire.points || wire.points.length === 0) {
+    return 0;
+  }
+
+  // Find closest segment
+  let closestIndex = 0;
+  let closestDistance = Infinity;
+
+  for (let i = 0; i < wire.points.length; i++) {
+    const point = wire.points[i];
+    const distance = Math.sqrt(
+      Math.pow(point.x - position.x, 2) + Math.pow(point.y - position.y, 2)
+    );
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestIndex = i;
+    }
+  }
+
+  return closestIndex + 1;
 }
 
 /** Get default ports for a block type */
@@ -340,6 +420,10 @@ function getDefaultPorts(type: BlockType): Block['ports'] {
         { id: 'ch2', type: 'input', label: 'CH2', position: 'left', offset: 0.5 },
         { id: 'ch3', type: 'input', label: 'CH3', position: 'left', offset: 0.75 },
         { id: 'ch4', type: 'input', label: 'CH4', position: 'left', offset: 1.0 },
+      ];
+    case 'junction':
+      return [
+        { id: 'hub', type: 'bidirectional', label: '', position: 'right', offset: 0.5 },
       ];
     default:
       return [];
@@ -466,7 +550,7 @@ export const useCanvasStore = create<CanvasStore>()(
       // Wire Operations
       // ========================================================================
 
-      addWire: (from, to) => {
+      addWire: (from, to, options) => {
         const state = get();
 
         // Validate endpoints
@@ -505,7 +589,14 @@ export const useCanvasStore = create<CanvasStore>()(
               state.historyIndex++;
             }
 
-            state.wires.push({ id, from, to });
+            const newWire: Wire = { id, from, to };
+            if (options?.fromExitDirection) {
+              newWire.fromExitDirection = options.fromExitDirection;
+            }
+            if (options?.toExitDirection) {
+              newWire.toExitDirection = options.toExitDirection;
+            }
+            state.wires.push(newWire);
             state.isDirty = true;
           },
           false,
@@ -540,16 +631,93 @@ export const useCanvasStore = create<CanvasStore>()(
         );
       },
 
-      startWireDrawing: (from) => {
+      createJunctionOnWire: (wireId, position) => {
         const state = get();
-        if (!isValidEndpoint(from, state.components)) {
+        const wire = state.wires.find((w) => w.id === wireId);
+        if (!wire) {
+          console.warn('Wire not found:', wireId);
+          return null;
+        }
+
+        // Create junction component (centered at click position)
+        const junctionId = generateId('junction');
+        const junctionPosition = {
+          x: position.x - 6, // Center the 12x12 junction
+          y: position.y - 6,
+        };
+
+        const junctionBlock: Block = {
+          id: junctionId,
+          type: 'junction',
+          position: junctionPosition,
+          ports: getDefaultPorts('junction'),
+          sourceWireId: wireId,
+        } as Block;
+
+        set(
+          (state) => {
+            // Push history
+            const snapshot = createSnapshot(state.components, state.wires);
+            state.history = state.history.slice(0, state.historyIndex + 1);
+            state.history.push(snapshot);
+            if (state.history.length > MAX_HISTORY_SIZE) {
+              state.history.shift();
+            } else {
+              state.historyIndex++;
+            }
+
+            // Find and remove original wire
+            const wireIndex = state.wires.findIndex((w) => w.id === wireId);
+            if (wireIndex === -1) return;
+            const originalWire = state.wires[wireIndex];
+            state.wires.splice(wireIndex, 1);
+
+            // Add junction component
+            state.components.set(junctionId, junctionBlock);
+
+            // Create two new wires: from->junction and junction->to
+            const wire1Id = generateId('wire');
+            const wire2Id = generateId('wire');
+
+            state.wires.push({
+              id: wire1Id,
+              from: { ...originalWire.from },
+              to: { componentId: junctionId, portId: 'hub' },
+            });
+
+            state.wires.push({
+              id: wire2Id,
+              from: { componentId: junctionId, portId: 'hub' },
+              to: { ...originalWire.to },
+            });
+
+            // Select the new junction
+            state.selectedIds = new Set([junctionId]);
+            state.isDirty = true;
+          },
+          false,
+          `createJunctionOnWire/${wireId}`
+        );
+
+        return junctionId;
+      },
+
+      startWireDrawing: (from, options) => {
+        const state = get();
+        // Skip validation if caller already validated against their own components
+        if (!options?.skipValidation && !isValidEndpoint(from, state.components)) {
           console.warn('Invalid wire start endpoint:', from);
           return;
         }
 
         set(
           (state) => {
-            state.wireDrawing = { from, tempPosition: { x: 0, y: 0 } };
+            state.wireDrawing = {
+              from,
+              tempPosition: { x: 0, y: 0 },
+              startPosition: options?.startPosition,
+              exitDirection: undefined,
+            };
           },
           false,
           'startWireDrawing'
@@ -561,6 +729,14 @@ export const useCanvasStore = create<CanvasStore>()(
           (state) => {
             if (state.wireDrawing) {
               state.wireDrawing.tempPosition = position;
+
+              // Detect exit direction if we have a start position and haven't detected yet
+              if (state.wireDrawing.startPosition && !state.wireDrawing.exitDirection) {
+                const direction = detectDragDirection(state.wireDrawing.startPosition, position);
+                if (direction) {
+                  state.wireDrawing.exitDirection = direction;
+                }
+              }
             }
           },
           false,
@@ -572,7 +748,10 @@ export const useCanvasStore = create<CanvasStore>()(
         const state = get();
         if (!state.wireDrawing) return null;
 
-        const wireId = get().addWire(state.wireDrawing.from, to);
+        const { from, exitDirection } = state.wireDrawing;
+        const wireId = get().addWire(from, to, {
+          fromExitDirection: exitDirection,
+        });
         set(
           (state) => {
             state.wireDrawing = null;
@@ -591,6 +770,92 @@ export const useCanvasStore = create<CanvasStore>()(
           },
           false,
           'cancelWireDrawing'
+        );
+      },
+
+      // ========================================================================
+      // Wire Handle Operations
+      // ========================================================================
+
+      addWireHandle: (wireId, position) => {
+        set(
+          (state) => {
+            const wire = state.wires.find((w) => w.id === wireId);
+            if (!wire) return;
+
+            // Push history
+            const snapshot = createSnapshot(state.components, state.wires);
+            state.history = state.history.slice(0, state.historyIndex + 1);
+            state.history.push(snapshot);
+            if (state.history.length > MAX_HISTORY_SIZE) {
+              state.history.shift();
+            } else {
+              state.historyIndex++;
+            }
+
+            // Determine constraint based on insertion position
+            const constraint = determineHandleConstraint(wire, position);
+
+            // Initialize arrays if needed
+            wire.points = wire.points || [];
+            wire.handleConstraints = wire.handleConstraints || [];
+
+            // Insert handle at correct position in points array
+            const insertIndex = findHandleInsertIndex(wire, position);
+            wire.points.splice(insertIndex, 0, position);
+            wire.handleConstraints.splice(insertIndex, 0, constraint);
+
+            state.isDirty = true;
+          },
+          false,
+          `addWireHandle/${wireId}`
+        );
+      },
+
+      updateWireHandle: (wireId, handleIndex, position) => {
+        set(
+          (state) => {
+            const wire = state.wires.find((w) => w.id === wireId);
+            if (!wire?.points?.[handleIndex]) return;
+
+            const constraint = wire.handleConstraints?.[handleIndex] || 'horizontal';
+            const original = wire.points[handleIndex];
+
+            // Apply constraint - only allow movement in constrained direction
+            wire.points[handleIndex] = constraint === 'horizontal'
+              ? { x: position.x, y: original.y }
+              : { x: original.x, y: position.y };
+
+            state.isDirty = true;
+          },
+          false,
+          `updateWireHandle/${wireId}/${handleIndex}`
+        );
+      },
+
+      removeWireHandle: (wireId, handleIndex) => {
+        set(
+          (state) => {
+            const wire = state.wires.find((w) => w.id === wireId);
+            if (!wire?.points?.[handleIndex]) return;
+
+            // Push history
+            const snapshot = createSnapshot(state.components, state.wires);
+            state.history = state.history.slice(0, state.historyIndex + 1);
+            state.history.push(snapshot);
+            if (state.history.length > MAX_HISTORY_SIZE) {
+              state.history.shift();
+            } else {
+              state.historyIndex++;
+            }
+
+            wire.points.splice(handleIndex, 1);
+            wire.handleConstraints?.splice(handleIndex, 1);
+
+            state.isDirty = true;
+          },
+          false,
+          `removeWireHandle/${wireId}/${handleIndex}`
         );
       },
 

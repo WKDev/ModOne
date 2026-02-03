@@ -2,11 +2,13 @@
  * Wire Component
  *
  * Renders wire connections between ports with visual feedback.
+ * Supports handles (control points) for custom wire routing.
  */
 
-import { memo } from 'react';
-import type { Position } from './types';
-import { calculateWirePath } from './utils/wirePathCalculator';
+import { memo, useCallback } from 'react';
+import type { Position, HandleConstraint, PortPosition } from './types';
+import { calculateWirePath, calculatePathWithHandles, calculatePathWithExitDirections } from './utils/wirePathCalculator';
+import { WireHandle } from './components/WireHandle';
 
 // ============================================================================
 // Types
@@ -31,9 +33,36 @@ interface WireProps {
   /** Whether wire is being hovered */
   isHovered?: boolean;
   /** Path mode */
-  pathMode?: 'straight' | 'bezier';
+  pathMode?: 'straight' | 'bezier' | 'orthogonal';
   /** Click handler */
   onClick?: (id: string) => void;
+  /** Double-click handler for adding handle */
+  onAddHandle?: (wireId: string, position: Position) => void;
+  /** Right-click context menu handler */
+  onContextMenu?: (wireId: string, position: Position, screenPos: { x: number; y: number }) => void;
+  /** Double-click handler for creating junction (deprecated - use context menu) */
+  onCreateJunction?: (wireId: string, position: Position) => void;
+  /** Handle positions (control points) */
+  handles?: Position[];
+  /** Constraints for each handle */
+  handleConstraints?: HandleConstraint[];
+  /** Handler for starting handle drag */
+  onHandleDragStart?: (
+    wireId: string,
+    handleIndex: number,
+    constraint: HandleConstraint,
+    e: React.MouseEvent
+  ) => void;
+  /** Handler for handle right-click (removal) */
+  onHandleContextMenu?: (wireId: string, handleIndex: number, e: React.MouseEvent) => void;
+  /** Direction wire exits from source port */
+  fromExitDirection?: PortPosition;
+  /** Direction wire enters target port */
+  toExitDirection?: PortPosition;
+  /** Default from direction based on port position */
+  defaultFromDirection?: PortPosition;
+  /** Default to direction based on port position */
+  defaultToDirection?: PortPosition;
 }
 
 // ============================================================================
@@ -70,21 +99,121 @@ export const Wire = memo(function Wire({
   isActive = false,
   isSelected = false,
   isHovered = false,
-  pathMode = 'bezier',
+  pathMode = 'straight',
   onClick,
+  onAddHandle,
+  onContextMenu,
+  onCreateJunction,
+  handles,
+  handleConstraints,
+  onHandleDragStart,
+  onHandleContextMenu,
+  fromExitDirection,
+  toExitDirection,
+  defaultFromDirection,
+  defaultToDirection,
 }: WireProps) {
-  // Calculate path
-  const pathD = calculateWirePath(from, to, pathMode);
+  // Calculate path based on mode and handles
+  const pathD = (() => {
+    // If we have handles, use path with handles
+    if (handles && handles.length > 0) {
+      return calculatePathWithHandles(
+        from,
+        to,
+        handles,
+        fromExitDirection || defaultFromDirection,
+        toExitDirection || defaultToDirection
+      );
+    }
+
+    // If we have exit directions, use orthogonal path with directions
+    if (fromExitDirection || toExitDirection || defaultFromDirection || defaultToDirection) {
+      return calculatePathWithExitDirections(
+        from,
+        to,
+        fromExitDirection,
+        toExitDirection,
+        defaultFromDirection,
+        defaultToDirection
+      );
+    }
+
+    // Default path calculation
+    return calculateWirePath(from, to, pathMode === 'orthogonal' ? 'straight' : pathMode);
+  })();
 
   // Determine colors and widths
   const baseColor = WIRE_COLORS[type];
   const strokeColor = isSelected ? SELECTED_COLOR : isHovered ? HOVER_COLOR : baseColor;
   const strokeWidth = isSelected ? WIRE_WIDTH_SELECTED : WIRE_WIDTH;
 
+  // Calculate click position on wire from mouse event
+  const getClickPosition = useCallback((e: React.MouseEvent<SVGPathElement>): Position | null => {
+    const pathElement = e.currentTarget;
+    const svgElement = pathElement.ownerSVGElement;
+    if (!svgElement) return null;
+
+    const point = svgElement.createSVGPoint();
+    point.x = e.clientX;
+    point.y = e.clientY;
+    const ctm = svgElement.getScreenCTM();
+    if (!ctm) return null;
+    const svgPoint = point.matrixTransform(ctm.inverse());
+
+    // Find closest point on path
+    const totalLength = pathElement.getTotalLength();
+    let closestPoint = { x: 0, y: 0 };
+    let closestDistance = Infinity;
+
+    for (let i = 0; i <= 100; i++) {
+      const t = i / 100;
+      const length = t * totalLength;
+      const p = pathElement.getPointAtLength(length);
+      const distance = Math.sqrt(
+        Math.pow(p.x - svgPoint.x, 2) + Math.pow(p.y - svgPoint.y, 2)
+      );
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestPoint = { x: p.x, y: p.y };
+      }
+    }
+
+    return closestPoint;
+  }, []);
+
   // Handle click
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onClick?.(id);
+  };
+
+  // Handle double-click for adding handle or creating junction (legacy)
+  const handleDoubleClick = (e: React.MouseEvent<SVGPathElement>) => {
+    e.stopPropagation();
+
+    const position = getClickPosition(e);
+    if (!position) return;
+
+    // Prefer adding handle if handler is provided
+    if (onAddHandle) {
+      onAddHandle(id, position);
+    } else if (onCreateJunction) {
+      // Legacy: create junction on double-click
+      onCreateJunction(id, position);
+    }
+  };
+
+  // Handle right-click for context menu
+  const handleRightClick = (e: React.MouseEvent<SVGPathElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!onContextMenu) return;
+
+    const position = getClickPosition(e);
+    if (!position) return;
+
+    onContextMenu(id, position, { x: e.clientX, y: e.clientY });
   };
 
   return (
@@ -96,7 +225,10 @@ export const Wire = memo(function Wire({
         stroke="transparent"
         strokeWidth={12}
         className="cursor-pointer"
+        style={{ pointerEvents: 'auto' }}
         onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+        onContextMenu={handleRightClick}
       />
 
       {/* Main wire path */}
@@ -149,6 +281,23 @@ export const Wire = memo(function Wire({
           className="pointer-events-none"
         />
       )}
+
+      {/* Render handles when wire is selected */}
+      {isSelected && handles && handles.length > 0 && onHandleDragStart && (
+        <>
+          {handles.map((handle, index) => (
+            <WireHandle
+              key={`${id}-handle-${index}`}
+              position={handle}
+              wireId={id}
+              handleIndex={index}
+              constraint={handleConstraints?.[index] || 'horizontal'}
+              onDragStart={onHandleDragStart}
+              onContextMenu={onHandleContextMenu}
+            />
+          ))}
+        </>
+      )}
     </g>
   );
 });
@@ -175,7 +324,7 @@ export const WirePreview = memo(function WirePreview({
   from,
   to,
   isValidTarget = false,
-  pathMode = 'bezier',
+  pathMode = 'straight',
 }: WirePreviewProps) {
   const pathD = calculateWirePath(from, to, pathMode);
 

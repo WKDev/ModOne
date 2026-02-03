@@ -15,6 +15,8 @@ import type {
   Wire,
   WireEndpoint,
   Position,
+  PortPosition,
+  HandleConstraint,
   CircuitMetadata,
 } from '../../components/OneCanvas/types';
 
@@ -51,8 +53,12 @@ export interface UseCanvasDocumentReturn {
   moveComponent: (id: string, position: Position) => void;
 
   // Wire operations
-  addWire: (from: WireEndpoint, to: WireEndpoint) => string | null;
+  addWire: (from: WireEndpoint, to: WireEndpoint, options?: { fromExitDirection?: PortPosition; toExitDirection?: PortPosition }) => string | null;
   removeWire: (id: string) => void;
+  createJunctionOnWire: (wireId: string, position: Position) => string | null;
+  addWireHandle: (wireId: string, position: Position) => void;
+  updateWireHandle: (wireId: string, handleIndex: number, position: Position) => void;
+  removeWireHandle: (wireId: string, handleIndex: number) => void;
 
   // Viewport operations
   setZoom: (zoom: number) => void;
@@ -190,6 +196,38 @@ function wireExists(wires: Wire[], from: WireEndpoint, to: WireEndpoint): boolea
   );
 }
 
+/** Determine handle constraint based on wire path */
+function determineHandleConstraint(): HandleConstraint {
+  return 'horizontal';
+}
+
+/** Find where to insert a new handle */
+function findHandleInsertIndex(wire: Wire, position: Position): number {
+  if (!wire.points || wire.points.length === 0) {
+    return 0;
+  }
+  let closestIndex = 0;
+  let closestDistance = Infinity;
+  for (let i = 0; i < wire.points.length; i++) {
+    const point = wire.points[i];
+    const distance = Math.sqrt(
+      Math.pow(point.x - position.x, 2) + Math.pow(point.y - position.y, 2)
+    );
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestIndex = i;
+    }
+  }
+  return closestIndex + 1;
+}
+
+/** Get default ports for junction */
+function getJunctionPorts(): Block['ports'] {
+  return [
+    { id: 'hub', type: 'bidirectional', label: '', position: 'right', offset: 0.5 },
+  ];
+}
+
 // ============================================================================
 // Hook
 // ============================================================================
@@ -309,7 +347,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
 
   // Wire operations
   const addWire = useCallback(
-    (from: WireEndpoint, to: WireEndpoint): string | null => {
+    (from: WireEndpoint, to: WireEndpoint, options?: { fromExitDirection?: PortPosition; toExitDirection?: PortPosition }): string | null => {
       if (!documentId || !data) return null;
 
       // Validate endpoints
@@ -326,7 +364,14 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
 
       pushHistory(documentId);
       updateCanvasData(documentId, (docData) => {
-        docData.wires.push({ id, from, to });
+        const newWire: Wire = { id, from, to };
+        if (options?.fromExitDirection) {
+          newWire.fromExitDirection = options.fromExitDirection;
+        }
+        if (options?.toExitDirection) {
+          newWire.toExitDirection = options.toExitDirection;
+        }
+        docData.wires.push(newWire);
       });
 
       return id;
@@ -341,6 +386,122 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       pushHistory(documentId);
       updateCanvasData(documentId, (docData) => {
         docData.wires = docData.wires.filter((wire) => wire.id !== id);
+      });
+    },
+    [documentId, pushHistory, updateCanvasData]
+  );
+
+  const createJunctionOnWire = useCallback(
+    (wireId: string, position: Position): string | null => {
+      if (!documentId || !data) return null;
+
+      const wire = data.wires.find((w) => w.id === wireId);
+      if (!wire) {
+        console.warn('Wire not found:', wireId);
+        return null;
+      }
+
+      const junctionId = generateId('junction');
+      const junctionPosition = {
+        x: position.x - 6,
+        y: position.y - 6,
+      };
+
+      const junctionBlock: Block = {
+        id: junctionId,
+        type: 'junction',
+        position: junctionPosition,
+        ports: getJunctionPorts(),
+        sourceWireId: wireId,
+      } as Block;
+
+      pushHistory(documentId);
+      updateCanvasData(documentId, (docData) => {
+        // Find and remove original wire
+        const wireIndex = docData.wires.findIndex((w) => w.id === wireId);
+        if (wireIndex === -1) return;
+        const originalWire = docData.wires[wireIndex];
+        docData.wires.splice(wireIndex, 1);
+
+        // Add junction component
+        docData.components.set(junctionId, junctionBlock);
+
+        // Create two new wires
+        const wire1Id = generateId('wire');
+        const wire2Id = generateId('wire');
+
+        docData.wires.push({
+          id: wire1Id,
+          from: { ...originalWire.from },
+          to: { componentId: junctionId, portId: 'hub' },
+        });
+
+        docData.wires.push({
+          id: wire2Id,
+          from: { componentId: junctionId, portId: 'hub' },
+          to: { ...originalWire.to },
+        });
+      });
+
+      return junctionId;
+    },
+    [documentId, data, pushHistory, updateCanvasData]
+  );
+
+  const addWireHandle = useCallback(
+    (wireId: string, position: Position) => {
+      if (!documentId || !data) return;
+
+      const wire = data.wires.find((w) => w.id === wireId);
+      if (!wire) return;
+
+      pushHistory(documentId);
+      updateCanvasData(documentId, (docData) => {
+        const targetWire = docData.wires.find((w) => w.id === wireId);
+        if (!targetWire) return;
+
+        const constraint = determineHandleConstraint();
+        targetWire.points = targetWire.points || [];
+        targetWire.handleConstraints = targetWire.handleConstraints || [];
+
+        const insertIndex = findHandleInsertIndex(targetWire, position);
+        targetWire.points.splice(insertIndex, 0, position);
+        targetWire.handleConstraints.splice(insertIndex, 0, constraint);
+      });
+    },
+    [documentId, data, pushHistory, updateCanvasData]
+  );
+
+  const updateWireHandle = useCallback(
+    (wireId: string, handleIndex: number, position: Position) => {
+      if (!documentId) return;
+
+      updateCanvasData(documentId, (docData) => {
+        const wire = docData.wires.find((w) => w.id === wireId);
+        if (!wire?.points?.[handleIndex]) return;
+
+        const constraint = wire.handleConstraints?.[handleIndex] || 'horizontal';
+        const original = wire.points[handleIndex];
+
+        wire.points[handleIndex] = constraint === 'horizontal'
+          ? { x: position.x, y: original.y }
+          : { x: original.x, y: position.y };
+      });
+    },
+    [documentId, updateCanvasData]
+  );
+
+  const removeWireHandle = useCallback(
+    (wireId: string, handleIndex: number) => {
+      if (!documentId) return;
+
+      pushHistory(documentId);
+      updateCanvasData(documentId, (docData) => {
+        const wire = docData.wires.find((w) => w.id === wireId);
+        if (!wire?.points?.[handleIndex]) return;
+
+        wire.points.splice(handleIndex, 1);
+        wire.handleConstraints?.splice(handleIndex, 1);
       });
     },
     [documentId, pushHistory, updateCanvasData]
@@ -476,6 +637,10 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       // Wire operations
       addWire,
       removeWire,
+      createJunctionOnWire,
+      addWireHandle,
+      updateWireHandle,
+      removeWireHandle,
 
       // Viewport operations
       setZoom,
@@ -507,6 +672,10 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
     moveComponent,
     addWire,
     removeWire,
+    createJunctionOnWire,
+    addWireHandle,
+    updateWireHandle,
+    removeWireHandle,
     setZoom,
     setPan,
     resetViewport,

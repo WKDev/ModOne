@@ -13,6 +13,7 @@ import { PlcOutBlock } from './blocks/PlcOutBlock';
 import { PlcInBlock } from './blocks/PlcInBlock';
 import { ButtonBlock } from './blocks/ButtonBlock';
 import { ScopeBlock } from './blocks/ScopeBlock';
+import { JunctionBlock } from './blocks/JunctionBlock';
 
 // ============================================================================
 // Types
@@ -133,6 +134,9 @@ export const BlockRenderer = memo(function BlockRenderer({
             }
           />
         );
+
+      case 'junction':
+        return <JunctionBlock block={block} {...commonProps} />;
 
       default:
         // Unknown block type - render a placeholder

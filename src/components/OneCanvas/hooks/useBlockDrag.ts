@@ -25,6 +25,10 @@ interface UseBlockDragOptions {
   canvasRef: React.RefObject<HTMLElement | null>;
   /** Callback to check if dragging should be prevented (e.g., during wire drawing) */
   shouldPreventDrag?: () => boolean;
+  /** Optional document-aware components (overrides global store) */
+  components?: Map<string, { position: Position }>;
+  /** Optional document-aware moveComponent function (overrides global store) */
+  moveComponent?: (id: string, position: Position) => void;
 }
 
 interface DragState {
@@ -54,16 +58,22 @@ interface UseBlockDragReturn {
 export function useBlockDrag({
   canvasRef,
   shouldPreventDrag,
+  components: customComponents,
+  moveComponent: customMoveComponent,
 }: UseBlockDragOptions): UseBlockDragReturn {
   // Store access
   const zoom = useCanvasStore((state) => state.zoom);
   const selectedIds = useCanvasStore((state) => state.selectedIds);
-  const components = useCanvasStore((state) => state.components);
-  const moveComponent = useCanvasStore((state) => state.moveComponent);
+  const globalComponents = useCanvasStore((state) => state.components);
+  const globalMoveComponent = useCanvasStore((state) => state.moveComponent);
   const snapToGridEnabled = useCanvasStore((state) => state.snapToGrid);
   const gridSize = useCanvasStore((state) => state.gridSize);
   const setSelection = useCanvasStore((state) => state.setSelection);
   const addToSelection = useCanvasStore((state) => state.addToSelection);
+
+  // Use custom (document-aware) components/moveComponent if provided, else fall back to global store
+  const components = customComponents ?? globalComponents;
+  const moveComponent = customMoveComponent ?? globalMoveComponent;
 
   // Drag state
   const [isDragging, setIsDragging] = useState(false);

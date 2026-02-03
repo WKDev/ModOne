@@ -12,13 +12,14 @@ import type {
   Power24vBlock,
   Power12vBlock,
   GndBlock,
+  JunctionBlock,
 } from '../../../OneCanvas/types';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-type BasicBlock = Power24vBlock | Power12vBlock | GndBlock;
+type BasicBlock = Power24vBlock | Power12vBlock | GndBlock | JunctionBlock;
 
 interface BasicPropertiesProps {
   component: BasicBlock;
@@ -33,7 +34,7 @@ function isPowerBlock(block: BasicBlock): block is Power24vBlock | Power12vBlock
   return block.type === 'power_24v' || block.type === 'power_12v';
 }
 
-function getVoltage(block: BasicBlock): number {
+function getVoltage(block: BasicBlock): number | null {
   switch (block.type) {
     case 'power_24v':
       return 24;
@@ -41,6 +42,8 @@ function getVoltage(block: BasicBlock): number {
       return 12;
     case 'gnd':
       return 0;
+    case 'junction':
+      return null;
   }
 }
 
@@ -52,6 +55,8 @@ function getBlockDescription(block: BasicBlock): string {
       return 'Provides 12V DC power supply for low-voltage circuits';
     case 'gnd':
       return 'Ground reference (0V) for circuit completion';
+    case 'junction':
+      return 'Wire junction point for branching connections';
   }
 }
 
@@ -104,26 +109,28 @@ export const BasicProperties = memo(function BasicProperties({
       {/* Block Specific Info */}
       <div className="space-y-3">
         <h4 className="text-xs font-semibold uppercase text-neutral-400">
-          {component.type === 'gnd' ? 'Ground' : 'Power Supply'} Settings
+          {component.type === 'gnd' ? 'Ground' : component.type === 'junction' ? 'Junction' : 'Power Supply'} Settings
         </h4>
 
         {/* Description */}
         <p className="text-xs text-neutral-500">{description}</p>
 
-        {/* Voltage Display */}
-        <div className="space-y-1">
-          <label className="text-xs text-neutral-500">Output Voltage</label>
-          <div className="flex items-center gap-2 px-2 py-1.5 bg-neutral-800 rounded">
-            <span
-              className={`text-lg font-mono font-bold ${
-                voltage > 0 ? 'text-yellow-400' : 'text-green-400'
-              }`}
-            >
-              {voltage}V
-            </span>
-            <span className="text-xs text-neutral-500">DC</span>
+        {/* Voltage Display (not for junction) */}
+        {voltage !== null && (
+          <div className="space-y-1">
+            <label className="text-xs text-neutral-500">Output Voltage</label>
+            <div className="flex items-center gap-2 px-2 py-1.5 bg-neutral-800 rounded">
+              <span
+                className={`text-lg font-mono font-bold ${
+                  voltage > 0 ? 'text-yellow-400' : 'text-green-400'
+                }`}
+              >
+                {voltage}V
+              </span>
+              <span className="text-xs text-neutral-500">DC</span>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Max Current (only for power blocks) */}
         {isPowerBlock(component) && (
@@ -156,6 +163,12 @@ export const BasicProperties = memo(function BasicProperties({
                 <span className="text-green-400">Ground Reference</span>
                 <br />
                 Connect to complete circuit paths back to power supply
+              </>
+            ) : component.type === 'junction' ? (
+              <>
+                <span className="text-blue-400">Junction Point</span>
+                <br />
+                Double-click on a wire to create a junction for branching
               </>
             ) : (
               <>

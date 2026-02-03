@@ -18,7 +18,8 @@ export type BlockType =
   | 'plc_in'
   | 'led'
   | 'button'
-  | 'scope';
+  | 'scope'
+  | 'junction';
 
 /** Position in canvas coordinates */
 export interface Position {
@@ -159,6 +160,12 @@ export interface ScopeBlock extends BaseBlock<'scope'> {
   voltageScale?: number;
 }
 
+/** Junction block for wire branching */
+export interface JunctionBlock extends BaseBlock<'junction'> {
+  /** Source wire ID this junction was created from (optional) */
+  sourceWireId?: string;
+}
+
 /** Discriminated union of all block types */
 export type Block =
   | Power24vBlock
@@ -168,7 +175,8 @@ export type Block =
   | PlcInBlock
   | LedBlock
   | ButtonBlock
-  | ScopeBlock;
+  | ScopeBlock
+  | JunctionBlock;
 
 // ============================================================================
 // Wire Types
@@ -181,6 +189,9 @@ export interface WireEndpoint {
   /** ID of the port on the component */
   portId: string;
 }
+
+/** Wire handle constraint direction */
+export type HandleConstraint = 'horizontal' | 'vertical';
 
 /** Wire connection between two ports */
 export interface Wire {
@@ -196,6 +207,12 @@ export interface Wire {
   color?: string;
   /** Wire path points for routing (optional) */
   points?: Position[];
+  /** Direction wire exits from source port (user-specified via drag direction) */
+  fromExitDirection?: PortPosition;
+  /** Direction wire enters target port (user-specified via drag direction) */
+  toExitDirection?: PortPosition;
+  /** Constraint for each handle (same length as points) */
+  handleConstraints?: HandleConstraint[];
 }
 
 // ============================================================================
@@ -346,6 +363,7 @@ export function isValidBlockType(type: string): type is BlockType {
     'led',
     'button',
     'scope',
+    'junction',
   ].includes(type);
 }
 

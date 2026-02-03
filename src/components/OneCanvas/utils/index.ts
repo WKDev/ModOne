@@ -5,6 +5,7 @@
 export * from './canvasCoordinates';
 export * from './connectionValidator';
 export * from './wirePathCalculator';
+export * from './wireHitTest';
 export * from './plcAddressUtils';
 export * from './circuitGraph';
 export * from './pathFinder';

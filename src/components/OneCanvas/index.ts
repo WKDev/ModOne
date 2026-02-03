@@ -34,6 +34,9 @@ export { DraggableBlock } from './components/DraggableBlock';
 export { Wire, WirePreview } from './Wire';
 export type { WireType } from './Wire';
 export { AnimatedWire, wireAnimationStyles } from './components/AnimatedWire';
+export { WireHandle } from './components/WireHandle';
+export { WireContextMenu } from './components/WireContextMenu';
+export type { WireContextMenuAction } from './components/WireContextMenu';
 
 // Hooks
 export { useCanvasInteraction } from './hooks/useCanvasInteraction';
@@ -52,6 +55,7 @@ export { useSimulation } from './hooks/useSimulation';
 export type { UseSimulationReturn, UseSimulationOptions } from './hooks/useSimulation';
 export { useCanvasKeyboardShortcuts } from './hooks/useCanvasKeyboardShortcuts';
 export { useSelectionHandler } from './hooks/useSelectionHandler';
+export { useWireHandleDrag } from './hooks/useWireHandleDrag';
 
 // Selection
 export { SelectionBox, type SelectionBoxState, isPointInBox, doesRectIntersectBox } from './components/SelectionBox';

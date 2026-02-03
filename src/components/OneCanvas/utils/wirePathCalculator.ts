@@ -24,6 +24,7 @@ const BLOCK_SIZES: Record<string, { width: number; height: number }> = {
   led: { width: 40, height: 60 },
   button: { width: 60, height: 60 },
   scope: { width: 100, height: 80 },
+  junction: { width: 12, height: 12 },
 };
 
 // ============================================================================
@@ -108,6 +109,166 @@ export function getWireEndpoints(
 // ============================================================================
 // Path Generation
 // ============================================================================
+
+/** Exit distance from port before routing */
+const PORT_EXIT_DISTANCE = 20;
+
+/**
+ * Generate a port-direction aware orthogonal wire path with rounded corners.
+ * Routes wire to exit in the direction the port faces, then routes to target.
+ */
+export function calculateOrthogonalPath(
+  from: Position,
+  to: Position,
+  fromDirection?: PortPosition,
+  toDirection?: PortPosition,
+  cornerRadius: number = 8
+): string {
+  // If no direction info, fall back to simple straight path
+  if (!fromDirection || !toDirection) {
+    return calculateStraightPath(from, to, cornerRadius);
+  }
+
+  // Calculate exit points based on port directions
+  const fromExit = getExitPoint(from, fromDirection, PORT_EXIT_DISTANCE);
+  const toExit = getExitPoint(to, toDirection, PORT_EXIT_DISTANCE);
+
+  // Build path segments
+  const segments: Position[] = [from, fromExit];
+
+  // Route between exit points with orthogonal lines
+  const routePoints = calculateOrthogonalRoute(fromExit, toExit, fromDirection, toDirection);
+  segments.push(...routePoints);
+
+  segments.push(toExit, to);
+
+  // Convert segments to SVG path with rounded corners
+  return segmentsToPath(segments, cornerRadius);
+}
+
+/**
+ * Calculate exit point from port position in given direction
+ */
+function getExitPoint(pos: Position, direction: PortPosition, distance: number): Position {
+  switch (direction) {
+    case 'top':
+      return { x: pos.x, y: pos.y - distance };
+    case 'bottom':
+      return { x: pos.x, y: pos.y + distance };
+    case 'left':
+      return { x: pos.x - distance, y: pos.y };
+    case 'right':
+      return { x: pos.x + distance, y: pos.y };
+    default:
+      return pos;
+  }
+}
+
+/**
+ * Calculate intermediate routing points between two exit points
+ */
+function calculateOrthogonalRoute(
+  fromExit: Position,
+  toExit: Position,
+  fromDirection: PortPosition,
+  toDirection: PortPosition
+): Position[] {
+  const dx = toExit.x - fromExit.x;
+  const dy = toExit.y - fromExit.y;
+
+  // If already aligned, no intermediate points needed
+  if (Math.abs(dx) < 1 && Math.abs(dy) < 1) {
+    return [];
+  }
+  if (Math.abs(dx) < 1 || Math.abs(dy) < 1) {
+    return [];
+  }
+
+  // Determine routing strategy based on port directions
+  const fromIsHorizontal = fromDirection === 'left' || fromDirection === 'right';
+  const toIsHorizontal = toDirection === 'left' || toDirection === 'right';
+
+  if (fromIsHorizontal && toIsHorizontal) {
+    // Both horizontal: route vertically in the middle
+    const midX = fromExit.x + dx / 2;
+    return [
+      { x: midX, y: fromExit.y },
+      { x: midX, y: toExit.y },
+    ];
+  } else if (!fromIsHorizontal && !toIsHorizontal) {
+    // Both vertical: route horizontally in the middle
+    const midY = fromExit.y + dy / 2;
+    return [
+      { x: fromExit.x, y: midY },
+      { x: toExit.x, y: midY },
+    ];
+  } else if (fromIsHorizontal && !toIsHorizontal) {
+    // From horizontal, to vertical: single corner
+    return [{ x: toExit.x, y: fromExit.y }];
+  } else {
+    // From vertical, to horizontal: single corner
+    return [{ x: fromExit.x, y: toExit.y }];
+  }
+}
+
+/**
+ * Convert position segments to SVG path with rounded corners
+ */
+export function segmentsToPath(segments: Position[], cornerRadius: number): string {
+  if (segments.length < 2) return '';
+  if (segments.length === 2) {
+    return `M ${segments[0].x} ${segments[0].y} L ${segments[1].x} ${segments[1].y}`;
+  }
+
+  const parts: string[] = [`M ${segments[0].x} ${segments[0].y}`];
+
+  for (let i = 1; i < segments.length - 1; i++) {
+    const prev = segments[i - 1];
+    const curr = segments[i];
+    const next = segments[i + 1];
+
+    // Calculate distances to prev and next
+    const toPrev = Math.sqrt(Math.pow(curr.x - prev.x, 2) + Math.pow(curr.y - prev.y, 2));
+    const toNext = Math.sqrt(Math.pow(next.x - curr.x, 2) + Math.pow(next.y - curr.y, 2));
+
+    // Limit corner radius to half the shortest segment
+    const maxRadius = Math.min(toPrev, toNext) / 2;
+    const r = Math.min(cornerRadius, maxRadius);
+
+    if (r < 1) {
+      // Too short for curve, just line to
+      parts.push(`L ${curr.x} ${curr.y}`);
+    } else {
+      // Calculate corner start and end points
+      const dirFromPrev = {
+        x: (curr.x - prev.x) / toPrev,
+        y: (curr.y - prev.y) / toPrev,
+      };
+      const dirToNext = {
+        x: (next.x - curr.x) / toNext,
+        y: (next.y - curr.y) / toNext,
+      };
+
+      const cornerStart = {
+        x: curr.x - dirFromPrev.x * r,
+        y: curr.y - dirFromPrev.y * r,
+      };
+      const cornerEnd = {
+        x: curr.x + dirToNext.x * r,
+        y: curr.y + dirToNext.y * r,
+      };
+
+      parts.push(`L ${cornerStart.x} ${cornerStart.y}`);
+      parts.push(`Q ${curr.x} ${curr.y} ${cornerEnd.x} ${cornerEnd.y}`);
+    }
+  }
+
+  // Final line to last point
+  const last = segments[segments.length - 1];
+  parts.push(`L ${last.x} ${last.y}`);
+
+  return parts.join(' ');
+}
 
 /**
  * Generate a straight (orthogonal) wire path with rounded corners
@@ -198,4 +359,77 @@ export function getPortDirection(portPosition: PortPosition): Position {
     default:
       return { x: 0, y: 0 };
   }
+}
+
+/**
+ * Calculate orthogonal path through user-defined handles.
+ * Handles are intermediate control points that the wire must pass through.
+ *
+ * @param from - Start position
+ * @param to - End position
+ * @param handles - Array of handle positions (control points)
+ * @param fromDirection - Direction wire exits from source
+ * @param toDirection - Direction wire enters target
+ * @param cornerRadius - Radius for rounded corners
+ * @returns SVG path string
+ */
+export function calculatePathWithHandles(
+  from: Position,
+  to: Position,
+  handles: Position[],
+  fromDirection?: PortPosition,
+  toDirection?: PortPosition,
+  cornerRadius: number = 8
+): string {
+  // If no handles, use standard orthogonal path
+  if (!handles || handles.length === 0) {
+    return calculateOrthogonalPath(from, to, fromDirection, toDirection, cornerRadius);
+  }
+
+  // Build path segments: from -> exit point -> handles -> entry point -> to
+  const segments: Position[] = [];
+
+  // Add start point
+  segments.push(from);
+
+  // Add exit point if we have direction
+  if (fromDirection) {
+    const fromExit = getExitPoint(from, fromDirection, PORT_EXIT_DISTANCE);
+    segments.push(fromExit);
+  }
+
+  // Add all handles
+  segments.push(...handles);
+
+  // Add entry point if we have direction
+  if (toDirection) {
+    const toExit = getExitPoint(to, toDirection, PORT_EXIT_DISTANCE);
+    segments.push(toExit);
+  }
+
+  // Add end point
+  segments.push(to);
+
+  // Convert segments to SVG path with rounded corners
+  return segmentsToPath(segments, cornerRadius);
+}
+
+/**
+ * Calculate path with user-specified exit directions (from drag).
+ * Uses the user's drag direction to determine how the wire exits the port.
+ */
+export function calculatePathWithExitDirections(
+  from: Position,
+  to: Position,
+  fromExitDirection?: PortPosition,
+  toExitDirection?: PortPosition,
+  defaultFromDirection?: PortPosition,
+  defaultToDirection?: PortPosition,
+  cornerRadius: number = 8
+): string {
+  // Use user-specified directions if available, otherwise fall back to defaults
+  const fromDir = fromExitDirection || defaultFromDirection;
+  const toDir = toExitDirection || defaultToDirection;
+
+  return calculateOrthogonalPath(from, to, fromDir, toDir, cornerRadius);
 }
