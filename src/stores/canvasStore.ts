@@ -347,8 +347,6 @@ function getDefaultBlockProps(type: BlockType): Partial<Block> {
       return { mode: 'momentary', contactConfig: '1a', pressed: false };
     case 'scope':
       return { channels: 1, triggerMode: 'auto', timeBase: 100, voltageScale: 5 };
-    case 'junction':
-      return {};
     default:
       return {};
   }
@@ -506,10 +504,6 @@ function getDefaultPorts(type: BlockType): Block['ports'] {
         { id: 'ch2', type: 'input', label: 'CH2', position: 'left', offset: 0.5 },
         { id: 'ch3', type: 'input', label: 'CH3', position: 'left', offset: 0.75 },
         { id: 'ch4', type: 'input', label: 'CH4', position: 'left', offset: 1.0 },
-      ];
-    case 'junction':
-      return [
-        { id: 'hub', type: 'bidirectional', label: '', position: 'right', offset: 0.5 },
       ];
     default:
       return [];
@@ -744,21 +738,12 @@ export const useCanvasStore = create<CanvasStore>()(
           return null;
         }
 
-        // Create junction component (position = center point)
+        // Create junction (wire-level concept, not a block)
         const junctionId = generateId('junction');
-        const junctionPosition = {
-          x: position.x,
-          y: position.y,
-        };
-
-        const junctionBlock: Block = {
+        const junction: Junction = {
           id: junctionId,
-          type: 'junction',
-          position: junctionPosition,
-          size: { width: 0, height: 0 },
-          ports: getDefaultPorts('junction'),
-          sourceWireId: wireId,
-        } as Block;
+          position: { x: position.x, y: position.y },
+        };
 
         set(
           (state) => {
@@ -778,18 +763,18 @@ export const useCanvasStore = create<CanvasStore>()(
             const originalWire = state.wires[wireIndex];
             state.wires.splice(wireIndex, 1);
 
-            // Add junction component
-            state.components.set(junctionId, junctionBlock);
+            // Add junction to junctions map
+            state.junctions.set(junctionId, junction);
 
             // Create two new wires: from->junction and junction->to
-            // Preserve routing info from the original wire
+            // Use JunctionEndpoint for junction connections
             const wire1Id = generateId('wire');
             const wire2Id = generateId('wire');
 
             const wire1: Wire = {
               id: wire1Id,
               from: { ...originalWire.from },
-              to: { componentId: junctionId, portId: 'hub' },
+              to: { junctionId },
             };
             if (originalWire.fromExitDirection) {
               wire1.fromExitDirection = originalWire.fromExitDirection;
@@ -797,28 +782,11 @@ export const useCanvasStore = create<CanvasStore>()(
 
             const wire2: Wire = {
               id: wire2Id,
-              from: { componentId: junctionId, portId: 'hub' },
+              from: { junctionId },
               to: { ...originalWire.to },
             };
             if (originalWire.toExitDirection) {
               wire2.toExitDirection = originalWire.toExitDirection;
-            }
-
-            // Auto-generate bend points for both new wires
-            const handles1 = computeWireBendPoints(
-              wire1.from, wire1.to, state.components,
-              wire1.fromExitDirection, undefined
-            );
-            if (handles1) {
-              wire1.handles = handles1;
-            }
-
-            const handles2 = computeWireBendPoints(
-              wire2.from, wire2.to, state.components,
-              undefined, wire2.toExitDirection
-            );
-            if (handles2) {
-              wire2.handles = handles2;
             }
 
             state.wires.push(wire1);
@@ -1286,29 +1254,59 @@ export const useCanvasStore = create<CanvasStore>()(
       loadCircuit: (data) => {
         set(
           (state) => {
-            state.components = new Map(Object.entries(data.components));
+            const rawComponents = new Map(Object.entries(data.components));
 
-            // Migrate existing blocks: backfill size if missing, fix junction positions
+            // Migrate: separate junction blocks into junctions map
+            const migratedJunctions = new Map<string, Junction>();
+            const junctionBlockIds = new Set<string>();
+            for (const [id, block] of rawComponents) {
+              const blockAny = block as unknown as Record<string, unknown>;
+              if (blockAny.type === 'junction') {
+                // Old format: junction-as-block with position offset by 6px
+                migratedJunctions.set(id, {
+                  id,
+                  position: {
+                    x: (block.position?.x ?? 0) + 6,
+                    y: (block.position?.y ?? 0) + 6,
+                  },
+                });
+                junctionBlockIds.add(id);
+              }
+            }
+
+            // Remove junction blocks from components
+            for (const id of junctionBlockIds) {
+              rawComponents.delete(id);
+            }
+
+            // Backfill size for remaining blocks
+            state.components = rawComponents as Map<string, Block>;
             for (const [, block] of state.components) {
               if (!block.size) {
                 block.size = getBlockSize(block.type);
               }
-              if (block.type === 'junction') {
-                // Old format stored top-left corner (position.x - 6, position.y - 6)
-                // New format stores center point. Detect old format by checking
-                // if position was offset (heuristic: if junction exists, migrate it)
-                block.position = {
-                  x: block.position.x + 6,
-                  y: block.position.y + 6,
-                };
-              }
             }
 
+            // Migrate wires: convert junction block endpoints to junction endpoints
             state.wires = data.wires.map((wire) => {
+              const fromRaw = wire.from as unknown as Record<string, string>;
+              const toRaw = wire.to as unknown as Record<string, string>;
+
+              let migratedFrom = { ...wire.from };
+              let migratedTo = { ...wire.to };
+
+              // If wire endpoint points to a junction block, convert to JunctionEndpoint
+              if (fromRaw.componentId && junctionBlockIds.has(fromRaw.componentId)) {
+                migratedFrom = { junctionId: fromRaw.componentId } as unknown as typeof wire.from;
+              }
+              if (toRaw.componentId && junctionBlockIds.has(toRaw.componentId)) {
+                migratedTo = { junctionId: toRaw.componentId } as unknown as typeof wire.to;
+              }
+
               const migrated: Wire = {
                 ...wire,
-                from: { ...wire.from },
-                to: { ...wire.to },
+                from: migratedFrom,
+                to: migratedTo,
               };
               // Migrate old points/handleConstraints to handles
               const oldWire = wire as unknown as { points?: Position[]; handleConstraints?: HandleConstraint[] };
@@ -1325,10 +1323,16 @@ export const useCanvasStore = create<CanvasStore>()(
               delete raw.handleConstraints;
               return migrated;
             });
-            // Load junctions (if present in data)
+
+            // Merge migrated junctions with any existing junctions in data
             state.junctions = data.junctions
               ? new Map(Object.entries(data.junctions))
               : new Map();
+            for (const [id, j] of migratedJunctions) {
+              if (!state.junctions.has(id)) {
+                state.junctions.set(id, j);
+              }
+            }
 
             state.metadata = { ...data.metadata };
             state.selectedIds = new Set();

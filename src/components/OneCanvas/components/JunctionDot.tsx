@@ -1,36 +1,35 @@
 /**
  * JunctionDot SVG Component
  *
- * Renders a junction as a small SVG circle in the wire layer,
- * replacing the old HTML-based JunctionBlock that was forced to 60x60 by BlockWrapper.
- * Supports selection, wire start/end, and dragging.
+ * Renders a junction as a small SVG circle in the wire layer.
+ * Junctions are wire-level concepts (not blocks) that represent branching points.
  *
  * Interaction model:
- * - MouseDown on dot: starts wire drawing from the 'hub' port (same as Port component)
- * - MouseUp on dot: ends wire drawing at the 'hub' port
- * - Click on outer hit area: select/drag the junction block
+ * - MouseDown on dot: starts wire drawing from the junction
+ * - MouseUp on dot: ends wire drawing at the junction
+ * - Click on outer hit area: select/drag the junction
  */
 
 import { memo, useCallback } from 'react';
-import type { JunctionBlock } from '../types';
+import type { Junction } from '../types';
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface JunctionDotProps {
-  /** Junction block data */
-  block: JunctionBlock;
+  /** Junction data */
+  junction: Junction;
   /** Whether the junction is selected */
   isSelected?: boolean;
   /** Selection handler */
-  onSelect?: (blockId: string, addToSelection: boolean) => void;
-  /** Wire start handler */
-  onStartWire?: (blockId: string, portId: string) => void;
-  /** Wire end handler */
-  onEndWire?: (blockId: string, portId: string) => void;
+  onSelect?: (junctionId: string, addToSelection: boolean) => void;
+  /** Wire start handler (junction acts as wire endpoint) */
+  onStartWire?: (junctionId: string) => void;
+  /** Wire end handler (junction acts as wire endpoint) */
+  onEndWire?: (junctionId: string) => void;
   /** Drag start handler */
-  onDragStart?: (blockId: string, event: React.MouseEvent) => void;
+  onDragStart?: (junctionId: string, event: React.MouseEvent) => void;
   /** Whether a wire is currently being drawn */
   isWireDrawing?: boolean;
 }
@@ -52,10 +51,10 @@ const PORT_RADIUS = 8;
 
 /**
  * SVG junction dot - a small circle rendered in the wire SVG layer.
- * Position is center-based (block.position = center of dot).
+ * Position is center-based (junction.position = center of dot).
  */
 export const JunctionDot = memo(function JunctionDot({
-  block,
+  junction,
   isSelected,
   onSelect,
   onStartWire,
@@ -63,8 +62,8 @@ export const JunctionDot = memo(function JunctionDot({
   onDragStart,
   isWireDrawing,
 }: JunctionDotProps) {
-  const cx = block.position.x;
-  const cy = block.position.y;
+  const cx = junction.position.x;
+  const cy = junction.position.y;
 
   // Outer area: selection and drag
   const handleOuterMouseDown = useCallback(
@@ -74,10 +73,10 @@ export const JunctionDot = memo(function JunctionDot({
 
       e.stopPropagation();
       const addToSelection = e.ctrlKey || e.metaKey;
-      onSelect?.(block.id, addToSelection);
-      onDragStart?.(block.id, e);
+      onSelect?.(junction.id, addToSelection);
+      onDragStart?.(junction.id, e);
     },
-    [block.id, onSelect, onDragStart, isWireDrawing]
+    [junction.id, onSelect, onDragStart, isWireDrawing]
   );
 
   // Port area: start wire
@@ -88,22 +87,22 @@ export const JunctionDot = memo(function JunctionDot({
 
       e.stopPropagation();
       e.preventDefault();
-      onStartWire?.(block.id, 'hub');
+      onStartWire?.(junction.id);
     },
-    [block.id, onStartWire, isWireDrawing]
+    [junction.id, onStartWire, isWireDrawing]
   );
 
   // Port area: end wire
   const handlePortMouseUp = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
-      onEndWire?.(block.id, 'hub');
+      onEndWire?.(junction.id);
     },
-    [block.id, onEndWire]
+    [junction.id, onEndWire]
   );
 
   return (
-    <g data-block-id={block.id}>
+    <g data-junction-id={junction.id}>
       {/* Outer hit area for selection/drag */}
       <circle
         cx={cx}
@@ -148,8 +147,7 @@ export const JunctionDot = memo(function JunctionDot({
         style={{ pointerEvents: 'all', cursor: 'crosshair' }}
         onMouseDown={handlePortMouseDown}
         onMouseUp={handlePortMouseUp}
-        data-port-id="hub"
-        data-block-id={block.id}
+        data-junction-id={junction.id}
       />
     </g>
   );

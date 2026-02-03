@@ -2,7 +2,6 @@
  * Block Definitions Registry
  *
  * Single source of truth for block sizes, default ports, and default properties.
- * All block types (except junction, which is a wire-level concept) are defined here.
  */
 
 import type { BlockType, Port, Size } from './types';
@@ -24,7 +23,7 @@ export interface BlockDefinition {
 // Definitions
 // ============================================================================
 
-const BLOCK_DEFINITIONS: Record<Exclude<BlockType, 'junction'>, BlockDefinition> = {
+const BLOCK_DEFINITIONS: Record<BlockType, BlockDefinition> = {
   power_24v: {
     size: { width: 60, height: 40 },
     defaultPorts: [
@@ -96,38 +95,30 @@ const BLOCK_DEFINITIONS: Record<Exclude<BlockType, 'junction'>, BlockDefinition>
 
 /**
  * Get the full block definition for a block type.
- * Returns undefined for 'junction' type (use Junction interface instead).
  */
-export function getBlockDefinition(type: BlockType): BlockDefinition | undefined {
-  if (type === 'junction') return undefined;
-  return BLOCK_DEFINITIONS[type as Exclude<BlockType, 'junction'>];
+export function getBlockDefinition(type: BlockType): BlockDefinition {
+  return BLOCK_DEFINITIONS[type];
 }
 
 /**
  * Get the size for a block type.
- * Returns { width: 0, height: 0 } for junction (center-based, no visual size).
  */
 export function getBlockSize(type: BlockType): Size {
-  if (type === 'junction') return { width: 0, height: 0 };
-  return BLOCK_DEFINITIONS[type as Exclude<BlockType, 'junction'>]?.size ?? { width: 60, height: 60 };
+  return BLOCK_DEFINITIONS[type].size;
 }
 
 /**
  * Get the default ports for a block type.
  */
 export function getDefaultPorts(type: BlockType): Port[] {
-  if (type === 'junction') {
-    return [{ id: 'hub', type: 'bidirectional', label: '', position: 'right', offset: 0.5 }];
-  }
-  return BLOCK_DEFINITIONS[type as Exclude<BlockType, 'junction'>]?.defaultPorts ?? [];
+  return BLOCK_DEFINITIONS[type].defaultPorts;
 }
 
 /**
  * Get the default type-specific properties for a block type.
  */
 export function getDefaultBlockProps(type: BlockType): Record<string, unknown> {
-  if (type === 'junction') return {};
-  return BLOCK_DEFINITIONS[type as Exclude<BlockType, 'junction'>]?.defaultProps ?? {};
+  return BLOCK_DEFINITIONS[type].defaultProps;
 }
 
 export default BLOCK_DEFINITIONS;

@@ -12,14 +12,13 @@ import type {
   Power24vBlock,
   Power12vBlock,
   GndBlock,
-  JunctionBlock,
 } from '../../../OneCanvas/types';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-type BasicBlock = Power24vBlock | Power12vBlock | GndBlock | JunctionBlock;
+type BasicBlock = Power24vBlock | Power12vBlock | GndBlock;
 
 interface BasicPropertiesProps {
   component: BasicBlock;
@@ -42,8 +41,6 @@ function getVoltage(block: BasicBlock): number | null {
       return 12;
     case 'gnd':
       return 0;
-    case 'junction':
-      return null;
   }
 }
 
@@ -55,8 +52,6 @@ function getBlockDescription(block: BasicBlock): string {
       return 'Provides 12V DC power supply for low-voltage circuits';
     case 'gnd':
       return 'Ground reference (0V) for circuit completion';
-    case 'junction':
-      return 'Wire junction point for branching connections';
   }
 }
 
@@ -109,7 +104,7 @@ export const BasicProperties = memo(function BasicProperties({
       {/* Block Specific Info */}
       <div className="space-y-3">
         <h4 className="text-xs font-semibold uppercase text-neutral-400">
-          {component.type === 'gnd' ? 'Ground' : component.type === 'junction' ? 'Junction' : 'Power Supply'} Settings
+          {component.type === 'gnd' ? 'Ground' : 'Power Supply'} Settings
         </h4>
 
         {/* Description */}
@@ -163,12 +158,6 @@ export const BasicProperties = memo(function BasicProperties({
                 <span className="text-green-400">Ground Reference</span>
                 <br />
                 Connect to complete circuit paths back to power supply
-              </>
-            ) : component.type === 'junction' ? (
-              <>
-                <span className="text-blue-400">Junction Point</span>
-                <br />
-                Double-click on a wire to create a junction for branching
               </>
             ) : (
               <>

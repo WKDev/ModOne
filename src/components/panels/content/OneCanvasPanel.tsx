@@ -40,7 +40,7 @@ import {
   type Position,
   type SelectionBoxState,
 } from '../../OneCanvas';
-import type { Wire as WireData, HandleConstraint, PortPosition, JunctionBlock as JunctionBlockType } from '../../OneCanvas/types';
+import type { Wire as WireData, HandleConstraint, PortPosition, Junction } from '../../OneCanvas/types';
 import { isPortEndpoint } from '../../OneCanvas/types';
 import { WireContextMenu, type WireContextMenuAction } from '../../OneCanvas/components/WireContextMenu';
 import { JunctionDot } from '../../OneCanvas/components/JunctionDot';
@@ -73,7 +73,6 @@ const BlockDragPreview = memo(function BlockDragPreview({ type }: { type: BlockT
     led: 'LED',
     button: 'Button',
     scope: 'Scope',
-    junction: 'Junction',
   };
 
   return (
@@ -149,15 +148,7 @@ const WireRenderer = memo(function WireRenderer({
     const port = component.ports.find((p) => p.id === portId);
     const basePos = component.position;
 
-    // Junction: position is center-based, port = position directly
-    if (component.type === 'junction') {
-      return {
-        position: { x: basePos.x, y: basePos.y },
-        direction: (port?.position as PortPosition) || 'right',
-      };
-    }
-
-    const blockSize = getBlockSize(component.type);
+    const blockSize = getBlockSize(component.type as BlockType);
     const { width: blockWidth, height: blockHeight } = blockSize;
 
     if (!port) {
@@ -228,6 +219,7 @@ function useCanvasState(documentId: string | null) {
 
   // Global store state (used when no document)
   const globalComponents = useCanvasStore((state) => state.components);
+  const globalJunctions = useCanvasStore((state) => state.junctions);
   const globalWires = useCanvasStore((state) => state.wires);
   const globalZoom = useCanvasStore((state) => state.zoom);
   const globalPan = useCanvasStore((state) => state.pan);
@@ -245,6 +237,7 @@ function useCanvasState(documentId: string | null) {
     if (documentState) {
       return {
         components: documentState.components,
+        junctions: new Map<string, Junction>(), // TODO: document mode junctions
         wires: documentState.wires,
         zoom: documentState.zoom,
         pan: documentState.pan,
@@ -262,6 +255,7 @@ function useCanvasState(documentId: string | null) {
 
     return {
       components: globalComponents,
+      junctions: globalJunctions,
       wires: globalWires,
       zoom: globalZoom,
       pan: globalPan,
@@ -278,6 +272,7 @@ function useCanvasState(documentId: string | null) {
   }, [
     documentState,
     globalComponents,
+    globalJunctions,
     globalWires,
     globalZoom,
     globalPan,
@@ -305,6 +300,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
   // Get canvas state (from document or global store)
   const {
     components,
+    junctions,
     wires,
     zoom,
     pan,
@@ -371,10 +367,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
       const port = block.ports.find((p) => p.id === portId);
       let startPosition: Position | undefined;
 
-      if (block.type === 'junction') {
-        // Junction: position is center-based
-        startPosition = { x: block.position.x, y: block.position.y };
-      } else if (port) {
+      if (port) {
         const blockSize = getBlockSize(block.type);
         const offset = port.offset ?? 0.5;
         let portRelativePos: Position;
@@ -632,9 +625,8 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
               onMouseUp={handleCanvasMouseUp}
             >
               <Canvas ref={canvasRef} className="w-full h-full">
-                {/* Render blocks (junctions are rendered as SVG dots below) */}
+                {/* Render blocks */}
                 {Array.from(components.values())
-                  .filter((block) => block.type !== 'junction')
                   .map((block) => (
                     <BlockRenderer
                       key={block.id}
@@ -667,16 +659,12 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
                 ))}
 
                 {/* Render junction dots in SVG layer */}
-                {Array.from(components.values())
-                  .filter((block): block is JunctionBlockType => block.type === 'junction')
-                  .map((junction) => (
+                {Array.from(junctions.values()).map((junction) => (
                     <JunctionDot
                       key={junction.id}
-                      block={junction}
+                      junction={junction}
                       isSelected={selectedIds.has(junction.id)}
                       onSelect={handleBlockSelect}
-                      onStartWire={handleStartWire}
-                      onEndWire={handleEndWire}
                       onDragStart={handleBlockDragStart}
                       isWireDrawing={wireDrawing !== null}
                     />
@@ -691,17 +679,6 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
                   // Calculate the from position from the endpoint
                   const fromComponent = components.get(drawingFrom.componentId);
                   if (!fromComponent) return null;
-
-                  // Junction: position is center-based
-                  if (fromComponent.type === 'junction') {
-                    return (
-                      <WirePreview
-                        from={fromComponent.position}
-                        to={wireDrawing.tempPosition}
-                        fromExitDirection={wireDrawing.exitDirection}
-                      />
-                    );
-                  }
 
                   const fromPort = fromComponent.ports.find((p) => p.id === drawingFrom.portId);
                   const fromBlockSize = getBlockSize(fromComponent.type);

@@ -135,14 +135,6 @@ const PropertyEditorRouter = memo(function PropertyEditorRouter({
         />
       );
 
-    case 'junction':
-      return (
-        <BasicProperties
-          component={component}
-          onChange={onChange}
-        />
-      );
-
     default: {
       // Exhaustive check - this should never be reached with proper typing
       const _exhaustiveCheck: never = component;

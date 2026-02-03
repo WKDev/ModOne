@@ -18,8 +18,7 @@ export type BlockType =
   | 'plc_in'
   | 'led'
   | 'button'
-  | 'scope'
-  | 'junction';
+  | 'scope';
 
 /** Position in canvas coordinates */
 export interface Position {
@@ -162,12 +161,6 @@ export interface ScopeBlock extends BaseBlock<'scope'> {
   voltageScale?: number;
 }
 
-/** Junction block for wire branching */
-export interface JunctionBlock extends BaseBlock<'junction'> {
-  /** Source wire ID this junction was created from (optional) */
-  sourceWireId?: string;
-}
-
 /** Discriminated union of all block types */
 export type Block =
   | Power24vBlock
@@ -177,8 +170,7 @@ export type Block =
   | PlcInBlock
   | LedBlock
   | ButtonBlock
-  | ScopeBlock
-  | JunctionBlock;
+  | ScopeBlock;
 
 // ============================================================================
 // Junction (wire-level concept)
@@ -415,7 +407,6 @@ export function isValidBlockType(type: string): type is BlockType {
     'led',
     'button',
     'scope',
-    'junction',
   ].includes(type);
 }
 

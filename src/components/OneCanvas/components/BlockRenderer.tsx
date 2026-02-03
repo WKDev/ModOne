@@ -135,10 +135,6 @@ export const BlockRenderer = memo(function BlockRenderer({
           />
         );
 
-      case 'junction':
-        // Junctions are rendered as SVG dots in the wire layer, not as HTML blocks
-        return null;
-
       default:
         // Unknown block type - render a placeholder
         return (

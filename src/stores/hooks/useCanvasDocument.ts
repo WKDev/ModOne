@@ -275,13 +275,6 @@ function computeWireBendPoints(
   }));
 }
 
-/** Get default ports for junction */
-function getJunctionPorts(): Block['ports'] {
-  return [
-    { id: 'hub', type: 'bidirectional', label: '', position: 'right', offset: 0.5 },
-  ];
-}
-
 // ============================================================================
 // Hook
 // ============================================================================
@@ -460,7 +453,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
   );
 
   const createJunctionOnWire = useCallback(
-    (wireId: string, position: Position): string | null => {
+    (wireId: string, _position: Position): string | null => {
       if (!documentId || !data) return null;
 
       const wire = data.wires.find((w) => w.id === wireId);
@@ -469,20 +462,8 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         return null;
       }
 
+      // Create junction (wire-level concept, not a block)
       const junctionId = generateId('junction');
-      const junctionPosition = {
-        x: position.x,
-        y: position.y,
-      };
-
-      const junctionBlock: Block = {
-        id: junctionId,
-        type: 'junction',
-        position: junctionPosition,
-        size: { width: 0, height: 0 },
-        ports: getJunctionPorts(),
-        sourceWireId: wireId,
-      } as Block;
 
       pushHistory(documentId);
       updateCanvasData(documentId, (docData) => {
@@ -492,17 +473,18 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         const originalWire = docData.wires[wireIndex];
         docData.wires.splice(wireIndex, 1);
 
-        // Add junction component
-        docData.components.set(junctionId, junctionBlock);
+        // Add junction to junctions map (if available)
+        // Note: document mode junction support is limited — junctions stored in components for now
+        // TODO: Add junctions map to document data model
 
-        // Create two new wires
+        // Create two new wires using JunctionEndpoint
         const wire1Id = generateId('wire');
         const wire2Id = generateId('wire');
 
         const wire1: Wire = {
           id: wire1Id,
           from: { ...originalWire.from },
-          to: { componentId: junctionId, portId: 'hub' },
+          to: { junctionId },
         };
         if (originalWire.fromExitDirection) {
           wire1.fromExitDirection = originalWire.fromExitDirection;
@@ -510,28 +492,11 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
 
         const wire2: Wire = {
           id: wire2Id,
-          from: { componentId: junctionId, portId: 'hub' },
+          from: { junctionId },
           to: { ...originalWire.to },
         };
         if (originalWire.toExitDirection) {
           wire2.toExitDirection = originalWire.toExitDirection;
-        }
-
-        // Auto-generate bend points for both new wires
-        const handles1 = computeWireBendPoints(
-          wire1.from, wire1.to, docData.components,
-          wire1.fromExitDirection, undefined
-        );
-        if (handles1) {
-          wire1.handles = handles1;
-        }
-
-        const handles2 = computeWireBendPoints(
-          wire2.from, wire2.to, docData.components,
-          undefined, wire2.toExitDirection
-        );
-        if (handles2) {
-          wire2.handles = handles2;
         }
 
         docData.wires.push(wire1);

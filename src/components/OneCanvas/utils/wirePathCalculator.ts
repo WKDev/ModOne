@@ -24,7 +24,6 @@ const BLOCK_SIZES: Record<string, { width: number; height: number }> = {
   led: { width: 40, height: 60 },
   button: { width: 60, height: 60 },
   scope: { width: 100, height: 80 },
-  junction: { width: 0, height: 0 },
 };
 
 // ============================================================================
@@ -71,11 +70,6 @@ export function getPortAbsolutePosition(
 ): Position | null {
   const port = block.ports.find((p) => p.id === portId);
   if (!port) return null;
-
-  // Junction: position is the center point (no block size offset)
-  if (block.type === 'junction') {
-    return { x: block.position.x, y: block.position.y };
-  }
 
   const blockSize = getBlockSize(block.type);
   const relativePos = getPortRelativePosition(
