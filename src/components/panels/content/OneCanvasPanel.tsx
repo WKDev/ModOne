@@ -40,7 +40,7 @@ import {
   type Position,
   type SelectionBoxState,
 } from '../../OneCanvas';
-import type { Wire as WireData, HandleConstraint, PortPosition, Junction } from '../../OneCanvas/types';
+import type { Wire as WireData, HandleConstraint, PortPosition } from '../../OneCanvas/types';
 import { isPortEndpoint } from '../../OneCanvas/types';
 import { WireContextMenu, type WireContextMenuAction } from '../../OneCanvas/components/WireContextMenu';
 import { JunctionDot } from '../../OneCanvas/components/JunctionDot';
@@ -227,6 +227,7 @@ function useCanvasState(documentId: string | null) {
   const globalMoveComponent = useCanvasStore((state) => state.moveComponent);
   const globalRemoveWire = useCanvasStore((state) => state.removeWire);
   const globalCreateJunctionOnWire = useCanvasStore((state) => state.createJunctionOnWire);
+  const globalMoveJunction = useCanvasStore((state) => state.moveJunction);
   const globalAddWireHandle = useCanvasStore((state) => state.addWireHandle);
   const globalUpdateWireHandle = useCanvasStore((state) => state.updateWireHandle);
   const globalRemoveWireHandle = useCanvasStore((state) => state.removeWireHandle);
@@ -236,13 +237,14 @@ function useCanvasState(documentId: string | null) {
     if (documentState) {
       return {
         components: documentState.components,
-        junctions: new Map<string, Junction>(), // TODO: document mode junctions
+        junctions: documentState.junctions,
         wires: documentState.wires,
         zoom: documentState.zoom,
         pan: documentState.pan,
         addComponent: documentState.addComponent,
         addWire: documentState.addWire,
         moveComponent: documentState.moveComponent,
+        moveJunction: documentState.moveJunction,
         removeWire: documentState.removeWire,
         createJunctionOnWire: documentState.createJunctionOnWire,
         addWireHandle: documentState.addWireHandle,
@@ -261,6 +263,7 @@ function useCanvasState(documentId: string | null) {
       addComponent: globalAddComponent,
       addWire: globalAddWire,
       moveComponent: globalMoveComponent,
+      moveJunction: globalMoveJunction,
       removeWire: globalRemoveWire,
       createJunctionOnWire: globalCreateJunctionOnWire,
       addWireHandle: globalAddWireHandle,
@@ -278,6 +281,7 @@ function useCanvasState(documentId: string | null) {
     globalAddComponent,
     globalAddWire,
     globalMoveComponent,
+    globalMoveJunction,
     globalRemoveWire,
     globalCreateJunctionOnWire,
     globalAddWireHandle,
@@ -306,6 +310,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     addComponent,
     addWire,
     moveComponent,
+    moveJunction,
     removeWire,
     createJunctionOnWire,
     addWireHandle,
@@ -351,6 +356,8 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     shouldPreventDrag: useCallback(() => wireDrawing !== null, [wireDrawing]),
     components: components as Map<string, { position: Position }>,
     moveComponent,
+    junctions: junctions as Map<string, { position: Position }>,
+    moveJunction,
   });
 
   // Wire drawing handlers

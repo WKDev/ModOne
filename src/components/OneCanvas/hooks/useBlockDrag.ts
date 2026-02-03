@@ -28,7 +28,11 @@ interface UseBlockDragOptions {
   /** Optional document-aware components (overrides global store) */
   components?: Map<string, { position: Position }>;
   /** Optional document-aware moveComponent function (overrides global store) */
-  moveComponent?: (id: string, position: Position) => void;
+  moveComponent?: (id: string, position: Position, skipHistory?: boolean) => void;
+  /** Optional junctions map for junction drag support */
+  junctions?: Map<string, { position: Position }>;
+  /** Optional moveJunction function for junction drag support */
+  moveJunction?: (id: string, position: Position, skipHistory?: boolean) => void;
 }
 
 interface DragState {
@@ -40,6 +44,10 @@ interface DragState {
   startMousePos: Position | null;
   /** Original positions of all blocks being dragged (for multi-select) */
   originalPositions: Map<string, Position>;
+  /** IDs that are junctions (use moveJunction instead of moveComponent) */
+  junctionIds: Set<string>;
+  /** Whether this is the first move in the current drag (for history push) */
+  isFirstMove: boolean;
 }
 
 interface UseBlockDragReturn {
@@ -60,20 +68,26 @@ export function useBlockDrag({
   shouldPreventDrag,
   components: customComponents,
   moveComponent: customMoveComponent,
+  junctions: customJunctions,
+  moveJunction: customMoveJunction,
 }: UseBlockDragOptions): UseBlockDragReturn {
   // Store access
   const zoom = useCanvasStore((state) => state.zoom);
   const selectedIds = useCanvasStore((state) => state.selectedIds);
   const globalComponents = useCanvasStore((state) => state.components);
   const globalMoveComponent = useCanvasStore((state) => state.moveComponent);
+  const globalJunctions = useCanvasStore((state) => state.junctions);
+  const globalMoveJunction = useCanvasStore((state) => state.moveJunction);
   const snapToGridEnabled = useCanvasStore((state) => state.snapToGrid);
   const gridSize = useCanvasStore((state) => state.gridSize);
   const setSelection = useCanvasStore((state) => state.setSelection);
   const addToSelection = useCanvasStore((state) => state.addToSelection);
 
-  // Use custom (document-aware) components/moveComponent if provided, else fall back to global store
+  // Use custom (document-aware) or fall back to global store
   const components = customComponents ?? globalComponents;
   const moveComponent = customMoveComponent ?? globalMoveComponent;
+  const junctions = customJunctions ?? globalJunctions;
+  const moveJunction = customMoveJunction ?? globalMoveJunction;
 
   // Drag state
   const [isDragging, setIsDragging] = useState(false);
@@ -83,6 +97,8 @@ export function useBlockDrag({
     draggedBlockId: null,
     startMousePos: null,
     originalPositions: new Map(),
+    junctionIds: new Set(),
+    isFirstMove: true,
   });
 
   // Handle drag start
@@ -107,31 +123,36 @@ export function useBlockDrag({
       event.preventDefault();
       event.stopPropagation();
 
-      // Determine which blocks to drag
-      let blocksToDrag: string[];
+      // Determine which items to drag (components and/or junctions)
+      let itemsToDrag: string[];
 
       if (selectedIds.has(blockId)) {
-        // Block is already selected - drag all selected blocks
-        blocksToDrag = Array.from(selectedIds).filter((id) => components.has(id));
+        // Item is already selected - drag all selected items
+        itemsToDrag = Array.from(selectedIds).filter((id) => components.has(id) || junctions.has(id));
       } else {
-        // Block is not selected - select it and drag only this block
+        // Item is not selected - select it and drag only this item
         if (event.ctrlKey || event.metaKey) {
-          // Add to selection
           addToSelection(blockId);
-          blocksToDrag = [...Array.from(selectedIds).filter((id) => components.has(id)), blockId];
+          itemsToDrag = [...Array.from(selectedIds).filter((id) => components.has(id) || junctions.has(id)), blockId];
         } else {
-          // Replace selection
           setSelection([blockId]);
-          blocksToDrag = [blockId];
+          itemsToDrag = [blockId];
         }
       }
 
-      // Store original positions for all blocks being dragged
+      // Store original positions and track which are junctions
       const originalPositions = new Map<string, Position>();
-      for (const id of blocksToDrag) {
+      const junctionIdSet = new Set<string>();
+      for (const id of itemsToDrag) {
         const component = components.get(id);
         if (component) {
           originalPositions.set(id, { ...component.position });
+        } else {
+          const junction = junctions.get(id);
+          if (junction) {
+            originalPositions.set(id, { ...junction.position });
+            junctionIdSet.add(id);
+          }
         }
       }
 
@@ -141,12 +162,14 @@ export function useBlockDrag({
         draggedBlockId: blockId,
         startMousePos: { x: event.clientX, y: event.clientY },
         originalPositions,
+        junctionIds: junctionIdSet,
+        isFirstMove: true,
       };
 
       setIsDragging(true);
       setDraggedBlockId(blockId);
     },
-    [shouldPreventDrag, selectedIds, components, addToSelection, setSelection]
+    [shouldPreventDrag, selectedIds, components, junctions, addToSelection, setSelection]
   );
 
   // Handle mouse move during drag
@@ -166,7 +189,13 @@ export function useBlockDrag({
       const canvasDeltaX = deltaX / zoom;
       const canvasDeltaY = deltaY / zoom;
 
-      // Move all dragged blocks
+      // On first move, let the store push history; on subsequent moves, skip
+      const skipHistory = !state.isFirstMove;
+      if (state.isFirstMove) {
+        state.isFirstMove = false;
+      }
+
+      // Move all dragged items (components and junctions)
       state.originalPositions.forEach((originalPos, id) => {
         let newPosition: Position = {
           x: originalPos.x + canvasDeltaX,
@@ -178,10 +207,14 @@ export function useBlockDrag({
           newPosition = snapToGrid(newPosition, gridSize);
         }
 
-        moveComponent(id, newPosition);
+        if (state.junctionIds.has(id)) {
+          moveJunction(id, newPosition, skipHistory);
+        } else {
+          moveComponent(id, newPosition, skipHistory);
+        }
       });
     },
-    [canvasRef, zoom, snapToGridEnabled, gridSize, moveComponent]
+    [canvasRef, zoom, snapToGridEnabled, gridSize, moveComponent, moveJunction]
   );
 
   // Handle mouse up (end drag)
@@ -194,6 +227,8 @@ export function useBlockDrag({
       draggedBlockId: null,
       startMousePos: null,
       originalPositions: new Map(),
+      junctionIds: new Set(),
+      isFirstMove: true,
     };
 
     setIsDragging(false);

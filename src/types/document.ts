@@ -8,6 +8,7 @@
 import type {
   Block,
   Wire,
+  Junction,
   CircuitMetadata,
 } from '../components/OneCanvas/types';
 import type {
@@ -76,6 +77,7 @@ export interface HistorySnapshot<T = unknown> {
 /** Snapshot data for canvas history */
 export interface CanvasHistoryData {
   components: Array<[string, Block]>;
+  junctions: Array<[string, Junction]>;
   wires: Wire[];
 }
 
@@ -83,6 +85,8 @@ export interface CanvasHistoryData {
 export interface CanvasDocumentData {
   /** Components by ID */
   components: Map<string, Block>;
+  /** Junctions by ID */
+  junctions: Map<string, Junction>;
   /** Wire connections */
   wires: Wire[];
   /** Circuit metadata */
@@ -207,6 +211,7 @@ export function isScenarioDocument(doc: DocumentState): doc is ScenarioDocumentS
 /** Default canvas document data */
 export const DEFAULT_CANVAS_DATA: CanvasDocumentData = {
   components: new Map(),
+  junctions: new Map(),
   wires: [],
   metadata: {
     name: 'Untitled Circuit',
@@ -282,6 +287,7 @@ export function createEmptyCanvasDocument(
     data: {
       ...DEFAULT_CANVAS_DATA,
       components: new Map(),
+      junctions: new Map(),
       wires: [],
     },
     history: [],

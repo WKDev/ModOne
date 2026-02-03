@@ -131,6 +131,49 @@ export function propagateVoltage(
 }
 
 /**
+ * Apply net-based voltage equalization.
+ * All nodes in the same net should share the highest voltage found among them.
+ *
+ * @param nodeVoltages - Current voltage map (mutated in place)
+ * @param nets - Nets from buildNets
+ */
+export function equalizeNetVoltages(
+  nodeVoltages: Map<string, number>,
+  nets: Net[]
+): void {
+  for (const net of nets) {
+    // Find the highest voltage among all members of this net
+    let maxVoltage = 0;
+    for (const memberKey of net.members) {
+      // Convert endpoint key to node ID format
+      // endpoint key: "port:compId:portId" → node ID: "compId:portId"
+      // endpoint key: "junction:juncId" → node ID: "junction:juncId"
+      const nodeId = memberKey.startsWith('port:')
+        ? memberKey.substring(5) // remove "port:" prefix → "compId:portId"
+        : memberKey; // junction keys stay as-is
+      const voltage = nodeVoltages.get(nodeId) ?? 0;
+      if (voltage > maxVoltage) {
+        maxVoltage = voltage;
+      }
+    }
+
+    // Assign the max voltage to all members
+    if (maxVoltage > 0) {
+      for (const memberKey of net.members) {
+        const nodeId = memberKey.startsWith('port:')
+          ? memberKey.substring(5)
+          : memberKey;
+        const currentVoltage = nodeVoltages.get(nodeId) ?? 0;
+        if (maxVoltage > currentVoltage) {
+          nodeVoltages.set(nodeId, maxVoltage);
+        }
+      }
+      net.voltage = maxVoltage;
+    }
+  }
+}
+
+/**
  * Determine which load components are actually powered.
  * A component is powered if it has voltage on input AND is part of a complete path.
  *
@@ -242,27 +285,30 @@ export function simulateCircuit(
       detectShortCircuits: options.detectShortCircuits,
     });
 
-    // 5. Propagate voltage
+    // 5. Propagate voltage (path-based)
     const nodeVoltages = propagateVoltage(graph, currentPaths);
 
-    // 6. Determine powered components
+    // 6. Build nets (union-find grouping of connected endpoints)
+    const componentsMap = new Map(components.map((c) => [c.id, c]));
+    const junctionsMap = new Map(junctions.map((j) => [j.id, j]));
+    const nets = buildNets(wires, componentsMap, junctionsMap);
+
+    // 7. Equalize voltages within each net
+    equalizeNetVoltages(nodeVoltages, nets);
+
+    // 8. Determine powered components
     const poweredComponents = determinePoweredComponents(
       nodeVoltages,
       currentPaths,
       components
     );
 
-    // 7. Get powered wires and directions
+    // 9. Get powered wires and directions
     const poweredWires = getPoweredWires(currentPaths);
     const wireDirections = getWireDirections(currentPaths, graph);
 
-    // 8. Detect short circuits
+    // 10. Detect short circuits
     const shortCircuits = detectShortCircuits(currentPaths);
-
-    // 9. Build nets (union-find grouping of connected endpoints)
-    const componentsMap = new Map(components.map((c) => [c.id, c]));
-    const junctionsMap = new Map(junctions.map((j) => [j.id, j]));
-    const nets = buildNets(wires, componentsMap, junctionsMap);
 
     return {
       nodeVoltages,
@@ -383,6 +429,7 @@ export function getComponentVoltages(
 export default {
   simulateCircuit,
   propagateVoltage,
+  equalizeNetVoltages,
   determinePoweredComponents,
   detectShortCircuits,
   getPortVoltage,

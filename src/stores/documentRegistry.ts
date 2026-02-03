@@ -157,6 +157,10 @@ function createCanvasHistorySnapshot(data: CanvasDocumentData): CanvasHistoryDat
       id,
       { ...block, ports: [...block.ports] },
     ]),
+    junctions: Array.from(data.junctions.entries()).map(([id, junction]) => [
+      id,
+      { ...junction, position: { ...junction.position } },
+    ]),
     wires: data.wires.map((wire) => ({
       ...wire,
       from: { ...wire.from },
@@ -167,10 +171,13 @@ function createCanvasHistorySnapshot(data: CanvasDocumentData): CanvasHistoryDat
 }
 
 /** Restore canvas data from history snapshot */
-function restoreCanvasFromHistory(snapshot: CanvasHistoryData): Pick<CanvasDocumentData, 'components' | 'wires'> {
+function restoreCanvasFromHistory(snapshot: CanvasHistoryData): Pick<CanvasDocumentData, 'components' | 'junctions' | 'wires'> {
   return {
     components: new Map(
       snapshot.components.map(([id, block]) => [id, { ...block, ports: [...block.ports] }])
+    ),
+    junctions: new Map(
+      (snapshot.junctions ?? []).map(([id, junction]) => [id, { ...junction, position: { ...junction.position } }])
     ),
     wires: snapshot.wires.map((wire) => ({
       ...wire,
@@ -314,6 +321,9 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
             const canvasDoc = doc as CanvasDocumentState;
             const circuitData = data as SerializableCircuitState;
             canvasDoc.data.components = new Map(Object.entries(circuitData.components));
+            canvasDoc.data.junctions = circuitData.junctions
+              ? new Map(Object.entries(circuitData.junctions))
+              : new Map();
             canvasDoc.data.wires = circuitData.wires.map((wire) => ({
               ...wire,
               from: { ...wire.from },
@@ -494,6 +504,9 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
             const doc = state.documents.get(documentId);
             if (doc && isCanvasDocument(doc)) {
               doc.data.components = new Map(Object.entries(circuit.components));
+              doc.data.junctions = circuit.junctions
+                ? new Map(Object.entries(circuit.junctions))
+                : new Map();
               doc.data.wires = circuit.wires.map((wire) => ({
                 ...wire,
                 from: { ...wire.from },
@@ -523,6 +536,9 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
         if (doc && isCanvasDocument(doc)) {
           return {
             components: Object.fromEntries(doc.data.components),
+            junctions: doc.data.junctions.size > 0
+              ? Object.fromEntries(doc.data.junctions)
+              : undefined,
             wires: doc.data.wires,
             metadata: doc.data.metadata,
             viewport: {
@@ -665,6 +681,7 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
               const snapshot = doc.history[doc.historyIndex];
               const restored = restoreCanvasFromHistory(snapshot.data);
               doc.data.components = restored.components;
+              doc.data.junctions = restored.junctions;
               doc.data.wires = restored.wires;
               doc.historyIndex--;
               doc.isDirty = true;
@@ -717,6 +734,7 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
               if (snapshot) {
                 const restored = restoreCanvasFromHistory(snapshot.data);
                 doc.data.components = restored.components;
+                doc.data.junctions = restored.junctions;
                 doc.data.wires = restored.wires;
                 doc.isDirty = true;
               }

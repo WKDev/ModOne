@@ -15,6 +15,7 @@ import type {
   Wire,
   WireHandle,
   WireEndpoint,
+  Junction,
   Position,
   PortPosition,
   CircuitMetadata,
@@ -34,6 +35,7 @@ import {
   findHandleInsertIndex,
   computeWireBendPoints,
   getWiresConnectedToComponent,
+  getWiresConnectedToJunction,
   recalculateAutoHandles,
 } from '../../components/OneCanvas/utils/canvasHelpers';
 
@@ -54,6 +56,7 @@ export type CanvasTool = 'select' | 'wire' | 'pan';
 export interface UseCanvasDocumentReturn {
   // Data
   components: Map<string, Block>;
+  junctions: Map<string, Junction>;
   wires: Wire[];
   metadata: CircuitMetadata;
   zoom: number;
@@ -67,7 +70,10 @@ export interface UseCanvasDocumentReturn {
   addComponent: (type: BlockType, position: Position, props?: Partial<Block>) => string;
   removeComponent: (id: string) => void;
   updateComponent: (id: string, updates: Partial<Block>) => void;
-  moveComponent: (id: string, position: Position) => void;
+  moveComponent: (id: string, position: Position, skipHistory?: boolean) => void;
+
+  // Junction operations
+  moveJunction: (id: string, position: Position, skipHistory?: boolean) => void;
 
   // Wire operations
   addWire: (from: WireEndpoint, to: WireEndpoint, options?: { fromExitDirection?: PortPosition; toExitDirection?: PortPosition }) => string | null;
@@ -223,14 +229,16 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
   );
 
   const moveComponent = useCallback(
-    (id: string, position: Position) => {
+    (id: string, position: Position, skipHistory?: boolean) => {
       if (!documentId || !data) return;
 
       const finalPosition = data.snapToGrid
         ? snapToGridPosition(position, data.gridSize)
         : position;
 
-      pushHistory(documentId);
+      if (!skipHistory) {
+        pushHistory(documentId);
+      }
       updateCanvasData(documentId, (docData) => {
         const component = docData.components.get(id);
         if (component) {
@@ -238,6 +246,36 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
 
           // Recalculate auto handles on connected wires
           const connectedWires = getWiresConnectedToComponent(docData.wires, id);
+          for (const wire of connectedWires) {
+            const target = docData.wires.find((w) => w.id === wire.id);
+            if (target) {
+              target.handles = recalculateAutoHandles(target, docData.components);
+            }
+          }
+        }
+      });
+    },
+    [documentId, data, pushHistory, updateCanvasData]
+  );
+
+  const moveJunction = useCallback(
+    (id: string, position: Position, skipHistory?: boolean) => {
+      if (!documentId || !data) return;
+
+      const finalPosition = data.snapToGrid
+        ? snapToGridPosition(position, data.gridSize)
+        : position;
+
+      if (!skipHistory) {
+        pushHistory(documentId);
+      }
+      updateCanvasData(documentId, (docData) => {
+        const junction = docData.junctions.get(id);
+        if (junction) {
+          docData.junctions.set(id, { ...junction, position: finalPosition });
+
+          // Recalculate auto handles on connected wires
+          const connectedWires = getWiresConnectedToJunction(docData.wires, id);
           for (const wire of connectedWires) {
             const target = docData.wires.find((w) => w.id === wire.id);
             if (target) {
@@ -328,9 +366,11 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         const originalWire = docData.wires[wireIndex];
         docData.wires.splice(wireIndex, 1);
 
-        // Add junction to junctions map (if available)
-        // Note: document mode junction support is limited — junctions stored in components for now
-        // TODO: Add junctions map to document data model
+        // Add junction to junctions map
+        docData.junctions.set(junctionId, {
+          id: junctionId,
+          position: { ..._position },
+        });
 
         // Create two new wires using JunctionEndpoint
         const wire1Id = generateId('wire');
@@ -509,6 +549,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
     pushHistory(documentId);
     updateCanvasData(documentId, (docData) => {
       docData.components = new Map();
+      docData.junctions = new Map();
       docData.wires = [];
       docData.metadata = {
         name: 'Untitled Circuit',
@@ -540,6 +581,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
     return {
       // Data
       components: data.components,
+      junctions: data.junctions,
       wires: data.wires,
       metadata: data.metadata,
       zoom: data.zoom,
@@ -554,6 +596,9 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       removeComponent,
       updateComponent,
       moveComponent,
+
+      // Junction operations
+      moveJunction,
 
       // Wire operations
       addWire,
@@ -591,6 +636,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
     removeComponent,
     updateComponent,
     moveComponent,
+    moveJunction,
     addWire,
     removeWire,
     createJunctionOnWire,

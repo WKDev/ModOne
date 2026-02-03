@@ -36,6 +36,7 @@ import {
   findHandleInsertIndex,
   computeWireBendPoints,
   getWiresConnectedToComponent,
+  getWiresConnectedToJunction,
   recalculateAutoHandles,
 } from '../components/OneCanvas/utils/canvasHelpers';
 
@@ -122,8 +123,12 @@ interface CanvasActions {
   removeComponent: (id: string) => void;
   /** Update a component's properties */
   updateComponent: (id: string, updates: Partial<Block>) => void;
-  /** Move a component to a new position */
-  moveComponent: (id: string, position: Position) => void;
+  /** Move a component to a new position. Set skipHistory=true during continuous drag. */
+  moveComponent: (id: string, position: Position, skipHistory?: boolean) => void;
+
+  // Junction operations
+  /** Move a junction to a new position. Set skipHistory=true during continuous drag. */
+  moveJunction: (id: string, position: Position, skipHistory?: boolean) => void;
 
   // Wire operations
   /** Add a wire connection between two ports */
@@ -422,7 +427,7 @@ export const useCanvasStore = create<CanvasStore>()(
         );
       },
 
-      moveComponent: (id, position) => {
+      moveComponent: (id, position, skipHistory) => {
         const state = get();
         const finalPosition = state.snapToGrid
           ? snapToGridPosition(position, state.gridSize)
@@ -433,7 +438,9 @@ export const useCanvasStore = create<CanvasStore>()(
             const component = state.components.get(id);
             if (!component) return;
 
-            pushHistorySnapshot(state);
+            if (!skipHistory) {
+              pushHistorySnapshot(state);
+            }
 
             state.components.set(id, { ...component, position: finalPosition } as Block);
 
@@ -450,6 +457,39 @@ export const useCanvasStore = create<CanvasStore>()(
           },
           false,
           `moveComponent/${id}`
+        );
+      },
+
+      moveJunction: (id, position, skipHistory) => {
+        const state = get();
+        const finalPosition = state.snapToGrid
+          ? snapToGridPosition(position, state.gridSize)
+          : position;
+
+        set(
+          (state) => {
+            const junction = state.junctions.get(id);
+            if (!junction) return;
+
+            if (!skipHistory) {
+              pushHistorySnapshot(state);
+            }
+
+            state.junctions.set(id, { ...junction, position: finalPosition });
+
+            // Recalculate auto handles on connected wires
+            const connectedWires = getWiresConnectedToJunction(state.wires, id);
+            for (const wire of connectedWires) {
+              const target = state.wires.find((w) => w.id === wire.id);
+              if (target) {
+                target.handles = recalculateAutoHandles(target, state.components);
+              }
+            }
+
+            state.isDirty = true;
+          },
+          false,
+          `moveJunction/${id}`
         );
       },
 
