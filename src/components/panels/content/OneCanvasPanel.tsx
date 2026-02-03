@@ -296,6 +296,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     zoom,
     pan,
     addComponent,
+    addWire,
     moveComponent,
     removeWire,
     createJunctionOnWire,
@@ -308,7 +309,6 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
   const wireDrawing = useCanvasStore((state) => state.wireDrawing);
   const startWireDrawing = useCanvasStore((state) => state.startWireDrawing);
   const updateWireDrawing = useCanvasStore((state) => state.updateWireDrawing);
-  const completeWireDrawing = useCanvasStore((state) => state.completeWireDrawing);
   const cancelWireDrawing = useCanvasStore((state) => state.cancelWireDrawing);
   const selectedIds = useCanvasStore((state) => state.selectedIds);
   const setSelection = useCanvasStore((state) => state.setSelection);
@@ -435,11 +435,27 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
   const handleEndWire = useCallback(
     (blockId: string, portId: string) => {
       if (wireDrawing) {
-        // Use completeWireDrawing to properly record exit directions
-        completeWireDrawing({ componentId: blockId, portId });
+        // Use document-aware addWire with exit direction info from store wireDrawing
+        const to = { componentId: blockId, portId };
+
+        // Get toExitDirection from target port's position
+        const toBlock = components.get(blockId);
+        let toExitDirection: PortPosition | undefined;
+        if (toBlock) {
+          const toPort = toBlock.ports.find((p: { id: string; position: string }) => p.id === portId);
+          if (toPort) {
+            toExitDirection = toPort.position as PortPosition;
+          }
+        }
+
+        addWire(wireDrawing.from, to, {
+          fromExitDirection: wireDrawing.exitDirection,
+          toExitDirection,
+        });
+        cancelWireDrawing();
       }
     },
-    [wireDrawing, completeWireDrawing]
+    [wireDrawing, components, addWire, cancelWireDrawing]
   );
 
   // Handle canvas mouse move for wire preview
