@@ -69,6 +69,8 @@ export interface BaseBlock<T extends BlockType = BlockType> {
   type: T;
   /** Position on canvas */
   position: Position;
+  /** Block dimensions */
+  size: Size;
   /** Connection ports */
   ports: Port[];
   /** Whether block is selected */
@@ -179,19 +181,68 @@ export type Block =
   | JunctionBlock;
 
 // ============================================================================
+// Junction (wire-level concept)
+// ============================================================================
+
+/** Junction point for wire branching (not a Block) */
+export interface Junction {
+  /** Unique identifier */
+  id: string;
+  /** Position on canvas (center-based) */
+  position: Position;
+  /** Whether junction is selected */
+  selected?: boolean;
+}
+
+// ============================================================================
 // Wire Types
 // ============================================================================
 
-/** Endpoint of a wire connection */
-export interface WireEndpoint {
+/** Wire endpoint connected to a block port */
+export interface PortEndpoint {
   /** ID of the component block */
   componentId: string;
   /** ID of the port on the component */
   portId: string;
 }
 
+/** Wire endpoint connected to a junction */
+export interface JunctionEndpoint {
+  /** ID of the junction */
+  junctionId: string;
+}
+
+/** Endpoint of a wire connection (discriminated union) */
+export type WireEndpoint = PortEndpoint | JunctionEndpoint;
+
+/** Type guard: check if endpoint connects to a block port */
+export function isPortEndpoint(ep: WireEndpoint): ep is PortEndpoint {
+  return 'componentId' in ep;
+}
+
+/** Type guard: check if endpoint connects to a junction */
+export function isJunctionEndpoint(ep: WireEndpoint): ep is JunctionEndpoint {
+  return 'junctionId' in ep;
+}
+
+/** Legacy endpoint format (for backward compatibility during migration) */
+export interface LegacyWireEndpoint {
+  componentId: string;
+  portId: string;
+}
+
 /** Wire handle constraint direction */
 export type HandleConstraint = 'horizontal' | 'vertical' | 'free';
+
+/** Wire control point with constraint and source info */
+export interface WireHandle {
+  /** Handle position */
+  position: Position;
+  /** Movement constraint */
+  constraint: HandleConstraint;
+  /** Whether auto-generated or user-placed */
+  source: 'auto' | 'user';
+}
 
 /** Wire connection between two ports */
 export interface Wire {
@@ -205,14 +256,12 @@ export interface Wire {
   selected?: boolean;
   /** Optional wire color */
   color?: string;
-  /** Wire path points for routing (optional) */
-  points?: Position[];
+  /** Control points for wire routing */
+  handles?: WireHandle[];
   /** Direction wire exits from source port (user-specified via drag direction) */
   fromExitDirection?: PortPosition;
   /** Direction wire enters target port (user-specified via drag direction) */
   toExitDirection?: PortPosition;
-  /** Constraint for each handle (same length as points) */
-  handleConstraints?: HandleConstraint[];
 }
 
 // ============================================================================
@@ -241,6 +290,8 @@ export interface CircuitMetadata {
 export interface CircuitState {
   /** All component blocks by ID */
   components: Map<string, Block>;
+  /** All junction points by ID */
+  junctions: Map<string, Junction>;
   /** All wire connections */
   wires: Wire[];
   /** Circuit metadata */
@@ -264,6 +315,7 @@ export interface ViewportState {
 /** Serializable version of CircuitState (for JSON) */
 export interface SerializableCircuitState {
   components: Record<string, Block>;
+  junctions?: Record<string, Junction>;
   wires: Wire[];
   metadata: CircuitMetadata;
   viewport?: ViewportState;
@@ -426,6 +478,7 @@ export function circuitStateToSerializable(
 ): SerializableCircuitState {
   return {
     components: Object.fromEntries(state.components),
+    junctions: state.junctions.size > 0 ? Object.fromEntries(state.junctions) : undefined,
     wires: state.wires,
     metadata: state.metadata,
     viewport: state.viewport,
@@ -438,6 +491,7 @@ export function serializableToCircuitState(
 ): CircuitState {
   return {
     components: new Map(Object.entries(data.components)),
+    junctions: data.junctions ? new Map(Object.entries(data.junctions)) : new Map(),
     wires: data.wires,
     metadata: data.metadata,
     viewport: data.viewport,
@@ -450,7 +504,7 @@ export function circuitStateToYaml(state: CircuitState): YamlCircuitSchema {
   const components: YamlBlockDefinition[] = [];
 
   for (const [, block] of state.components) {
-    const { id, type, position, label, ports, ...properties } = block;
+    const { id, type, position, label, ports, size, ...properties } = block;
     components.push({
       id,
       type,
@@ -471,11 +525,13 @@ export function circuitStateToYaml(state: CircuitState): YamlCircuitSchema {
       modified: state.metadata.modifiedAt,
     },
     components,
-    wires: state.wires.map((wire) => ({
-      id: wire.id,
-      from: { component: wire.from.componentId, port: wire.from.portId },
-      to: { component: wire.to.componentId, port: wire.to.portId },
-      color: wire.color,
-    })),
+    wires: state.wires
+      .filter((wire) => isPortEndpoint(wire.from) && isPortEndpoint(wire.to))
+      .map((wire) => ({
+        id: wire.id,
+        from: { component: (wire.from as PortEndpoint).componentId, port: (wire.from as PortEndpoint).portId },
+        to: { component: (wire.to as PortEndpoint).componentId, port: (wire.to as PortEndpoint).portId },
+        color: wire.color,
+      })),
   };
 }

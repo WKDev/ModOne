@@ -12,18 +12,23 @@ import type {
   Block,
   BlockType,
   Wire,
+  WireHandle,
   WireEndpoint,
+  Junction,
   Position,
   PortPosition,
   HandleConstraint,
   CircuitMetadata,
   SerializableCircuitState,
 } from '../components/OneCanvas/types';
+import { isPortEndpoint } from '../components/OneCanvas/types';
 import {
-  getBlockSize,
   getPortRelativePosition,
   calculateWireBendPoints,
 } from '../components/OneCanvas/utils/wirePathCalculator';
+import {
+  getBlockSize,
+} from '../components/OneCanvas/blockDefinitions';
 
 // ============================================================================
 // Types
@@ -48,6 +53,8 @@ export interface WireDrawingState {
 interface HistorySnapshot {
   /** Components as array of entries for serialization */
   components: Array<[string, Block]>;
+  /** Junction points as array of entries */
+  junctions: Array<[string, Junction]>;
   /** Wire connections */
   wires: Wire[];
 }
@@ -56,6 +63,8 @@ interface CanvasState {
   // Circuit data
   /** All component blocks by ID */
   components: Map<string, Block>;
+  /** All junction points by ID */
+  junctions: Map<string, Junction>;
   /** All wire connections */
   wires: Wire[];
   /** Circuit metadata */
@@ -208,6 +217,7 @@ const DEFAULT_GRID_SIZE = 20;
 
 const initialState: CanvasState = {
   components: new Map(),
+  junctions: new Map(),
   wires: [],
   metadata: {
     name: 'Untitled Circuit',
@@ -245,18 +255,18 @@ function snapToGridPosition(position: Position, gridSize: number): Position {
 }
 
 /** Create a deep clone of circuit state for history */
-function createSnapshot(components: Map<string, Block>, wires: Wire[]): HistorySnapshot {
+function createSnapshot(components: Map<string, Block>, wires: Wire[], junctions?: Map<string, Junction>): HistorySnapshot {
   return {
     components: Array.from(components.entries()).map(([id, block]) => [
       id,
       { ...block, ports: [...block.ports] },
     ]),
+    junctions: junctions ? Array.from(junctions.entries()).map(([id, j]) => [id, { ...j, position: { ...j.position } }]) : [],
     wires: wires.map((wire) => ({
       ...wire,
       from: { ...wire.from },
       to: { ...wire.to },
-      points: wire.points ? [...wire.points] : undefined,
-      handleConstraints: wire.handleConstraints ? [...wire.handleConstraints] : undefined,
+      handles: wire.handles ? wire.handles.map((h) => ({ ...h, position: { ...h.position } })) : undefined,
     })),
   };
 }
@@ -264,18 +274,21 @@ function createSnapshot(components: Map<string, Block>, wires: Wire[]): HistoryS
 /** Restore circuit state from history snapshot */
 function restoreSnapshot(snapshot: HistorySnapshot): {
   components: Map<string, Block>;
+  junctions: Map<string, Junction>;
   wires: Wire[];
 } {
   return {
     components: new Map(
       snapshot.components.map(([id, block]) => [id, { ...block, ports: [...block.ports] }])
     ),
+    junctions: new Map(
+      snapshot.junctions.map(([id, j]) => [id, { ...j, position: { ...j.position } }])
+    ),
     wires: snapshot.wires.map((wire) => ({
       ...wire,
       from: { ...wire.from },
       to: { ...wire.to },
-      points: wire.points ? [...wire.points] : undefined,
-      handleConstraints: wire.handleConstraints ? [...wire.handleConstraints] : undefined,
+      handles: wire.handles ? wire.handles.map((h) => ({ ...h, position: { ...h.position } })) : undefined,
     })),
   };
 }
@@ -283,25 +296,35 @@ function restoreSnapshot(snapshot: HistorySnapshot): {
 /** Validate wire endpoint exists */
 function isValidEndpoint(
   endpoint: WireEndpoint,
-  components: Map<string, Block>
+  components: Map<string, Block>,
+  junctions?: Map<string, Junction>
 ): boolean {
-  const component = components.get(endpoint.componentId);
-  if (!component) return false;
-  return component.ports.some((port) => port.id === endpoint.portId);
+  if (isPortEndpoint(endpoint)) {
+    const component = components.get(endpoint.componentId);
+    if (!component) return false;
+    return component.ports.some((port) => port.id === endpoint.portId);
+  } else {
+    // Junction endpoint
+    return junctions ? junctions.has(endpoint.junctionId) : false;
+  }
+}
+
+/** Get a unique key for a wire endpoint for comparison */
+function endpointKey(ep: WireEndpoint): string {
+  if (isPortEndpoint(ep)) {
+    return `port:${ep.componentId}:${ep.portId}`;
+  }
+  return `junction:${ep.junctionId}`;
 }
 
 /** Check if wire already exists (in either direction) */
 function wireExists(wires: Wire[], from: WireEndpoint, to: WireEndpoint): boolean {
+  const fromKey = endpointKey(from);
+  const toKey = endpointKey(to);
   return wires.some(
     (wire) =>
-      (wire.from.componentId === from.componentId &&
-        wire.from.portId === from.portId &&
-        wire.to.componentId === to.componentId &&
-        wire.to.portId === to.portId) ||
-      (wire.from.componentId === to.componentId &&
-        wire.from.portId === to.portId &&
-        wire.to.componentId === from.componentId &&
-        wire.to.portId === from.portId)
+      (endpointKey(wire.from) === fromKey && endpointKey(wire.to) === toKey) ||
+      (endpointKey(wire.from) === toKey && endpointKey(wire.to) === fromKey)
   );
 }
 
@@ -372,17 +395,18 @@ function getPortRelativePos(
  * Uses distance from the wire's from-port to determine ordering along the path.
  */
 function findHandleInsertIndex(wire: Wire, position: Position, components: Map<string, Block>): number {
-  if (!wire.points || wire.points.length === 0) {
+  if (!wire.handles || wire.handles.length === 0) {
     return 0;
   }
 
   // Get from port position as reference point for ordering
   let fromPos: Position = { x: 0, y: 0 };
-  const fromBlock = components.get(wire.from.componentId);
-  if (fromBlock) {
-    const fromPort = fromBlock.ports.find((p) => p.id === wire.from.portId);
+  const wireFrom = wire.from;
+  const fromBlock = isPortEndpoint(wireFrom) ? components.get(wireFrom.componentId) : undefined;
+  if (fromBlock && isPortEndpoint(wireFrom)) {
+    const fromPort = fromBlock.ports.find((p) => p.id === wireFrom.portId);
     if (fromPort) {
-      const blockSize = { width: 60, height: 60 };
+      const blockSize = fromBlock.size || { width: 60, height: 60 };
       const relPos = getPortRelativePos(fromPort.position, fromPort.offset ?? 0.5, blockSize);
       fromPos = { x: fromBlock.position.x + relPos.x, y: fromBlock.position.y + relPos.y };
     }
@@ -395,13 +419,13 @@ function findHandleInsertIndex(wire: Wire, position: Position, components: Map<s
   const newDist = distFromStart(position);
 
   // Find the correct insertion index to maintain order by distance from start
-  for (let i = 0; i < wire.points.length; i++) {
-    if (newDist < distFromStart(wire.points[i])) {
+  for (let i = 0; i < wire.handles.length; i++) {
+    if (newDist < distFromStart(wire.handles[i].position)) {
       return i;
     }
   }
 
-  return wire.points.length;
+  return wire.handles.length;
 }
 
 /**
@@ -414,7 +438,10 @@ function computeWireBendPoints(
   components: Map<string, Block>,
   fromExitDirection?: PortPosition,
   toExitDirection?: PortPosition
-): { points: Position[]; handleConstraints: HandleConstraint[] } | undefined {
+): WireHandle[] | undefined {
+  // Only compute bend points for port-to-port wires
+  if (!isPortEndpoint(from) || !isPortEndpoint(to)) return undefined;
+
   const fromBlock = components.get(from.componentId);
   const toBlock = components.get(to.componentId);
   if (!fromBlock || !toBlock) return undefined;
@@ -423,8 +450,8 @@ function computeWireBendPoints(
   const toPort = toBlock.ports.find((p) => p.id === to.portId);
   if (!fromPort || !toPort) return undefined;
 
-  const fromSize = getBlockSize(fromBlock.type);
-  const toSize = getBlockSize(toBlock.type);
+  const fromSize = fromBlock.size || getBlockSize(fromBlock.type);
+  const toSize = toBlock.size || getBlockSize(toBlock.type);
 
   const fromRelPos = getPortRelativePosition(fromPort.position, fromPort.offset ?? 0.5, fromSize);
   const toRelPos = getPortRelativePosition(toPort.position, toPort.offset ?? 0.5, toSize);
@@ -438,7 +465,11 @@ function computeWireBendPoints(
   const result = calculateWireBendPoints(fromPos, toPos, fromDir, toDir);
   if (result.points.length === 0) return undefined;
 
-  return { points: result.points, handleConstraints: result.constraints };
+  return result.points.map((p, i) => ({
+    position: p,
+    constraint: result.constraints[i],
+    source: 'auto' as const,
+  }));
 }
 
 /** Get default ports for a block type */
@@ -510,6 +541,7 @@ export const useCanvasStore = create<CanvasStore>()(
           id,
           type,
           position: finalPosition,
+          size: getBlockSize(type),
           ports: getDefaultPorts(type),
           ...getDefaultBlockProps(type),
           ...props,
@@ -518,7 +550,7 @@ export const useCanvasStore = create<CanvasStore>()(
         set(
           (state) => {
             // Push history before modification
-            const snapshot = createSnapshot(state.components, state.wires);
+            const snapshot = createSnapshot(state.components, state.wires, state.junctions);
             state.history = state.history.slice(0, state.historyIndex + 1);
             state.history.push(snapshot);
             if (state.history.length > MAX_HISTORY_SIZE) {
@@ -543,7 +575,7 @@ export const useCanvasStore = create<CanvasStore>()(
             if (!state.components.has(id)) return;
 
             // Push history
-            const snapshot = createSnapshot(state.components, state.wires);
+            const snapshot = createSnapshot(state.components, state.wires, state.junctions);
             state.history = state.history.slice(0, state.historyIndex + 1);
             state.history.push(snapshot);
             if (state.history.length > MAX_HISTORY_SIZE) {
@@ -557,7 +589,9 @@ export const useCanvasStore = create<CanvasStore>()(
 
             // Remove connected wires
             state.wires = state.wires.filter(
-              (wire) => wire.from.componentId !== id && wire.to.componentId !== id
+              (wire) =>
+                !(isPortEndpoint(wire.from) && wire.from.componentId === id) &&
+                !(isPortEndpoint(wire.to) && wire.to.componentId === id)
             );
 
             // Remove from selection
@@ -576,7 +610,7 @@ export const useCanvasStore = create<CanvasStore>()(
             if (!component) return;
 
             // Push history
-            const snapshot = createSnapshot(state.components, state.wires);
+            const snapshot = createSnapshot(state.components, state.wires, state.junctions);
             state.history = state.history.slice(0, state.historyIndex + 1);
             state.history.push(snapshot);
             if (state.history.length > MAX_HISTORY_SIZE) {
@@ -609,18 +643,24 @@ export const useCanvasStore = create<CanvasStore>()(
         const state = get();
 
         // Validate endpoints
-        if (!isValidEndpoint(from, state.components)) {
+        if (!isValidEndpoint(from, state.components, state.junctions)) {
           console.warn('Invalid wire source endpoint:', from);
           return null;
         }
-        if (!isValidEndpoint(to, state.components)) {
+        if (!isValidEndpoint(to, state.components, state.junctions)) {
           console.warn('Invalid wire target endpoint:', to);
           return null;
         }
 
-        // Prevent self-connection
-        if (from.componentId === to.componentId) {
+        // Prevent self-connection (only for port endpoints on the same component)
+        if (isPortEndpoint(from) && isPortEndpoint(to) && from.componentId === to.componentId) {
           console.warn('Cannot connect component to itself');
+          return null;
+        }
+
+        // Prevent connecting same endpoint to itself
+        if (endpointKey(from) === endpointKey(to)) {
+          console.warn('Cannot connect endpoint to itself');
           return null;
         }
 
@@ -635,7 +675,7 @@ export const useCanvasStore = create<CanvasStore>()(
         set(
           (state) => {
             // Push history
-            const snapshot = createSnapshot(state.components, state.wires);
+            const snapshot = createSnapshot(state.components, state.wires, state.junctions);
             state.history = state.history.slice(0, state.historyIndex + 1);
             state.history.push(snapshot);
             if (state.history.length > MAX_HISTORY_SIZE) {
@@ -653,20 +693,19 @@ export const useCanvasStore = create<CanvasStore>()(
             }
 
             // Auto-generate bend points
-            const bendData = computeWireBendPoints(
+            const handles = computeWireBendPoints(
               from, to, state.components,
               options?.fromExitDirection, options?.toExitDirection
             );
-            if (bendData) {
-              newWire.points = bendData.points;
-              newWire.handleConstraints = bendData.handleConstraints;
+            if (handles) {
+              newWire.handles = handles;
             }
 
             state.wires.push(newWire);
             state.isDirty = true;
           },
           false,
-          `addWire/${from.componentId}-${to.componentId}`
+          `addWire/${endpointKey(from)}-${endpointKey(to)}`
         );
 
         return id;
@@ -679,7 +718,7 @@ export const useCanvasStore = create<CanvasStore>()(
             if (wireIndex === -1) return;
 
             // Push history
-            const snapshot = createSnapshot(state.components, state.wires);
+            const snapshot = createSnapshot(state.components, state.wires, state.junctions);
             state.history = state.history.slice(0, state.historyIndex + 1);
             state.history.push(snapshot);
             if (state.history.length > MAX_HISTORY_SIZE) {
@@ -716,6 +755,7 @@ export const useCanvasStore = create<CanvasStore>()(
           id: junctionId,
           type: 'junction',
           position: junctionPosition,
+          size: { width: 0, height: 0 },
           ports: getDefaultPorts('junction'),
           sourceWireId: wireId,
         } as Block;
@@ -723,7 +763,7 @@ export const useCanvasStore = create<CanvasStore>()(
         set(
           (state) => {
             // Push history
-            const snapshot = createSnapshot(state.components, state.wires);
+            const snapshot = createSnapshot(state.components, state.wires, state.junctions);
             state.history = state.history.slice(0, state.historyIndex + 1);
             state.history.push(snapshot);
             if (state.history.length > MAX_HISTORY_SIZE) {
@@ -765,22 +805,20 @@ export const useCanvasStore = create<CanvasStore>()(
             }
 
             // Auto-generate bend points for both new wires
-            const bend1 = computeWireBendPoints(
+            const handles1 = computeWireBendPoints(
               wire1.from, wire1.to, state.components,
               wire1.fromExitDirection, undefined
             );
-            if (bend1) {
-              wire1.points = bend1.points;
-              wire1.handleConstraints = bend1.handleConstraints;
+            if (handles1) {
+              wire1.handles = handles1;
             }
 
-            const bend2 = computeWireBendPoints(
+            const handles2 = computeWireBendPoints(
               wire2.from, wire2.to, state.components,
               undefined, wire2.toExitDirection
             );
-            if (bend2) {
-              wire2.points = bend2.points;
-              wire2.handleConstraints = bend2.handleConstraints;
+            if (handles2) {
+              wire2.handles = handles2;
             }
 
             state.wires.push(wire1);
@@ -847,11 +885,13 @@ export const useCanvasStore = create<CanvasStore>()(
 
         // Determine target port's natural direction for toExitDirection
         let toExitDirection: PortPosition | undefined;
-        const toBlock = state.components.get(to.componentId);
-        if (toBlock) {
-          const toPort = toBlock.ports.find((p) => p.id === to.portId);
-          if (toPort) {
-            toExitDirection = toPort.position;
+        if (isPortEndpoint(to)) {
+          const toBlock = state.components.get(to.componentId);
+          if (toBlock) {
+            const toPort = toBlock.ports.find((p) => p.id === to.portId);
+            if (toPort) {
+              toExitDirection = toPort.position;
+            }
           }
         }
 
@@ -891,7 +931,7 @@ export const useCanvasStore = create<CanvasStore>()(
             if (!wire) return;
 
             // Push history
-            const snapshot = createSnapshot(state.components, state.wires);
+            const snapshot = createSnapshot(state.components, state.wires, state.junctions);
             state.history = state.history.slice(0, state.historyIndex + 1);
             state.history.push(snapshot);
             if (state.history.length > MAX_HISTORY_SIZE) {
@@ -900,18 +940,19 @@ export const useCanvasStore = create<CanvasStore>()(
               state.historyIndex++;
             }
 
-            // Initialize arrays if needed
-            wire.points = wire.points || [];
-            wire.handleConstraints = wire.handleConstraints || [];
+            // Initialize array if needed
+            wire.handles = wire.handles || [];
 
-            // Insert handle at correct position in points array
+            // Insert handle at correct position
             const insertIndex = findHandleInsertIndex(wire, position, state.components);
 
-            // Manually added handles default to 'free' constraint
-            const constraint: HandleConstraint = 'free';
+            const newHandle: WireHandle = {
+              position,
+              constraint: 'free',
+              source: 'user',
+            };
 
-            wire.points.splice(insertIndex, 0, position);
-            wire.handleConstraints.splice(insertIndex, 0, constraint);
+            wire.handles.splice(insertIndex, 0, newHandle);
 
             state.isDirty = true;
           },
@@ -924,11 +965,11 @@ export const useCanvasStore = create<CanvasStore>()(
         set(
           (state) => {
             const wire = state.wires.find((w) => w.id === wireId);
-            if (!wire?.points?.[handleIndex]) return;
+            if (!wire?.handles?.[handleIndex]) return;
 
             // Push history on first move of a drag so Undo reverts the whole drag
             if (isFirstMove) {
-              const snapshot = createSnapshot(state.components, state.wires);
+              const snapshot = createSnapshot(state.components, state.wires, state.junctions);
               state.history = state.history.slice(0, state.historyIndex + 1);
               state.history.push(snapshot);
               if (state.history.length > MAX_HISTORY_SIZE) {
@@ -938,14 +979,15 @@ export const useCanvasStore = create<CanvasStore>()(
               }
             }
 
-            const constraint = wire.handleConstraints?.[handleIndex] || 'horizontal';
-            const original = wire.points[handleIndex];
+            const handle = wire.handles[handleIndex];
+            const constraint = handle.constraint;
+            const original = handle.position;
 
             // Apply constraint - only allow movement in constrained direction
             if (constraint === 'free') {
-              wire.points[handleIndex] = { x: position.x, y: position.y };
+              handle.position = { x: position.x, y: position.y };
             } else {
-              wire.points[handleIndex] = constraint === 'horizontal'
+              handle.position = constraint === 'horizontal'
                 ? { x: position.x, y: original.y }
                 : { x: original.x, y: position.y };
             }
@@ -961,10 +1003,10 @@ export const useCanvasStore = create<CanvasStore>()(
         set(
           (state) => {
             const wire = state.wires.find((w) => w.id === wireId);
-            if (!wire?.points?.[handleIndex]) return;
+            if (!wire?.handles?.[handleIndex]) return;
 
             // Push history
-            const snapshot = createSnapshot(state.components, state.wires);
+            const snapshot = createSnapshot(state.components, state.wires, state.junctions);
             state.history = state.history.slice(0, state.historyIndex + 1);
             state.history.push(snapshot);
             if (state.history.length > MAX_HISTORY_SIZE) {
@@ -973,8 +1015,7 @@ export const useCanvasStore = create<CanvasStore>()(
               state.historyIndex++;
             }
 
-            wire.points.splice(handleIndex, 1);
-            wire.handleConstraints?.splice(handleIndex, 1);
+            wire.handles.splice(handleIndex, 1);
 
             state.isDirty = true;
           },
@@ -1199,13 +1240,14 @@ export const useCanvasStore = create<CanvasStore>()(
 
             // Save current state for redo if at the end
             if (state.historyIndex === state.history.length - 1) {
-              const snapshot = createSnapshot(state.components, state.wires);
+              const snapshot = createSnapshot(state.components, state.wires, state.junctions);
               state.history.push(snapshot);
             }
 
             const snapshot = state.history[state.historyIndex];
             const restored = restoreSnapshot(snapshot);
             state.components = restored.components;
+            state.junctions = restored.junctions;
             state.wires = restored.wires;
             state.historyIndex--;
             state.selectedIds = new Set();
@@ -1226,6 +1268,7 @@ export const useCanvasStore = create<CanvasStore>()(
             if (snapshot) {
               const restored = restoreSnapshot(snapshot);
               state.components = restored.components;
+              state.junctions = restored.junctions;
               state.wires = restored.wires;
               state.selectedIds = new Set();
               state.isDirty = true;
@@ -1245,8 +1288,11 @@ export const useCanvasStore = create<CanvasStore>()(
           (state) => {
             state.components = new Map(Object.entries(data.components));
 
-            // Migrate existing junction positions from corner-based to center-based
+            // Migrate existing blocks: backfill size if missing, fix junction positions
             for (const [, block] of state.components) {
+              if (!block.size) {
+                block.size = getBlockSize(block.type);
+              }
               if (block.type === 'junction') {
                 // Old format stored top-left corner (position.x - 6, position.y - 6)
                 // New format stores center point. Detect old format by checking
@@ -1258,11 +1304,32 @@ export const useCanvasStore = create<CanvasStore>()(
               }
             }
 
-            state.wires = data.wires.map((wire) => ({
-              ...wire,
-              from: { ...wire.from },
-              to: { ...wire.to },
-            }));
+            state.wires = data.wires.map((wire) => {
+              const migrated: Wire = {
+                ...wire,
+                from: { ...wire.from },
+                to: { ...wire.to },
+              };
+              // Migrate old points/handleConstraints to handles
+              const oldWire = wire as unknown as { points?: Position[]; handleConstraints?: HandleConstraint[] };
+              if (oldWire.points && oldWire.points.length > 0 && !migrated.handles) {
+                migrated.handles = oldWire.points.map((p: Position, i: number) => ({
+                  position: { ...p },
+                  constraint: oldWire.handleConstraints?.[i] || ('horizontal' as HandleConstraint),
+                  source: 'auto' as const,
+                }));
+              }
+              // Clean up old fields if present on the data object
+              const raw = migrated as unknown as Record<string, unknown>;
+              delete raw.points;
+              delete raw.handleConstraints;
+              return migrated;
+            });
+            // Load junctions (if present in data)
+            state.junctions = data.junctions
+              ? new Map(Object.entries(data.junctions))
+              : new Map();
+
             state.metadata = { ...data.metadata };
             state.selectedIds = new Set();
             state.history = [];
@@ -1282,6 +1349,7 @@ export const useCanvasStore = create<CanvasStore>()(
         const state = get();
         return {
           components: Object.fromEntries(state.components),
+          junctions: state.junctions.size > 0 ? Object.fromEntries(state.junctions) : undefined,
           wires: state.wires,
           metadata: state.metadata,
           viewport: {
@@ -1296,7 +1364,7 @@ export const useCanvasStore = create<CanvasStore>()(
         set(
           (state) => {
             // Push history
-            const snapshot = createSnapshot(state.components, state.wires);
+            const snapshot = createSnapshot(state.components, state.wires, state.junctions);
             state.history = state.history.slice(0, state.historyIndex + 1);
             state.history.push(snapshot);
             if (state.history.length > MAX_HISTORY_SIZE) {
@@ -1306,6 +1374,7 @@ export const useCanvasStore = create<CanvasStore>()(
             }
 
             state.components = new Map();
+            state.junctions = new Map();
             state.wires = [];
             state.selectedIds = new Set();
             state.metadata = {
@@ -1350,6 +1419,7 @@ export const useCanvasStore = create<CanvasStore>()(
           () => ({
             ...initialState,
             components: new Map(),
+            junctions: new Map(),
             wires: [],
             selectedIds: new Set(),
             history: [],
@@ -1369,6 +1439,9 @@ export const useCanvasStore = create<CanvasStore>()(
 
 /** Select all components */
 export const selectComponents = (state: CanvasStore) => state.components;
+
+/** Select all junctions */
+export const selectJunctions = (state: CanvasStore) => state.junctions;
 
 /** Select all wires */
 export const selectWires = (state: CanvasStore) => state.wires;

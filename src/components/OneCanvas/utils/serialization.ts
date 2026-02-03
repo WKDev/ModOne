@@ -18,7 +18,8 @@ import type {
   YamlBlockDefinition,
   YamlWireDefinition,
 } from '../types';
-import { isValidBlockType } from '../types';
+import { isValidBlockType, isPortEndpoint } from '../types';
+import { getBlockSize } from '../blockDefinitions';
 
 // ============================================================================
 // Serialization (CircuitState -> YAML String)
@@ -28,7 +29,7 @@ import { isValidBlockType } from '../types';
  * Convert a Block to YAML format.
  */
 function blockToYaml(block: Block): YamlBlockDefinition {
-  const { id, type, position, label, ports, selected, ...properties } = block;
+  const { id, type, position, label, ports, selected, size, ...properties } = block;
 
   // Filter out undefined/null properties and runtime state
   const cleanProperties: Record<string, unknown> = {};
@@ -59,7 +60,9 @@ function blockToYaml(block: Block): YamlBlockDefinition {
 /**
  * Convert a Wire to YAML format.
  */
-function wireToYaml(wire: Wire): YamlWireDefinition {
+function wireToYaml(wire: Wire): YamlWireDefinition | null {
+  // Only serialize port-to-port wires (junction wires handled separately in future)
+  if (!isPortEndpoint(wire.from) || !isPortEndpoint(wire.to)) return null;
   return {
     id: wire.id,
     from: { component: wire.from.componentId, port: wire.from.portId },
@@ -88,7 +91,7 @@ export function circuitToYamlSchema(state: CircuitState): YamlCircuitSchema {
       modified: new Date().toISOString(),
     },
     components,
-    wires: state.wires.map(wireToYaml),
+    wires: state.wires.map(wireToYaml).filter((w): w is YamlWireDefinition => w !== null),
   };
 }
 
@@ -291,6 +294,7 @@ function yamlToBlock(yamlBlock: YamlBlockDefinition): Block {
     id: yamlBlock.id,
     type: yamlBlock.type,
     position: { x: yamlBlock.position.x, y: yamlBlock.position.y },
+    size: getBlockSize(yamlBlock.type),
     ports,
     label: yamlBlock.label,
   };
@@ -354,6 +358,7 @@ export function yamlToCircuit(yamlString: string): CircuitState {
 
   return {
     components,
+    junctions: new Map(),
     wires,
     metadata,
     selectedIds: new Set(),
@@ -370,6 +375,7 @@ export function yamlToCircuit(yamlString: string): CircuitState {
 export function createDefaultCircuit(name: string): CircuitState {
   return {
     components: new Map(),
+    junctions: new Map(),
     wires: [],
     metadata: {
       name,

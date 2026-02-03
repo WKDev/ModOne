@@ -6,7 +6,7 @@
  */
 
 import { memo, useCallback } from 'react';
-import type { Position, HandleConstraint, PortPosition } from './types';
+import type { Position, HandleConstraint, PortPosition, WireHandle as WireHandleData } from './types';
 import { calculateWirePath, calculatePathWithHandles, calculatePathWithExitDirections } from './utils/wirePathCalculator';
 import { getClosestPointOnPath } from './utils/wireHitTest';
 import { WireHandle } from './components/WireHandle';
@@ -43,10 +43,8 @@ interface WireProps {
   onContextMenu?: (wireId: string, position: Position, screenPos: { x: number; y: number }) => void;
   /** Double-click handler for creating junction (deprecated - use context menu) */
   onCreateJunction?: (wireId: string, position: Position) => void;
-  /** Handle positions (control points) */
-  handles?: Position[];
-  /** Constraints for each handle */
-  handleConstraints?: HandleConstraint[];
+  /** Wire handles (control points with constraints) */
+  handles?: WireHandleData[];
   /** Handler for starting handle drag */
   onHandleDragStart?: (
     wireId: string,
@@ -107,7 +105,6 @@ export const Wire = memo(function Wire({
   onContextMenu,
   onCreateJunction,
   handles,
-  handleConstraints,
   onHandleDragStart,
   onHandleContextMenu,
   fromExitDirection,
@@ -115,14 +112,17 @@ export const Wire = memo(function Wire({
   defaultFromDirection,
   defaultToDirection,
 }: WireProps) {
+  // Extract positions from handles
+  const handlePositions = handles?.map((h) => h.position);
+
   // Calculate path based on mode and handles
   const pathD = (() => {
     // If we have handles, use path with handles
-    if (handles && handles.length > 0) {
+    if (handlePositions && handlePositions.length > 0) {
       return calculatePathWithHandles(
         from,
         to,
-        handles,
+        handlePositions,
         fromExitDirection || defaultFromDirection,
         toExitDirection || defaultToDirection
       );
@@ -273,10 +273,10 @@ export const Wire = memo(function Wire({
           {handles.map((handle, index) => (
             <WireHandle
               key={`${id}-handle-${index}`}
-              position={handle}
+              position={handle.position}
               wireId={id}
               handleIndex={index}
-              constraint={handleConstraints?.[index] || 'horizontal'}
+              constraint={handle.constraint}
               onDragStart={onHandleDragStart}
               onContextMenu={onHandleContextMenu}
             />

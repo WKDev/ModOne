@@ -161,7 +161,7 @@ function createCanvasHistorySnapshot(data: CanvasDocumentData): CanvasHistoryDat
       ...wire,
       from: { ...wire.from },
       to: { ...wire.to },
-      points: wire.points ? [...wire.points] : undefined,
+      handles: wire.handles ? wire.handles.map((h) => ({ ...h, position: { ...h.position } })) : undefined,
     })),
   };
 }
@@ -176,7 +176,7 @@ function restoreCanvasFromHistory(snapshot: CanvasHistoryData): Pick<CanvasDocum
       ...wire,
       from: { ...wire.from },
       to: { ...wire.to },
-      points: wire.points ? [...wire.points] : undefined,
+      handles: wire.handles ? wire.handles.map((h) => ({ ...h, position: { ...h.position } })) : undefined,
     })),
   };
 }

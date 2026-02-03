@@ -11,6 +11,7 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { useCanvasStore } from '../../../stores/canvasStore';
+import { isPortEndpoint } from '../types';
 
 // ============================================================================
 // Types
@@ -143,7 +144,9 @@ export function useCanvasKeyboardShortcuts(options: UseCanvasKeyboardShortcutsOp
 
     // Collect wires between selected components
     wiresRef.current.forEach((wire) => {
-      if (componentIds.has(wire.from.componentId) && componentIds.has(wire.to.componentId)) {
+      const fromInSelection = isPortEndpoint(wire.from) && componentIds.has(wire.from.componentId);
+      const toInSelection = isPortEndpoint(wire.to) && componentIds.has(wire.to.componentId);
+      if (fromInSelection && toInSelection) {
         selectedWires.push({ ...wire });
       }
     });

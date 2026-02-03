@@ -6,6 +6,7 @@
  */
 
 import type { Block, Wire, Port } from '../types';
+import { isPortEndpoint } from '../types';
 
 // ============================================================================
 // Types
@@ -248,6 +249,9 @@ export function buildCircuitGraph(components: Block[], wires: Wire[]): CircuitGr
 
   // Create edges from wires
   for (const wire of wires) {
+    // Only port-to-port wires create edges (junction wires handled separately in future)
+    if (!isPortEndpoint(wire.from) || !isPortEndpoint(wire.to)) continue;
+
     const fromId = makeNodeId(wire.from.componentId, wire.from.portId);
     const toId = makeNodeId(wire.to.componentId, wire.to.portId);
 

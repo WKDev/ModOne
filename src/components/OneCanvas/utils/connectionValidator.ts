@@ -4,7 +4,8 @@
  * Validates wire connections between ports following circuit rules.
  */
 
-import type { Block, Wire, WireEndpoint, PortType } from '../types';
+import type { Block, Wire, WireEndpoint, PortEndpoint, PortType } from '../types';
+import { isPortEndpoint } from '../types';
 
 // ============================================================================
 // Types
@@ -58,6 +59,14 @@ export function arePortTypesCompatible(
   return false;
 }
 
+/** Get a unique key for a wire endpoint for comparison */
+function endpointKey(ep: WireEndpoint): string {
+  if (isPortEndpoint(ep)) {
+    return `port:${ep.componentId}:${ep.portId}`;
+  }
+  return `junction:${ep.junctionId}`;
+}
+
 /**
  * Check if a wire already exists between two endpoints
  */
@@ -66,22 +75,18 @@ export function wireExists(
   from: WireEndpoint,
   to: WireEndpoint
 ): boolean {
+  const fromKey = endpointKey(from);
+  const toKey = endpointKey(to);
   return wires.some(
     (wire) =>
-      // Check both directions
-      (wire.from.componentId === from.componentId &&
-        wire.from.portId === from.portId &&
-        wire.to.componentId === to.componentId &&
-        wire.to.portId === to.portId) ||
-      (wire.from.componentId === to.componentId &&
-        wire.from.portId === to.portId &&
-        wire.to.componentId === from.componentId &&
-        wire.to.portId === from.portId)
+      (endpointKey(wire.from) === fromKey && endpointKey(wire.to) === toKey) ||
+      (endpointKey(wire.from) === toKey && endpointKey(wire.to) === fromKey)
   );
 }
 
 /**
- * Validate a wire connection between two endpoints
+ * Validate a wire connection between two endpoints.
+ * Currently only validates port-to-port connections.
  */
 export function isValidConnection(
   from: WireEndpoint,
@@ -89,6 +94,11 @@ export function isValidConnection(
   blocks: Map<string, Block>,
   existingWires: Wire[] = []
 ): ValidationResult {
+  // Both must be port endpoints for now
+  if (!isPortEndpoint(from) || !isPortEndpoint(to)) {
+    return { valid: false, reason: 'Junction connections not validated here' };
+  }
+
   // Check 1: Cannot connect same port to itself
   if (from.componentId === to.componentId && from.portId === to.portId) {
     return {
@@ -172,7 +182,7 @@ export function getValidTargets(
 
   blocks.forEach((block) => {
     block.ports.forEach((port) => {
-      const to: WireEndpoint = { componentId: block.id, portId: port.id };
+      const to: PortEndpoint = { componentId: block.id, portId: port.id };
       const validation = isValidConnection(from, to, blocks, existingWires);
 
       if (validation.valid) {

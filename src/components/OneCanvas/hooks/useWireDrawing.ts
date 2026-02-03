@@ -10,7 +10,8 @@ import { useState, useCallback, useMemo } from 'react';
 import { useCanvasStore } from '../../../stores/canvasStore';
 import { isValidConnection, getValidTargets } from '../utils/connectionValidator';
 import { getPortAbsolutePosition } from '../utils/wirePathCalculator';
-import type { Position, WireEndpoint } from '../types';
+import type { Position, WireEndpoint, PortEndpoint } from '../types';
+import { isPortEndpoint } from '../types';
 
 // ============================================================================
 // Types
@@ -65,6 +66,7 @@ export function useWireDrawing(): UseWireDrawingReturn {
   const drawing = useMemo((): WireDrawingState | null => {
     if (!storeWireDrawing) return null;
 
+    if (!isPortEndpoint(storeWireDrawing.from)) return null;
     const block = components.get(storeWireDrawing.from.componentId);
     if (!block) return null;
 
@@ -91,9 +93,9 @@ export function useWireDrawing(): UseWireDrawingReturn {
       if (!fromPosition) return;
 
       // Compute valid targets (UI logic)
-      const from: WireEndpoint = { componentId: blockId, portId };
+      const from: PortEndpoint = { componentId: blockId, portId };
       const targets = getValidTargets(from, components, wires);
-      setValidTargets(new Set(targets.map((t) => `${t.componentId}:${t.portId}`)));
+      setValidTargets(new Set(targets.filter(isPortEndpoint).map((t) => `${t.componentId}:${t.portId}`)));
 
       // Delegate to store
       startWireDrawing(from, { startPosition: fromPosition });

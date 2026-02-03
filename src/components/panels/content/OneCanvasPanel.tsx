@@ -41,6 +41,7 @@ import {
   type SelectionBoxState,
 } from '../../OneCanvas';
 import type { Wire as WireData, HandleConstraint, PortPosition, JunctionBlock as JunctionBlockType } from '../../OneCanvas/types';
+import { isPortEndpoint } from '../../OneCanvas/types';
 import { WireContextMenu, type WireContextMenuAction } from '../../OneCanvas/components/WireContextMenu';
 import { JunctionDot } from '../../OneCanvas/components/JunctionDot';
 import { useWireHandleDrag } from '../../OneCanvas/hooks/useWireHandleDrag';
@@ -129,7 +130,10 @@ const WireRenderer = memo(function WireRenderer({
   onHandleDragStart,
   onHandleContextMenu,
 }: WireRendererProps) {
-  const { id: wireId, from, to, points, handleConstraints, fromExitDirection, toExitDirection } = wire;
+  const { id: wireId, from, to, handles, fromExitDirection, toExitDirection } = wire;
+
+  // Only render port-to-port wires (junction wires handled separately in future)
+  if (!isPortEndpoint(from) || !isPortEndpoint(to)) return null;
 
   // Get component positions and calculate wire endpoints
   const fromComponent = components.get(from.componentId);
@@ -197,8 +201,7 @@ const WireRenderer = memo(function WireRenderer({
       to={toData.position}
       isSelected={isSelected}
       pathMode="orthogonal"
-      handles={points}
-      handleConstraints={handleConstraints}
+      handles={handles}
       fromExitDirection={fromExitDirection}
       toExitDirection={toExitDirection}
       defaultFromDirection={fromData.direction}
@@ -681,8 +684,12 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
 
                 {/* Wire preview during drawing */}
                 {wireDrawing && (() => {
+                  // Only handle port endpoints for wire preview
+                  if (!isPortEndpoint(wireDrawing.from)) return null;
+                  const drawingFrom = wireDrawing.from;
+
                   // Calculate the from position from the endpoint
-                  const fromComponent = components.get(wireDrawing.from.componentId);
+                  const fromComponent = components.get(drawingFrom.componentId);
                   if (!fromComponent) return null;
 
                   // Junction: position is center-based
@@ -696,7 +703,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
                     );
                   }
 
-                  const fromPort = fromComponent.ports.find((p) => p.id === wireDrawing.from.portId);
+                  const fromPort = fromComponent.ports.find((p) => p.id === drawingFrom.portId);
                   const fromBlockSize = getBlockSize(fromComponent.type);
                   const portOffset = fromPort?.offset ?? 0.5;
                   let fromPos: Position = { x: fromComponent.position.x + fromBlockSize.width / 2, y: fromComponent.position.y + fromBlockSize.height / 2 };

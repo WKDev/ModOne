@@ -13,17 +13,20 @@ import type {
   Block,
   BlockType,
   Wire,
+  WireHandle,
   WireEndpoint,
   Position,
   PortPosition,
-  HandleConstraint,
   CircuitMetadata,
 } from '../../components/OneCanvas/types';
+import { isPortEndpoint } from '../../components/OneCanvas/types';
 import {
-  getBlockSize,
   getPortRelativePosition,
   calculateWireBendPoints,
 } from '../../components/OneCanvas/utils/wirePathCalculator';
+import {
+  getBlockSize,
+} from '../../components/OneCanvas/blockDefinitions';
 
 // ============================================================================
 // Types
@@ -181,37 +184,45 @@ function isValidEndpoint(
   endpoint: WireEndpoint,
   components: Map<string, Block>
 ): boolean {
-  const component = components.get(endpoint.componentId);
-  if (!component) return false;
-  return component.ports.some((port) => port.id === endpoint.portId);
+  if (isPortEndpoint(endpoint)) {
+    const component = components.get(endpoint.componentId);
+    if (!component) return false;
+    return component.ports.some((port) => port.id === endpoint.portId);
+  }
+  // Junction endpoints validated elsewhere
+  return false;
+}
+
+/** Get a unique key for a wire endpoint for comparison */
+function endpointKey(ep: WireEndpoint): string {
+  if (isPortEndpoint(ep)) {
+    return `port:${ep.componentId}:${ep.portId}`;
+  }
+  return `junction:${ep.junctionId}`;
 }
 
 /** Check if wire already exists */
 function wireExists(wires: Wire[], from: WireEndpoint, to: WireEndpoint): boolean {
+  const fromKey = endpointKey(from);
+  const toKey = endpointKey(to);
   return wires.some(
     (wire) =>
-      (wire.from.componentId === from.componentId &&
-        wire.from.portId === from.portId &&
-        wire.to.componentId === to.componentId &&
-        wire.to.portId === to.portId) ||
-      (wire.from.componentId === to.componentId &&
-        wire.from.portId === to.portId &&
-        wire.to.componentId === from.componentId &&
-        wire.to.portId === from.portId)
+      (endpointKey(wire.from) === fromKey && endpointKey(wire.to) === toKey) ||
+      (endpointKey(wire.from) === toKey && endpointKey(wire.to) === fromKey)
   );
 }
 
 /** Find where to insert a new handle */
 function findHandleInsertIndex(wire: Wire, position: Position): number {
-  if (!wire.points || wire.points.length === 0) {
+  if (!wire.handles || wire.handles.length === 0) {
     return 0;
   }
   let closestIndex = 0;
   let closestDistance = Infinity;
-  for (let i = 0; i < wire.points.length; i++) {
-    const point = wire.points[i];
+  for (let i = 0; i < wire.handles.length; i++) {
+    const hp = wire.handles[i].position;
     const distance = Math.sqrt(
-      Math.pow(point.x - position.x, 2) + Math.pow(point.y - position.y, 2)
+      Math.pow(hp.x - position.x, 2) + Math.pow(hp.y - position.y, 2)
     );
     if (distance < closestDistance) {
       closestDistance = distance;
@@ -230,7 +241,10 @@ function computeWireBendPoints(
   components: Map<string, Block>,
   fromExitDirection?: PortPosition,
   toExitDirection?: PortPosition
-): { points: Position[]; handleConstraints: HandleConstraint[] } | undefined {
+): WireHandle[] | undefined {
+  // Only compute bend points for port-to-port wires
+  if (!isPortEndpoint(from) || !isPortEndpoint(to)) return undefined;
+
   const fromBlock = components.get(from.componentId);
   const toBlock = components.get(to.componentId);
   if (!fromBlock || !toBlock) return undefined;
@@ -239,8 +253,8 @@ function computeWireBendPoints(
   const toPort = toBlock.ports.find((p) => p.id === to.portId);
   if (!fromPort || !toPort) return undefined;
 
-  const fromSize = getBlockSize(fromBlock.type);
-  const toSize = getBlockSize(toBlock.type);
+  const fromSize = fromBlock.size || getBlockSize(fromBlock.type);
+  const toSize = toBlock.size || getBlockSize(toBlock.type);
 
   const fromRelPos = getPortRelativePosition(fromPort.position, fromPort.offset ?? 0.5, fromSize);
   const toRelPos = getPortRelativePosition(toPort.position, toPort.offset ?? 0.5, toSize);
@@ -254,7 +268,11 @@ function computeWireBendPoints(
   const result = calculateWireBendPoints(fromPos, toPos, fromDir, toDir);
   if (result.points.length === 0) return undefined;
 
-  return { points: result.points, handleConstraints: result.constraints };
+  return result.points.map((p, i) => ({
+    position: p,
+    constraint: result.constraints[i],
+    source: 'auto' as const,
+  }));
 }
 
 /** Get default ports for junction */
@@ -316,6 +334,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         id,
         type,
         position: finalPosition,
+        size: getBlockSize(type),
         ports: getDefaultPorts(type),
         ...getDefaultBlockProps(type),
         ...props,
@@ -340,7 +359,9 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         docData.components.delete(id);
         // Remove connected wires
         docData.wires = docData.wires.filter(
-          (wire) => wire.from.componentId !== id && wire.to.componentId !== id
+          (wire) =>
+            !(isPortEndpoint(wire.from) && wire.from.componentId === id) &&
+            !(isPortEndpoint(wire.to) && wire.to.componentId === id)
         );
       });
     },
@@ -391,7 +412,8 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       if (!isValidEndpoint(to, data.components)) return null;
 
       // Prevent self-connection
-      if (from.componentId === to.componentId) return null;
+      if (isPortEndpoint(from) && isPortEndpoint(to) && from.componentId === to.componentId) return null;
+      if (endpointKey(from) === endpointKey(to)) return null;
 
       // Prevent duplicate wires
       if (wireExists(data.wires, from, to)) return null;
@@ -409,13 +431,12 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         }
 
         // Auto-generate bend points
-        const bendData = computeWireBendPoints(
+        const handles = computeWireBendPoints(
           from, to, docData.components,
           options?.fromExitDirection, options?.toExitDirection
         );
-        if (bendData) {
-          newWire.points = bendData.points;
-          newWire.handleConstraints = bendData.handleConstraints;
+        if (handles) {
+          newWire.handles = handles;
         }
 
         docData.wires.push(newWire);
@@ -458,6 +479,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         id: junctionId,
         type: 'junction',
         position: junctionPosition,
+        size: { width: 0, height: 0 },
         ports: getJunctionPorts(),
         sourceWireId: wireId,
       } as Block;
@@ -496,22 +518,20 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         }
 
         // Auto-generate bend points for both new wires
-        const bend1 = computeWireBendPoints(
+        const handles1 = computeWireBendPoints(
           wire1.from, wire1.to, docData.components,
           wire1.fromExitDirection, undefined
         );
-        if (bend1) {
-          wire1.points = bend1.points;
-          wire1.handleConstraints = bend1.handleConstraints;
+        if (handles1) {
+          wire1.handles = handles1;
         }
 
-        const bend2 = computeWireBendPoints(
+        const handles2 = computeWireBendPoints(
           wire2.from, wire2.to, docData.components,
           undefined, wire2.toExitDirection
         );
-        if (bend2) {
-          wire2.points = bend2.points;
-          wire2.handleConstraints = bend2.handleConstraints;
+        if (handles2) {
+          wire2.handles = handles2;
         }
 
         docData.wires.push(wire1);
@@ -535,14 +555,15 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         const targetWire = docData.wires.find((w) => w.id === wireId);
         if (!targetWire) return;
 
-        // Manually added handles default to 'free' constraint
-        const constraint: HandleConstraint = 'free';
-        targetWire.points = targetWire.points || [];
-        targetWire.handleConstraints = targetWire.handleConstraints || [];
+        targetWire.handles = targetWire.handles || [];
 
         const insertIndex = findHandleInsertIndex(targetWire, position);
-        targetWire.points.splice(insertIndex, 0, position);
-        targetWire.handleConstraints.splice(insertIndex, 0, constraint);
+        const newHandle: WireHandle = {
+          position,
+          constraint: 'free',
+          source: 'user',
+        };
+        targetWire.handles.splice(insertIndex, 0, newHandle);
       });
     },
     [documentId, data, pushHistory, updateCanvasData]
@@ -554,15 +575,16 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
 
       updateCanvasData(documentId, (docData) => {
         const wire = docData.wires.find((w) => w.id === wireId);
-        if (!wire?.points?.[handleIndex]) return;
+        if (!wire?.handles?.[handleIndex]) return;
 
-        const constraint = wire.handleConstraints?.[handleIndex] || 'horizontal';
-        const original = wire.points[handleIndex];
+        const handle = wire.handles[handleIndex];
+        const constraint = handle.constraint;
+        const original = handle.position;
 
         if (constraint === 'free') {
-          wire.points[handleIndex] = { x: position.x, y: position.y };
+          handle.position = { x: position.x, y: position.y };
         } else {
-          wire.points[handleIndex] = constraint === 'horizontal'
+          handle.position = constraint === 'horizontal'
             ? { x: position.x, y: original.y }
             : { x: original.x, y: position.y };
         }
@@ -578,10 +600,9 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       pushHistory(documentId);
       updateCanvasData(documentId, (docData) => {
         const wire = docData.wires.find((w) => w.id === wireId);
-        if (!wire?.points?.[handleIndex]) return;
+        if (!wire?.handles?.[handleIndex]) return;
 
-        wire.points.splice(handleIndex, 1);
-        wire.handleConstraints?.splice(handleIndex, 1);
+        wire.handles.splice(handleIndex, 1);
       });
     },
     [documentId, pushHistory, updateCanvasData]

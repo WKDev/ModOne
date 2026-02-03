@@ -125,12 +125,12 @@ export const AnimatedWire = memo(function AnimatedWire({
 }: AnimatedWireProps) {
   // Calculate wire path as points for arrow positioning
   const pathPoints = useMemo(() => {
-    // Use provided points or calculate orthogonal path
-    if (wire.points && wire.points.length > 0) {
-      return wire.points;
+    // Use provided handle positions or calculate orthogonal path
+    if (wire.handles && wire.handles.length > 0) {
+      return wire.handles.map((h) => h.position);
     }
     return calculateOrthogonalPoints(startPos, endPos);
-  }, [wire.points, startPos, endPos]);
+  }, [wire.handles, startPos, endPos]);
 
   // Generate SVG path string
   const pathString = useMemo(() => {
