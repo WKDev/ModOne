@@ -18,8 +18,8 @@ import type {
   YamlBlockDefinition,
   YamlWireDefinition,
 } from '../types';
-import { isValidBlockType, isPortEndpoint } from '../types';
-import { getBlockSize } from '../blockDefinitions';
+import { isValidBlockType, isLegacyBlockType, isPortEndpoint, migrateLegacyBlockType } from '../types';
+import { getBlockSize, getPowerSourcePorts } from '../blockDefinitions';
 
 // ============================================================================
 // Serialization (CircuitState -> YAML String)
@@ -178,7 +178,7 @@ function validateCircuitYaml(data: unknown): YamlCircuitSchema {
     }
     componentIds.add(comp.id);
 
-    if (typeof comp.type !== 'string' || !isValidBlockType(comp.type)) {
+    if (typeof comp.type !== 'string' || (!isValidBlockType(comp.type) && !isLegacyBlockType(comp.type))) {
       throw new CircuitValidationError(
         `Invalid component type: ${comp.type}`,
         `components[${i}]`
@@ -247,13 +247,12 @@ function yamlToPort(yamlPort: { id: string; type: string; label: string; positio
 /**
  * Get default ports for a block type.
  */
-function getDefaultPorts(type: BlockType): Port[] {
+function getDefaultPorts(type: string, properties?: Record<string, unknown>): Port[] {
   switch (type) {
-    case 'power_24v':
-    case 'power_12v':
-      return [{ id: 'out', type: 'output', label: '+', position: 'bottom' }];
-    case 'gnd':
-      return [{ id: 'in', type: 'input', label: 'GND', position: 'top' }];
+    case 'powersource': {
+      const polarity = (properties?.polarity as string) || 'positive';
+      return getPowerSourcePorts(polarity as 'positive' | 'negative' | 'ground');
+    }
     case 'plc_out':
     case 'plc_in':
       return [
@@ -283,24 +282,40 @@ function getDefaultPorts(type: BlockType): Port[] {
 }
 
 /**
- * Convert YAML component to Block.
+ * Convert YAML component to Block, migrating legacy types.
  */
 function yamlToBlock(yamlBlock: YamlBlockDefinition): Block {
+  let type = yamlBlock.type as string;
+  let properties = { ...(yamlBlock.properties || {}) };
+  let label = yamlBlock.label;
+
+  // Migrate legacy block types to powersource
+  const migration = migrateLegacyBlockType(type);
+  if (migration) {
+    type = 'powersource';
+    properties = {
+      ...properties,
+      voltage: migration.voltage,
+      polarity: migration.polarity,
+    };
+    if (!label) {
+      label = migration.label;
+    }
+  }
+
+  const blockType = type as BlockType;
   const ports = yamlBlock.ports
     ? yamlBlock.ports.map(yamlToPort)
-    : getDefaultPorts(yamlBlock.type);
+    : getDefaultPorts(blockType, properties);
 
   const baseBlock = {
     id: yamlBlock.id,
-    type: yamlBlock.type,
+    type: blockType,
     position: { x: yamlBlock.position.x, y: yamlBlock.position.y },
-    size: getBlockSize(yamlBlock.type),
+    size: getBlockSize(blockType),
     ports,
-    label: yamlBlock.label,
+    label,
   };
-
-  // Merge type-specific properties
-  const properties = yamlBlock.properties || {};
 
   return { ...baseBlock, ...properties } as Block;
 }

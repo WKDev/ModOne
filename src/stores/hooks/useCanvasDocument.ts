@@ -26,6 +26,7 @@ import {
   getBlockSize,
   getDefaultPorts as getDefaultPortsFromDefs,
   getDefaultBlockProps as getDefaultBlockPropsFromDefs,
+  getPowerSourcePorts,
 } from '../../components/OneCanvas/blockDefinitions';
 import {
   generateId,
@@ -180,12 +181,21 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         ? snapToGridPosition(position, data.gridSize)
         : position;
 
+      // For powersource, override ports based on polarity
+      let ports = getDefaultPorts(type);
+      if (type === 'powersource') {
+        const polarity = (props as Record<string, unknown>).polarity as string | undefined;
+        if (polarity === 'ground' || polarity === 'negative' || polarity === 'positive') {
+          ports = getPowerSourcePorts(polarity);
+        }
+      }
+
       const newBlock: Block = {
         id,
         type,
         position: finalPosition,
         size: getBlockSize(type),
-        ports: getDefaultPorts(type),
+        ports,
         ...getDefaultBlockProps(type),
         ...props,
       } as Block;

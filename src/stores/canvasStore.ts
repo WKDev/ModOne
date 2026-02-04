@@ -26,7 +26,9 @@ import {
   getBlockSize,
   getDefaultPorts as getDefaultPortsFromDefs,
   getDefaultBlockProps as getDefaultBlockPropsFromDefs,
+  getPowerSourcePorts,
 } from '../components/OneCanvas/blockDefinitions';
+import { migrateLegacyBlockType } from '../components/OneCanvas/types';
 import {
   generateId,
   snapToGridPosition,
@@ -368,12 +370,21 @@ export const useCanvasStore = create<CanvasStore>()(
           ? snapToGridPosition(position, state.gridSize)
           : position;
 
+        // For powersource, override ports based on polarity
+        let ports = getDefaultPorts(type);
+        if (type === 'powersource') {
+          const polarity = (props as Record<string, unknown>).polarity as string | undefined;
+          if (polarity === 'ground' || polarity === 'negative' || polarity === 'positive') {
+            ports = getPowerSourcePorts(polarity);
+          }
+        }
+
         const newBlock: Block = {
           id,
           type,
           position: finalPosition,
           size: getBlockSize(type),
-          ports: getDefaultPorts(type),
+          ports,
           ...getDefaultBlockProps(type),
           ...props,
         } as Block;
@@ -1183,9 +1194,23 @@ export const useCanvasStore = create<CanvasStore>()(
               rawComponents.delete(id);
             }
 
-            // Backfill size for remaining blocks
+            // Migrate legacy power block types and backfill size
             state.components = rawComponents as Map<string, Block>;
-            for (const [, block] of state.components) {
+            for (const [id, block] of state.components) {
+              const blockAny = block as unknown as Record<string, unknown>;
+              const legacyMigration = migrateLegacyBlockType(blockAny.type as string);
+              if (legacyMigration) {
+                // Migrate power_24v/power_12v/gnd → powersource
+                blockAny.type = 'powersource';
+                blockAny.voltage = legacyMigration.voltage;
+                blockAny.polarity = legacyMigration.polarity;
+                if (!blockAny.label) {
+                  blockAny.label = legacyMigration.label;
+                }
+                // Set correct ports based on polarity
+                blockAny.ports = getPowerSourcePorts(legacyMigration.polarity);
+                state.components.set(id, blockAny as unknown as Block);
+              }
               if (!block.size) {
                 block.size = getBlockSize(block.type);
               }

@@ -8,4 +8,4 @@ export { PlcInProperties } from './PlcInProperties';
 export { LedProperties } from './LedProperties';
 export { ButtonProperties } from './ButtonProperties';
 export { ScopeProperties } from './ScopeProperties';
-export { BasicProperties } from './BasicProperties';
+export { PowerSourceProperties } from './PowerSourceProperties';

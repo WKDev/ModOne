@@ -40,12 +40,13 @@ import {
   type Position,
   type SelectionBoxState,
 } from '../../OneCanvas';
-import type { Wire as WireData, HandleConstraint, PortPosition } from '../../OneCanvas/types';
+import type { Block, Wire as WireData, HandleConstraint, PortPosition } from '../../OneCanvas/types';
 import { isPortEndpoint } from '../../OneCanvas/types';
 import { WireContextMenu, type WireContextMenuAction } from '../../OneCanvas/components/WireContextMenu';
 import { JunctionDot } from '../../OneCanvas/components/JunctionDot';
 import { useWireHandleDrag } from '../../OneCanvas/hooks/useWireHandleDrag';
 import { useWireSegmentDrag } from '../../OneCanvas/hooks/useWireSegmentDrag';
+import { PropertiesPanel } from './PropertiesPanel';
 
 
 // Import simulation styles
@@ -64,11 +65,9 @@ interface OneCanvasPanelProps {
 // Block Preview Component (for drag overlay)
 // ============================================================================
 
-const BlockDragPreview = memo(function BlockDragPreview({ type }: { type: BlockType }) {
+const BlockDragPreview = memo(function BlockDragPreview({ type, presetLabel }: { type: BlockType; presetLabel?: string }) {
   const labels: Record<BlockType, string> = {
-    power_24v: '+24V',
-    power_12v: '+12V',
-    gnd: 'GND',
+    powersource: '+24V',
     plc_out: 'PLC Out',
     plc_in: 'PLC In',
     led: 'LED',
@@ -78,7 +77,7 @@ const BlockDragPreview = memo(function BlockDragPreview({ type }: { type: BlockT
 
   return (
     <div className="px-3 py-2 bg-neutral-700 border border-neutral-500 rounded shadow-lg text-white text-sm font-medium">
-      {labels[type] || type}
+      {presetLabel || labels[type] || type}
     </div>
   );
 });
@@ -239,6 +238,7 @@ function useCanvasState(documentId: string | null) {
   const globalMoveWireSegment = useCanvasStore((state) => state.moveWireSegment);
   const globalInsertEndpointHandle = useCanvasStore((state) => state.insertEndpointHandle);
   const globalCleanupOverlappingHandles = useCanvasStore((state) => state.cleanupOverlappingHandles);
+  const globalUpdateComponent = useCanvasStore((state) => state.updateComponent);
 
   // Return document state if available, otherwise global state
   return useMemo(() => {
@@ -254,6 +254,7 @@ function useCanvasState(documentId: string | null) {
         moveComponent: documentState.moveComponent,
         moveJunction: documentState.moveJunction,
         removeWire: documentState.removeWire,
+        updateComponent: documentState.updateComponent,
         updateWireHandle: documentState.updateWireHandle,
         removeWireHandle: documentState.removeWireHandle,
         moveWireSegment: documentState.moveWireSegment,
@@ -274,6 +275,7 @@ function useCanvasState(documentId: string | null) {
       moveComponent: globalMoveComponent,
       moveJunction: globalMoveJunction,
       removeWire: globalRemoveWire,
+      updateComponent: globalUpdateComponent,
       updateWireHandle: globalUpdateWireHandle,
       removeWireHandle: globalRemoveWireHandle,
       moveWireSegment: globalMoveWireSegment,
@@ -293,6 +295,7 @@ function useCanvasState(documentId: string | null) {
     globalMoveComponent,
     globalMoveJunction,
     globalRemoveWire,
+    globalUpdateComponent,
     globalUpdateWireHandle,
     globalRemoveWireHandle,
     globalMoveWireSegment,
@@ -323,6 +326,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     moveComponent,
     moveJunction,
     removeWire,
+    updateComponent,
     updateWireHandle,
     removeWireHandle,
     moveWireSegment,
@@ -671,6 +675,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
 
   // Track dragging state
   const [draggedType, setDraggedType] = useState<BlockType | null>(null);
+  const [draggedLabel, setDraggedLabel] = useState<string | undefined>(undefined);
 
   // Handle drag start from toolbox
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -678,6 +683,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     const blockType = active.data.current?.blockType as BlockType | undefined;
     if (blockType) {
       setDraggedType(blockType);
+      setDraggedLabel(active.data.current?.presetLabel as string | undefined);
     }
   }, []);
 
@@ -686,6 +692,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     (event: DragEndEvent) => {
       const { active, over } = event;
       setDraggedType(null);
+      setDraggedLabel(undefined);
 
       // Check if dropped over canvas
       if (over?.id === 'canvas-dropzone') {
@@ -712,11 +719,30 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
           const canvasY = (relativeY - pan.y) / zoom;
 
           const position: Position = { x: canvasX, y: canvasY };
-          addComponent(blockType, position);
+          const presetProps = active.data.current?.presetProps as Partial<Block> | undefined;
+          addComponent(blockType, position, presetProps);
         }
       }
     },
     [addComponent, zoom, pan]
+  );
+
+  // Derive selected components for the Properties sidebar
+  const selectedComponentsForPanel = useMemo(() => {
+    const result: Block[] = [];
+    selectedIds.forEach((id) => {
+      const component = components.get(id);
+      if (component) result.push(component as Block);
+    });
+    return result;
+  }, [selectedIds, components]);
+
+  // Wrap updateComponent as (id, updates) for PropertiesPanel
+  const handleUpdateComponent = useCallback(
+    (id: string, updates: Partial<Block>) => {
+      updateComponent(id, updates);
+    },
+    [updateComponent]
   );
 
   return (
@@ -845,6 +871,16 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
             </Canvas>
             </div>
           </CanvasDropZone>
+
+          {/* Properties Sidebar */}
+          {selectedComponentsForPanel.length === 1 && (
+            <div className="w-64 border-l border-neutral-700 overflow-y-auto flex-shrink-0 bg-neutral-900">
+              <PropertiesPanel
+                selectedComponents={selectedComponentsForPanel}
+                onUpdateComponent={handleUpdateComponent}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -861,7 +897,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
 
       {/* Drag Overlay */}
       <DragOverlay>
-        {draggedType && <BlockDragPreview type={draggedType} />}
+        {draggedType && <BlockDragPreview type={draggedType} presetLabel={draggedLabel} />}
       </DragOverlay>
     </DndContext>
   );

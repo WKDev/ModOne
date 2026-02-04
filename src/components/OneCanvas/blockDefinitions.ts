@@ -4,7 +4,7 @@
  * Single source of truth for block sizes, default ports, and default properties.
  */
 
-import type { BlockType, Port, Size } from './types';
+import type { BlockType, Port, Size, PowerPolarity } from './types';
 
 // ============================================================================
 // Types
@@ -24,26 +24,12 @@ export interface BlockDefinition {
 // ============================================================================
 
 const BLOCK_DEFINITIONS: Record<BlockType, BlockDefinition> = {
-  power_24v: {
+  powersource: {
     size: { width: 40, height: 40 },
     defaultPorts: [
       { id: 'out', type: 'output', label: '+', position: 'bottom' },
     ],
-    defaultProps: { maxCurrent: 1000 },
-  },
-  power_12v: {
-    size: { width: 40, height: 40 },
-    defaultPorts: [
-      { id: 'out', type: 'output', label: '+', position: 'bottom' },
-    ],
-    defaultProps: { maxCurrent: 1000 },
-  },
-  gnd: {
-    size: { width: 40, height: 40 },
-    defaultPorts: [
-      { id: 'in', type: 'input', label: 'GND', position: 'top' },
-    ],
-    defaultProps: {},
+    defaultProps: { voltage: 24, polarity: 'positive', maxCurrent: 1000 },
   },
   plc_out: {
     size: { width: 80, height: 40 },
@@ -119,6 +105,18 @@ export function getDefaultPorts(type: BlockType): Port[] {
  */
 export function getDefaultBlockProps(type: BlockType): Record<string, unknown> {
   return BLOCK_DEFINITIONS[type].defaultProps;
+}
+
+/**
+ * Get the appropriate ports for a power source based on polarity.
+ * - positive/negative → output port on bottom
+ * - ground → input port on top
+ */
+export function getPowerSourcePorts(polarity: PowerPolarity): Port[] {
+  if (polarity === 'ground') {
+    return [{ id: 'in', type: 'input', label: 'GND', position: 'top' }];
+  }
+  return [{ id: 'out', type: 'output', label: '+', position: 'bottom' }];
 }
 
 export default BLOCK_DEFINITIONS;

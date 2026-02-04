@@ -3,6 +3,10 @@
  *
  * Shows property editor for currently selected canvas element.
  * Routes to appropriate type-specific editor based on component type.
+ *
+ * Supports two modes:
+ * 1. Standalone: uses global canvasStore for selection/update
+ * 2. Injected: receives selectedComponents/onUpdateComponent as props (e.g., OneCanvasPanel sidebar)
  */
 
 import { memo, useCallback, useMemo } from 'react';
@@ -15,17 +19,36 @@ import {
   LedProperties,
   ButtonProperties,
   ScopeProperties,
-  BasicProperties,
+  PowerSourceProperties,
 } from './properties';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+interface PropertiesPanelProps {
+  /** Externally supplied selected components (overrides global store) */
+  selectedComponents?: Block[];
+  /** Externally supplied update handler (overrides global store) */
+  onUpdateComponent?: (id: string, updates: Partial<Block>) => void;
+  /** Tab data (for TabContent compatibility) */
+  data?: unknown;
+}
 
 // ============================================================================
 // Component
 // ============================================================================
 
-export const PropertiesPanel = memo(function PropertiesPanel() {
-  // Get selected components from canvas store
-  const selectedComponents = useCanvasStore(selectSelectedComponents);
-  const updateComponent = useCanvasStore((state) => state.updateComponent);
+export const PropertiesPanel = memo(function PropertiesPanel({
+  selectedComponents: externalSelectedComponents,
+  onUpdateComponent: externalUpdateComponent,
+}: PropertiesPanelProps) {
+  // Use external props if provided, otherwise fall back to global store
+  const storeSelectedComponents = useCanvasStore(selectSelectedComponents);
+  const storeUpdateComponent = useCanvasStore((state) => state.updateComponent);
+
+  const selectedComponents = externalSelectedComponents ?? storeSelectedComponents;
+  const updateComponent = externalUpdateComponent ?? storeUpdateComponent;
 
   // Get the first selected component (single selection for now)
   const selectedComponent = useMemo(() => {
@@ -125,11 +148,9 @@ const PropertyEditorRouter = memo(function PropertyEditorRouter({
         />
       );
 
-    case 'power_24v':
-    case 'power_12v':
-    case 'gnd':
+    case 'powersource':
       return (
-        <BasicProperties
+        <PowerSourceProperties
           component={component}
           onChange={onChange}
         />

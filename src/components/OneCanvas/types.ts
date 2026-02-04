@@ -11,14 +11,18 @@
 
 /** Available block types in the canvas */
 export type BlockType =
-  | 'power_24v'
-  | 'power_12v'
-  | 'gnd'
+  | 'powersource'
   | 'plc_out'
   | 'plc_in'
   | 'led'
   | 'button'
   | 'scope';
+
+/** Legacy block types (for migration) */
+export type LegacyBlockType = 'power_24v' | 'power_12v' | 'gnd';
+
+/** Polarity for power source blocks */
+export type PowerPolarity = 'positive' | 'negative' | 'ground';
 
 /** Position in canvas coordinates */
 export interface Position {
@@ -82,20 +86,15 @@ export interface BaseBlock<T extends BlockType = BlockType> {
 // Specialized Block Types
 // ============================================================================
 
-/** 24V power supply block */
-export interface Power24vBlock extends BaseBlock<'power_24v'> {
-  /** Maximum current in mA (default: 1000) */
+/** Unified power source block (replaces Power24v, Power12v, Gnd) */
+export interface PowerSourceBlock extends BaseBlock<'powersource'> {
+  /** Voltage in volts (24, 12, 5, 0, etc.) */
+  voltage: number;
+  /** Polarity: determines port direction and symbol */
+  polarity: PowerPolarity;
+  /** Maximum current in mA (not applicable for ground) */
   maxCurrent?: number;
 }
-
-/** 12V power supply block */
-export interface Power12vBlock extends BaseBlock<'power_12v'> {
-  /** Maximum current in mA (default: 1000) */
-  maxCurrent?: number;
-}
-
-/** Ground (0V) block */
-export interface GndBlock extends BaseBlock<'gnd'> {}
 
 /** PLC output (Coil) block - controls circuit based on PLC state */
 export interface PlcOutBlock extends BaseBlock<'plc_out'> {
@@ -163,9 +162,7 @@ export interface ScopeBlock extends BaseBlock<'scope'> {
 
 /** Discriminated union of all block types */
 export type Block =
-  | Power24vBlock
-  | Power12vBlock
-  | GndBlock
+  | PowerSourceBlock
   | PlcOutBlock
   | PlcInBlock
   | LedBlock
@@ -354,7 +351,7 @@ export interface SerializableSimulationState {
 /** YAML block definition */
 export interface YamlBlockDefinition {
   id: string;
-  type: BlockType;
+  type: BlockType | LegacyBlockType;
   position: { x: number; y: number };
   label?: string;
   properties?: Record<string, unknown>;
@@ -399,9 +396,7 @@ export interface YamlCircuitSchema {
 /** Check if a string is a valid BlockType */
 export function isValidBlockType(type: string): type is BlockType {
   return [
-    'power_24v',
-    'power_12v',
-    'gnd',
+    'powersource',
     'plc_out',
     'plc_in',
     'led',
@@ -410,11 +405,31 @@ export function isValidBlockType(type: string): type is BlockType {
   ].includes(type);
 }
 
+/** Check if a string is a legacy block type that can be migrated */
+export function isLegacyBlockType(type: string): type is LegacyBlockType {
+  return ['power_24v', 'power_12v', 'gnd'].includes(type);
+}
+
 /** Check if a block is a power source */
-export function isPowerBlock(
-  block: Block
-): block is Power24vBlock | Power12vBlock {
-  return block.type === 'power_24v' || block.type === 'power_12v';
+export function isPowerSource(block: Block): block is PowerSourceBlock {
+  return block.type === 'powersource';
+}
+
+/**
+ * Migrate a legacy block type to powersource properties.
+ * Returns null if type is not a legacy type.
+ */
+export function migrateLegacyBlockType(type: string): { voltage: number; polarity: PowerPolarity; label: string } | null {
+  switch (type) {
+    case 'power_24v':
+      return { voltage: 24, polarity: 'positive', label: '+24V' };
+    case 'power_12v':
+      return { voltage: 12, polarity: 'positive', label: '+12V' };
+    case 'gnd':
+      return { voltage: 0, polarity: 'ground', label: 'GND' };
+    default:
+      return null;
+  }
 }
 
 /** Check if a block is a PLC I/O block */

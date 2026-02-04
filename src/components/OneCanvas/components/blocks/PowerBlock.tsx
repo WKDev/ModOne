@@ -1,13 +1,14 @@
 /**
- * Power Block Components
+ * Power Source Block Component
  *
- * Power supply blocks (+24V, +12V) with voltage labels.
+ * Unified renderer for all power source blocks: +24V, +12V, custom voltages, and GND.
+ * Renders voltage labels for positive/negative polarity, ground symbol for ground.
  */
 
 import { memo } from 'react';
 import { BlockWrapper } from './BlockWrapper';
 import { Port } from '../Port';
-import type { Power24vBlock, Power12vBlock } from '../../types';
+import type { PowerSourceBlock } from '../../types';
 
 // ============================================================================
 // Types
@@ -15,7 +16,7 @@ import type { Power24vBlock, Power12vBlock } from '../../types';
 
 interface PowerBlockProps {
   /** Block data */
-  block: Power24vBlock | Power12vBlock;
+  block: PowerSourceBlock;
   /** Whether the block is selected */
   isSelected?: boolean;
   /** Selection handler */
@@ -29,12 +30,53 @@ interface PowerBlockProps {
 }
 
 // ============================================================================
+// Helpers
+// ============================================================================
+
+function getDefaultLabel(voltage: number, polarity: string): string {
+  if (polarity === 'ground') return 'GND';
+  const sign = polarity === 'negative' ? '-' : '+';
+  return `${sign}${voltage}V`;
+}
+
+function getVoltageColor(voltage: number): string {
+  if (voltage >= 24) return 'bg-red-600';
+  if (voltage >= 12) return 'bg-orange-500';
+  if (voltage >= 5) return 'bg-yellow-600';
+  return 'bg-neutral-600';
+}
+
+// ============================================================================
+// Ground Symbol Sub-component
+// ============================================================================
+
+const GroundSymbol = memo(function GroundSymbol() {
+  return (
+    <svg
+      viewBox="0 0 40 40"
+      className="w-full h-full"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* Vertical line from top */}
+      <line
+        x1="20" y1="0" x2="20" y2="12"
+        stroke="currentColor" strokeWidth="2"
+        className="text-neutral-400"
+      />
+      {/* Ground symbol lines */}
+      <line x1="6" y1="12" x2="34" y2="12" stroke="currentColor" strokeWidth="3" className="text-neutral-800" />
+      <line x1="10" y1="20" x2="30" y2="20" stroke="currentColor" strokeWidth="3" className="text-neutral-800" />
+      <line x1="14" y1="28" x2="26" y2="28" stroke="currentColor" strokeWidth="3" className="text-neutral-800" />
+      <line x1="18" y1="36" x2="22" y2="36" stroke="currentColor" strokeWidth="3" className="text-neutral-800" />
+    </svg>
+  );
+});
+
+// ============================================================================
 // Component
 // ============================================================================
 
-/**
- * Power supply block rendering +24V or +12V sources.
- */
 export const PowerBlock = memo(function PowerBlock({
   block,
   isSelected,
@@ -43,8 +85,7 @@ export const PowerBlock = memo(function PowerBlock({
   onEndWire,
   connectedPorts,
 }: PowerBlockProps) {
-  const voltage = block.type === 'power_24v' ? '+24V' : '+12V';
-  const bgColor = block.type === 'power_24v' ? 'bg-red-600' : 'bg-orange-500';
+  const displayLabel = block.label || getDefaultLabel(block.voltage, block.polarity);
 
   return (
     <BlockWrapper
@@ -54,20 +95,23 @@ export const PowerBlock = memo(function PowerBlock({
       width={block.size.width}
       height={block.size.height}
     >
-      {/* Block body */}
-      <div
-        className={`
-          w-full h-full rounded
-          ${bgColor}
-          flex items-center justify-center
-          text-white font-bold text-sm
-          select-none
-        `}
-      >
-        {voltage}
-      </div>
+      {block.polarity === 'ground' ? (
+        <GroundSymbol />
+      ) : (
+        <div
+          className={`
+            w-full h-full rounded
+            ${getVoltageColor(block.voltage)}
+            flex items-center justify-center
+            text-white font-bold text-sm
+            select-none
+          `}
+        >
+          {displayLabel}
+        </div>
+      )}
 
-      {/* Output port (bottom) */}
+      {/* Ports */}
       {block.ports.map((port) => (
         <Port
           key={port.id}

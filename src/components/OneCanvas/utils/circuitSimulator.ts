@@ -194,12 +194,8 @@ export function determinePoweredComponents(
 
   // For load components, verify they have voltage and are in a path
   for (const component of components) {
-    // Skip non-load components for powered check
-    if (
-      component.type === 'power_24v' ||
-      component.type === 'power_12v' ||
-      component.type === 'gnd'
-    ) {
+    // Skip power source components for powered check
+    if (component.type === 'powersource') {
       continue;
     }
 

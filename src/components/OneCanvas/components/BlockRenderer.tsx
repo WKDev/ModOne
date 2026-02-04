@@ -7,7 +7,6 @@
 import { memo, useCallback } from 'react';
 import type { Block } from '../types';
 import { PowerBlock } from './blocks/PowerBlock';
-import { GndBlock } from './blocks/GndBlock';
 import { LedBlock } from './blocks/LedBlock';
 import { PlcOutBlock } from './blocks/PlcOutBlock';
 import { PlcInBlock } from './blocks/PlcInBlock';
@@ -90,12 +89,8 @@ export const BlockRenderer = memo(function BlockRenderer({
   // Render based on block type
   const renderBlock = () => {
     switch (block.type) {
-      case 'power_24v':
-      case 'power_12v':
+      case 'powersource':
         return <PowerBlock block={block} {...commonProps} />;
-
-      case 'gnd':
-        return <GndBlock block={block} {...commonProps} />;
 
       case 'led':
         return <LedBlock block={block} {...commonProps} voltage={getVoltage()} />;

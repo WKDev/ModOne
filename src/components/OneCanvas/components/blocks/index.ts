@@ -6,7 +6,6 @@
 
 export { BlockWrapper } from './BlockWrapper';
 export { PowerBlock } from './PowerBlock';
-export { GndBlock } from './GndBlock';
 export { LedBlock } from './LedBlock';
 export { PlcOutBlock } from './PlcOutBlock';
 export { PlcInBlock } from './PlcInBlock';

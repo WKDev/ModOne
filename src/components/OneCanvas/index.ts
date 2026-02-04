@@ -17,7 +17,6 @@ export { Port as PortComponent } from './components/Port';
 export { BlockRenderer } from './components/BlockRenderer';
 export { BlockWrapper } from './components/blocks/BlockWrapper';
 export { PowerBlock as PowerBlockComponent } from './components/blocks/PowerBlock';
-export { GndBlock as GndBlockComponent } from './components/blocks/GndBlock';
 export { LedBlock as LedBlockComponent } from './components/blocks/LedBlock';
 export { PlcOutBlock as PlcOutBlockComponent } from './components/blocks/PlcOutBlock';
 export { PlcInBlock as PlcInBlockComponent } from './components/blocks/PlcInBlock';

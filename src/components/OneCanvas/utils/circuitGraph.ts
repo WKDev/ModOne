@@ -91,15 +91,13 @@ export function parseNodeId(nodeId: string): { componentId: string; portId: stri
 }
 
 /**
- * Determine the circuit node type based on block type.
+ * Determine the circuit node type based on block.
  */
-function getNodeType(blockType: Block['type'], portType: Port['type']): CircuitNodeType {
-  switch (blockType) {
-    case 'power_24v':
-    case 'power_12v':
-      return 'power';
-    case 'gnd':
-      return 'ground';
+function getNodeType(block: Block, portType: Port['type']): CircuitNodeType {
+  if (block.type === 'powersource') {
+    return block.polarity === 'ground' ? 'ground' : 'power';
+  }
+  switch (block.type) {
     case 'plc_out':
     case 'button':
       return 'switch';
@@ -116,15 +114,11 @@ function getNodeType(blockType: Block['type'], portType: Port['type']): CircuitN
 /**
  * Get the source voltage for power blocks.
  */
-function getSourceVoltage(blockType: Block['type']): number | undefined {
-  switch (blockType) {
-    case 'power_24v':
-      return 24;
-    case 'power_12v':
-      return 12;
-    default:
-      return undefined;
+function getSourceVoltage(block: Block): number | undefined {
+  if (block.type === 'powersource' && block.polarity !== 'ground') {
+    return block.voltage;
   }
+  return undefined;
 }
 
 /**
@@ -158,8 +152,8 @@ export function buildCircuitGraph(components: Block[], wires: Wire[], junctions:
   for (const component of components) {
     for (const port of component.ports) {
       const nodeId = makeNodeId(component.id, port.id);
-      const nodeType = getNodeType(component.type, port.type);
-      const sourceVoltage = getSourceVoltage(component.type);
+      const nodeType = getNodeType(component, port.type);
+      const sourceVoltage = getSourceVoltage(component);
 
       const node: CircuitNode = {
         id: nodeId,

@@ -9,6 +9,7 @@ import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { ChevronDown, ChevronRight, Zap, Cpu, Lightbulb, Activity } from 'lucide-react';
 import type { BlockType } from './types';
+import type { Block } from './types';
 
 // ============================================================================
 // Types
@@ -21,6 +22,8 @@ interface BlockCategory {
     type: BlockType;
     label: string;
     description: string;
+    /** Preset properties to apply when this item is dropped */
+    presetProps?: Partial<Block>;
   }>;
 }
 
@@ -33,6 +36,7 @@ interface DraggableBlockItemProps {
   type: BlockType;
   label: string;
   description: string;
+  presetProps?: Partial<Block>;
 }
 
 // ============================================================================
@@ -44,9 +48,24 @@ const BLOCK_CATEGORIES: BlockCategory[] = [
     name: 'Power',
     icon: <Zap size={16} />,
     blocks: [
-      { type: 'power_24v', label: '+24V', description: '24V power supply' },
-      { type: 'power_12v', label: '+12V', description: '12V power supply' },
-      { type: 'gnd', label: 'GND', description: 'Ground reference (0V)' },
+      {
+        type: 'powersource',
+        label: '+24V',
+        description: '24V power supply',
+        presetProps: { voltage: 24, polarity: 'positive', label: '+24V', maxCurrent: 1000 } as Partial<Block>,
+      },
+      {
+        type: 'powersource',
+        label: 'GND',
+        description: 'Ground reference (0V)',
+        presetProps: { voltage: 0, polarity: 'ground', label: 'GND' } as Partial<Block>,
+      },
+      {
+        type: 'powersource',
+        label: '+12V',
+        description: '12V power supply (custom)',
+        presetProps: { voltage: 12, polarity: 'positive', label: '+12V', maxCurrent: 1000 } as Partial<Block>,
+      },
     ],
   },
   {
@@ -82,12 +101,16 @@ const DraggableBlockItem = memo(function DraggableBlockItem({
   type,
   label,
   description,
+  presetProps,
 }: DraggableBlockItemProps) {
+  // Use label as part of draggable id so presets with same type have distinct ids
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `toolbox-${type}`,
+    id: `toolbox-${type}-${label}`,
     data: {
       type: 'toolbox-item',
       blockType: type,
+      presetProps,
+      presetLabel: label,
     },
   });
 
@@ -157,10 +180,11 @@ const CategorySection = memo(function CategorySection({
         <div className="px-2 pb-2 space-y-1">
           {category.blocks.map((block) => (
             <DraggableBlockItem
-              key={block.type}
+              key={`${block.type}-${block.label}`}
               type={block.type}
               label={block.label}
               description={block.description}
+              presetProps={block.presetProps}
             />
           ))}
         </div>

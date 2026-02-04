@@ -17,35 +17,33 @@ interface BlockDragOverlayProps {
   blockType: BlockType | null;
   /** Whether a drag is active */
   isDragging: boolean;
+  /** Preset label for the block being dragged */
+  presetLabel?: string;
 }
 
 // ============================================================================
 // Block Previews
 // ============================================================================
 
-const BlockPreview = memo(function BlockPreview({ type }: { type: BlockType }) {
+const BlockPreview = memo(function BlockPreview({ type, presetLabel }: { type: BlockType; presetLabel?: string }) {
   switch (type) {
-    case 'power_24v':
+    case 'powersource':
+      // Use preset label to determine visual style
+      if (presetLabel === 'GND' || presetLabel?.includes('GND')) {
+        return (
+          <div className="w-10 h-12 flex items-center justify-center">
+            <svg viewBox="0 0 40 50" className="w-full h-full" fill="none">
+              <line x1="6" y1="15" x2="34" y2="15" stroke="#525252" strokeWidth="3" />
+              <line x1="10" y1="25" x2="30" y2="25" stroke="#525252" strokeWidth="3" />
+              <line x1="14" y1="35" x2="26" y2="35" stroke="#525252" strokeWidth="3" />
+              <line x1="18" y1="45" x2="22" y2="45" stroke="#525252" strokeWidth="3" />
+            </svg>
+          </div>
+        );
+      }
       return (
         <div className="w-16 h-10 bg-red-600 rounded flex items-center justify-center text-white font-bold text-sm shadow-lg">
-          +24V
-        </div>
-      );
-    case 'power_12v':
-      return (
-        <div className="w-16 h-10 bg-orange-500 rounded flex items-center justify-center text-white font-bold text-sm shadow-lg">
-          +12V
-        </div>
-      );
-    case 'gnd':
-      return (
-        <div className="w-10 h-12 flex items-center justify-center">
-          <svg viewBox="0 0 40 50" className="w-full h-full" fill="none">
-            <line x1="6" y1="15" x2="34" y2="15" stroke="#525252" strokeWidth="3" />
-            <line x1="10" y1="25" x2="30" y2="25" stroke="#525252" strokeWidth="3" />
-            <line x1="14" y1="35" x2="26" y2="35" stroke="#525252" strokeWidth="3" />
-            <line x1="18" y1="45" x2="22" y2="45" stroke="#525252" strokeWidth="3" />
-          </svg>
+          {presetLabel || '+24V'}
         </div>
       );
     case 'plc_out':
@@ -102,6 +100,7 @@ const BlockPreview = memo(function BlockPreview({ type }: { type: BlockType }) {
 export const BlockDragOverlay = memo(function BlockDragOverlay({
   blockType,
   isDragging,
+  presetLabel,
 }: BlockDragOverlayProps) {
   if (!isDragging || !blockType) {
     return null;
@@ -110,7 +109,7 @@ export const BlockDragOverlay = memo(function BlockDragOverlay({
   return (
     <DndKitDragOverlay dropAnimation={null}>
       <div className="opacity-80">
-        <BlockPreview type={blockType} />
+        <BlockPreview type={blockType} presetLabel={presetLabel} />
       </div>
     </DndKitDragOverlay>
   );
