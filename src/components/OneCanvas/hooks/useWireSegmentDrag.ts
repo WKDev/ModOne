@@ -45,7 +45,8 @@ interface UseWireSegmentDragResult {
     orientation: 'horizontal' | 'vertical',
     e: React.MouseEvent,
     startPositionA: Position,
-    startPositionB: Position
+    startPositionB: Position,
+    historyAlreadyPushed?: boolean
   ) => void;
   /** Whether currently dragging a segment */
   isDragging: boolean;
@@ -73,12 +74,14 @@ export function useWireSegmentDrag({
       orientation: 'horizontal' | 'vertical',
       e: React.MouseEvent,
       startPositionA: Position,
-      startPositionB: Position
+      startPositionB: Position,
+      historyAlreadyPushed?: boolean
     ) => {
       e.preventDefault();
       e.stopPropagation();
 
-      isFirstMoveRef.current = true;
+      // If history was already pushed (e.g. by insertEndpointHandle), skip push on first move
+      isFirstMoveRef.current = !historyAlreadyPushed;
       appliedDeltaRef.current = { x: 0, y: 0 };
       setDragging({
         wireId,

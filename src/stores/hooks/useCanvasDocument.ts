@@ -18,6 +18,7 @@ import type {
   Junction,
   Position,
   PortPosition,
+  HandleConstraint,
   CircuitMetadata,
 } from '../../components/OneCanvas/types';
 import { isPortEndpoint } from '../../components/OneCanvas/types';
@@ -83,6 +84,7 @@ export interface UseCanvasDocumentReturn {
   updateWireHandle: (wireId: string, handleIndex: number, position: Position) => void;
   removeWireHandle: (wireId: string, handleIndex: number) => void;
   moveWireSegment: (wireId: string, handleIndexA: number, handleIndexB: number, delta: Position, isFirstMove?: boolean) => void;
+  insertEndpointHandle: (wireId: string, end: 'from' | 'to', position: Position, constraint: HandleConstraint) => void;
 
   // Viewport operations
   setZoom: (zoom: number) => void;
@@ -504,6 +506,28 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
     [documentId, pushHistory, updateCanvasData]
   );
 
+  const insertEndpointHandle = useCallback(
+    (wireId: string, end: 'from' | 'to', position: Position, constraint: HandleConstraint) => {
+      if (!documentId) return;
+
+      pushHistory(documentId);
+      updateCanvasData(documentId, (docData) => {
+        const wire = docData.wires.find((w) => w.id === wireId);
+        if (!wire) return;
+
+        wire.handles = wire.handles || [];
+        const newHandle: WireHandle = { position, constraint, source: 'user' as const };
+
+        if (end === 'from') {
+          wire.handles.unshift(newHandle);
+        } else {
+          wire.handles.push(newHandle);
+        }
+      });
+    },
+    [documentId, pushHistory, updateCanvasData]
+  );
+
   // Viewport operations
   const setZoom = useCallback(
     (zoom: number) => {
@@ -644,6 +668,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       updateWireHandle,
       removeWireHandle,
       moveWireSegment,
+      insertEndpointHandle,
 
       // Viewport operations
       setZoom,
@@ -681,6 +706,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
     updateWireHandle,
     removeWireHandle,
     moveWireSegment,
+    insertEndpointHandle,
     setZoom,
     setPan,
     resetViewport,

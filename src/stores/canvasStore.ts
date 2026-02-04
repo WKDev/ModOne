@@ -155,6 +155,8 @@ interface CanvasActions {
   removeWireHandle: (wireId: string, handleIndex: number) => void;
   /** Move a wire segment (two adjacent handles) by delta. Set isFirstMove=true on drag start to record history. */
   moveWireSegment: (wireId: string, handleIndexA: number, handleIndexB: number, delta: Position, isFirstMove?: boolean) => void;
+  /** Insert a handle at the endpoint (from/to) of a wire for endpoint segment drag */
+  insertEndpointHandle: (wireId: string, end: 'from' | 'to', position: Position, constraint: HandleConstraint) => void;
 
   // Selection operations
   /** Set selection to specific IDs (replaces current) */
@@ -846,6 +848,30 @@ export const useCanvasStore = create<CanvasStore>()(
           },
           false,
           `moveWireSegment/${wireId}/${handleIndexA}-${handleIndexB}`
+        );
+      },
+
+      insertEndpointHandle: (wireId, end, position, constraint) => {
+        set(
+          (state) => {
+            const wire = state.wires.find((w) => w.id === wireId);
+            if (!wire) return;
+
+            pushHistorySnapshot(state);
+
+            wire.handles = wire.handles || [];
+            const newHandle: WireHandle = { position, constraint, source: 'user' as const };
+
+            if (end === 'from') {
+              wire.handles.unshift(newHandle);
+            } else {
+              wire.handles.push(newHandle);
+            }
+
+            state.isDirty = true;
+          },
+          false,
+          `insertEndpointHandle/${wireId}/${end}`
         );
       },
 

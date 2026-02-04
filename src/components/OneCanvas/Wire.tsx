@@ -61,6 +61,13 @@ interface WireProps {
     startPositionA: Position,
     startPositionB: Position
   ) => void;
+  /** Handler for starting endpoint segment drag (port ↔ first/last handle) */
+  onEndpointSegmentDragStart?: (
+    wireId: string,
+    end: 'from' | 'to',
+    orientation: 'horizontal' | 'vertical',
+    e: React.MouseEvent
+  ) => void;
   /** Direction wire exits from source port */
   fromExitDirection?: PortPosition;
   /** Direction wire enters target port */
@@ -112,6 +119,7 @@ export const Wire = memo(function Wire({
   onHandleDragStart,
   onHandleContextMenu,
   onSegmentDragStart,
+  onEndpointSegmentDragStart,
   fromExitDirection,
   toExitDirection,
   defaultFromDirection,
@@ -282,6 +290,76 @@ export const Wire = memo(function Wire({
           );
         })
       }
+
+      {/* Endpoint segment drag hit areas (port exit ↔ first/last handle) */}
+      {isSelected && handles && handles.length >= 1 && onEndpointSegmentDragStart && (() => {
+        const getExitPt = (pos: Position, dir: PortPosition, dist = 20): Position => {
+          switch (dir) {
+            case 'top': return { x: pos.x, y: pos.y - dist };
+            case 'bottom': return { x: pos.x, y: pos.y + dist };
+            case 'left': return { x: pos.x - dist, y: pos.y };
+            case 'right': return { x: pos.x + dist, y: pos.y };
+          }
+        };
+
+        const segments: React.ReactNode[] = [];
+
+        // From endpoint segment: fromExitPt → handles[0]
+        const fromDir = fromExitDirection || defaultFromDirection;
+        if (fromDir) {
+          const fromExitPt = getExitPt(from, fromDir);
+          const firstHandle = handles[0].position;
+          const dx = Math.abs(fromExitPt.x - firstHandle.x);
+          const dy = Math.abs(fromExitPt.y - firstHandle.y);
+          if (!(dx > 10 && dy > 10)) {
+            const orientation = dx <= 10 ? 'vertical' as const : 'horizontal' as const;
+            const cursor = orientation === 'vertical' ? 'ew-resize' : 'ns-resize';
+            segments.push(
+              <line
+                key="endpoint-from"
+                x1={fromExitPt.x} y1={fromExitPt.y}
+                x2={firstHandle.x} y2={firstHandle.y}
+                stroke="transparent" strokeWidth={12}
+                style={{ pointerEvents: 'auto', cursor }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onEndpointSegmentDragStart(id, 'from', orientation, e);
+                }}
+              />
+            );
+          }
+        }
+
+        // To endpoint segment: handles[N-1] → toExitPt
+        const toDir = toExitDirection || defaultToDirection;
+        if (toDir) {
+          const toExitPt = getExitPt(to, toDir);
+          const lastHandle = handles[handles.length - 1].position;
+          const dx = Math.abs(lastHandle.x - toExitPt.x);
+          const dy = Math.abs(lastHandle.y - toExitPt.y);
+          if (!(dx > 10 && dy > 10)) {
+            const orientation = dx <= 10 ? 'vertical' as const : 'horizontal' as const;
+            const cursor = orientation === 'vertical' ? 'ew-resize' : 'ns-resize';
+            segments.push(
+              <line
+                key="endpoint-to"
+                x1={lastHandle.x} y1={lastHandle.y}
+                x2={toExitPt.x} y2={toExitPt.y}
+                stroke="transparent" strokeWidth={12}
+                style={{ pointerEvents: 'auto', cursor }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onEndpointSegmentDragStart(id, 'to', orientation, e);
+                }}
+              />
+            );
+          }
+        }
+
+        return segments;
+      })()}
 
       {/* Render handles when wire is selected */}
       {isSelected && handles && handles.length > 0 && onHandleDragStart && (

@@ -120,6 +120,7 @@ interface WireRendererProps {
   onHandleDragStart?: (wireId: string, handleIndex: number, constraint: HandleConstraint, e: React.MouseEvent, handlePosition: Position) => void;
   onHandleContextMenu?: (wireId: string, handleIndex: number, e: React.MouseEvent) => void;
   onSegmentDragStart?: (wireId: string, handleIndexA: number, handleIndexB: number, orientation: 'horizontal' | 'vertical', e: React.MouseEvent, startPositionA: Position, startPositionB: Position) => void;
+  onEndpointSegmentDragStart?: (wireId: string, end: 'from' | 'to', orientation: 'horizontal' | 'vertical', e: React.MouseEvent) => void;
 }
 
 const WireRenderer = memo(function WireRenderer({
@@ -131,6 +132,7 @@ const WireRenderer = memo(function WireRenderer({
   onHandleDragStart,
   onHandleContextMenu,
   onSegmentDragStart,
+  onEndpointSegmentDragStart,
 }: WireRendererProps) {
   const { id: wireId, from, to, handles, fromExitDirection, toExitDirection } = wire;
 
@@ -204,6 +206,7 @@ const WireRenderer = memo(function WireRenderer({
       onHandleDragStart={onHandleDragStart}
       onHandleContextMenu={onHandleContextMenu}
       onSegmentDragStart={onSegmentDragStart}
+      onEndpointSegmentDragStart={onEndpointSegmentDragStart}
     />
   );
 });
@@ -234,6 +237,7 @@ function useCanvasState(documentId: string | null) {
   const globalUpdateWireHandle = useCanvasStore((state) => state.updateWireHandle);
   const globalRemoveWireHandle = useCanvasStore((state) => state.removeWireHandle);
   const globalMoveWireSegment = useCanvasStore((state) => state.moveWireSegment);
+  const globalInsertEndpointHandle = useCanvasStore((state) => state.insertEndpointHandle);
 
   // Return document state if available, otherwise global state
   return useMemo(() => {
@@ -252,6 +256,7 @@ function useCanvasState(documentId: string | null) {
         updateWireHandle: documentState.updateWireHandle,
         removeWireHandle: documentState.removeWireHandle,
         moveWireSegment: documentState.moveWireSegment,
+        insertEndpointHandle: documentState.insertEndpointHandle,
         isDocumentMode: true,
       };
     }
@@ -270,6 +275,7 @@ function useCanvasState(documentId: string | null) {
       updateWireHandle: globalUpdateWireHandle,
       removeWireHandle: globalRemoveWireHandle,
       moveWireSegment: globalMoveWireSegment,
+      insertEndpointHandle: globalInsertEndpointHandle,
       isDocumentMode: false,
     };
   }, [
@@ -287,6 +293,7 @@ function useCanvasState(documentId: string | null) {
     globalUpdateWireHandle,
     globalRemoveWireHandle,
     globalMoveWireSegment,
+    globalInsertEndpointHandle,
   ]);
 }
 
@@ -315,6 +322,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     updateWireHandle,
     removeWireHandle,
     moveWireSegment,
+    insertEndpointHandle,
   } = useCanvasState(documentId);
 
   // Wire drawing state and selection from global store (shared across modes)
@@ -343,6 +351,89 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     moveWireSegment,
     zoom,
   });
+
+  // Endpoint segment drag handler (port ↔ first/last handle)
+  const handleEndpointSegmentDragStart = useCallback((
+    wireId: string,
+    end: 'from' | 'to',
+    orientation: 'horizontal' | 'vertical',
+    e: React.MouseEvent
+  ) => {
+    const wire = wires.find((w) => w.id === wireId);
+    if (!wire?.handles?.length) return;
+
+    // Only handle port endpoints
+    if (!isPortEndpoint(wire.from) || !isPortEndpoint(wire.to)) return;
+
+    // Compute exit position for the endpoint
+    const computeExitPos = (endpoint: { componentId: string; portId: string }, exitDir?: PortPosition): Position | null => {
+      const comp = components.get(endpoint.componentId);
+      if (!comp) return null;
+
+      const port = comp.ports.find((p: { id: string; position: string; offset?: number }) => p.id === endpoint.portId);
+      if (!port) return null;
+
+      const offset = port.offset ?? 0.5;
+      const dir = exitDir || (port.position as PortPosition);
+      let portPos: Position;
+
+      switch (port.position) {
+        case 'top':
+          portPos = { x: comp.position.x + comp.size.width * offset, y: comp.position.y };
+          break;
+        case 'bottom':
+          portPos = { x: comp.position.x + comp.size.width * offset, y: comp.position.y + comp.size.height };
+          break;
+        case 'left':
+          portPos = { x: comp.position.x, y: comp.position.y + comp.size.height * offset };
+          break;
+        case 'right':
+          portPos = { x: comp.position.x + comp.size.width, y: comp.position.y + comp.size.height * offset };
+          break;
+        default:
+          portPos = { x: comp.position.x + comp.size.width / 2, y: comp.position.y + comp.size.height / 2 };
+      }
+
+      const dist = 20;
+      switch (dir) {
+        case 'top': return { x: portPos.x, y: portPos.y - dist };
+        case 'bottom': return { x: portPos.x, y: portPos.y + dist };
+        case 'left': return { x: portPos.x - dist, y: portPos.y };
+        case 'right': return { x: portPos.x + dist, y: portPos.y };
+      }
+    };
+
+    const constraint: HandleConstraint = orientation === 'horizontal' ? 'vertical' : 'horizontal';
+
+    if (end === 'from') {
+      const fromEndpoint = wire.from as { componentId: string; portId: string };
+      const exitPos = computeExitPos(fromEndpoint, wire.fromExitDirection);
+      if (!exitPos) return;
+
+      const firstHandlePos = { ...wire.handles[0].position };
+
+      // Insert new handle at exit position (pushes history)
+      insertEndpointHandle(wireId, 'from', exitPos, constraint);
+
+      // Start segment drag on indices 0,1 (new handle + original first handle)
+      // historyAlreadyPushed=true to avoid double history push
+      handleSegmentDragStart(wireId, 0, 1, orientation, e, exitPos, firstHandlePos, true);
+    } else {
+      const toEndpoint = wire.to as { componentId: string; portId: string };
+      const exitPos = computeExitPos(toEndpoint, wire.toExitDirection);
+      if (!exitPos) return;
+
+      const lastIdx = wire.handles.length - 1;
+      const lastHandlePos = { ...wire.handles[lastIdx].position };
+
+      // Insert new handle at exit position (pushes history)
+      insertEndpointHandle(wireId, 'to', exitPos, constraint);
+
+      // After insert, indices shift: original last handle is still at lastIdx,
+      // new handle is at lastIdx + 1
+      handleSegmentDragStart(wireId, lastIdx, lastIdx + 1, orientation, e, lastHandlePos, exitPos, true);
+    }
+  }, [wires, components, insertEndpointHandle, handleSegmentDragStart]);
 
   // Convert Maps to Arrays for simulation
   const componentsArray = useMemo(() => Array.from(components.values()), [components]);
@@ -667,6 +758,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
                     onHandleDragStart={handleWireHandleDragStart}
                     onHandleContextMenu={handleWireHandleContextMenu}
                     onSegmentDragStart={handleSegmentDragStart}
+                    onEndpointSegmentDragStart={handleEndpointSegmentDragStart}
                   />
                 ))}
 
