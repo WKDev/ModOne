@@ -444,11 +444,8 @@ describe('gridConverter', () => {
 
       const result = convertToEditorNetwork(astNetwork);
 
-      expect(result.id).toBe(astNetwork.id);
-      expect(result.label).toBe('Network 1');
       expect(result.elements instanceof Map).toBe(true);
       expect(result.elements.size).toBe(2);
-      expect(result.enabled).toBe(true);
     });
 
     it('should include network comment', () => {
@@ -466,7 +463,7 @@ describe('gridConverter', () => {
   });
 
   describe('convertMultipleNetworks', () => {
-    it('should convert multiple networks', () => {
+    it('should merge multiple networks into flat structure', () => {
       const networks = [
         createTestNetwork([createContactNode('contact_no', 'M', 0)], 0),
         createTestNetwork([createContactNode('contact_no', 'M', 1)], 1),
@@ -475,10 +472,7 @@ describe('gridConverter', () => {
 
       const result = convertMultipleNetworks(networks);
 
-      expect(result).toHaveLength(3);
-      expect(result[0].label).toBe('Network 0');
-      expect(result[1].label).toBe('Network 1');
-      expect(result[2].label).toBe('Network 2');
+      expect(result.elements.size).toBe(3);
     });
   });
 

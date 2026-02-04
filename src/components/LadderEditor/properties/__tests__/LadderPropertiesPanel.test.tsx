@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { LadderPropertiesPanel } from '../LadderPropertiesPanel';
 import { useLadderStore } from '../../../../stores/ladderStore';
-import type { ContactElement, CoilElement, TimerElement, CounterElement, LadderNetwork } from '../../../../types/ladder';
+import type { ContactElement, CoilElement, TimerElement, CounterElement, LadderElement } from '../../../../types/ladder';
 
 // Sample elements for testing
 const mockContactElement: ContactElement = {
@@ -48,20 +48,13 @@ const mockCounterElement: CounterElement = {
   },
 };
 
-function createMockNetwork(): LadderNetwork {
-  const elements = new Map<string, ContactElement | CoilElement | TimerElement | CounterElement>();
+function createMockElements(): Map<string, LadderElement> {
+  const elements = new Map<string, LadderElement>();
   elements.set(mockContactElement.id, mockContactElement);
   elements.set(mockCoilElement.id, mockCoilElement);
   elements.set(mockTimerElement.id, mockTimerElement);
   elements.set(mockCounterElement.id, mockCounterElement);
-
-  return {
-    id: 'network-1',
-    label: 'Network 1',
-    elements: elements as LadderNetwork['elements'],
-    wires: [],
-    enabled: true,
-  };
+  return elements;
 }
 
 describe('LadderPropertiesPanel', () => {
@@ -79,12 +72,9 @@ describe('LadderPropertiesPanel', () => {
 
   describe('Empty State', () => {
     it('should show empty state when no elements are selected', () => {
-      // Set up store with network but no selection
       act(() => {
-        const network = createMockNetwork();
         useLadderStore.setState({
-          networks: new Map([[network.id, network]]),
-          currentNetworkId: network.id,
+          elements: createMockElements(),
           selectedElementIds: new Set(),
           mode: 'edit',
         });
@@ -99,10 +89,8 @@ describe('LadderPropertiesPanel', () => {
   describe('Single Element Selection', () => {
     it('should show contact properties for selected contact', () => {
       act(() => {
-        const network = createMockNetwork();
         useLadderStore.setState({
-          networks: new Map([[network.id, network]]),
-          currentNetworkId: network.id,
+          elements: createMockElements(),
           selectedElementIds: new Set([mockContactElement.id]),
           mode: 'edit',
         });
@@ -117,10 +105,8 @@ describe('LadderPropertiesPanel', () => {
 
     it('should show coil properties for selected coil', () => {
       act(() => {
-        const network = createMockNetwork();
         useLadderStore.setState({
-          networks: new Map([[network.id, network]]),
-          currentNetworkId: network.id,
+          elements: createMockElements(),
           selectedElementIds: new Set([mockCoilElement.id]),
           mode: 'edit',
         });
@@ -135,10 +121,8 @@ describe('LadderPropertiesPanel', () => {
 
     it('should show timer properties for selected timer', () => {
       act(() => {
-        const network = createMockNetwork();
         useLadderStore.setState({
-          networks: new Map([[network.id, network]]),
-          currentNetworkId: network.id,
+          elements: createMockElements(),
           selectedElementIds: new Set([mockTimerElement.id]),
           mode: 'edit',
         });
@@ -153,10 +137,8 @@ describe('LadderPropertiesPanel', () => {
 
     it('should show counter properties for selected counter', () => {
       act(() => {
-        const network = createMockNetwork();
         useLadderStore.setState({
-          networks: new Map([[network.id, network]]),
-          currentNetworkId: network.id,
+          elements: createMockElements(),
           selectedElementIds: new Set([mockCounterElement.id]),
           mode: 'edit',
         });
@@ -171,10 +153,8 @@ describe('LadderPropertiesPanel', () => {
 
     it('should show element address in header', () => {
       act(() => {
-        const network = createMockNetwork();
         useLadderStore.setState({
-          networks: new Map([[network.id, network]]),
-          currentNetworkId: network.id,
+          elements: createMockElements(),
           selectedElementIds: new Set([mockContactElement.id]),
           mode: 'edit',
         });
@@ -182,7 +162,6 @@ describe('LadderPropertiesPanel', () => {
 
       render(<LadderPropertiesPanel />);
 
-      // Address should appear in header (on the right side)
       const header = screen.getByText('Contact (NO)').closest('div');
       expect(header).toHaveTextContent('M0001');
     });
@@ -191,10 +170,8 @@ describe('LadderPropertiesPanel', () => {
   describe('Multi-Select', () => {
     it('should show multi-select view when multiple elements selected', () => {
       act(() => {
-        const network = createMockNetwork();
         useLadderStore.setState({
-          networks: new Map([[network.id, network]]),
-          currentNetworkId: network.id,
+          elements: createMockElements(),
           selectedElementIds: new Set([mockContactElement.id, mockCoilElement.id]),
           mode: 'edit',
         });
@@ -208,10 +185,8 @@ describe('LadderPropertiesPanel', () => {
 
     it('should show type counts in multi-select view', () => {
       act(() => {
-        const network = createMockNetwork();
         useLadderStore.setState({
-          networks: new Map([[network.id, network]]),
-          currentNetworkId: network.id,
+          elements: createMockElements(),
           selectedElementIds: new Set([mockContactElement.id, mockTimerElement.id]),
           mode: 'edit',
         });
@@ -227,10 +202,8 @@ describe('LadderPropertiesPanel', () => {
   describe('Monitor Mode', () => {
     it('should show read-only message in monitor mode', () => {
       act(() => {
-        const network = createMockNetwork();
         useLadderStore.setState({
-          networks: new Map([[network.id, network]]),
-          currentNetworkId: network.id,
+          elements: createMockElements(),
           selectedElementIds: new Set([mockContactElement.id]),
           mode: 'monitor',
         });
@@ -243,10 +216,8 @@ describe('LadderPropertiesPanel', () => {
 
     it('should disable inputs in monitor mode', () => {
       act(() => {
-        const network = createMockNetwork();
         useLadderStore.setState({
-          networks: new Map([[network.id, network]]),
-          currentNetworkId: network.id,
+          elements: createMockElements(),
           selectedElementIds: new Set([mockContactElement.id]),
           mode: 'monitor',
         });
@@ -272,14 +243,11 @@ describe('LadderPropertiesPanel', () => {
       const updateElementSpy = vi.fn();
 
       act(() => {
-        const network = createMockNetwork();
         useLadderStore.setState({
-          networks: new Map([[network.id, network]]),
-          currentNetworkId: network.id,
+          elements: createMockElements(),
           selectedElementIds: new Set([mockContactElement.id]),
           mode: 'edit',
         });
-        // Spy on updateElement after setting state
         vi.spyOn(useLadderStore.getState(), 'updateElement').mockImplementation(updateElementSpy);
       });
 
@@ -288,7 +256,6 @@ describe('LadderPropertiesPanel', () => {
       const addressInput = screen.getByDisplayValue('M0001');
       fireEvent.change(addressInput, { target: { value: 'M0002' } });
 
-      // Wait for debounce (300ms)
       await act(async () => {
         vi.advanceTimersByTime(300);
       });
@@ -302,10 +269,8 @@ describe('LadderPropertiesPanel', () => {
       const updateElementSpy = vi.fn();
 
       act(() => {
-        const network = createMockNetwork();
         useLadderStore.setState({
-          networks: new Map([[network.id, network]]),
-          currentNetworkId: network.id,
+          elements: createMockElements(),
           selectedElementIds: new Set([mockContactElement.id]),
           mode: 'edit',
         });
@@ -326,10 +291,8 @@ describe('LadderPropertiesPanel', () => {
       const updateElementSpy = vi.fn();
 
       act(() => {
-        const network = createMockNetwork();
         useLadderStore.setState({
-          networks: new Map([[network.id, network]]),
-          currentNetworkId: network.id,
+          elements: createMockElements(),
           selectedElementIds: new Set([mockContactElement.id]),
           mode: 'edit',
         });
@@ -341,7 +304,6 @@ describe('LadderPropertiesPanel', () => {
       const labelInput = screen.getByDisplayValue('Start Button');
       fireEvent.change(labelInput, { target: { value: 'Stop Button' } });
 
-      // Wait for debounce (300ms)
       await act(async () => {
         vi.advanceTimersByTime(300);
       });
