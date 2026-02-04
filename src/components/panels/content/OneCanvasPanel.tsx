@@ -34,11 +34,11 @@ import {
   useSimulation,
   useCanvasKeyboardShortcuts,
   useBlockDrag,
+  useSelectionHandler,
   screenToCanvas,
   type CanvasRef,
   type BlockType,
   type Position,
-  type SelectionBoxState,
 } from '../../OneCanvas';
 import type { Block, Wire as WireData, HandleConstraint, PortPosition } from '../../OneCanvas/types';
 import { isPortEndpoint } from '../../OneCanvas/types';
@@ -588,10 +588,14 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     [wireDrawing, components, addWire, cancelWireDrawing]
   );
 
-  // Handle canvas mouse move for wire preview
-  const handleCanvasMouseMove = useCallback(
+  // Selection handler for drag-to-select
+  const selectionHandler = useSelectionHandler({});
+
+  // Handle canvas mouse down - for selection box
+  const handleCanvasMouseDown = useCallback(
     (event: React.MouseEvent) => {
-      if (!wireDrawing) return;
+      // Don't start selection if wire drawing is active
+      if (wireDrawing) return;
 
       const container = canvasRef.current?.getContainer();
       if (!container) return;
@@ -602,23 +606,51 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
         y: event.clientY - rect.top,
       };
       const canvasPos = screenToCanvas(screenPos, pan, zoom);
-      updateWireDrawing(canvasPos);
+
+      selectionHandler.handleCanvasMouseDown(event, canvasPos);
     },
-    [wireDrawing, pan, zoom, updateWireDrawing]
+    [wireDrawing, pan, zoom, selectionHandler]
   );
 
-  // Handle canvas mouse up for wire cancellation (when not ending on a port)
+  // Handle canvas mouse move for wire preview and selection box
+  const handleCanvasMouseMove = useCallback(
+    (event: React.MouseEvent) => {
+      const container = canvasRef.current?.getContainer();
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const screenPos = {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      };
+      const canvasPos = screenToCanvas(screenPos, pan, zoom);
+
+      // Update wire drawing if active
+      if (wireDrawing) {
+        updateWireDrawing(canvasPos);
+      }
+
+      // Update selection box if dragging
+      selectionHandler.handleCanvasMouseMove(event, canvasPos);
+    },
+    [wireDrawing, pan, zoom, updateWireDrawing, selectionHandler]
+  );
+
+  // Handle canvas mouse up for wire cancellation and selection completion
   const handleCanvasMouseUp = useCallback(
     (event: React.MouseEvent) => {
-      if (!wireDrawing) return;
-
-      // If clicking on empty canvas (not a port), cancel wire drawing
-      const target = event.target as HTMLElement;
-      if (!target.closest('[data-port-id]')) {
-        cancelWireDrawing();
+      // Handle wire drawing cancellation
+      if (wireDrawing) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('[data-port-id]')) {
+          cancelWireDrawing();
+        }
       }
+
+      // Handle selection completion
+      selectionHandler.handleCanvasMouseUp(event);
     },
-    [wireDrawing, cancelWireDrawing]
+    [wireDrawing, cancelWireDrawing, selectionHandler]
   );
 
   // Handle escape key to cancel wire drawing
@@ -660,9 +692,6 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     },
     [setSelection]
   );
-
-  // Selection box state for drag-to-select
-  const [selectionBox] = useState<SelectionBoxState | null>(null);
 
   // DnD sensors
   const sensors = useSensors(
@@ -745,6 +774,40 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     [updateComponent]
   );
 
+  // ============================================================================
+  // Simulation Integration
+  // ============================================================================
+
+  // Extract port voltages from simulation result
+  const portVoltages = useMemo(() => {
+    if (!simulation.result) return undefined;
+    return simulation.result.nodeVoltages;
+  }, [simulation.result]);
+
+  // Calculate connected ports for each block
+  const getConnectedPorts = useCallback((blockId: string): Set<string> => {
+    const ports = new Set<string>();
+    wires.forEach((wire) => {
+      if (isPortEndpoint(wire.from) && wire.from.componentId === blockId) {
+        ports.add(wire.from.portId);
+      }
+      if (isPortEndpoint(wire.to) && wire.to.componentId === blockId) {
+        ports.add(wire.to.portId);
+      }
+    });
+    return ports;
+  }, [wires]);
+
+  // Button press handler - updates simulation runtime state
+  const handleButtonPress = useCallback((blockId: string) => {
+    simulation.setButtonState(blockId, true);
+  }, [simulation]);
+
+  // Button release handler - updates simulation runtime state
+  const handleButtonRelease = useCallback((blockId: string) => {
+    simulation.setButtonState(blockId, false);
+  }, [simulation]);
+
   return (
     <DndContext
       sensors={sensors}
@@ -771,6 +834,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
           <CanvasDropZone className="flex-1 relative overflow-hidden">
             <div
               className="w-full h-full"
+              onMouseDown={handleCanvasMouseDown}
               onMouseMove={handleCanvasMouseMove}
               onMouseUp={handleCanvasMouseUp}
             >
@@ -867,7 +931,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
               </svg>
 
               {/* Selection box */}
-              <SelectionBox box={selectionBox} />
+              <SelectionBox box={selectionHandler.selectionBox} />
             </Canvas>
             </div>
           </CanvasDropZone>
