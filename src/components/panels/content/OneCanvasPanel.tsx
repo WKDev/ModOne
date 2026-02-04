@@ -310,6 +310,7 @@ function useCanvasState(documentId: string | null) {
 
 export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPanelProps) {
   const canvasRef = useRef<CanvasRef>(null);
+  const containerRectRef = useRef<DOMRect | null>(null);
 
   // Get document context (may be null if not in document mode)
   const { documentId } = useDocumentContext();
@@ -351,6 +352,23 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     position: Position;
     screenPosition: { x: number; y: number };
   } | null>(null);
+
+  // Cache container bounding rect to avoid getBoundingClientRect on every mouse event
+  useEffect(() => {
+    const container = canvasRef.current?.getContainer();
+    if (!container) return;
+
+    // Initial rect calculation
+    containerRectRef.current = container.getBoundingClientRect();
+
+    // ResizeObserver to update rect when container size changes
+    const observer = new ResizeObserver(() => {
+      containerRectRef.current = container.getBoundingClientRect();
+    });
+    observer.observe(container);
+
+    return () => observer.disconnect();
+  }, []);
 
   // Wire handle drag hook
   const { handleDragStart: handleWireHandleDragStart } = useWireHandleDrag({
@@ -609,10 +627,9 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
         return;
       }
 
-      const container = canvasRef.current?.getContainer();
-      if (!container) return;
+      const rect = containerRectRef.current;
+      if (!rect) return;
 
-      const rect = container.getBoundingClientRect();
       const screenPos = {
         x: event.clientX - rect.left,
         y: event.clientY - rect.top,
@@ -622,16 +639,15 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
       console.log('[OneCanvasPanel] Calling selectionHandler.handleCanvasMouseDown');
       selectionHandler.handleCanvasMouseDown(event, canvasPos);
     },
-    [wireDrawing, pan, zoom, selectionHandler]
+    [pan, zoom, selectionHandler]
   );
 
   // Handle canvas mouse move for wire preview and selection box
   const handleCanvasMouseMove = useCallback(
     (event: React.MouseEvent) => {
-      const container = canvasRef.current?.getContainer();
-      if (!container) return;
+      const rect = containerRectRef.current;
+      if (!rect) return;
 
-      const rect = container.getBoundingClientRect();
       const screenPos = {
         x: event.clientX - rect.left,
         y: event.clientY - rect.top,
@@ -740,9 +756,9 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
       if (over?.id === 'canvas-dropzone') {
         const blockType = active.data.current?.blockType as BlockType | undefined;
         if (blockType) {
-          // Get the canvas container for coordinate calculation
-          const container = canvasRef.current?.getContainer();
-          if (!container) return;
+          // Use cached container rect for coordinate calculation
+          const rect = containerRectRef.current;
+          if (!rect) return;
 
           // Calculate drop position in canvas coordinates
           // activatorEvent contains the original pointer position when drag started
@@ -752,7 +768,6 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
           const dropScreenY = activatorEvent.clientY + event.delta.y;
 
           // Convert to position relative to canvas container
-          const rect = container.getBoundingClientRect();
           const relativeX = dropScreenX - rect.left;
           const relativeY = dropScreenY - rect.top;
 

@@ -21,6 +21,7 @@ interface DragState {
   constraint: HandleConstraint;
   startCanvasPos: Position;
   startHandle: Position;
+  containerRect: DOMRect;
 }
 
 interface UseWireHandleDragOptions {
@@ -104,6 +105,7 @@ export function useWireHandleDrag({
         constraint,
         startCanvasPos,
         startHandle: handlePosition,
+        containerRect: rect, // Cache rect for performance during drag
       });
     },
     [canvasRef, pan, zoom]
@@ -114,14 +116,10 @@ export function useWireHandleDrag({
     if (!dragging) return;
 
     const handleMove = (e: MouseEvent) => {
-      const container = canvasRef.current?.getContainer();
-      if (!container) return;
-
-      // Convert current mouse position to canvas coordinates
-      const rect = container.getBoundingClientRect();
+      // Convert current mouse position to canvas coordinates using cached rect
       const screenPos = {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
+        x: e.clientX - dragging.containerRect.left,
+        y: e.clientY - dragging.containerRect.top,
       };
       const currentCanvasPos = screenToCanvas(screenPos, pan, zoom);
 
@@ -174,7 +172,7 @@ export function useWireHandleDrag({
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
-  }, [dragging, canvasRef, pan, zoom, snapToGridEnabled, gridSize, updateWireHandle, onDragEnd, cleanupOverlappingHandles]);
+  }, [dragging, pan, zoom, snapToGridEnabled, gridSize, updateWireHandle, onDragEnd, cleanupOverlappingHandles]);
 
   return {
     handleDragStart,

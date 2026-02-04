@@ -23,6 +23,7 @@ interface SegmentDragState {
   startCanvasPos: Position;
   startPositionA: Position;
   startPositionB: Position;
+  containerRect: DOMRect;
 }
 
 interface UseWireSegmentDragOptions {
@@ -109,6 +110,7 @@ export function useWireSegmentDrag({
         startCanvasPos,
         startPositionA: { ...startPositionA },
         startPositionB: { ...startPositionB },
+        containerRect: rect, // Cache rect for performance during drag
       });
     },
     [canvasRef, pan, zoom]
@@ -118,14 +120,10 @@ export function useWireSegmentDrag({
     if (!dragging) return;
 
     const handleMove = (e: MouseEvent) => {
-      const container = canvasRef.current?.getContainer();
-      if (!container) return;
-
-      // Convert current mouse position to canvas coordinates
-      const rect = container.getBoundingClientRect();
+      // Convert current mouse position to canvas coordinates using cached rect
       const screenPos = {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
+        x: e.clientX - dragging.containerRect.left,
+        y: e.clientY - dragging.containerRect.top,
       };
       const currentCanvasPos = screenToCanvas(screenPos, pan, zoom);
 
@@ -181,7 +179,7 @@ export function useWireSegmentDrag({
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
-  }, [dragging, canvasRef, pan, zoom, snapToGridEnabled, gridSize, moveWireSegment, cleanupOverlappingHandles]);
+  }, [dragging, pan, zoom, snapToGridEnabled, gridSize, moveWireSegment, cleanupOverlappingHandles]);
 
   return {
     handleSegmentDragStart,

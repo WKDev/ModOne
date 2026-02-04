@@ -49,6 +49,8 @@ interface DragState {
   junctionIds: Set<string>;
   /** Whether this is the first move in the current drag (for history push) */
   isFirstMove: boolean;
+  /** Cached container bounding rect (for performance) */
+  containerRect: DOMRect | null;
 }
 
 interface UseBlockDragReturn {
@@ -101,6 +103,7 @@ export function useBlockDrag({
     originalPositions: new Map(),
     junctionIds: new Set(),
     isFirstMove: true,
+    containerRect: null,
   });
 
   // Handle drag start
@@ -169,7 +172,7 @@ export function useBlockDrag({
       };
       const startCanvasPos = screenToCanvas(screenPos, pan, zoom);
 
-      // Initialize drag state
+      // Initialize drag state (cache rect for performance during drag)
       dragStateRef.current = {
         isDragging: true,
         draggedBlockId: blockId,
@@ -177,6 +180,7 @@ export function useBlockDrag({
         originalPositions,
         junctionIds: junctionIdSet,
         isFirstMove: true,
+        containerRect: rect,
       };
 
       setIsDragging(true);
@@ -189,16 +193,12 @@ export function useBlockDrag({
   const handleMouseMove = useCallback(
     (event: MouseEvent) => {
       const state = dragStateRef.current;
-      if (!state.isDragging || !state.startCanvasPos) return;
+      if (!state.isDragging || !state.startCanvasPos || !state.containerRect) return;
 
-      const container = canvasRef.current?.getContainer();
-      if (!container) return;
-
-      // Convert current mouse position to canvas coordinates
-      const rect = container.getBoundingClientRect();
+      // Convert current mouse position to canvas coordinates using cached rect
       const screenPos = {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
+        x: event.clientX - state.containerRect.left,
+        y: event.clientY - state.containerRect.top,
       };
       const currentCanvasPos = screenToCanvas(screenPos, pan, zoom);
 
@@ -231,7 +231,7 @@ export function useBlockDrag({
         }
       });
     },
-    [canvasRef, pan, zoom, snapToGridEnabled, gridSize, moveComponent, moveJunction]
+    [pan, zoom, snapToGridEnabled, gridSize, moveComponent, moveJunction]
   );
 
   // Handle mouse up (end drag)
@@ -246,6 +246,7 @@ export function useBlockDrag({
       originalPositions: new Map(),
       junctionIds: new Set(),
       isFirstMove: true,
+      containerRect: null,
     };
 
     setIsDragging(false);
