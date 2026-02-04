@@ -54,6 +54,11 @@ export const BlockWrapper = memo(function BlockWrapper({
     [blockId, onSelect]
   );
 
+  // Prevent mousedown from propagating to canvas
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
+
   return (
     <div
       className={`
@@ -68,6 +73,7 @@ export const BlockWrapper = memo(function BlockWrapper({
         width,
         height,
       }}
+      onMouseDown={handleMouseDown}
       onClick={handleClick}
       data-block-id={blockId}
     >
