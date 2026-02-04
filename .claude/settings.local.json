@@ -93,7 +93,8 @@
       "Bash(git diff:*)",
       "Bash(pnpm run test:*)",
       "Bash(git stash:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(pnpm run:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

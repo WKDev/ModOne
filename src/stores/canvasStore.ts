@@ -20,8 +20,19 @@ import type {
   HandleConstraint,
   CircuitMetadata,
   SerializableCircuitState,
+  Selection,
+  SelectionState,
 } from '../components/OneCanvas/types';
-import { isPortEndpoint } from '../components/OneCanvas/types';
+import {
+  isPortEndpoint,
+  createSelectionState,
+  addToSelectionState,
+  removeFromSelectionState,
+  toggleInSelectionState,
+  clearSelectionState,
+  getAllSelectedIds,
+  selectionStateToArray,
+} from '../components/OneCanvas/types';
 import {
   getBlockSize,
   getDefaultPorts as getDefaultPortsFromDefs,
@@ -70,6 +81,8 @@ interface HistorySnapshot {
   junctions: Array<[string, Junction]>;
   /** Wire connections */
   wires: Wire[];
+  /** Selection state (new field for history) */
+  selection?: Selection[];
 }
 
 interface CanvasState {
@@ -84,8 +97,10 @@ interface CanvasState {
   metadata: CircuitMetadata;
 
   // Selection
-  /** Currently selected component/wire IDs */
+  /** Currently selected component/wire IDs (legacy - will be removed) */
   selectedIds: Set<string>;
+  /** Typed selection state (new) */
+  selection: SelectionState;
 
   // Viewport
   /** Current zoom level (0.1 to 4.0) */
@@ -252,6 +267,7 @@ const initialState: CanvasState = {
     tags: [],
   },
   selectedIds: new Set(),
+  selection: createSelectionState([]),
   zoom: 1.0,
   pan: { x: 0, y: 0 },
   gridSize: DEFAULT_GRID_SIZE,
@@ -268,8 +284,29 @@ const initialState: CanvasState = {
 // Helper Functions (non-shared, canvasStore-specific)
 // ============================================================================
 
+/**
+ * Determine the type of an item by its ID
+ * @param id Item ID
+ * @param state Canvas state
+ * @returns SelectableType or null if not found
+ */
+function getItemType(
+  id: string,
+  state: CanvasState
+): 'block' | 'wire' | 'junction' | null {
+  if (state.components.has(id)) return 'block';
+  if (state.junctions.has(id)) return 'junction';
+  if (state.wires.find(w => w.id === id)) return 'wire';
+  return null;
+}
+
 /** Create a deep clone of circuit state for history */
-function createSnapshot(components: Map<string, Block>, wires: Wire[], junctions?: Map<string, Junction>): HistorySnapshot {
+function createSnapshot(
+  components: Map<string, Block>,
+  wires: Wire[],
+  junctions?: Map<string, Junction>,
+  selection?: SelectionState
+): HistorySnapshot {
   return {
     components: Array.from(components.entries()).map(([id, block]) => [
       id,
@@ -282,6 +319,7 @@ function createSnapshot(components: Map<string, Block>, wires: Wire[], junctions
       to: { ...wire.to },
       handles: wire.handles ? wire.handles.map((h) => ({ ...h, position: { ...h.position } })) : undefined,
     })),
+    selection: selection ? selectionStateToArray(selection) : undefined,
   };
 }
 
@@ -290,7 +328,12 @@ function createSnapshot(components: Map<string, Block>, wires: Wire[], junctions
  * Truncates any redo history, adds current snapshot, and caps at MAX_HISTORY_SIZE.
  */
 function pushHistorySnapshot(state: CanvasState): void {
-  const snapshot = createSnapshot(state.components, state.wires, state.junctions);
+  const snapshot = createSnapshot(
+    state.components,
+    state.wires,
+    state.junctions,
+    state.selection
+  );
   state.history = state.history.slice(0, state.historyIndex + 1);
   state.history.push(snapshot);
   if (state.history.length > MAX_HISTORY_SIZE) {
@@ -305,7 +348,13 @@ function restoreSnapshot(snapshot: HistorySnapshot): {
   components: Map<string, Block>;
   junctions: Map<string, Junction>;
   wires: Wire[];
+  selection: SelectionState;
+  selectedIds: Set<string>;
 } {
+  const selection = snapshot.selection
+    ? createSelectionState(snapshot.selection)
+    : createSelectionState([]);
+
   return {
     components: new Map(
       snapshot.components.map(([id, block]) => [id, { ...block, ports: [...block.ports] }])
@@ -319,6 +368,8 @@ function restoreSnapshot(snapshot: HistorySnapshot): {
       to: { ...wire.to },
       handles: wire.handles ? wire.handles.map((h) => ({ ...h, position: { ...h.position } })) : undefined,
     })),
+    selection,
+    selectedIds: new Set(getAllSelectedIds(selection)),
   };
 }
 
@@ -979,7 +1030,18 @@ export const useCanvasStore = create<CanvasStore>()(
       setSelection: (ids) => {
         set(
           (state) => {
+            // Update legacy Set
             state.selectedIds = new Set(ids);
+
+            // Update new SelectionState (dual-write)
+            const selections: Selection[] = ids
+              .map(id => {
+                const type = getItemType(id, state);
+                return type ? { id, type } : null;
+              })
+              .filter((s): s is Selection => s !== null);
+
+            state.selection = createSelectionState(selections);
           },
           false,
           'setSelection'
@@ -989,7 +1051,14 @@ export const useCanvasStore = create<CanvasStore>()(
       addToSelection: (id) => {
         set(
           (state) => {
+            // Update legacy Set
             state.selectedIds.add(id);
+
+            // Update new SelectionState (dual-write)
+            const type = getItemType(id, state);
+            if (type) {
+              state.selection = addToSelectionState(state.selection, { id, type });
+            }
           },
           false,
           `addToSelection/${id}`
@@ -999,7 +1068,11 @@ export const useCanvasStore = create<CanvasStore>()(
       removeFromSelection: (id) => {
         set(
           (state) => {
+            // Update legacy Set
             state.selectedIds.delete(id);
+
+            // Update new SelectionState (dual-write)
+            state.selection = removeFromSelectionState(state.selection, id);
           },
           false,
           `removeFromSelection/${id}`
@@ -1009,10 +1082,17 @@ export const useCanvasStore = create<CanvasStore>()(
       toggleSelection: (id) => {
         set(
           (state) => {
+            // Update legacy Set
             if (state.selectedIds.has(id)) {
               state.selectedIds.delete(id);
             } else {
               state.selectedIds.add(id);
+            }
+
+            // Update new SelectionState (dual-write)
+            const type = getItemType(id, state);
+            if (type) {
+              state.selection = toggleInSelectionState(state.selection, { id, type });
             }
           },
           false,
@@ -1023,7 +1103,11 @@ export const useCanvasStore = create<CanvasStore>()(
       clearSelection: () => {
         set(
           (state) => {
+            // Update legacy Set
             state.selectedIds = new Set();
+
+            // Update new SelectionState (dual-write)
+            state.selection = clearSelectionState();
           },
           false,
           'clearSelection'
@@ -1033,10 +1117,25 @@ export const useCanvasStore = create<CanvasStore>()(
       selectAll: () => {
         set(
           (state) => {
+            // Collect all IDs
+            const blockIds = Array.from(state.components.keys());
+            const wireIds = state.wires.map((w) => w.id);
+            const junctionIds = Array.from(state.junctions.keys());
+
+            // Update legacy Set
             state.selectedIds = new Set([
-              ...state.components.keys(),
-              ...state.wires.map((w) => w.id),
+              ...blockIds,
+              ...wireIds,
+              ...junctionIds,
             ]);
+
+            // Update new SelectionState (dual-write)
+            const selections: Selection[] = [
+              ...blockIds.map(id => ({ id, type: 'block' as const })),
+              ...wireIds.map(id => ({ id, type: 'wire' as const })),
+              ...junctionIds.map(id => ({ id, type: 'junction' as const })),
+            ];
+            state.selection = createSelectionState(selections);
           },
           false,
           'selectAll'
@@ -1187,7 +1286,12 @@ export const useCanvasStore = create<CanvasStore>()(
 
             // Save current state for redo if at the end
             if (state.historyIndex === state.history.length - 1) {
-              const snapshot = createSnapshot(state.components, state.wires, state.junctions);
+              const snapshot = createSnapshot(
+                state.components,
+                state.wires,
+                state.junctions,
+                state.selection
+              );
               state.history.push(snapshot);
             }
 
@@ -1196,8 +1300,9 @@ export const useCanvasStore = create<CanvasStore>()(
             state.components = restored.components;
             state.junctions = restored.junctions;
             state.wires = restored.wires;
+            state.selection = restored.selection;
+            state.selectedIds = restored.selectedIds;
             state.historyIndex--;
-            state.selectedIds = new Set();
             state.isDirty = true;
           },
           false,
@@ -1216,7 +1321,8 @@ export const useCanvasStore = create<CanvasStore>()(
             state.components = restored.components;
             state.junctions = restored.junctions;
             state.wires = restored.wires;
-            state.selectedIds = new Set();
+            state.selection = restored.selection;
+            state.selectedIds = restored.selectedIds;
             state.isDirty = true;
           },
           false,

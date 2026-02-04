@@ -95,97 +95,96 @@ export interface Selection {
   id: string;
 }
 
-/** Typed selection state with helper methods */
-export class SelectionState {
-  private items: Map<string, Selection>;
+/** Typed selection state (plain object, works with Zustand immer) */
+export interface SelectionState {
+  /** Map of selected items by ID */
+  items: Map<string, Selection>;
+}
 
-  constructor(selections: Selection[] = []) {
-    this.items = new Map(selections.map(s => [s.id, s]));
-  }
+/** Create a new empty selection state */
+export function createSelectionState(selections: Selection[] = []): SelectionState {
+  return {
+    items: new Map(selections.map(s => [s.id, s])),
+  };
+}
 
-  /** Get all selected block IDs */
-  getBlocks(): string[] {
-    return Array.from(this.items.values())
-      .filter(s => s.type === 'block')
-      .map(s => s.id);
-  }
+/** Get all selected block IDs */
+export function getSelectedBlocks(state: SelectionState): string[] {
+  return Array.from(state.items.values())
+    .filter(s => s.type === 'block')
+    .map(s => s.id);
+}
 
-  /** Get all selected wire IDs */
-  getWires(): string[] {
-    return Array.from(this.items.values())
-      .filter(s => s.type === 'wire')
-      .map(s => s.id);
-  }
+/** Get all selected wire IDs */
+export function getSelectedWires(state: SelectionState): string[] {
+  return Array.from(state.items.values())
+    .filter(s => s.type === 'wire')
+    .map(s => s.id);
+}
 
-  /** Get all selected junction IDs */
-  getJunctions(): string[] {
-    return Array.from(this.items.values())
-      .filter(s => s.type === 'junction')
-      .map(s => s.id);
-  }
+/** Get all selected junction IDs */
+export function getSelectedJunctions(state: SelectionState): string[] {
+  return Array.from(state.items.values())
+    .filter(s => s.type === 'junction')
+    .map(s => s.id);
+}
 
-  /** Get all selected items */
-  getAll(): Selection[] {
-    return Array.from(this.items.values());
-  }
+/** Get all selected items */
+export function getAllSelections(state: SelectionState): Selection[] {
+  return Array.from(state.items.values());
+}
 
-  /** Get all selected IDs (regardless of type) */
-  getAllIds(): string[] {
-    return Array.from(this.items.keys());
-  }
+/** Get all selected IDs (regardless of type) */
+export function getAllSelectedIds(state: SelectionState): string[] {
+  return Array.from(state.items.keys());
+}
 
-  /** Check if an item is selected */
-  has(id: string): boolean {
-    return this.items.has(id);
-  }
+/** Check if an item is selected */
+export function isSelected(state: SelectionState, id: string): boolean {
+  return state.items.has(id);
+}
 
-  /** Check if selection is empty */
-  isEmpty(): boolean {
-    return this.items.size === 0;
-  }
+/** Check if selection is empty */
+export function isSelectionEmpty(state: SelectionState): boolean {
+  return state.items.size === 0;
+}
 
-  /** Get number of selected items */
-  get size(): number {
-    return this.items.size;
-  }
+/** Get number of selected items */
+export function getSelectionSize(state: SelectionState): number {
+  return state.items.size;
+}
 
-  /** Add an item to selection */
-  add(selection: Selection): SelectionState {
-    const newItems = new Map(this.items);
-    newItems.set(selection.id, selection);
-    return new SelectionState(Array.from(newItems.values()));
-  }
+/** Add an item to selection (immutable) */
+export function addToSelectionState(state: SelectionState, selection: Selection): SelectionState {
+  const newItems = new Map(state.items);
+  newItems.set(selection.id, selection);
+  return { items: newItems };
+}
 
-  /** Remove an item from selection */
-  remove(id: string): SelectionState {
-    const newItems = new Map(this.items);
-    newItems.delete(id);
-    return new SelectionState(Array.from(newItems.values()));
-  }
+/** Remove an item from selection (immutable) */
+export function removeFromSelectionState(state: SelectionState, id: string): SelectionState {
+  const newItems = new Map(state.items);
+  newItems.delete(id);
+  return { items: newItems };
+}
 
-  /** Toggle an item in selection */
-  toggle(selection: Selection): SelectionState {
-    if (this.has(selection.id)) {
-      return this.remove(selection.id);
-    } else {
-      return this.add(selection);
-    }
+/** Toggle an item in selection (immutable) */
+export function toggleInSelectionState(state: SelectionState, selection: Selection): SelectionState {
+  if (isSelected(state, selection.id)) {
+    return removeFromSelectionState(state, selection.id);
+  } else {
+    return addToSelectionState(state, selection);
   }
+}
 
-  /** Clear all selections */
-  clear(): SelectionState {
-    return new SelectionState([]);
-  }
+/** Clear all selections (immutable) */
+export function clearSelectionState(): SelectionState {
+  return { items: new Map() };
+}
 
-  /** Create a new selection state from IDs and types */
-  static fromIds(items: Array<{ id: string; type: SelectableType }>): SelectionState {
-    return new SelectionState(items.map(({ id, type }) => ({ id, type })));
-  }
-
-  /** Convert to plain array for serialization */
-  toArray(): Selection[] {
-    return this.getAll();
-  }
+/** Convert selection state to plain array for serialization */
+export function selectionStateToArray(state: SelectionState): Selection[] {
+  return getAllSelections(state);
 }
 
 // ============================================================================
