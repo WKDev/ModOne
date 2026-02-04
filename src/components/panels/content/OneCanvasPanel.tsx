@@ -342,6 +342,9 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
   const selectedIds = useCanvasStore((state) => state.selectedIds);
   const setSelection = useCanvasStore((state) => state.setSelection);
 
+  // DEBUG: Log when selectedIds changes
+  console.log('[OneCanvasPanel] selectedIds:', Array.from(selectedIds));
+
   // Wire context menu state
   const [wireContextMenu, setWireContextMenu] = useState<{
     wireId: string;
@@ -352,7 +355,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
   // Wire handle drag hook
   const { handleDragStart: handleWireHandleDragStart } = useWireHandleDrag({
     updateWireHandle,
-    zoom,
+    canvasRef,
     cleanupOverlappingHandles,
   });
 
@@ -360,7 +363,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
   const { handleSegmentDragStart } = useWireSegmentDrag({
     moveWireSegment,
     cleanupOverlappingHandles,
-    zoom,
+    canvasRef,
   });
 
   // Endpoint segment drag handler (port ↔ first/last handle)
@@ -474,7 +477,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
   // Block drag hook - prevent drag during wire drawing
   // Pass document-aware components and moveComponent to override global store
   const { isDragging: _isDragging, handleBlockDragStart } = useBlockDrag({
-    canvasRef: canvasRef as React.RefObject<HTMLElement | null>,
+    canvasRef,
     shouldPreventDrag: useCallback(() => wireDrawing !== null, [wireDrawing]),
     components: components as Map<string, { position: Position }>,
     moveComponent,
@@ -588,14 +591,23 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     [wireDrawing, components, addWire, cancelWireDrawing]
   );
 
-  // Selection handler for drag-to-select
-  const selectionHandler = useSelectionHandler({});
+  // Selection handler for drag-to-select (pass current state)
+  const selectionHandler = useSelectionHandler({
+    components,
+    wires,
+    junctions,
+  });
 
   // Handle canvas mouse down - for selection box
   const handleCanvasMouseDown = useCallback(
     (event: React.MouseEvent) => {
+      console.log('[OneCanvasPanel] MouseDown - wireDrawing:', !!wireDrawing);
+
       // Don't start selection if wire drawing is active
-      if (wireDrawing) return;
+      if (wireDrawing) {
+        console.log('[OneCanvasPanel] Skipping selection - wire drawing active');
+        return;
+      }
 
       const container = canvasRef.current?.getContainer();
       if (!container) return;
@@ -607,6 +619,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
       };
       const canvasPos = screenToCanvas(screenPos, pan, zoom);
 
+      console.log('[OneCanvasPanel] Calling selectionHandler.handleCanvasMouseDown');
       selectionHandler.handleCanvasMouseDown(event, canvasPos);
     },
     [wireDrawing, pan, zoom, selectionHandler]
@@ -744,10 +757,8 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
           const relativeY = dropScreenY - rect.top;
 
           // Apply pan/zoom transformation to get canvas coordinates
-          const canvasX = (relativeX - pan.x) / zoom;
-          const canvasY = (relativeY - pan.y) / zoom;
-
-          const position: Position = { x: canvasX, y: canvasY };
+          const canvasPos = screenToCanvas({ x: relativeX, y: relativeY }, pan, zoom);
+          const position: Position = { x: canvasPos.x, y: canvasPos.y };
           const presetProps = active.data.current?.presetProps as Partial<Block> | undefined;
           addComponent(blockType, position, presetProps);
         }

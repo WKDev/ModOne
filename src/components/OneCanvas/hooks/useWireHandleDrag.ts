@@ -7,8 +7,9 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useCanvasStore } from '../../../stores/canvasStore';
-import { snapToGrid } from '../utils/canvasCoordinates';
+import { snapToGrid, screenToCanvas } from '../utils/canvasCoordinates';
 import type { Position, HandleConstraint } from '../types';
+import type { CanvasRef } from '../Canvas';
 
 // ============================================================================
 // Types
@@ -18,15 +19,15 @@ interface DragState {
   wireId: string;
   handleIndex: number;
   constraint: HandleConstraint;
-  startMouse: Position;
+  startCanvasPos: Position;
   startHandle: Position;
 }
 
 interface UseWireHandleDragOptions {
   /** Function to update handle position in store */
   updateWireHandle: (wireId: string, handleIndex: number, position: Position, isFirstMove?: boolean) => void;
-  /** Current zoom level */
-  zoom: number;
+  /** Reference to the canvas */
+  canvasRef: React.RefObject<CanvasRef | null>;
   /** Callback when drag ends */
   onDragEnd?: () => void;
   /** Remove adjacent overlapping/collinear handles after drag ends */
@@ -62,12 +63,14 @@ interface UseWireHandleDragResult {
  */
 export function useWireHandleDrag({
   updateWireHandle,
-  zoom,
+  canvasRef,
   onDragEnd,
   cleanupOverlappingHandles,
 }: UseWireHandleDragOptions): UseWireHandleDragResult {
   const [dragging, setDragging] = useState<DragState | null>(null);
   const isFirstMoveRef = useRef(false);
+  const zoom = useCanvasStore((state) => state.zoom);
+  const pan = useCanvasStore((state) => state.pan);
   const snapToGridEnabled = useCanvasStore((state) => state.snapToGrid);
   const gridSize = useCanvasStore((state) => state.gridSize);
 
@@ -83,16 +86,27 @@ export function useWireHandleDrag({
       e.preventDefault();
       e.stopPropagation();
 
+      // Convert initial mouse position to canvas coordinates
+      const container = canvasRef.current?.getContainer();
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const screenPos = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      };
+      const startCanvasPos = screenToCanvas(screenPos, pan, zoom);
+
       isFirstMoveRef.current = true;
       setDragging({
         wireId,
         handleIndex,
         constraint,
-        startMouse: { x: e.clientX, y: e.clientY },
+        startCanvasPos,
         startHandle: handlePosition,
       });
     },
-    []
+    [canvasRef, pan, zoom]
   );
 
   // Handle mouse movement and release
@@ -100,9 +114,21 @@ export function useWireHandleDrag({
     if (!dragging) return;
 
     const handleMove = (e: MouseEvent) => {
+      const container = canvasRef.current?.getContainer();
+      if (!container) return;
+
+      // Convert current mouse position to canvas coordinates
+      const rect = container.getBoundingClientRect();
+      const screenPos = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      };
+      const currentCanvasPos = screenToCanvas(screenPos, pan, zoom);
+
+      // Calculate delta in canvas coordinates
       const delta = {
-        x: (e.clientX - dragging.startMouse.x) / zoom,
-        y: (e.clientY - dragging.startMouse.y) / zoom,
+        x: currentCanvasPos.x - dragging.startCanvasPos.x,
+        y: currentCanvasPos.y - dragging.startCanvasPos.y,
       };
 
       // Apply constraint - calculate new position based on constraint direction
@@ -148,7 +174,7 @@ export function useWireHandleDrag({
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
-  }, [dragging, zoom, snapToGridEnabled, gridSize, updateWireHandle, onDragEnd, cleanupOverlappingHandles]);
+  }, [dragging, canvasRef, pan, zoom, snapToGridEnabled, gridSize, updateWireHandle, onDragEnd, cleanupOverlappingHandles]);
 
   return {
     handleDragStart,

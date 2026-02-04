@@ -13,16 +13,17 @@
 
 import { useCallback, useRef, useEffect, useState } from 'react';
 import { useCanvasStore } from '../../../stores/canvasStore';
-import { snapToGrid } from '../utils/canvasCoordinates';
+import { snapToGrid, screenToCanvas } from '../utils/canvasCoordinates';
 import type { Position } from '../types';
+import type { CanvasRef } from '../Canvas';
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface UseBlockDragOptions {
-  /** Reference to the canvas container element */
-  canvasRef: React.RefObject<HTMLElement | null>;
+  /** Reference to the canvas */
+  canvasRef: React.RefObject<CanvasRef | null>;
   /** Callback to check if dragging should be prevented (e.g., during wire drawing) */
   shouldPreventDrag?: () => boolean;
   /** Optional document-aware components (overrides global store) */
@@ -40,8 +41,8 @@ interface DragState {
   isDragging: boolean;
   /** The block ID being dragged (primary drag target) */
   draggedBlockId: string | null;
-  /** Starting mouse position in screen coordinates */
-  startMousePos: Position | null;
+  /** Starting mouse position in canvas coordinates */
+  startCanvasPos: Position | null;
   /** Original positions of all blocks being dragged (for multi-select) */
   originalPositions: Map<string, Position>;
   /** IDs that are junctions (use moveJunction instead of moveComponent) */
@@ -73,6 +74,7 @@ export function useBlockDrag({
 }: UseBlockDragOptions): UseBlockDragReturn {
   // Store access
   const zoom = useCanvasStore((state) => state.zoom);
+  const pan = useCanvasStore((state) => state.pan);
   const selectedIds = useCanvasStore((state) => state.selectedIds);
   const globalComponents = useCanvasStore((state) => state.components);
   const globalMoveComponent = useCanvasStore((state) => state.moveComponent);
@@ -95,7 +97,7 @@ export function useBlockDrag({
   const dragStateRef = useRef<DragState>({
     isDragging: false,
     draggedBlockId: null,
-    startMousePos: null,
+    startCanvasPos: null,
     originalPositions: new Map(),
     junctionIds: new Set(),
     isFirstMove: true,
@@ -156,11 +158,22 @@ export function useBlockDrag({
         }
       }
 
+      // Convert initial mouse position to canvas coordinates
+      const container = canvasRef.current?.getContainer();
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const screenPos = {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      };
+      const startCanvasPos = screenToCanvas(screenPos, pan, zoom);
+
       // Initialize drag state
       dragStateRef.current = {
         isDragging: true,
         draggedBlockId: blockId,
-        startMousePos: { x: event.clientX, y: event.clientY },
+        startCanvasPos,
         originalPositions,
         junctionIds: junctionIdSet,
         isFirstMove: true,
@@ -169,25 +182,29 @@ export function useBlockDrag({
       setIsDragging(true);
       setDraggedBlockId(blockId);
     },
-    [shouldPreventDrag, selectedIds, components, junctions, addToSelection, setSelection]
+    [shouldPreventDrag, selectedIds, components, junctions, addToSelection, setSelection, canvasRef, pan, zoom]
   );
 
   // Handle mouse move during drag
   const handleMouseMove = useCallback(
     (event: MouseEvent) => {
       const state = dragStateRef.current;
-      if (!state.isDragging || !state.startMousePos) return;
+      if (!state.isDragging || !state.startCanvasPos) return;
 
-      const container = canvasRef.current;
+      const container = canvasRef.current?.getContainer();
       if (!container) return;
 
-      // Calculate mouse delta in screen coordinates
-      const deltaX = event.clientX - state.startMousePos.x;
-      const deltaY = event.clientY - state.startMousePos.y;
+      // Convert current mouse position to canvas coordinates
+      const rect = container.getBoundingClientRect();
+      const screenPos = {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      };
+      const currentCanvasPos = screenToCanvas(screenPos, pan, zoom);
 
-      // Convert delta to canvas coordinates (accounting for zoom)
-      const canvasDeltaX = deltaX / zoom;
-      const canvasDeltaY = deltaY / zoom;
+      // Calculate delta in canvas coordinates
+      const canvasDeltaX = currentCanvasPos.x - state.startCanvasPos.x;
+      const canvasDeltaY = currentCanvasPos.y - state.startCanvasPos.y;
 
       // On first move, let the store push history; on subsequent moves, skip
       const skipHistory = !state.isFirstMove;
@@ -214,7 +231,7 @@ export function useBlockDrag({
         }
       });
     },
-    [canvasRef, zoom, snapToGridEnabled, gridSize, moveComponent, moveJunction]
+    [canvasRef, pan, zoom, snapToGridEnabled, gridSize, moveComponent, moveJunction]
   );
 
   // Handle mouse up (end drag)
@@ -225,7 +242,7 @@ export function useBlockDrag({
     dragStateRef.current = {
       isDragging: false,
       draggedBlockId: null,
-      startMousePos: null,
+      startCanvasPos: null,
       originalPositions: new Map(),
       junctionIds: new Set(),
       isFirstMove: true,

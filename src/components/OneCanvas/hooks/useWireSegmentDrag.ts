@@ -7,7 +7,9 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useCanvasStore } from '../../../stores/canvasStore';
+import { screenToCanvas } from '../utils/canvasCoordinates';
 import type { Position } from '../types';
+import type { CanvasRef } from '../Canvas';
 
 // ============================================================================
 // Types
@@ -18,7 +20,7 @@ interface SegmentDragState {
   handleIndexA: number;
   handleIndexB: number;
   orientation: 'horizontal' | 'vertical';
-  startMouse: Position;
+  startCanvasPos: Position;
   startPositionA: Position;
   startPositionB: Position;
 }
@@ -34,8 +36,8 @@ interface UseWireSegmentDragOptions {
   ) => void;
   /** Remove adjacent overlapping handles after drag ends */
   cleanupOverlappingHandles?: (wireId: string) => void;
-  /** Current zoom level */
-  zoom: number;
+  /** Reference to the canvas */
+  canvasRef: React.RefObject<CanvasRef | null>;
 }
 
 interface UseWireSegmentDragResult {
@@ -61,11 +63,13 @@ interface UseWireSegmentDragResult {
 export function useWireSegmentDrag({
   moveWireSegment,
   cleanupOverlappingHandles,
-  zoom,
+  canvasRef,
 }: UseWireSegmentDragOptions): UseWireSegmentDragResult {
   const [dragging, setDragging] = useState<SegmentDragState | null>(null);
   const isFirstMoveRef = useRef(false);
   const appliedDeltaRef = useRef<Position>({ x: 0, y: 0 });
+  const zoom = useCanvasStore((state) => state.zoom);
+  const pan = useCanvasStore((state) => state.pan);
   const snapToGridEnabled = useCanvasStore((state) => state.snapToGrid);
   const gridSize = useCanvasStore((state) => state.gridSize);
 
@@ -83,6 +87,17 @@ export function useWireSegmentDrag({
       e.preventDefault();
       e.stopPropagation();
 
+      // Convert initial mouse position to canvas coordinates
+      const container = canvasRef.current?.getContainer();
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const screenPos = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      };
+      const startCanvasPos = screenToCanvas(screenPos, pan, zoom);
+
       // If history was already pushed (e.g. by insertEndpointHandle), skip push on first move
       isFirstMoveRef.current = !historyAlreadyPushed;
       appliedDeltaRef.current = { x: 0, y: 0 };
@@ -91,21 +106,32 @@ export function useWireSegmentDrag({
         handleIndexA,
         handleIndexB,
         orientation,
-        startMouse: { x: e.clientX, y: e.clientY },
+        startCanvasPos,
         startPositionA: { ...startPositionA },
         startPositionB: { ...startPositionB },
       });
     },
-    []
+    [canvasRef, pan, zoom]
   );
 
   useEffect(() => {
     if (!dragging) return;
 
     const handleMove = (e: MouseEvent) => {
-      // Absolute delta from drag start (avoids floating-point accumulation)
-      const absDx = (e.clientX - dragging.startMouse.x) / zoom;
-      const absDy = (e.clientY - dragging.startMouse.y) / zoom;
+      const container = canvasRef.current?.getContainer();
+      if (!container) return;
+
+      // Convert current mouse position to canvas coordinates
+      const rect = container.getBoundingClientRect();
+      const screenPos = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      };
+      const currentCanvasPos = screenToCanvas(screenPos, pan, zoom);
+
+      // Absolute delta from drag start in canvas coordinates
+      const absDx = currentCanvasPos.x - dragging.startCanvasPos.x;
+      const absDy = currentCanvasPos.y - dragging.startCanvasPos.y;
 
       // Constrain based on segment orientation:
       // horizontal segment → move Y only; vertical segment → move X only
@@ -155,7 +181,7 @@ export function useWireSegmentDrag({
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
-  }, [dragging, zoom, snapToGridEnabled, gridSize, moveWireSegment, cleanupOverlappingHandles]);
+  }, [dragging, canvasRef, pan, zoom, snapToGridEnabled, gridSize, moveWireSegment, cleanupOverlappingHandles]);
 
   return {
     handleSegmentDragStart,
