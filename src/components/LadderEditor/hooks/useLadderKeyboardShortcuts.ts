@@ -8,8 +8,6 @@
  * - Ctrl+C: Copy elements
  * - Ctrl+X: Cut elements
  * - Ctrl+V: Paste elements
- * - Ctrl+Shift+C: Copy entire network
- * - Ctrl+Shift+V: Paste network
  * - Ctrl+D: Duplicate
  * - Ctrl+A: Select all
  * - Escape: Clear selection
@@ -71,8 +69,6 @@ export function useLadderKeyboardShortcuts(
     undo,
     redo,
     duplicateElement,
-    copyNetwork,
-    pasteNetwork,
   } = useLadderStore();
 
   // Handle delete key
@@ -116,17 +112,6 @@ export function useLadderKeyboardShortcuts(
   const handleSelectAll = useCallback(() => {
     selectAll();
   }, [selectAll]);
-
-  // Handle network copy
-  const handleCopyNetwork = useCallback(() => {
-    copyNetwork();
-  }, [copyNetwork]);
-
-  // Handle network paste
-  const handlePasteNetwork = useCallback(() => {
-    if (mode !== 'edit') return;
-    pasteNetwork();
-  }, [mode, pasteNetwork]);
 
   // Handle escape
   const handleEscape = useCallback(() => {
@@ -225,11 +210,7 @@ export function useLadderKeyboardShortcuts(
 
           case 'c':
             event.preventDefault();
-            if (shiftKey) {
-              handleCopyNetwork();
-            } else {
-              handleCopy();
-            }
+            handleCopy();
             break;
 
           case 'x':
@@ -239,11 +220,7 @@ export function useLadderKeyboardShortcuts(
 
           case 'v':
             event.preventDefault();
-            if (shiftKey) {
-              handlePasteNetwork();
-            } else {
-              handlePaste();
-            }
+            handlePaste();
             break;
 
           case 'd':
@@ -267,8 +244,6 @@ export function useLadderKeyboardShortcuts(
       handleCopy,
       handleCut,
       handlePaste,
-      handleCopyNetwork,
-      handlePasteNetwork,
       handleDuplicate,
       handleSelectAll,
       undo,

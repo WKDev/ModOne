@@ -34,7 +34,7 @@ import {
   isScenarioDocument,
 } from '../types/document';
 import type { SerializableCircuitState } from '../components/OneCanvas/types';
-import type { LadderNetwork, LadderElement } from '../types/ladder';
+import type { LadderElement, LadderWire } from '../types/ladder';
 import type { Scenario, ScenarioExecutionState } from '../types/scenario';
 
 // ============================================================================
@@ -188,65 +188,39 @@ function restoreCanvasFromHistory(snapshot: CanvasHistoryData): Pick<CanvasDocum
   };
 }
 
-/** Serialize ladder network for history */
-function serializeLadderNetwork(network: LadderNetwork) {
+/** Create ladder history snapshot */
+function createLadderHistorySnapshot(data: LadderDocumentData): LadderHistoryData {
   const elements: Array<[string, LadderElement]> = [];
-  network.elements.forEach((element, id) => {
+  data.elements.forEach((element, id) => {
     elements.push([id, JSON.parse(JSON.stringify(element))]);
   });
 
   return {
-    id: network.id,
-    label: network.label,
-    comment: network.comment,
     elements,
-    wires: network.wires.map((wire) => ({
+    wires: data.wires.map((wire: LadderWire) => ({
       ...wire,
       from: { ...wire.from },
       to: { ...wire.to },
     })),
-    enabled: network.enabled,
-  };
-}
-
-/** Create ladder history snapshot */
-function createLadderHistorySnapshot(data: LadderDocumentData): LadderHistoryData {
-  return {
-    networks: Array.from(data.networks.entries()).map(([id, network]) => [
-      id,
-      serializeLadderNetwork(network),
-    ]),
-    currentNetworkId: data.currentNetworkId,
+    comment: data.comment,
   };
 }
 
 /** Restore ladder data from history snapshot */
-function restoreLadderFromHistory(snapshot: LadderHistoryData): Pick<LadderDocumentData, 'networks' | 'currentNetworkId'> {
+function restoreLadderFromHistory(snapshot: LadderHistoryData): Pick<LadderDocumentData, 'elements' | 'wires' | 'comment'> {
+  const elements = new Map<string, LadderElement>();
+  snapshot.elements.forEach(([id, element]) => {
+    elements.set(id, JSON.parse(JSON.stringify(element)));
+  });
+
   return {
-    networks: new Map(
-      snapshot.networks.map(([id, data]) => {
-        const elements = new Map<string, LadderElement>();
-        data.elements.forEach(([elemId, element]) => {
-          elements.set(elemId, JSON.parse(JSON.stringify(element)));
-        });
-
-        const network: LadderNetwork = {
-          id: data.id,
-          label: data.label,
-          comment: data.comment,
-          elements,
-          wires: data.wires.map((wire) => ({
-            ...wire,
-            from: { ...wire.from },
-            to: { ...wire.to },
-          })),
-          enabled: data.enabled,
-        };
-
-        return [id, network];
-      })
-    ),
-    currentNetworkId: snapshot.currentNetworkId,
+    elements,
+    wires: snapshot.wires.map((wire: LadderWire) => ({
+      ...wire,
+      from: { ...wire.from },
+      to: { ...wire.to },
+    })),
+    comment: snapshot.comment,
   };
 }
 
@@ -696,8 +670,9 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
 
               const snapshot = doc.history[doc.historyIndex];
               const restored = restoreLadderFromHistory(snapshot.data);
-              doc.data.networks = restored.networks;
-              doc.data.currentNetworkId = restored.currentNetworkId;
+              doc.data.elements = restored.elements;
+              doc.data.wires = restored.wires;
+              doc.data.comment = restored.comment;
               doc.historyIndex--;
               doc.isDirty = true;
             } else if (isScenarioDocument(doc)) {
@@ -745,8 +720,9 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
               const snapshot = doc.history[doc.historyIndex + 1];
               if (snapshot) {
                 const restored = restoreLadderFromHistory(snapshot.data);
-                doc.data.networks = restored.networks;
-                doc.data.currentNetworkId = restored.currentNetworkId;
+                doc.data.elements = restored.elements;
+                doc.data.wires = restored.wires;
+                doc.data.comment = restored.comment;
                 doc.isDirty = true;
               }
             } else if (isScenarioDocument(doc)) {

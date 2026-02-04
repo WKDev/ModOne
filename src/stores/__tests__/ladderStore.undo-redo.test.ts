@@ -18,60 +18,60 @@ describe('ladderStore undo/redo', () => {
       expect(selectCanUndo(state)).toBe(false);
     });
 
-    it('should be able to undo after adding a network', () => {
-      const { addNetwork } = useLadderStore.getState();
-      addNetwork('Test Network');
+    it('should be able to undo after adding an element', () => {
+      const { addElement } = useLadderStore.getState();
+      addElement('contact_no', { row: 0, col: 0 });
 
       const state = useLadderStore.getState();
       expect(selectCanUndo(state)).toBe(true);
     });
 
-    it('should undo addNetwork correctly', () => {
-      const { addNetwork, undo } = useLadderStore.getState();
+    it('should undo addElement correctly', () => {
+      const { addElement, undo } = useLadderStore.getState();
 
-      // Initial state: no networks
-      expect(useLadderStore.getState().networks.size).toBe(0);
+      // Initial state: no elements
+      expect(useLadderStore.getState().elements.size).toBe(0);
 
-      // Add a network
-      addNetwork('Test Network');
-      expect(useLadderStore.getState().networks.size).toBe(1);
+      // Add an element
+      addElement('contact_no', { row: 0, col: 0 });
+      expect(useLadderStore.getState().elements.size).toBe(1);
 
       // Undo
       undo();
-      expect(useLadderStore.getState().networks.size).toBe(0);
+      expect(useLadderStore.getState().elements.size).toBe(0);
     });
 
     it('should redo after undo correctly', () => {
-      const { addNetwork, undo, redo } = useLadderStore.getState();
+      const { addElement, undo, redo } = useLadderStore.getState();
 
-      addNetwork('Test Network');
-      expect(useLadderStore.getState().networks.size).toBe(1);
+      addElement('contact_no', { row: 0, col: 0 });
+      expect(useLadderStore.getState().elements.size).toBe(1);
 
       undo();
-      expect(useLadderStore.getState().networks.size).toBe(0);
+      expect(useLadderStore.getState().elements.size).toBe(0);
 
       redo();
-      expect(useLadderStore.getState().networks.size).toBe(1);
+      expect(useLadderStore.getState().elements.size).toBe(1);
     });
 
     it('should handle multiple undo/redo cycles', () => {
-      const { addNetwork, undo, redo } = useLadderStore.getState();
+      const { addElement, undo, redo } = useLadderStore.getState();
 
-      addNetwork('Network 1');
-      addNetwork('Network 2');
-      expect(useLadderStore.getState().networks.size).toBe(2);
+      addElement('contact_no', { row: 0, col: 0 });
+      addElement('contact_no', { row: 1, col: 0 });
+      expect(useLadderStore.getState().elements.size).toBe(2);
 
       // Undo twice
       undo();
-      expect(useLadderStore.getState().networks.size).toBe(1);
+      expect(useLadderStore.getState().elements.size).toBe(1);
       undo();
-      expect(useLadderStore.getState().networks.size).toBe(0);
+      expect(useLadderStore.getState().elements.size).toBe(0);
 
       // Redo twice
       redo();
-      expect(useLadderStore.getState().networks.size).toBe(1);
+      expect(useLadderStore.getState().elements.size).toBe(1);
       redo();
-      expect(useLadderStore.getState().networks.size).toBe(2);
+      expect(useLadderStore.getState().elements.size).toBe(2);
     });
   });
 
@@ -82,20 +82,20 @@ describe('ladderStore undo/redo', () => {
     });
 
     it('should not crash when redoing at most recent state', () => {
-      const { addNetwork, redo } = useLadderStore.getState();
-      addNetwork('Test');
+      const { addElement, redo } = useLadderStore.getState();
+      addElement('contact_no', { row: 0, col: 0 });
       expect(() => redo()).not.toThrow();
     });
 
     it('should report canUndo/canRedo correctly at boundaries', () => {
-      const { addNetwork, undo, redo } = useLadderStore.getState();
+      const { addElement, undo, redo } = useLadderStore.getState();
 
       // Empty history
       expect(selectCanUndo(useLadderStore.getState())).toBe(false);
       expect(selectCanRedo(useLadderStore.getState())).toBe(false);
 
       // After adding
-      addNetwork('Test');
+      addElement('contact_no', { row: 0, col: 0 });
       expect(selectCanUndo(useLadderStore.getState())).toBe(true);
       expect(selectCanRedo(useLadderStore.getState())).toBe(false);
 
@@ -113,27 +113,27 @@ describe('ladderStore undo/redo', () => {
 
   describe('History Stack Management', () => {
     it('should clear redo stack when new action is performed', () => {
-      const { addNetwork, undo } = useLadderStore.getState();
+      const { addElement, undo } = useLadderStore.getState();
 
-      addNetwork('Network 1');
-      addNetwork('Network 2');
+      addElement('contact_no', { row: 0, col: 0 });
+      addElement('contact_no', { row: 1, col: 0 });
 
       // Undo to create redo history
       undo();
       expect(selectCanRedo(useLadderStore.getState())).toBe(true);
 
       // New action should clear redo history
-      addNetwork('Network 3');
+      addElement('contact_no', { row: 2, col: 0 });
       expect(selectCanRedo(useLadderStore.getState())).toBe(false);
     });
 
     it('should enforce MAX_HISTORY_SIZE limit', () => {
-      const { addNetwork } = useLadderStore.getState();
+      const { addElement } = useLadderStore.getState();
       const MAX_HISTORY_SIZE = 50;
 
-      // Add more than MAX_HISTORY_SIZE actions
+      // Add more than MAX_HISTORY_SIZE actions (each at different position)
       for (let i = 0; i < MAX_HISTORY_SIZE + 10; i++) {
-        addNetwork(`Network ${i}`);
+        addElement('contact_no', { row: i, col: 0 });
       }
 
       // History should be capped
@@ -142,74 +142,35 @@ describe('ladderStore undo/redo', () => {
     });
 
     it('should maintain correct historyIndex when history is trimmed', () => {
-      const { addNetwork, undo } = useLadderStore.getState();
+      const { addElement, undo } = useLadderStore.getState();
       const MAX_HISTORY_SIZE = 50;
 
       // Add exactly MAX_HISTORY_SIZE actions
       for (let i = 0; i < MAX_HISTORY_SIZE; i++) {
-        addNetwork(`Network ${i}`);
+        addElement('contact_no', { row: i, col: 0 });
       }
 
       // Add one more to trigger trim
-      addNetwork('Extra Network');
+      addElement('contact_no', { row: MAX_HISTORY_SIZE, col: 0 });
 
       // Should still be able to undo
       expect(selectCanUndo(useLadderStore.getState())).toBe(true);
       undo();
-      expect(useLadderStore.getState().networks.size).toBe(MAX_HISTORY_SIZE);
+      expect(useLadderStore.getState().elements.size).toBe(MAX_HISTORY_SIZE);
     });
   });
 
   describe('All Modifying Actions Push History', () => {
-    it('addNetwork pushes history', () => {
-      const { addNetwork } = useLadderStore.getState();
+    it('addElement pushes history', () => {
+      const { addElement } = useLadderStore.getState();
       const initialHistoryLength = useLadderStore.getState().history.length;
 
-      addNetwork('Test');
+      addElement('contact_no', { row: 0, col: 0 });
       expect(useLadderStore.getState().history.length).toBeGreaterThan(initialHistoryLength);
     });
 
-    it('removeNetwork pushes history', () => {
-      const { addNetwork, removeNetwork } = useLadderStore.getState();
-      addNetwork('Network 1');
-      const networkId = addNetwork('Network 2');
-      const historyLengthBefore = useLadderStore.getState().history.length;
-
-      removeNetwork(networkId);
-      expect(useLadderStore.getState().history.length).toBeGreaterThan(historyLengthBefore);
-    });
-
-    it('updateNetwork pushes history', () => {
-      const { addNetwork, updateNetwork } = useLadderStore.getState();
-      const networkId = addNetwork('Test');
-      const historyLengthBefore = useLadderStore.getState().history.length;
-
-      updateNetwork(networkId, { label: 'Updated' });
-      expect(useLadderStore.getState().history.length).toBeGreaterThan(historyLengthBefore);
-    });
-
-    it('reorderNetworks pushes history', () => {
-      const { addNetwork, reorderNetworks } = useLadderStore.getState();
-      addNetwork('Network 1');
-      addNetwork('Network 2');
-      const historyLengthBefore = useLadderStore.getState().history.length;
-
-      reorderNetworks(0, 1);
-      expect(useLadderStore.getState().history.length).toBeGreaterThan(historyLengthBefore);
-    });
-
-    it('addElement pushes history', () => {
-      const { addNetwork, addElement } = useLadderStore.getState();
-      addNetwork('Test');
-      const historyLengthBefore = useLadderStore.getState().history.length;
-
-      addElement('contact_no', { row: 0, col: 0 });
-      expect(useLadderStore.getState().history.length).toBeGreaterThan(historyLengthBefore);
-    });
-
     it('removeElement pushes history', () => {
-      const { addNetwork, addElement, removeElement } = useLadderStore.getState();
-      addNetwork('Test');
+      const { addElement, removeElement } = useLadderStore.getState();
       const elementId = addElement('contact_no', { row: 0, col: 0 });
       const historyLengthBefore = useLadderStore.getState().history.length;
 
@@ -220,8 +181,7 @@ describe('ladderStore undo/redo', () => {
     });
 
     it('moveElement pushes history', () => {
-      const { addNetwork, addElement, moveElement } = useLadderStore.getState();
-      addNetwork('Test');
+      const { addElement, moveElement } = useLadderStore.getState();
       const elementId = addElement('contact_no', { row: 0, col: 0 });
       const historyLengthBefore = useLadderStore.getState().history.length;
 
@@ -232,8 +192,7 @@ describe('ladderStore undo/redo', () => {
     });
 
     it('updateElement pushes history', () => {
-      const { addNetwork, addElement, updateElement } = useLadderStore.getState();
-      addNetwork('Test');
+      const { addElement, updateElement } = useLadderStore.getState();
       const elementId = addElement('contact_no', { row: 0, col: 0 });
       const historyLengthBefore = useLadderStore.getState().history.length;
 
@@ -244,8 +203,7 @@ describe('ladderStore undo/redo', () => {
     });
 
     it('cutSelection pushes history', () => {
-      const { addNetwork, addElement, setSelection, cutSelection } = useLadderStore.getState();
-      addNetwork('Test');
+      const { addElement, setSelection, cutSelection } = useLadderStore.getState();
       const elementId = addElement('contact_no', { row: 0, col: 0 });
       if (elementId) {
         setSelection([elementId]);
@@ -257,8 +215,7 @@ describe('ladderStore undo/redo', () => {
     });
 
     it('pasteFromClipboard pushes history', () => {
-      const { addNetwork, addElement, setSelection, copyToClipboard, pasteFromClipboard } = useLadderStore.getState();
-      addNetwork('Test');
+      const { addElement, setSelection, copyToClipboard, pasteFromClipboard } = useLadderStore.getState();
       const elementId = addElement('contact_no', { row: 0, col: 0 });
       if (elementId) {
         setSelection([elementId]);
@@ -271,42 +228,37 @@ describe('ladderStore undo/redo', () => {
     });
 
     it('clearAll pushes history', () => {
-      const { addNetwork, clearAll } = useLadderStore.getState();
-      addNetwork('Test');
+      const { addElement, clearAll } = useLadderStore.getState();
+      addElement('contact_no', { row: 0, col: 0 });
       const historyLengthBefore = useLadderStore.getState().history.length;
 
       clearAll();
       expect(useLadderStore.getState().history.length).toBeGreaterThan(historyLengthBefore);
     });
+
+    it('updateComment pushes history', () => {
+      const { updateComment } = useLadderStore.getState();
+      const historyLengthBefore = useLadderStore.getState().history.length;
+
+      updateComment('Test comment');
+      expect(useLadderStore.getState().history.length).toBeGreaterThan(historyLengthBefore);
+    });
   });
 
   describe('State Restoration', () => {
-    it('should correctly restore networks Map after undo', () => {
-      const { addNetwork, undo } = useLadderStore.getState();
+    it('should correctly restore elements Map after undo', () => {
+      const { addElement, undo } = useLadderStore.getState();
 
-      const networkId = addNetwork('Test Network');
-      const networkBefore = useLadderStore.getState().networks.get(networkId);
-      expect(networkBefore).toBeDefined();
-
-      undo();
-      const networkAfter = useLadderStore.getState().networks.get(networkId);
-      expect(networkAfter).toBeUndefined();
-    });
-
-    it('should correctly restore currentNetworkId after undo', () => {
-      const { addNetwork, undo } = useLadderStore.getState();
-
-      addNetwork('Test');
-      expect(useLadderStore.getState().currentNetworkId).not.toBeNull();
+      const elementId = addElement('contact_no', { row: 0, col: 0 });
+      expect(useLadderStore.getState().elements.get(elementId!)).toBeDefined();
 
       undo();
-      expect(useLadderStore.getState().currentNetworkId).toBeNull();
+      expect(useLadderStore.getState().elements.get(elementId!)).toBeUndefined();
     });
 
     it('should clear selection on undo', () => {
-      const { addNetwork, addElement, setSelection, undo } = useLadderStore.getState();
+      const { addElement, setSelection, undo } = useLadderStore.getState();
 
-      addNetwork('Test');
       const elementId = addElement('contact_no', { row: 0, col: 0 });
       if (elementId) {
         setSelection([elementId]);
@@ -318,9 +270,8 @@ describe('ladderStore undo/redo', () => {
     });
 
     it('should clear selection on redo', () => {
-      const { addNetwork, addElement, setSelection, undo, redo } = useLadderStore.getState();
+      const { addElement, setSelection, undo, redo } = useLadderStore.getState();
 
-      addNetwork('Test');
       const elementId = addElement('contact_no', { row: 0, col: 0 });
       if (elementId) {
         setSelection([elementId]);
@@ -334,7 +285,7 @@ describe('ladderStore undo/redo', () => {
 
   describe('Custom Hooks', () => {
     it('useCanUndo returns correct value', () => {
-      const { addNetwork, undo } = useLadderStore.getState();
+      const { addElement, undo } = useLadderStore.getState();
 
       // Initial state
       const { result } = renderHook(() => useCanUndo());
@@ -342,7 +293,7 @@ describe('ladderStore undo/redo', () => {
 
       // After adding
       act(() => {
-        addNetwork('Test');
+        addElement('contact_no', { row: 0, col: 0 });
       });
       expect(result.current).toBe(true);
 
@@ -354,7 +305,7 @@ describe('ladderStore undo/redo', () => {
     });
 
     it('useCanRedo returns correct value', () => {
-      const { addNetwork, undo, redo } = useLadderStore.getState();
+      const { addElement, undo, redo } = useLadderStore.getState();
 
       // Initial state
       const { result } = renderHook(() => useCanRedo());
@@ -362,7 +313,7 @@ describe('ladderStore undo/redo', () => {
 
       // After adding
       act(() => {
-        addNetwork('Test');
+        addElement('contact_no', { row: 0, col: 0 });
       });
       expect(result.current).toBe(false);
 

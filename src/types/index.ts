@@ -87,7 +87,6 @@ export type {
   DocumentState,
   DocumentActions,
   DocumentInfo,
-  SerializableLadderNetwork,
 } from './document';
 
 export {

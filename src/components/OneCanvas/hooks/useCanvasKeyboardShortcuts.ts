@@ -98,6 +98,7 @@ export function useCanvasKeyboardShortcuts(options: UseCanvasKeyboardShortcutsOp
   const toggleSnap = useCanvasStore((state) => state.toggleSnap);
   const undo = useCanvasStore((state) => state.undo);
   const redo = useCanvasStore((state) => state.redo);
+  const rotateSelectedComponents = useCanvasStore((state) => state.rotateSelectedComponents);
 
   // Store refs for callbacks
   const selectedIdsRef = useRef(selectedIds);
@@ -123,6 +124,21 @@ export function useCanvasKeyboardShortcuts(options: UseCanvasKeyboardShortcutsOp
     clearSelection();
     onDelete?.();
   }, [removeComponent, removeWire, clearSelection, onDelete]);
+
+  // Rotate selected components
+  const rotateSelected = useCallback(() => {
+    const ids = selectedIdsRef.current;
+    if (ids.size === 0) return;
+
+    // Only rotate components (not wires)
+    const hasComponents = Array.from(ids).some((id) =>
+      componentsRef.current.has(id)
+    );
+
+    if (hasComponents) {
+      rotateSelectedComponents(90);
+    }
+  }, [rotateSelectedComponents]);
 
   // Copy selected components to clipboard
   const copySelected = useCallback(() => {
@@ -310,6 +326,14 @@ export function useCanvasKeyboardShortcuts(options: UseCanvasKeyboardShortcutsOp
           }
           break;
 
+        // Rotate selected blocks
+        case 'r':
+          if (!ctrl && !shift) {
+            e.preventDefault();
+            rotateSelected();
+          }
+          break;
+
         // Escape - clear selection
         case 'escape':
           e.preventDefault();
@@ -328,6 +352,7 @@ export function useCanvasKeyboardShortcuts(options: UseCanvasKeyboardShortcutsOp
       redo,
       toggleGrid,
       toggleSnap,
+      rotateSelected,
       clearSelection,
     ]
   );

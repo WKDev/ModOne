@@ -22,8 +22,6 @@ describe('useLadderKeyboardShortcuts', () => {
   const mockUndo = vi.fn();
   const mockRedo = vi.fn();
   const mockDuplicateElement = vi.fn();
-  const mockCopyNetwork = vi.fn();
-  const mockPasteNetwork = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -40,8 +38,6 @@ describe('useLadderKeyboardShortcuts', () => {
       undo: mockUndo,
       redo: mockRedo,
       duplicateElement: mockDuplicateElement,
-      copyNetwork: mockCopyNetwork,
-      pasteNetwork: mockPasteNetwork,
     });
   });
 
@@ -100,8 +96,6 @@ describe('useLadderKeyboardShortcuts', () => {
         undo: mockUndo,
         redo: mockRedo,
         duplicateElement: mockDuplicateElement,
-        copyNetwork: mockCopyNetwork,
-        pasteNetwork: mockPasteNetwork,
       });
 
       renderHook(() => useLadderKeyboardShortcuts());
@@ -190,8 +184,6 @@ describe('useLadderKeyboardShortcuts', () => {
         undo: mockUndo,
         redo: mockRedo,
         duplicateElement: mockDuplicateElement,
-        copyNetwork: mockCopyNetwork,
-        pasteNetwork: mockPasteNetwork,
       });
 
       renderHook(() => useLadderKeyboardShortcuts());
@@ -203,53 +195,6 @@ describe('useLadderKeyboardShortcuts', () => {
       expect(mockCutSelection).not.toHaveBeenCalled();
     });
 
-    it('should copy network on Ctrl+Shift+C', () => {
-      renderHook(() => useLadderKeyboardShortcuts());
-
-      act(() => {
-        simulateKeyDown('c', { ctrlKey: true, shiftKey: true });
-      });
-
-      expect(mockCopyNetwork).toHaveBeenCalledTimes(1);
-      expect(mockCopyToClipboard).not.toHaveBeenCalled();
-    });
-
-    it('should paste network on Ctrl+Shift+V', () => {
-      renderHook(() => useLadderKeyboardShortcuts());
-
-      act(() => {
-        simulateKeyDown('v', { ctrlKey: true, shiftKey: true });
-      });
-
-      expect(mockPasteNetwork).toHaveBeenCalledTimes(1);
-      expect(mockPasteFromClipboard).not.toHaveBeenCalled();
-    });
-
-    it('should not paste network in monitor mode', () => {
-      (useLadderStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-        selectedElementIds: new Set(['element-1']),
-        mode: 'monitor',
-        removeElement: mockRemoveElement,
-        copyToClipboard: mockCopyToClipboard,
-        cutSelection: mockCutSelection,
-        pasteFromClipboard: mockPasteFromClipboard,
-        selectAll: mockSelectAll,
-        clearSelection: mockClearSelection,
-        undo: mockUndo,
-        redo: mockRedo,
-        duplicateElement: mockDuplicateElement,
-        copyNetwork: mockCopyNetwork,
-        pasteNetwork: mockPasteNetwork,
-      });
-
-      renderHook(() => useLadderKeyboardShortcuts());
-
-      act(() => {
-        simulateKeyDown('v', { ctrlKey: true, shiftKey: true });
-      });
-
-      expect(mockPasteNetwork).not.toHaveBeenCalled();
-    });
   });
 
   describe('Selection operations', () => {
@@ -327,8 +272,6 @@ describe('useLadderKeyboardShortcuts', () => {
         undo: mockUndo,
         redo: mockRedo,
         duplicateElement: mockDuplicateElement,
-        copyNetwork: mockCopyNetwork,
-        pasteNetwork: mockPasteNetwork,
       });
 
       const onEditElement = vi.fn();

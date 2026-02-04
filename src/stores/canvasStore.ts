@@ -128,6 +128,10 @@ interface CanvasActions {
   updateComponent: (id: string, updates: Partial<Block>) => void;
   /** Move a component to a new position. Set skipHistory=true during continuous drag. */
   moveComponent: (id: string, position: Position, skipHistory?: boolean) => void;
+  /** Rotate a component by specified degrees */
+  rotateComponent: (id: string, degrees: number) => void;
+  /** Rotate all selected components by specified degrees */
+  rotateSelectedComponents: (degrees: number) => void;
 
   // Junction operations
   /** Move a junction to a new position. Set skipHistory=true during continuous drag. */
@@ -476,6 +480,64 @@ export const useCanvasStore = create<CanvasStore>()(
           },
           false,
           `moveComponent/${id}`
+        );
+      },
+
+      rotateComponent: (id, degrees) => {
+        set(
+          (state) => {
+            const component = state.components.get(id);
+            if (!component) return;
+
+            pushHistorySnapshot(state);
+
+            // Calculate new rotation (cumulative, normalized to 0-359)
+            const currentRotation = component.rotation || 0;
+            const newRotation = (currentRotation + degrees) % 360;
+
+            // Update component with new rotation
+            state.components.set(id, {
+              ...component,
+              rotation: newRotation,
+            } as Block);
+
+            // Mark as dirty for save tracking
+            state.isDirty = true;
+          },
+          false,
+          `rotateComponent/${id}/${degrees}`
+        );
+      },
+
+      rotateSelectedComponents: (degrees) => {
+        set(
+          (state) => {
+            const selectedComponents = Array.from(state.selectedIds)
+              .filter((id) => state.components.has(id));
+
+            if (selectedComponents.length === 0) return;
+
+            pushHistorySnapshot(state);
+
+            // Rotate each selected component
+            selectedComponents.forEach((id) => {
+              const component = state.components.get(id);
+              if (!component) return;
+
+              const currentRotation = component.rotation || 0;
+              const newRotation = (currentRotation + degrees) % 360;
+
+              state.components.set(id, {
+                ...component,
+                rotation: newRotation,
+              } as Block);
+            });
+
+            // Mark as dirty
+            state.isDirty = true;
+          },
+          false,
+          `rotateSelectedComponents/${degrees}`
         );
       },
 

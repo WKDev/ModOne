@@ -2,10 +2,10 @@
  * LadderEditor Component
  *
  * Main ladder diagram editor with drag-and-drop support.
- * Integrates toolbox, grid, network list, properties panel, and toolbar.
+ * Integrates toolbox, grid, properties panel, and toolbar.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import {
   DndContext,
@@ -20,7 +20,6 @@ import { useLadderStore } from '../../stores/ladderStore';
 import { LadderGrid } from './LadderGrid';
 import { LadderToolbox } from './LadderToolbox';
 import { LadderToolbar } from './LadderToolbar';
-import { LadderNetworkList } from './LadderNetworkList';
 import { NetworkCommentHeader } from './NetworkCommentHeader';
 import { LadderPropertiesPanel } from './properties';
 import { useLadderDragDrop } from '../../hooks/useLadderDragDrop';
@@ -31,8 +30,6 @@ export interface LadderEditorProps {
   className?: string;
   /** Whether to show the toolbox */
   showToolbox?: boolean;
-  /** Whether to show the network list sidebar */
-  showNetworkList?: boolean;
   /** Whether to show the properties panel */
   showPropertiesPanel?: boolean;
 }
@@ -65,24 +62,22 @@ function DragOverlayContent({ activeId }: { activeId: string | null }) {
  * LadderStatusBar - Status bar at the bottom of the editor
  */
 function LadderStatusBar() {
-  const { mode, networks, selectedElementIds, currentNetwork } = useLadderStore(
+  const { mode, elements, selectedElementIds } = useLadderStore(
     useShallow((state) => ({
       mode: state.mode,
-      networks: state.networks,
+      elements: state.elements,
       selectedElementIds: state.selectedElementIds,
-      currentNetwork: state.currentNetworkId ? state.networks.get(state.currentNetworkId) : null,
     }))
   );
 
   const isMonitorMode = mode === 'monitor';
   const selectedCount = selectedElementIds.size;
-  const elementCount = currentNetwork?.elements.size ?? 0;
+  const elementCount = elements.size;
 
   return (
     <div className="flex items-center justify-between px-3 py-1.5 bg-neutral-800 border-t border-neutral-700 text-xs text-neutral-400">
       <div className="flex items-center gap-4">
         <span>Mode: {isMonitorMode ? 'Monitor' : 'Edit'}</span>
-        <span>Networks: {networks.size}</span>
         <span>Elements: {elementCount}</span>
         {selectedCount > 0 && <span>{selectedCount} selected</span>}
       </div>
@@ -104,24 +99,17 @@ function LadderStatusBar() {
 export function LadderEditor({
   className,
   showToolbox = true,
-  showNetworkList = true,
   showPropertiesPanel = true,
 }: LadderEditorProps) {
   const {
-    currentNetworkId,
-    currentNetwork,
+    comment,
     mode,
-    networks,
-    addNetwork,
-    updateNetwork,
+    updateComment,
   } = useLadderStore(
     useShallow((state) => ({
-      currentNetworkId: state.currentNetworkId,
-      currentNetwork: state.currentNetworkId ? state.networks.get(state.currentNetworkId) : null,
+      comment: state.comment,
       mode: state.mode,
-      networks: state.networks,
-      addNetwork: state.addNetwork,
-      updateNetwork: state.updateNetwork,
+      updateComment: state.updateComment,
     }))
   );
 
@@ -164,21 +152,12 @@ export function LadderEditor({
     setActiveId(null);
   }, []);
 
-  // Create a default network if none exists
-  useEffect(() => {
-    if (networks.size === 0) {
-      addNetwork('Network 1');
-    }
-  }, [networks.size, addNetwork]);
-
-  // Handle network comment update
+  // Handle comment update
   const handleUpdateComment = useCallback(
-    (comment: string) => {
-      if (currentNetworkId) {
-        updateNetwork(currentNetworkId, { comment });
-      }
+    (newComment: string) => {
+      updateComment(newComment);
     },
-    [currentNetworkId, updateNetwork]
+    [updateComment]
   );
 
   const isMonitorMode = mode === 'monitor';
@@ -192,11 +171,6 @@ export function LadderEditor({
       onDragCancel={onDragCancel}
     >
       <div className={cn('flex h-full bg-neutral-900', className)}>
-        {/* Network List Sidebar */}
-        {showNetworkList && (
-          <LadderNetworkList className="w-48 shrink-0" />
-        )}
-
         {/* Main content area */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Toolbar */}
@@ -214,28 +188,19 @@ export function LadderEditor({
 
             {/* Grid area */}
             <div className="flex-1 flex flex-col overflow-hidden">
-              {/* Network comment header */}
-              {currentNetwork && (
-                <NetworkCommentHeader
-                  comment={currentNetwork.comment}
-                  onUpdateComment={handleUpdateComment}
-                  editable={!isMonitorMode}
-                />
-              )}
+              {/* Comment header */}
+              <NetworkCommentHeader
+                comment={comment}
+                onUpdateComment={handleUpdateComment}
+                editable={!isMonitorMode}
+              />
 
               {/* Grid container */}
               <div className="flex-1 overflow-auto p-4">
-                {currentNetworkId ? (
-                  <LadderGrid
-                    networkId={currentNetworkId}
-                    readonly={isMonitorMode}
-                    showRowNumbers
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-neutral-500">
-                    No network selected
-                  </div>
-                )}
+                <LadderGrid
+                  readonly={isMonitorMode}
+                  showRowNumbers
+                />
               </div>
             </div>
 

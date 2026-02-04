@@ -75,7 +75,6 @@ export function LadderToolbar({ className }: LadderToolbarProps) {
     history,
     selectedElementIds,
     clipboard,
-    networkClipboard,
     undo,
     redo,
     startMonitoring,
@@ -83,8 +82,6 @@ export function LadderToolbar({ className }: LadderToolbarProps) {
     copyToClipboard,
     pasteFromClipboard,
     removeElement,
-    copyNetwork,
-    pasteNetwork,
   } = useLadderStore(
     useShallow((state) => ({
       mode: state.mode,
@@ -92,7 +89,6 @@ export function LadderToolbar({ className }: LadderToolbarProps) {
       history: state.history,
       selectedElementIds: state.selectedElementIds,
       clipboard: state.clipboard,
-      networkClipboard: state.networkClipboard,
       undo: state.undo,
       redo: state.redo,
       startMonitoring: state.startMonitoring,
@@ -100,8 +96,6 @@ export function LadderToolbar({ className }: LadderToolbarProps) {
       copyToClipboard: state.copyToClipboard,
       pasteFromClipboard: state.pasteFromClipboard,
       removeElement: state.removeElement,
-      copyNetwork: state.copyNetwork,
-      pasteNetwork: state.pasteNetwork,
     }))
   );
 
@@ -109,7 +103,6 @@ export function LadderToolbar({ className }: LadderToolbarProps) {
   const canRedo = historyIndex < history.length - 1;
   const hasSelection = selectedElementIds.size > 0;
   const hasClipboard = clipboard.length > 0;
-  const hasNetworkClipboard = networkClipboard !== null;
   const isEditMode = mode === 'edit';
 
   // Handle delete selected elements
@@ -158,51 +151,6 @@ export function LadderToolbar({ className }: LadderToolbarProps) {
         title="Delete (Del)"
       >
         <Trash2 size={16} />
-      </ToolbarButton>
-
-      <ToolbarSeparator />
-
-      {/* Network operations */}
-      <ToolbarButton
-        onClick={() => copyNetwork()}
-        title="Copy Network (Ctrl+Shift+C)"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect x="8" y="8" width="12" height="12" rx="2" />
-          <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
-        </svg>
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => pasteNetwork()}
-        disabled={!hasNetworkClipboard || !isEditMode}
-        title="Paste Network (Ctrl+Shift+V)"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect x="8" y="8" width="12" height="12" rx="2" />
-          <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
-          <path d="M12 12v6" />
-          <path d="M9 15h6" />
-        </svg>
       </ToolbarButton>
 
       {/* Spacer */}

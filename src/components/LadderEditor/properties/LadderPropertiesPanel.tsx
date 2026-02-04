@@ -8,7 +8,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { cn } from '../../../lib/utils';
-import { useLadderStore, selectCurrentNetwork } from '../../../stores/ladderStore';
+import { useLadderStore, selectElements } from '../../../stores/ladderStore';
 import {
   isContactElement,
   isCoilElement,
@@ -194,10 +194,10 @@ function SingleElementProperties({
  */
 export function LadderPropertiesPanel({ className }: LadderPropertiesPanelProps) {
   // Use shallow comparison for stable selection
-  const { selectedElementIds, currentNetwork, mode, updateElement } = useLadderStore(
+  const { selectedElementIds, elements, mode, updateElement } = useLadderStore(
     useShallow((state) => ({
       selectedElementIds: state.selectedElementIds,
-      currentNetwork: selectCurrentNetwork(state),
+      elements: selectElements(state),
       mode: state.mode,
       updateElement: state.updateElement,
     }))
@@ -206,16 +206,15 @@ export function LadderPropertiesPanel({ className }: LadderPropertiesPanelProps)
   // Device select dialog state
   const [isDeviceDialogOpen, setIsDeviceDialogOpen] = useState(false);
 
-  // Compute selected elements from IDs and current network
+  // Compute selected elements from IDs
   const selectedElements = useMemo(() => {
-    if (!currentNetwork) return [];
-    const elements: LadderElement[] = [];
+    const result: LadderElement[] = [];
     selectedElementIds.forEach((id) => {
-      const element = currentNetwork.elements.get(id);
-      if (element) elements.push(element);
+      const element = elements.get(id);
+      if (element) result.push(element);
     });
-    return elements;
-  }, [selectedElementIds, currentNetwork]);
+    return result;
+  }, [selectedElementIds, elements]);
 
   const isMonitorMode = mode === 'monitor';
 

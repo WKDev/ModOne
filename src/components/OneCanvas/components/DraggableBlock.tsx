@@ -44,7 +44,8 @@ export const DraggableBlock = memo(function DraggableBlock({
     position: 'absolute' as const,
     left: block.position.x,
     top: block.position.y,
-    transform: CSS.Translate.toString(transform),
+    transform: `${CSS.Translate.toString(transform)} rotate(${block.rotation || 0}deg)`,
+    transformOrigin: 'center center',
     opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 1000 : 1,
   };

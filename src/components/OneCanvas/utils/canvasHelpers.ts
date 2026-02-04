@@ -375,3 +375,36 @@ export function computeWireBendPoints(
     source: 'auto' as const,
   }));
 }
+
+// ============================================================================
+// Block Rotation
+// ============================================================================
+
+/**
+ * Rotate a port position by the given rotation angle.
+ * Rotates clockwise: left → top → right → bottom → left
+ *
+ * @param position - Original port position
+ * @param rotation - Rotation angle in degrees (0, 90, 180, 270)
+ * @returns Rotated port position
+ */
+export function rotatePortPosition(
+  position: PortPosition,
+  rotation: number
+): PortPosition {
+  // Normalize rotation to 0-270
+  const normalizedRotation = ((rotation % 360) + 360) % 360;
+
+  // No rotation needed
+  if (normalizedRotation === 0) return position;
+
+  // Map positions to indices for rotation
+  const positions: PortPosition[] = ['right', 'bottom', 'left', 'top'];
+  const currentIndex = positions.indexOf(position);
+
+  // Calculate rotated index (clockwise)
+  const rotationSteps = normalizedRotation / 90;
+  const newIndex = (currentIndex + rotationSteps) % 4;
+
+  return positions[newIndex];
+}

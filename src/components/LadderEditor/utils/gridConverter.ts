@@ -40,7 +40,6 @@ import type {
   TimerProperties,
   CounterProperties,
   CompareProperties,
-  LadderNetwork,
 } from '../../../types/ladder';
 
 // ============================================================================
@@ -538,13 +537,20 @@ export function convertNetworkToGrid(
   };
 }
 
+/** Result of converting AST network to editor format */
+export interface EditorNetworkData {
+  elements: Map<string, LadderElement>;
+  wires: LadderWire[];
+  comment?: string;
+}
+
 /**
- * Convert AST network to editor LadderNetwork format
+ * Convert AST network to editor format (elements Map + wires)
  */
 export function convertToEditorNetwork(
   astNetwork: LadderNetworkAST,
   options: ConversionOptions = {}
-): LadderNetwork {
+): EditorNetworkData {
   const result = convertNetworkToGrid(astNetwork, options);
 
   // Convert elements array to Map
@@ -554,23 +560,34 @@ export function convertToEditorNetwork(
   }
 
   return {
-    id: astNetwork.id,
-    label: `Network ${astNetwork.step}`,
-    comment: astNetwork.comment,
     elements: elementsMap,
     wires: result.wires,
-    enabled: true,
+    comment: astNetwork.comment,
   };
 }
 
 /**
- * Batch convert multiple AST networks
+ * Batch convert multiple AST networks and merge into a single flat structure
  */
 export function convertMultipleNetworks(
   networks: LadderNetworkAST[],
   options: ConversionOptions = {}
-): LadderNetwork[] {
-  return networks.map((network) => convertToEditorNetwork(network, options));
+): EditorNetworkData {
+  const mergedElements = new Map<string, LadderElement>();
+  const mergedWires: LadderWire[] = [];
+
+  for (const network of networks) {
+    const data = convertToEditorNetwork(network, options);
+    for (const [id, element] of data.elements) {
+      mergedElements.set(id, element);
+    }
+    mergedWires.push(...data.wires);
+  }
+
+  return {
+    elements: mergedElements,
+    wires: mergedWires,
+  };
 }
 
 // ============================================================================
@@ -1181,12 +1198,14 @@ export function gridToAST(
 }
 
 /**
- * Convert editor LadderNetwork to AST LadderNetwork
+ * Convert editor elements/wires to AST LadderNetwork
  */
-export function convertEditorNetworkToAST(
-  network: LadderNetwork
+export function convertEditorToAST(
+  elements: Map<string, LadderElement>,
+  wires: LadderWire[],
+  options?: { id?: string; step?: number; comment?: string }
 ): LadderNetworkAST | null {
-  const ast = gridToAST(network.elements, network.wires);
+  const ast = gridToAST(elements, wires);
 
   if (!ast) {
     return null;
@@ -1199,10 +1218,10 @@ export function convertEditorNetworkToAST(
   const resultNodes = isBlockNode(ast) ? nodes : [ast];
 
   return {
-    id: network.id,
-    step: parseInt(network.label?.replace(/\D/g, '') ?? '1', 10),
+    id: options?.id ?? 'network-1',
+    step: options?.step ?? 1,
     nodes: resultNodes,
-    comment: network.comment,
+    comment: options?.comment,
   };
 }
 
@@ -1220,5 +1239,5 @@ export default {
   buildASTFromGroups,
   normalizeAST,
   gridToAST,
-  convertEditorNetworkToAST,
+  convertEditorToAST,
 };

@@ -7,8 +7,8 @@
 
 import { useCallback } from 'react';
 import type { DragEndEvent, DragStartEvent, DragOverEvent } from '@dnd-kit/core';
-import { useLadderStore, selectCurrentNetwork, selectGridConfig } from '../stores/ladderStore';
-import type { LadderElementType, GridPosition, LadderNetwork, LadderGridConfig } from '../types/ladder';
+import { useLadderStore, selectElements, selectGridConfig } from '../stores/ladderStore';
+import type { LadderElementType, GridPosition, LadderElement, LadderGridConfig } from '../types/ladder';
 import { isCoilType } from '../types/ladder';
 
 // ============================================================================
@@ -58,12 +58,12 @@ export interface PlacementValidation {
  * Check if a cell is occupied by an element
  */
 function isCellOccupied(
-  network: LadderNetwork,
+  elements: Map<string, LadderElement>,
   row: number,
   col: number,
   excludeId?: string
 ): boolean {
-  for (const [id, element] of network.elements) {
+  for (const [id, element] of elements) {
     if (excludeId && id === excludeId) continue;
     if (element.position.row === row && element.position.col === col) {
       return true;
@@ -97,22 +97,17 @@ function isWithinBounds(position: GridPosition, gridConfig: LadderGridConfig): b
 export function validatePlacement(
   elementType: LadderElementType,
   position: GridPosition,
-  network: LadderNetwork | null,
+  elements: Map<string, LadderElement>,
   gridConfig: LadderGridConfig,
   excludeId?: string
 ): PlacementValidation {
-  // Check network exists
-  if (!network) {
-    return { valid: false, reason: 'No network selected' };
-  }
-
   // Check bounds
   if (!isWithinBounds(position, gridConfig)) {
     return { valid: false, reason: 'Position out of bounds' };
   }
 
   // Check if cell is occupied
-  if (isCellOccupied(network, position.row, position.col, excludeId)) {
+  if (isCellOccupied(elements, position.row, position.col, excludeId)) {
     return { valid: false, reason: 'Cell is occupied' };
   }
 
@@ -160,7 +155,7 @@ export interface UseLadderDragDropResult {
  * useLadderDragDrop - Manages drag-and-drop for ladder elements
  */
 export function useLadderDragDrop(): UseLadderDragDropResult {
-  const network = useLadderStore(selectCurrentNetwork);
+  const elements = useLadderStore(selectElements);
   const gridConfig = useLadderStore(selectGridConfig);
   const addElement = useLadderStore((state) => state.addElement);
   const moveElement = useLadderStore((state) => state.moveElement);
@@ -171,9 +166,9 @@ export function useLadderDragDrop(): UseLadderDragDropResult {
    */
   const canPlaceAt = useCallback(
     (elementType: LadderElementType, position: GridPosition, excludeId?: string) => {
-      return validatePlacement(elementType, position, network ?? null, gridConfig, excludeId);
+      return validatePlacement(elementType, position, elements, gridConfig, excludeId);
     },
-    [network, gridConfig]
+    [elements, gridConfig]
   );
 
   /**
