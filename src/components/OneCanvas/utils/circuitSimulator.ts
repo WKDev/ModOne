@@ -290,7 +290,9 @@ export function simulateCircuit(
     const nets = buildNets(wires, componentsMap, junctionsMap);
 
     // 7. Equalize voltages within each net
-    equalizeNetVoltages(nodeVoltages, nets);
+    // DISABLED: This was causing LEDs to light up without a complete circuit to ground.
+    // Only complete paths (power → load → ground) should have voltage propagation.
+    // equalizeNetVoltages(nodeVoltages, nets);
 
     // 8. Determine powered components
     const poweredComponents = determinePoweredComponents(
