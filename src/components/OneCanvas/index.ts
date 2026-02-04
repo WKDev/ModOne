@@ -62,6 +62,7 @@ export { SelectionBoundingBox } from './components/SelectionBoundingBox';
 
 // Debug Tools
 export { CoordinateDebugger } from './components/CoordinateDebugger';
+export { CoordinateVerifier } from './components/CoordinateVerifier';
 
 // Simulation UI
 export { SimulationToolbar } from './SimulationToolbar';

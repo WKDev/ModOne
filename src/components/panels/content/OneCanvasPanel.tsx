@@ -629,8 +629,10 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
         return;
       }
 
-      const rect = containerRectRef.current;
-      if (!rect) return;
+      // TEMPORARY FIX: Use fresh rect instead of cached
+      const container = canvasRef.current?.getContainer();
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
 
       const screenPos = {
         x: event.clientX - rect.left,
@@ -641,14 +643,16 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
       console.log('[OneCanvasPanel] Calling selectionHandler.handleCanvasMouseDown');
       selectionHandler.handleCanvasMouseDown(event, canvasPos);
     },
-    [pan, zoom, selectionHandler]
+    [wireDrawing, pan, zoom, selectionHandler, canvasRef]
   );
 
   // Handle canvas mouse move for wire preview and selection box
   const handleCanvasMouseMove = useCallback(
     (event: React.MouseEvent) => {
-      const rect = containerRectRef.current;
-      if (!rect) return;
+      // TEMPORARY FIX: Use fresh rect instead of cached
+      const container = canvasRef.current?.getContainer();
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
 
       const screenPos = {
         x: event.clientX - rect.left,
@@ -664,7 +668,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
       // Update selection box if dragging
       selectionHandler.handleCanvasMouseMove(event, canvasPos);
     },
-    [wireDrawing, pan, zoom, updateWireDrawing, selectionHandler]
+    [wireDrawing, pan, zoom, updateWireDrawing, selectionHandler, canvasRef]
   );
 
   // Handle canvas mouse up for wire cancellation and selection completion
@@ -709,7 +713,11 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
         }
         setSelection(Array.from(newSelection));
       } else {
-        // Replace selection
+        // If already selected, keep current selection (for drag preparation)
+        if (selectedIds.has(blockId)) {
+          return;
+        }
+        // Otherwise, replace selection with this block only
         setSelection([blockId]);
       }
     },
