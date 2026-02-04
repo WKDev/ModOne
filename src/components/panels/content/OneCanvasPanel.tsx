@@ -232,7 +232,6 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
   const updateWireDrawing = useCanvasStore((state) => state.updateWireDrawing);
   const cancelWireDrawing = useCanvasStore((state) => state.cancelWireDrawing);
   const selectedIds = useCanvasStore((state) => state.selectedIds);
-  const setSelection = useCanvasStore((state) => state.setSelection);
 
   // DEBUG: Log when selectedIds changes
   console.log('[OneCanvasPanel] selectedIds:', Array.from(selectedIds));
@@ -590,38 +589,6 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [wireDrawing, cancelWireDrawing]);
 
-  // Handle block selection
-  const handleBlockSelect = useCallback(
-    (blockId: string, addToSelection: boolean) => {
-      if (addToSelection) {
-        // Toggle selection when Ctrl/Cmd is held
-        const newSelection = new Set(selectedIds);
-        if (newSelection.has(blockId)) {
-          newSelection.delete(blockId);
-        } else {
-          newSelection.add(blockId);
-        }
-        setSelection(Array.from(newSelection));
-      } else {
-        // If already selected AND it's the only selection, keep it (for drag preparation)
-        if (selectedIds.has(blockId) && selectedIds.size === 1) {
-          return;
-        }
-        // Otherwise, replace selection with this block only
-        setSelection([blockId]);
-      }
-    },
-    [selectedIds, setSelection]
-  );
-
-  // Handle wire selection
-  const handleWireClick = useCallback(
-    (wireId: string) => {
-      setSelection([wireId]);
-    },
-    [setSelection]
-  );
-
   // DnD sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -772,11 +739,9 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
                 junctions={junctions}
                 selectionBox={selectionHandler.selectionBox}
                 wirePreview={wireDrawing}
-                onBlockClick={(blockId, e) => {
-                  const addToSelection = e.ctrlKey || e.metaKey;
-                  handleBlockSelect(blockId, addToSelection);
-                }}
-                onWireClick={handleWireClick}
+                onBlockClick={selectionHandler.handleComponentClick}
+                onWireClick={selectionHandler.handleWireClick}
+                onJunctionClick={selectionHandler.handleJunctionClick}
                 selectedBlockIds={selectedIds}
                 selectedWireIds={selectedIds}
                 connectedPorts={Array.from(components.keys()).reduce((acc, blockId) => {

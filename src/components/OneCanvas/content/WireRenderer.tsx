@@ -36,7 +36,7 @@ interface WireProps {
   /** Path mode */
   pathMode?: 'straight' | 'bezier' | 'orthogonal';
   /** Click handler */
-  onClick?: (id: string) => void;
+  onClick?: (id: string, e: React.MouseEvent) => void;
   /** Right-click context menu handler */
   onContextMenu?: (wireId: string, position: Position, screenPos: { x: number; y: number }) => void;
   /** Wire handles (control points with constraints) */
@@ -182,7 +182,7 @@ export const Wire = memo(function Wire({
   // Handle click
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onClick?.(id);
+    onClick?.(id, e);
   };
 
   // Handle right-click for context menu

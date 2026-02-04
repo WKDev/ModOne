@@ -22,6 +22,8 @@ interface ButtonBlockProps {
   isSelected?: boolean;
   /** Selection handler */
   onSelect?: (blockId: string, addToSelection: boolean) => void;
+  /** Block click handler */
+  onBlockClick?: (blockId: string, e: React.MouseEvent) => void;
   /** Wire start handler */
   onStartWire?: (blockId: string, portId: string) => void;
   /** Wire end handler */
@@ -113,6 +115,7 @@ export const ButtonBlock = memo(function ButtonBlock({
   block,
   isSelected,
   onSelect,
+  onBlockClick,
   onStartWire,
   onEndWire,
   connectedPorts,
@@ -204,6 +207,7 @@ export const ButtonBlock = memo(function ButtonBlock({
       blockId={block.id}
       isSelected={isSelected}
       onSelect={onSelect}
+      onBlockClick={onBlockClick}
       width={block.size.width}
       height={block.size.height}
     >

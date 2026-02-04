@@ -18,7 +18,9 @@ interface BlockWrapperProps {
   isSelected?: boolean;
   /** Block content */
   children: React.ReactNode;
-  /** Callback when block is clicked (for selection) */
+  /** Callback when block is clicked (for selection) - supports new event-based handler */
+  onBlockClick?: (blockId: string, e: React.MouseEvent) => void;
+  /** Legacy callback for backward compatibility */
   onSelect?: (blockId: string, addToSelection: boolean) => void;
   /** Additional CSS classes */
   className?: string;
@@ -39,6 +41,7 @@ export const BlockWrapper = memo(function BlockWrapper({
   blockId,
   isSelected = false,
   children,
+  onBlockClick,
   onSelect,
   className = '',
   width = 60,
@@ -48,10 +51,17 @@ export const BlockWrapper = memo(function BlockWrapper({
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
-      const addToSelection = e.ctrlKey || e.metaKey;
-      onSelect?.(blockId, addToSelection);
+
+      // Prefer new event-based handler
+      if (onBlockClick) {
+        onBlockClick(blockId, e);
+      } else if (onSelect) {
+        // Fallback to legacy handler
+        const addToSelection = e.ctrlKey || e.metaKey;
+        onSelect(blockId, addToSelection);
+      }
     },
-    [blockId, onSelect]
+    [blockId, onBlockClick, onSelect]
   );
 
   return (

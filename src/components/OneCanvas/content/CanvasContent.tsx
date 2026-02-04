@@ -7,7 +7,8 @@ interface CanvasContentProps {
   wires: Wire[];
   junctions: Map<string, Junction>;
   onBlockClick?: (blockId: string, e: React.MouseEvent) => void;
-  onWireClick?: (wireId: string) => void;
+  onWireClick?: (wireId: string, e: React.MouseEvent) => void;
+  onJunctionClick?: (junctionId: string, e: React.MouseEvent) => void;
   selectedBlockIds?: Set<string>;
   selectedWireIds?: Set<string>;
   connectedPorts?: Set<string>;
@@ -59,6 +60,7 @@ export function CanvasContent({
   junctions,
   onBlockClick,
   onWireClick,
+  onJunctionClick,
   selectedBlockIds,
   selectedWireIds,
   connectedPorts,
@@ -155,14 +157,7 @@ export function CanvasContent({
           key={block.id}
           block={block}
           isSelected={selectedBlockIds?.has(block.id)}
-          onSelect={(blockId, addToSelection) => {
-            // Convert to MouseEvent for compatibility
-            const event = new MouseEvent('click', {
-              ctrlKey: addToSelection,
-              metaKey: addToSelection,
-            }) as unknown as React.MouseEvent;
-            onBlockClick?.(blockId, event);
-          }}
+          onBlockClick={onBlockClick}
           onStartWire={onStartWire}
           onEndWire={onEndWire}
           onDragStart={onBlockDragStart}
@@ -187,6 +182,10 @@ export function CanvasContent({
             r={4}
             fill={junction.selected ? '#facc15' : '#6b7280'}
             className="pointer-events-auto cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              onJunctionClick?.(junction.id, e.nativeEvent as unknown as React.MouseEvent);
+            }}
           />
         ))}
       </svg>

@@ -25,6 +25,8 @@ interface ScopeBlockProps {
   isSelected?: boolean;
   /** Selection handler */
   onSelect?: (blockId: string, addToSelection: boolean) => void;
+  /** Block click handler */
+  onBlockClick?: (blockId: string, e: React.MouseEvent) => void;
   /** Wire start handler */
   onStartWire?: (blockId: string, portId: string) => void;
   /** Wire end handler */
@@ -99,6 +101,7 @@ export const ScopeBlock = memo(function ScopeBlock({
   block,
   isSelected,
   onSelect,
+  onBlockClick,
   onStartWire,
   onEndWire,
   connectedPorts,
@@ -159,6 +162,7 @@ export const ScopeBlock = memo(function ScopeBlock({
         blockId={block.id}
         isSelected={isSelected}
         onSelect={onSelect}
+        onBlockClick={onBlockClick}
         width={block.size.width}
         height={block.size.height}
       >

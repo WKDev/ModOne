@@ -38,7 +38,8 @@ interface CanvasProps {
 
   // Callbacks
   onBlockClick?: (blockId: string, e: React.MouseEvent) => void;
-  onWireClick?: (wireId: string) => void;
+  onWireClick?: (wireId: string, e: React.MouseEvent) => void;
+  onJunctionClick?: (junctionId: string, e: React.MouseEvent) => void;
   onCanvasClick?: (event: React.MouseEvent) => void;
   onCanvasDoubleClick?: (event: React.MouseEvent) => void;
 
@@ -111,6 +112,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
     wirePreview,
     onBlockClick,
     onWireClick,
+    onJunctionClick,
     onCanvasClick,
     onCanvasDoubleClick,
     selectedBlockIds,
@@ -215,6 +217,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
               junctions={junctions}
               onBlockClick={onBlockClick}
               onWireClick={onWireClick}
+              onJunctionClick={onJunctionClick}
               selectedBlockIds={selectedBlockIds}
               selectedWireIds={selectedWireIds}
               connectedPorts={connectedPorts}

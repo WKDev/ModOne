@@ -23,8 +23,8 @@ interface BlockRendererProps {
   block: Block;
   /** Whether the block is selected */
   isSelected?: boolean;
-  /** Selection handler */
-  onSelect?: (blockId: string, addToSelection: boolean) => void;
+  /** Block click handler */
+  onBlockClick?: (blockId: string, e: React.MouseEvent) => void;
   /** Wire start handler */
   onStartWire?: (blockId: string, portId: string) => void;
   /** Wire end handler */
@@ -53,7 +53,7 @@ interface BlockRendererProps {
 export const BlockRenderer = memo(function BlockRenderer({
   block,
   isSelected,
-  onSelect,
+  onBlockClick,
   onStartWire,
   onEndWire,
   onDragStart,
@@ -66,7 +66,7 @@ export const BlockRenderer = memo(function BlockRenderer({
   // Common props for all block types
   const commonProps = {
     isSelected,
-    onSelect,
+    onBlockClick,
     onStartWire,
     onEndWire,
     onDragStart,

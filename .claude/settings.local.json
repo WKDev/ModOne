@@ -94,7 +94,9 @@
       "Bash(pnpm run test:*)",
       "Bash(git stash:*)",
       "Bash(git restore:*)",
-      "Bash(pnpm run:*)"
+      "Bash(pnpm run:*)",
+      "Bash(grep:*)",
+      "Bash(done)"
     ]
   },
   "enableAllProjectMcpServers": true,

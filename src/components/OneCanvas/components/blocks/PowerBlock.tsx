@@ -19,7 +19,9 @@ interface PowerBlockProps {
   block: PowerSourceBlock;
   /** Whether the block is selected */
   isSelected?: boolean;
-  /** Selection handler */
+  /** Block click handler */
+  onBlockClick?: (blockId: string, e: React.MouseEvent) => void;
+  /** Legacy selection handler */
   onSelect?: (blockId: string, addToSelection: boolean) => void;
   /** Wire start handler */
   onStartWire?: (blockId: string, portId: string) => void;
@@ -80,6 +82,7 @@ const GroundSymbol = memo(function GroundSymbol() {
 export const PowerBlock = memo(function PowerBlock({
   block,
   isSelected,
+  onBlockClick,
   onSelect,
   onStartWire,
   onEndWire,
@@ -91,6 +94,7 @@ export const PowerBlock = memo(function PowerBlock({
     <BlockWrapper
       blockId={block.id}
       isSelected={isSelected}
+      onBlockClick={onBlockClick}
       onSelect={onSelect}
       width={block.size.width}
       height={block.size.height}

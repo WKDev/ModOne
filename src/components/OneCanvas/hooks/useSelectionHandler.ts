@@ -138,28 +138,15 @@ export function useSelectionHandler(
 
   // Handle mouse down on canvas (not on a component)
   const handleCanvasMouseDown = useCallback(
-    (e: React.MouseEvent, canvasPosition: Position) => {
+    (_e: React.MouseEvent, canvasPosition: Position) => {
       // Only handle left click
-      if (e.button !== 0) return;
+      if (_e.button !== 0) return;
 
       // Always store initial position for drag detection
       mouseDownPos.current = canvasPosition;
       hasPassedThreshold.current = false;
-
-      // Check if clicking on interactive elements
-      const target = e.target as HTMLElement;
-      const isClickingBlock = target.closest('[data-block-id]');
-      const isClickingWire = target.closest('[data-wire-id]');
-      const isClickingPort = target.closest('[data-port-id]');
-      const isClickingJunction = target.closest('[data-junction-id]');
-
-      // Clear selection on empty canvas click (unless modifier held or clicking interactive elements)
-      const isClickingInteractive = isClickingBlock || isClickingWire || isClickingPort || isClickingJunction;
-      if (!isClickingInteractive && !hasModifier(e)) {
-        clearSelection();
-      }
     },
-    [clearSelection]
+    []
   );
 
   // Handle mouse move on canvas
@@ -248,6 +235,18 @@ export function useSelectionHandler(
         // This prevents Canvas onClick from clearing the selection
         e.preventDefault();
         e.stopPropagation();
+      } else if (!isDragSelecting) {
+        // Only clear selection if we did NOT drag-select
+        const target = e.target as HTMLElement;
+        const isClickingBlock = target.closest('[data-block-id]');
+        const isClickingWire = target.closest('[data-wire-id]');
+        const isClickingPort = target.closest('[data-port-id]');
+        const isClickingJunction = target.closest('[data-junction-id]');
+
+        const isClickingInteractive = isClickingBlock || isClickingWire || isClickingPort || isClickingJunction;
+        if (!isClickingInteractive && !hasModifier(e)) {
+          clearSelection();
+        }
       }
 
       // Reset drag state
@@ -264,6 +263,7 @@ export function useSelectionHandler(
       junctions,
       setSelection,
       addToSelection,
+      clearSelection,
     ]
   );
 
