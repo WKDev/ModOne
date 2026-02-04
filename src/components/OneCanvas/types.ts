@@ -31,6 +31,17 @@ export interface Position {
 }
 
 /**
+ * Screen Space Position (viewport/screen pixel coordinates)
+ * - Direct mouse event coordinates
+ * - Affected by zoom/pan
+ */
+export interface ScreenPosition {
+  readonly _brand: 'ScreenPosition';
+  x: number;
+  y: number;
+}
+
+/**
  * Container Space Position (컨테이너 기준 상대 좌표)
  * - getBoundingClientRect 기준
  * - zoom/pan 영향 없음
@@ -53,6 +64,10 @@ export interface CanvasPosition {
 }
 
 // Helper functions for type conversion
+export function toScreenPos(pos: Position): ScreenPosition {
+  return { ...pos, _brand: 'ScreenPosition' as const };
+}
+
 export function toContainerPos(pos: Position): ContainerPosition {
   return { ...pos, _brand: 'ContainerPosition' as const };
 }
@@ -65,6 +80,112 @@ export function toCanvasPos(pos: Position): CanvasPosition {
 export interface Size {
   width: number;
   height: number;
+}
+
+// ============================================================================
+// Selection Types
+// ============================================================================
+
+/** Type of selectable items on canvas */
+export type SelectableType = 'block' | 'wire' | 'junction';
+
+/** A selected item with its type */
+export interface Selection {
+  type: SelectableType;
+  id: string;
+}
+
+/** Typed selection state with helper methods */
+export class SelectionState {
+  private items: Map<string, Selection>;
+
+  constructor(selections: Selection[] = []) {
+    this.items = new Map(selections.map(s => [s.id, s]));
+  }
+
+  /** Get all selected block IDs */
+  getBlocks(): string[] {
+    return Array.from(this.items.values())
+      .filter(s => s.type === 'block')
+      .map(s => s.id);
+  }
+
+  /** Get all selected wire IDs */
+  getWires(): string[] {
+    return Array.from(this.items.values())
+      .filter(s => s.type === 'wire')
+      .map(s => s.id);
+  }
+
+  /** Get all selected junction IDs */
+  getJunctions(): string[] {
+    return Array.from(this.items.values())
+      .filter(s => s.type === 'junction')
+      .map(s => s.id);
+  }
+
+  /** Get all selected items */
+  getAll(): Selection[] {
+    return Array.from(this.items.values());
+  }
+
+  /** Get all selected IDs (regardless of type) */
+  getAllIds(): string[] {
+    return Array.from(this.items.keys());
+  }
+
+  /** Check if an item is selected */
+  has(id: string): boolean {
+    return this.items.has(id);
+  }
+
+  /** Check if selection is empty */
+  isEmpty(): boolean {
+    return this.items.size === 0;
+  }
+
+  /** Get number of selected items */
+  get size(): number {
+    return this.items.size;
+  }
+
+  /** Add an item to selection */
+  add(selection: Selection): SelectionState {
+    const newItems = new Map(this.items);
+    newItems.set(selection.id, selection);
+    return new SelectionState(Array.from(newItems.values()));
+  }
+
+  /** Remove an item from selection */
+  remove(id: string): SelectionState {
+    const newItems = new Map(this.items);
+    newItems.delete(id);
+    return new SelectionState(Array.from(newItems.values()));
+  }
+
+  /** Toggle an item in selection */
+  toggle(selection: Selection): SelectionState {
+    if (this.has(selection.id)) {
+      return this.remove(selection.id);
+    } else {
+      return this.add(selection);
+    }
+  }
+
+  /** Clear all selections */
+  clear(): SelectionState {
+    return new SelectionState([]);
+  }
+
+  /** Create a new selection state from IDs and types */
+  static fromIds(items: Array<{ id: string; type: SelectableType }>): SelectionState {
+    return new SelectionState(items.map(({ id, type }) => ({ id, type })));
+  }
+
+  /** Convert to plain array for serialization */
+  toArray(): Selection[] {
+    return this.getAll();
+  }
 }
 
 // ============================================================================
@@ -284,6 +405,30 @@ export interface Wire {
   fromExitDirection?: PortPosition;
   /** Direction wire enters target port (user-specified via drag direction) */
   toExitDirection?: PortPosition;
+}
+
+// ============================================================================
+// Wire Geometry Types (for DOM-free selection)
+// ============================================================================
+
+/** Bounding box for quick collision rejection */
+export interface BoundingBox {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+}
+
+/** Pre-computed geometry for a wire (no DOM dependency) */
+export interface WireGeometry {
+  /** Wire identifier */
+  wireId: string;
+  /** Bounding box for quick rejection tests */
+  bounds: BoundingBox;
+  /** Sampled points along the Bezier curve */
+  samples: Position[];
+  /** Line segments connecting sampled points */
+  segments: Array<{ start: Position; end: Position }>;
 }
 
 // ============================================================================
