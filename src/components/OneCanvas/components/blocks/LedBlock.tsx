@@ -36,11 +36,11 @@ interface LedBlockProps {
 
 // Color mapping
 const LED_COLORS: Record<LedColor, { base: string; glow: string }> = {
-  red: { base: '#dc2626', glow: '#ef4444' },      // red-600, red-500
-  green: { base: '#16a34a', glow: '#22c55e' },    // green-600, green-500
-  blue: { base: '#2563eb', glow: '#3b82f6' },     // blue-600, blue-500
-  yellow: { base: '#ca8a04', glow: '#eab308' },   // yellow-600, yellow-500
-  white: { base: '#d1d5db', glow: '#f3f4f6' },    // gray-300, gray-100
+  red: { base: '#1a0f0f', glow: '#ef4444' },      // Almost black with red tint, bright red glow
+  green: { base: '#0f1a0f', glow: '#22c55e' },    // Almost black with green tint, bright green glow
+  blue: { base: '#0f0f1a', glow: '#3b82f6' },     // Almost black with blue tint, bright blue glow
+  yellow: { base: '#1a1a0f', glow: '#eab308' },   // Almost black with yellow tint, bright yellow glow
+  white: { base: '#1a1a1a', glow: '#f3f4f6' },    // Almost black, white glow
 };
 
 // ============================================================================
