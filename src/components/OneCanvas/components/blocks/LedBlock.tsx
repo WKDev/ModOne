@@ -70,99 +70,50 @@ export const LedBlock = memo(function LedBlock({
       width={block.size.width}
       height={block.size.height}
     >
-      {/* LED SVG */}
-      <svg
-        viewBox="0 0 40 60"
-        className="w-full h-full"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        {/* Anode lead (top) */}
-        <line
-          x1="20"
-          y1="0"
-          x2="20"
-          y2="10"
-          stroke="#9ca3af"
-          strokeWidth="2"
-        />
-
-        {/* LED dome */}
-        <ellipse
-          cx="20"
-          cy="22"
-          rx="14"
-          ry="12"
-          fill={isPowered ? colors.glow : colors.base}
-          stroke="#525252"
-          strokeWidth="1"
-          style={
-            isPowered
-              ? {
-                  filter: `drop-shadow(0 0 8px ${colors.glow}) drop-shadow(0 0 16px ${colors.glow})`,
-                }
-              : undefined
-          }
-        />
-
-        {/* LED body (rectangular part) */}
-        <rect
-          x="6"
-          y="30"
-          width="28"
-          height="15"
-          fill={isPowered ? colors.glow : colors.base}
-          stroke="#525252"
-          strokeWidth="1"
-          rx="1"
-          style={
-            isPowered
-              ? {
-                  filter: `drop-shadow(0 0 4px ${colors.glow})`,
-                }
-              : undefined
-          }
-        />
-
-        {/* LED base */}
-        <rect
-          x="10"
-          y="45"
-          width="20"
-          height="5"
-          fill="#525252"
-        />
-
-        {/* Cathode lead (bottom) */}
-        <line
-          x1="20"
-          y1="50"
-          x2="20"
-          y2="60"
-          stroke="#9ca3af"
-          strokeWidth="2"
-        />
-
-        {/* Flat edge indicator (cathode side) */}
-        <line
-          x1="6"
-          y1="28"
-          x2="6"
-          y2="35"
-          stroke="#525252"
-          strokeWidth="2"
-        />
-      </svg>
-
-      {/* Glow overlay when powered */}
-      {isPowered && (
+      {/* Simple circular LED indicator */}
+      <div className="w-full h-full flex items-center justify-center relative">
+        {/* Main LED circle */}
         <div
-          className="absolute inset-0 rounded pointer-events-none animate-pulse"
+          className={`
+            rounded-full transition-all duration-200
+            ${isPowered ? 'shadow-2xl' : ''}
+          `}
           style={{
-            background: `radial-gradient(ellipse at center, ${colors.glow}40 0%, transparent 70%)`,
+            width: '48px',
+            height: '48px',
+            backgroundColor: isPowered ? colors.glow : colors.base,
+            border: `3px solid ${isPowered ? colors.glow : '#404040'}`,
+            boxShadow: isPowered
+              ? `0 0 20px ${colors.glow}, 0 0 40px ${colors.glow}80, inset 0 0 20px ${colors.glow}40`
+              : '0 2px 4px rgba(0,0,0,0.3), inset 0 2px 4px rgba(0,0,0,0.2)',
           }}
-        />
-      )}
+        >
+          {/* Inner highlight when powered */}
+          {isPowered && (
+            <div
+              className="absolute rounded-full"
+              style={{
+                width: '20px',
+                height: '20px',
+                top: '8px',
+                left: '8px',
+                backgroundColor: `${colors.glow}60`,
+                filter: 'blur(4px)',
+              }}
+            />
+          )}
+        </div>
+
+        {/* Animated glow pulse when powered */}
+        {isPowered && (
+          <div
+            className="absolute inset-0 rounded-full animate-pulse pointer-events-none"
+            style={{
+              background: `radial-gradient(circle, ${colors.glow}20 0%, transparent 70%)`,
+            }}
+          />
+        )}
+      </div>
 
       {/* Ports */}
       {block.ports.map((port) => (
