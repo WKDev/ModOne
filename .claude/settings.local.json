@@ -77,7 +77,16 @@
       "Bash(popd:*)",
       "Bash(pnpm tauri build:*)",
       "Bash(powershell -Command \"Get-Content .taskmaster/tasks/tasks.json | ConvertFrom-Json | ForEach-Object { $_master.tasks | Select-Object id, title, status | Format-Table -AutoSize }\")",
-      "Bash(timeout 15 pnpm run dev:*)"
+      "Bash(timeout 15 pnpm run dev:*)",
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(tree:*)",
+      "Bash(git -C \"C:\\\\Users\\\\chanh\\\\Projects\\\\ModOne\" log --oneline -5)",
+      "Bash(git -C \"C:\\\\Users\\\\chanh\\\\Projects\\\\ModOne\" add src/components/OneCanvas/blockDefinitions.ts src/components/OneCanvas/Wire.tsx src/components/OneCanvas/components/AnimatedWire.tsx src/components/OneCanvas/hooks/useCanvasKeyboardShortcuts.ts src/components/OneCanvas/hooks/useWireDrawing.ts src/components/OneCanvas/types.ts src/components/OneCanvas/utils/circuitGraph.ts src/components/OneCanvas/utils/connectionValidator.ts src/components/OneCanvas/utils/serialization.ts src/components/panels/content/OneCanvasPanel.tsx src/stores/canvasStore.ts src/stores/documentRegistry.ts src/stores/hooks/useCanvasDocument.ts)",
+      "Bash(git status:*)",
+      "Bash(python:*)",
+      "Bash(pnpm run dev:*)",
+      "mcp__chrome-devtools__list_pages",
+      "mcp__chrome-devtools__navigate_page"
     ]
   },
   "enableAllProjectMcpServers": true,
