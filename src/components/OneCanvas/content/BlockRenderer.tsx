@@ -4,7 +4,7 @@
  * Dispatches to the appropriate block component based on block type.
  */
 
-import { memo, useCallback } from 'react';
+import { memo } from 'react';
 import type { Block } from '../types';
 import { PowerBlock } from '../components/blocks/PowerBlock';
 import { LedBlock } from '../components/blocks/LedBlock';
@@ -67,9 +67,9 @@ export const BlockRenderer = memo(function BlockRenderer({
   const commonProps = {
     isSelected,
     onBlockClick,
+    onDragStart,
     onStartWire,
     onEndWire,
-    onDragStart,
     connectedPorts,
   };
 
@@ -143,16 +143,8 @@ export const BlockRenderer = memo(function BlockRenderer({
     }
   };
 
-  // Handle mouse down for drag start
-  const handleMouseDown = useCallback(
-    (event: React.MouseEvent) => {
-      onDragStart?.(block.id, event);
-    },
-    [block.id, onDragStart]
-  );
-
   return (
-    <div style={style} data-block-id={block.id} onMouseDown={handleMouseDown}>
+    <div style={style} data-block-id={block.id}>
       {renderBlock()}
     </div>
   );

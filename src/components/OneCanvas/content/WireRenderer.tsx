@@ -185,6 +185,11 @@ export const Wire = memo(function Wire({
     onClick?.(id, e);
   };
 
+  // Handle mouse up - prevent canvas handler from clearing selection
+  const handleMouseUp = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
   // Handle right-click for context menu
   const handleRightClick = (e: React.MouseEvent<SVGPathElement>) => {
     e.preventDefault();
@@ -209,6 +214,7 @@ export const Wire = memo(function Wire({
         className="cursor-pointer"
         style={{ pointerEvents: 'auto' }}
         onClick={handleClick}
+        onMouseUp={handleMouseUp}
         onContextMenu={handleRightClick}
       />
 
@@ -233,6 +239,7 @@ export const Wire = memo(function Wire({
             : undefined
         }
         onClick={handleClick}
+        onMouseUp={handleMouseUp}
       />
 
       {/* Glow effect for active wires */}

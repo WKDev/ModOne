@@ -186,6 +186,9 @@ export function CanvasContent({
               e.stopPropagation();
               onJunctionClick?.(junction.id, e.nativeEvent as unknown as React.MouseEvent);
             }}
+            onMouseUp={(e) => {
+              e.stopPropagation();
+            }}
           />
         ))}
       </svg>

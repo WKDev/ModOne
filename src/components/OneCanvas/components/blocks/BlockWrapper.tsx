@@ -22,6 +22,8 @@ interface BlockWrapperProps {
   onBlockClick?: (blockId: string, e: React.MouseEvent) => void;
   /** Legacy callback for backward compatibility */
   onSelect?: (blockId: string, addToSelection: boolean) => void;
+  /** Drag start handler */
+  onDragStart?: (blockId: string, event: React.MouseEvent) => void;
   /** Additional CSS classes */
   className?: string;
   /** Custom width */
@@ -43,21 +45,67 @@ export const BlockWrapper = memo(function BlockWrapper({
   children,
   onBlockClick,
   onSelect,
+  onDragStart,
   className = '',
   width = 60,
   height = 60,
 }: BlockWrapperProps) {
+  // Handle mouse down for drag start
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      console.log('[BlockWrapper] MouseDown:', blockId);
+      e.stopPropagation();
+
+      // Don't handle if clicking port
+      if ((e.target as HTMLElement).closest('[data-port-id]')) {
+        console.log('[BlockWrapper] Port clicked, skipping');
+        return;
+      }
+
+      // Call drag start handler
+      if (onDragStart) {
+        console.log('[BlockWrapper] Calling onDragStart:', blockId);
+        onDragStart(blockId, e);
+      }
+    },
+    [blockId, onDragStart]
+  );
+
+  // Handle mouse up - prevent canvas handler from clearing selection
+  const handleMouseUp = useCallback(
+    (e: React.MouseEvent) => {
+      console.log('[BlockWrapper] MouseUp:', blockId);
+      e.stopPropagation();
+
+      // Don't handle if clicking port
+      if ((e.target as HTMLElement).closest('[data-port-id]')) {
+        console.log('[BlockWrapper] Port clicked, skipping');
+        return;
+      }
+    },
+    [blockId]
+  );
+
   // Handle click for selection
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
+      console.log('[BlockWrapper] Click:', blockId, 'onBlockClick:', !!onBlockClick, 'onSelect:', !!onSelect);
       e.stopPropagation();
+
+      // Don't handle if clicking port
+      if ((e.target as HTMLElement).closest('[data-port-id]')) {
+        console.log('[BlockWrapper] Port clicked, skipping');
+        return;
+      }
 
       // Prefer new event-based handler
       if (onBlockClick) {
+        console.log('[BlockWrapper] Calling onBlockClick:', blockId);
         onBlockClick(blockId, e);
       } else if (onSelect) {
         // Fallback to legacy handler
         const addToSelection = e.ctrlKey || e.metaKey;
+        console.log('[BlockWrapper] Calling onSelect:', blockId, addToSelection);
         onSelect(blockId, addToSelection);
       }
     },
@@ -78,6 +126,8 @@ export const BlockWrapper = memo(function BlockWrapper({
         width,
         height,
       }}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
       onClick={handleClick}
       data-block-id={blockId}
     >
