@@ -32,6 +32,8 @@ interface UseWireSegmentDragOptions {
     delta: Position,
     isFirstMove?: boolean
   ) => void;
+  /** Remove adjacent overlapping handles after drag ends */
+  cleanupOverlappingHandles?: (wireId: string) => void;
   /** Current zoom level */
   zoom: number;
 }
@@ -58,6 +60,7 @@ interface UseWireSegmentDragResult {
 
 export function useWireSegmentDrag({
   moveWireSegment,
+  cleanupOverlappingHandles,
   zoom,
 }: UseWireSegmentDragOptions): UseWireSegmentDragResult {
   const [dragging, setDragging] = useState<SegmentDragState | null>(null);
@@ -139,6 +142,9 @@ export function useWireSegmentDrag({
     };
 
     const handleUp = () => {
+      if (dragging && cleanupOverlappingHandles) {
+        cleanupOverlappingHandles(dragging.wireId);
+      }
       setDragging(null);
     };
 
@@ -149,7 +155,7 @@ export function useWireSegmentDrag({
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
-  }, [dragging, zoom, snapToGridEnabled, gridSize, moveWireSegment]);
+  }, [dragging, zoom, snapToGridEnabled, gridSize, moveWireSegment, cleanupOverlappingHandles]);
 
   return {
     handleSegmentDragStart,

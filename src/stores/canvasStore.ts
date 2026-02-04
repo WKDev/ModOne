@@ -157,6 +157,8 @@ interface CanvasActions {
   moveWireSegment: (wireId: string, handleIndexA: number, handleIndexB: number, delta: Position, isFirstMove?: boolean) => void;
   /** Insert handles at the endpoint (from/to) of a wire for endpoint segment drag */
   insertEndpointHandle: (wireId: string, end: 'from' | 'to', newHandles: Array<{position: Position, constraint: HandleConstraint}>) => void;
+  /** Remove adjacent handles that overlap (same position). No history push — call after drag ends. */
+  cleanupOverlappingHandles: (wireId: string) => void;
 
   // Selection operations
   /** Set selection to specific IDs (replaces current) */
@@ -876,6 +878,42 @@ export const useCanvasStore = create<CanvasStore>()(
           },
           false,
           `insertEndpointHandle/${wireId}/${end}`
+        );
+      },
+
+      cleanupOverlappingHandles: (wireId) => {
+        set(
+          (state) => {
+            const wire = state.wires.find((w) => w.id === wireId);
+            if (!wire?.handles || wire.handles.length < 2) return;
+
+            const THRESHOLD = 1;
+            const cleaned: WireHandle[] = [wire.handles[0]];
+
+            for (let i = 1; i < wire.handles.length; i++) {
+              const prev = cleaned[cleaned.length - 1];
+              const curr = wire.handles[i];
+              if (
+                Math.abs(prev.position.x - curr.position.x) <= THRESHOLD &&
+                Math.abs(prev.position.y - curr.position.y) <= THRESHOLD
+              ) {
+                // Overlap: keep the 'user' source handle, remove 'auto'
+                if (prev.source === 'auto' && curr.source !== 'auto') {
+                  cleaned[cleaned.length - 1] = curr;
+                }
+                // else: skip curr (keep prev)
+              } else {
+                cleaned.push(curr);
+              }
+            }
+
+            if (cleaned.length !== wire.handles.length) {
+              wire.handles = cleaned;
+              state.isDirty = true;
+            }
+          },
+          false,
+          `cleanupOverlappingHandles/${wireId}`
         );
       },
 

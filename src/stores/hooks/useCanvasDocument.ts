@@ -85,6 +85,7 @@ export interface UseCanvasDocumentReturn {
   removeWireHandle: (wireId: string, handleIndex: number) => void;
   moveWireSegment: (wireId: string, handleIndexA: number, handleIndexB: number, delta: Position, isFirstMove?: boolean) => void;
   insertEndpointHandle: (wireId: string, end: 'from' | 'to', newHandles: Array<{position: Position, constraint: HandleConstraint}>) => void;
+  cleanupOverlappingHandles: (wireId: string) => void;
 
   // Viewport operations
   setZoom: (zoom: number) => void;
@@ -532,6 +533,41 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
     [documentId, pushHistory, updateCanvasData]
   );
 
+  const cleanupOverlappingHandles = useCallback(
+    (wireId: string) => {
+      if (!documentId) return;
+
+      // No history push — this is a post-drag cleanup within the same undo unit
+      updateCanvasData(documentId, (docData) => {
+        const wire = docData.wires.find((w) => w.id === wireId);
+        if (!wire?.handles || wire.handles.length < 2) return;
+
+        const THRESHOLD = 1;
+        const cleaned: typeof wire.handles = [wire.handles[0]];
+
+        for (let i = 1; i < wire.handles.length; i++) {
+          const prev = cleaned[cleaned.length - 1];
+          const curr = wire.handles[i];
+          if (
+            Math.abs(prev.position.x - curr.position.x) <= THRESHOLD &&
+            Math.abs(prev.position.y - curr.position.y) <= THRESHOLD
+          ) {
+            if (prev.source === 'auto' && curr.source !== 'auto') {
+              cleaned[cleaned.length - 1] = curr;
+            }
+          } else {
+            cleaned.push(curr);
+          }
+        }
+
+        if (cleaned.length !== wire.handles.length) {
+          wire.handles = cleaned;
+        }
+      });
+    },
+    [documentId, updateCanvasData]
+  );
+
   // Viewport operations
   const setZoom = useCallback(
     (zoom: number) => {
@@ -673,6 +709,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       removeWireHandle,
       moveWireSegment,
       insertEndpointHandle,
+      cleanupOverlappingHandles,
 
       // Viewport operations
       setZoom,
@@ -711,6 +748,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
     removeWireHandle,
     moveWireSegment,
     insertEndpointHandle,
+    cleanupOverlappingHandles,
     setZoom,
     setPan,
     resetViewport,

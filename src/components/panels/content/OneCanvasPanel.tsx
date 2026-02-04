@@ -238,6 +238,7 @@ function useCanvasState(documentId: string | null) {
   const globalRemoveWireHandle = useCanvasStore((state) => state.removeWireHandle);
   const globalMoveWireSegment = useCanvasStore((state) => state.moveWireSegment);
   const globalInsertEndpointHandle = useCanvasStore((state) => state.insertEndpointHandle);
+  const globalCleanupOverlappingHandles = useCanvasStore((state) => state.cleanupOverlappingHandles);
 
   // Return document state if available, otherwise global state
   return useMemo(() => {
@@ -257,6 +258,7 @@ function useCanvasState(documentId: string | null) {
         removeWireHandle: documentState.removeWireHandle,
         moveWireSegment: documentState.moveWireSegment,
         insertEndpointHandle: documentState.insertEndpointHandle,
+        cleanupOverlappingHandles: documentState.cleanupOverlappingHandles,
         isDocumentMode: true,
       };
     }
@@ -276,6 +278,7 @@ function useCanvasState(documentId: string | null) {
       removeWireHandle: globalRemoveWireHandle,
       moveWireSegment: globalMoveWireSegment,
       insertEndpointHandle: globalInsertEndpointHandle,
+      cleanupOverlappingHandles: globalCleanupOverlappingHandles,
       isDocumentMode: false,
     };
   }, [
@@ -294,6 +297,7 @@ function useCanvasState(documentId: string | null) {
     globalRemoveWireHandle,
     globalMoveWireSegment,
     globalInsertEndpointHandle,
+    globalCleanupOverlappingHandles,
   ]);
 }
 
@@ -323,6 +327,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     removeWireHandle,
     moveWireSegment,
     insertEndpointHandle,
+    cleanupOverlappingHandles,
   } = useCanvasState(documentId);
 
   // Wire drawing state and selection from global store (shared across modes)
@@ -349,6 +354,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
   // Wire segment drag hook
   const { handleSegmentDragStart } = useWireSegmentDrag({
     moveWireSegment,
+    cleanupOverlappingHandles,
     zoom,
   });
 
