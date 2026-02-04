@@ -25,28 +25,28 @@ export interface BlockDefinition {
 
 const BLOCK_DEFINITIONS: Record<BlockType, BlockDefinition> = {
   power_24v: {
-    size: { width: 60, height: 40 },
+    size: { width: 40, height: 40 },
     defaultPorts: [
       { id: 'out', type: 'output', label: '+', position: 'bottom' },
     ],
     defaultProps: { maxCurrent: 1000 },
   },
   power_12v: {
-    size: { width: 60, height: 40 },
+    size: { width: 40, height: 40 },
     defaultPorts: [
       { id: 'out', type: 'output', label: '+', position: 'bottom' },
     ],
     defaultProps: { maxCurrent: 1000 },
   },
   gnd: {
-    size: { width: 40, height: 50 },
+    size: { width: 40, height: 40 },
     defaultPorts: [
       { id: 'in', type: 'input', label: 'GND', position: 'top' },
     ],
     defaultProps: {},
   },
   plc_out: {
-    size: { width: 80, height: 50 },
+    size: { width: 80, height: 40 },
     defaultPorts: [
       { id: 'in', type: 'input', label: 'IN', position: 'left' },
       { id: 'out', type: 'output', label: 'OUT', position: 'right' },
@@ -54,7 +54,7 @@ const BLOCK_DEFINITIONS: Record<BlockType, BlockDefinition> = {
     defaultProps: { address: 'C:0x0000', normallyOpen: true, inverted: false },
   },
   plc_in: {
-    size: { width: 80, height: 50 },
+    size: { width: 80, height: 40 },
     defaultPorts: [
       { id: 'in', type: 'input', label: 'IN', position: 'left' },
       { id: 'out', type: 'output', label: 'OUT', position: 'right' },
@@ -70,7 +70,7 @@ const BLOCK_DEFINITIONS: Record<BlockType, BlockDefinition> = {
     defaultProps: { color: 'red', forwardVoltage: 2.0, lit: false },
   },
   button: {
-    size: { width: 60, height: 60 },
+    size: { width: 40, height: 40 },
     defaultPorts: [
       { id: 'in', type: 'input', label: 'IN', position: 'left' },
       { id: 'out', type: 'output', label: 'OUT', position: 'right' },

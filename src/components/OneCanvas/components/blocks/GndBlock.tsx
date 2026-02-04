@@ -53,7 +53,7 @@ export const GndBlock = memo(function GndBlock({
     >
       {/* Ground symbol SVG */}
       <svg
-        viewBox="0 0 40 50"
+        viewBox="0 0 40 40"
         className="w-full h-full"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
@@ -63,7 +63,7 @@ export const GndBlock = memo(function GndBlock({
           x1="20"
           y1="0"
           x2="20"
-          y2="15"
+          y2="12"
           stroke="currentColor"
           strokeWidth="2"
           className="text-neutral-400"
@@ -71,36 +71,36 @@ export const GndBlock = memo(function GndBlock({
         {/* Ground symbol lines */}
         <line
           x1="6"
-          y1="15"
+          y1="12"
           x2="34"
-          y2="15"
+          y2="12"
           stroke="currentColor"
           strokeWidth="3"
           className="text-neutral-800"
         />
         <line
           x1="10"
-          y1="25"
+          y1="20"
           x2="30"
-          y2="25"
+          y2="20"
           stroke="currentColor"
           strokeWidth="3"
           className="text-neutral-800"
         />
         <line
           x1="14"
-          y1="35"
+          y1="28"
           x2="26"
-          y2="35"
+          y2="28"
           stroke="currentColor"
           strokeWidth="3"
           className="text-neutral-800"
         />
         <line
           x1="18"
-          y1="45"
+          y1="36"
           x2="22"
-          y2="45"
+          y2="36"
           stroke="currentColor"
           strokeWidth="3"
           className="text-neutral-800"
