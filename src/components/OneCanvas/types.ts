@@ -80,6 +80,8 @@ export interface BaseBlock<T extends BlockType = BlockType> {
   selected?: boolean;
   /** Optional display label */
   label?: string;
+  /** Block rotation in degrees (0, 90, 180, 270) */
+  rotation?: number;
 }
 
 // ============================================================================

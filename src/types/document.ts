@@ -12,9 +12,9 @@ import type {
   CircuitMetadata,
 } from '../components/OneCanvas/types';
 import type {
-  LadderNetwork,
   LadderGridConfig,
   LadderElement,
+  LadderWire,
 } from './ladder';
 import type {
   Scenario,
@@ -115,28 +115,21 @@ export interface CanvasDocumentState extends DocumentMeta {
 // Ladder Document State
 // ============================================================================
 
-/** Serializable network for ladder history */
-export interface SerializableLadderNetwork {
-  id: string;
-  label?: string;
-  comment?: string;
-  elements: Array<[string, LadderElement]>;
-  wires: LadderNetwork['wires'];
-  enabled: boolean;
-}
-
 /** Snapshot data for ladder history */
 export interface LadderHistoryData {
-  networks: Array<[string, SerializableLadderNetwork]>;
-  currentNetworkId: string | null;
+  elements: Array<[string, LadderElement]>;
+  wires: LadderWire[];
+  comment?: string;
 }
 
 /** Ladder document data */
 export interface LadderDocumentData {
-  /** Networks by ID */
-  networks: Map<string, LadderNetwork>;
-  /** Current network ID */
-  currentNetworkId: string | null;
+  /** Elements by ID */
+  elements: Map<string, LadderElement>;
+  /** Wire connections */
+  wires: LadderWire[];
+  /** Ladder comment */
+  comment?: string;
   /** Grid configuration */
   gridConfig: LadderGridConfig;
 }
@@ -227,8 +220,9 @@ export const DEFAULT_CANVAS_DATA: CanvasDocumentData = {
 
 /** Default ladder document data */
 export const DEFAULT_LADDER_DATA: LadderDocumentData = {
-  networks: new Map(),
-  currentNetworkId: null,
+  elements: new Map(),
+  wires: [],
+  comment: undefined,
   gridConfig: {
     columns: 10,
     cellWidth: 80,
@@ -307,7 +301,8 @@ export function createEmptyLadderDocument(
     type: 'ladder',
     data: {
       ...DEFAULT_LADDER_DATA,
-      networks: new Map(),
+      elements: new Map(),
+      wires: [],
     },
     history: [],
     historyIndex: -1,

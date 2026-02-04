@@ -850,6 +850,10 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
                       onStartWire={handleStartWire}
                       onEndWire={handleEndWire}
                       onDragStart={handleBlockDragStart}
+                      portVoltages={portVoltages}
+                      connectedPorts={getConnectedPorts(block.id)}
+                      onButtonPress={handleButtonPress}
+                      onButtonRelease={handleButtonRelease}
                     />
                   ))}
 

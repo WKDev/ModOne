@@ -11,7 +11,6 @@ import { isLadderDocument } from '../../types/document';
 import type {
   LadderElement,
   LadderElementType,
-  LadderNetwork,
   LadderGridConfig,
   GridPosition,
   ElementProperties,
@@ -20,6 +19,7 @@ import type {
   TimerProperties,
   CounterProperties,
   CompareProperties,
+  LadderWire,
 } from '../../types/ladder';
 import {
   isContactType,
@@ -36,23 +36,20 @@ import {
 /** Return type for useLadderDocument hook */
 export interface UseLadderDocumentReturn {
   // Data
-  networks: Map<string, LadderNetwork>;
-  currentNetworkId: string | null;
-  currentNetwork: LadderNetwork | null;
+  elements: Map<string, LadderElement>;
+  wires: LadderWire[];
+  comment?: string;
   gridConfig: LadderGridConfig;
   isDirty: boolean;
-
-  // Network operations
-  addNetwork: (label?: string) => string;
-  removeNetwork: (id: string) => void;
-  selectNetwork: (id: string) => void;
-  updateNetwork: (id: string, updates: Partial<Pick<LadderNetwork, 'label' | 'comment' | 'enabled'>>) => void;
 
   // Element operations
   addElement: (type: LadderElementType, position: GridPosition, props?: Partial<LadderElement>) => string | null;
   removeElement: (id: string) => void;
   moveElement: (id: string, position: GridPosition) => void;
   updateElement: (id: string, updates: Partial<LadderElement>) => void;
+
+  // Comment
+  updateComment: (comment: string) => void;
 
   // Grid configuration
   setGridConfig: (config: Partial<LadderGridConfig>) => void;
@@ -75,17 +72,6 @@ export interface UseLadderDocumentReturn {
 /** Generate unique ID */
 function generateId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
-
-/** Create an empty network */
-function createEmptyNetwork(id: string, label?: string): LadderNetwork {
-  return {
-    id,
-    label: label || `Network ${id.slice(-4)}`,
-    elements: new Map(),
-    wires: [],
-    enabled: true,
-  };
 }
 
 /** Get default properties for an element type */
@@ -118,7 +104,7 @@ function getDefaultProperties(type: LadderElementType): ElementProperties {
 
 /** Check if a position is valid */
 function isValidPosition(
-  network: LadderNetwork,
+  elements: Map<string, LadderElement>,
   position: GridPosition,
   gridConfig: LadderGridConfig,
   excludeId?: string
@@ -130,7 +116,7 @@ function isValidPosition(
     return false;
   }
 
-  for (const [id, element] of network.elements) {
+  for (const [id, element] of elements) {
     if (excludeId && id === excludeId) continue;
     if (element.position.row === position.row && element.position.col === position.col) {
       return false;
@@ -166,81 +152,12 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
   const ladderDoc = document && isLadderDocument(document) ? document : null;
   const data = ladderDoc?.data;
 
-  // Network operations
-  const addNetwork = useCallback(
-    (label?: string): string => {
-      if (!documentId) return '';
-
-      const id = generateId('network');
-      const newNetwork = createEmptyNetwork(id, label);
-
-      pushHistory(documentId);
-      updateLadderData(documentId, (docData) => {
-        docData.networks.set(id, newNetwork);
-        docData.currentNetworkId = id;
-      });
-
-      return id;
-    },
-    [documentId, pushHistory, updateLadderData]
-  );
-
-  const removeNetwork = useCallback(
-    (id: string) => {
-      if (!documentId || !data) return;
-      if (data.networks.size <= 1) return; // Keep at least one
-
-      pushHistory(documentId);
-      updateLadderData(documentId, (docData) => {
-        docData.networks.delete(id);
-
-        if (docData.currentNetworkId === id) {
-          const remainingIds = Array.from(docData.networks.keys());
-          docData.currentNetworkId = remainingIds[0] ?? null;
-        }
-      });
-    },
-    [documentId, data, pushHistory, updateLadderData]
-  );
-
-  const selectNetwork = useCallback(
-    (id: string) => {
-      if (!documentId || !data) return;
-      if (!data.networks.has(id)) return;
-
-      updateLadderData(documentId, (docData) => {
-        docData.currentNetworkId = id;
-      });
-    },
-    [documentId, data, updateLadderData]
-  );
-
-  const updateNetwork = useCallback(
-    (id: string, updates: Partial<Pick<LadderNetwork, 'label' | 'comment' | 'enabled'>>) => {
-      if (!documentId || !data) return;
-
-      pushHistory(documentId);
-      updateLadderData(documentId, (docData) => {
-        const network = docData.networks.get(id);
-        if (network) {
-          if (updates.label !== undefined) network.label = updates.label;
-          if (updates.comment !== undefined) network.comment = updates.comment;
-          if (updates.enabled !== undefined) network.enabled = updates.enabled;
-        }
-      });
-    },
-    [documentId, data, pushHistory, updateLadderData]
-  );
-
   // Element operations
   const addElement = useCallback(
     (type: LadderElementType, position: GridPosition, props: Partial<LadderElement> = {}): string | null => {
-      if (!documentId || !data || !data.currentNetworkId) return null;
+      if (!documentId || !data) return null;
 
-      const network = data.networks.get(data.currentNetworkId);
-      if (!network) return null;
-
-      if (!isValidPosition(network, position, data.gridConfig)) {
+      if (!isValidPosition(data.elements, position, data.gridConfig)) {
         return null;
       }
 
@@ -255,10 +172,7 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
 
       pushHistory(documentId);
       updateLadderData(documentId, (docData) => {
-        const currentNetwork = docData.networks.get(docData.currentNetworkId!);
-        if (currentNetwork) {
-          currentNetwork.elements.set(id, newElement);
-        }
+        docData.elements.set(id, newElement);
       });
 
       return id;
@@ -268,18 +182,15 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
 
   const removeElement = useCallback(
     (id: string) => {
-      if (!documentId || !data || !data.currentNetworkId) return;
+      if (!documentId || !data) return;
 
       pushHistory(documentId);
       updateLadderData(documentId, (docData) => {
-        const network = docData.networks.get(docData.currentNetworkId!);
-        if (network) {
-          network.elements.delete(id);
-          // Remove connected wires
-          network.wires = network.wires.filter(
-            (wire) => wire.from.elementId !== id && wire.to.elementId !== id
-          );
-        }
+        docData.elements.delete(id);
+        // Remove connected wires
+        docData.wires = docData.wires.filter(
+          (wire) => wire.from.elementId !== id && wire.to.elementId !== id
+        );
       });
     },
     [documentId, data, pushHistory, updateLadderData]
@@ -287,19 +198,15 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
 
   const moveElement = useCallback(
     (id: string, position: GridPosition) => {
-      if (!documentId || !data || !data.currentNetworkId) return;
+      if (!documentId || !data) return;
 
-      const network = data.networks.get(data.currentNetworkId);
-      if (!network) return;
-
-      if (!isValidPosition(network, position, data.gridConfig, id)) {
+      if (!isValidPosition(data.elements, position, data.gridConfig, id)) {
         return;
       }
 
       pushHistory(documentId);
       updateLadderData(documentId, (docData) => {
-        const currentNetwork = docData.networks.get(docData.currentNetworkId!);
-        const element = currentNetwork?.elements.get(id);
+        const element = docData.elements.get(id);
         if (element) {
           element.position = { ...position };
         }
@@ -310,18 +217,30 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
 
   const updateElement = useCallback(
     (id: string, updates: Partial<LadderElement>) => {
-      if (!documentId || !data || !data.currentNetworkId) return;
+      if (!documentId || !data) return;
 
       pushHistory(documentId);
       updateLadderData(documentId, (docData) => {
-        const network = docData.networks.get(docData.currentNetworkId!);
-        const element = network?.elements.get(id);
+        const element = docData.elements.get(id);
         if (element) {
           Object.assign(element, updates);
         }
       });
     },
     [documentId, data, pushHistory, updateLadderData]
+  );
+
+  // Comment
+  const updateComment = useCallback(
+    (comment: string) => {
+      if (!documentId) return;
+
+      pushHistory(documentId);
+      updateLadderData(documentId, (docData) => {
+        docData.comment = comment;
+      });
+    },
+    [documentId, pushHistory, updateLadderData]
   );
 
   // Grid configuration
@@ -354,9 +273,9 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
 
     pushHistory(documentId);
     updateLadderData(documentId, (docData) => {
-      const newNetwork = createEmptyNetwork(generateId('network'), 'Network 1');
-      docData.networks = new Map([[newNetwork.id, newNetwork]]);
-      docData.currentNetworkId = newNetwork.id;
+      docData.elements = new Map();
+      docData.wires = [];
+      docData.comment = undefined;
     });
   }, [documentId, pushHistory, updateLadderData]);
 
@@ -364,35 +283,26 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
     if (documentId) markClean(documentId);
   }, [documentId, markClean]);
 
-  // Compute current network
-  const currentNetwork = useMemo(() => {
-    if (!data || !data.currentNetworkId) return null;
-    return data.networks.get(data.currentNetworkId) ?? null;
-  }, [data]);
-
   // Return memoized result
   return useMemo(() => {
     if (!ladderDoc || !data) return null;
 
     return {
       // Data
-      networks: data.networks,
-      currentNetworkId: data.currentNetworkId,
-      currentNetwork,
+      elements: data.elements,
+      wires: data.wires,
+      comment: data.comment,
       gridConfig: data.gridConfig,
       isDirty: ladderDoc.isDirty,
-
-      // Network operations
-      addNetwork,
-      removeNetwork,
-      selectNetwork,
-      updateNetwork,
 
       // Element operations
       addElement,
       removeElement,
       moveElement,
       updateElement,
+
+      // Comment
+      updateComment,
 
       // Grid configuration
       setGridConfig,
@@ -410,15 +320,11 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
   }, [
     ladderDoc,
     data,
-    currentNetwork,
-    addNetwork,
-    removeNetwork,
-    selectNetwork,
-    updateNetwork,
     addElement,
     removeElement,
     moveElement,
     updateElement,
+    updateComment,
     setGridConfig,
     undo,
     redo,

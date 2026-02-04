@@ -8,7 +8,7 @@
 
 import { useCallback, useMemo, useRef, useEffect } from 'react';
 import { cn } from '../../lib/utils';
-import { useLadderStore, selectCurrentNetwork, selectSelectedElementIds, selectGridConfig } from '../../stores/ladderStore';
+import { useLadderStore, selectElements, selectSelectedElementIds, selectGridConfig } from '../../stores/ladderStore';
 import { PowerRail } from './PowerRail';
 import { NeutralRail } from './NeutralRail';
 import { LadderCell } from './LadderCell';
@@ -16,15 +16,13 @@ import { LadderElementRenderer } from './elements';
 import type { GridPosition, LadderElement } from '../../types/ladder';
 
 export interface LadderGridProps {
-  /** Network ID to render */
-  networkId: string;
   /** Number of columns (default: from store config) */
   columnCount?: number;
   /** Cell width in pixels (default: from store config) */
   cellWidth?: number;
   /** Cell height in pixels (default: from store config) */
   cellHeight?: number;
-  /** Minimum row count (for empty networks) */
+  /** Minimum row count (for empty grids) */
   minRowCount?: number;
   /** Whether the grid is in readonly mode */
   readonly?: boolean;
@@ -41,7 +39,6 @@ const DEFAULT_MIN_ROWS = 5;
  * LadderGrid - Main ladder diagram grid component
  */
 export function LadderGrid({
-  networkId: _networkId, // TODO: Use to select specific network instead of current
   columnCount: columnCountProp,
   cellWidth: cellWidthProp,
   cellHeight: cellHeightProp,
@@ -54,7 +51,7 @@ export function LadderGrid({
   const gridRef = useRef<HTMLDivElement>(null);
 
   // Store state
-  const network = useLadderStore(selectCurrentNetwork);
+  const elements = useLadderStore(selectElements);
   const selectedIds = useLadderStore(selectSelectedElementIds);
   const gridConfig = useLadderStore(selectGridConfig);
 
@@ -70,34 +67,30 @@ export function LadderGrid({
   const cellHeight = cellHeightProp ?? gridConfig.cellHeight;
 
   // Calculate grid dimensions
-  const { elements, rowCount } = useMemo(() => {
-    if (!network) {
-      return { elements: new Map<string, LadderElement>(), rowCount: minRowCount };
-    }
-
+  const { elementsMap, rowCount } = useMemo(() => {
     // Find max row from elements
     let maxRow = minRowCount - 1;
-    network.elements.forEach((element) => {
+    elements.forEach((element) => {
       if (element.position.row > maxRow) {
         maxRow = element.position.row;
       }
     });
 
     return {
-      elements: network.elements,
+      elementsMap: elements,
       rowCount: Math.max(minRowCount, maxRow + 1),
     };
-  }, [network, minRowCount]);
+  }, [elements, minRowCount]);
 
   // Build element position map for quick lookup
   const elementPositionMap = useMemo(() => {
     const map = new Map<string, LadderElement>();
-    elements.forEach((element) => {
+    elementsMap.forEach((element) => {
       const key = `${element.position.row}-${element.position.col}`;
       map.set(key, element);
     });
     return map;
-  }, [elements]);
+  }, [elementsMap]);
 
   // Get element at position
   const getElementAt = useCallback(

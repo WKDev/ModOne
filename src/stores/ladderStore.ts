@@ -1,8 +1,11 @@
 /**
  * Ladder Store - Zustand State Management for LadderEditor
  *
- * Manages ladder editor state including networks, elements, selection,
+ * Manages ladder editor state including elements, wires, selection,
  * monitoring state, clipboard, and undo/redo history.
+ *
+ * Networks concept has been removed - elements and wires are stored directly.
+ * Individual ladder files (CSV) serve as the unit of organization.
  */
 
 import { create } from 'zustand';
@@ -15,7 +18,6 @@ enableMapSet();
 import type {
   LadderElement,
   LadderElementType,
-  LadderNetwork,
   LadderGridConfig,
   LadderMonitoringState,
   ContactElement,
@@ -37,7 +39,6 @@ import type {
 } from '../types/ladder';
 import {
   DEFAULT_LADDER_GRID_CONFIG,
-  createEmptyNetwork,
   createEmptyMonitoringState,
   isContactType,
   isCoilType,
@@ -52,39 +53,28 @@ import {
 
 /** History snapshot for undo/redo */
 interface HistorySnapshot {
-  /** Networks as array of entries for serialization */
-  networks: Array<[string, SerializableNetwork]>;
-  /** Current network ID */
-  currentNetworkId: string | null;
-}
-
-/** Serializable network for history */
-interface SerializableNetwork {
-  id: string;
-  label?: string;
-  comment?: string;
   elements: Array<[string, LadderElement]>;
-  wires: LadderNetwork['wires'];
-  enabled: boolean;
+  wires: LadderWire[];
+  comment?: string;
 }
 
 /** Ladder editor mode */
 export type LadderEditorMode = 'edit' | 'monitor';
 
 interface LadderState {
-  // Network data
-  /** All networks by ID */
-  networks: Map<string, LadderNetwork>;
-  /** Currently selected network ID */
-  currentNetworkId: string | null;
+  // Data (directly owned, no network indirection)
+  /** All elements by ID */
+  elements: Map<string, LadderElement>;
+  /** Wire connections */
+  wires: LadderWire[];
+  /** Ladder comment */
+  comment?: string;
 
   // Selection
   /** Currently selected element IDs */
   selectedElementIds: Set<string>;
   /** Clipboard contents for elements */
   clipboard: LadderElement[];
-  /** Clipboard contents for network copy */
-  networkClipboard: SerializableNetwork | null;
 
   // Configuration
   /** Grid configuration */
@@ -108,24 +98,8 @@ interface LadderState {
 }
 
 interface LadderActions {
-  // Network operations
-  /** Add a new network */
-  addNetwork: (label?: string) => string;
-  /** Remove a network by ID */
-  removeNetwork: (id: string) => void;
-  /** Select a network as current */
-  selectNetwork: (id: string) => void;
-  /** Update network label/comment */
-  updateNetwork: (id: string, updates: Partial<Pick<LadderNetwork, 'label' | 'comment' | 'enabled'>>) => void;
-  /** Reorder networks */
-  reorderNetworks: (fromIndex: number, toIndex: number) => void;
-  /** Copy current network to clipboard */
-  copyNetwork: (networkId?: string) => void;
-  /** Paste network from clipboard */
-  pasteNetwork: (afterNetworkId?: string) => string | null;
-
   // Element operations
-  /** Add a new element to the current network */
+  /** Add a new element */
   addElement: (type: LadderElementType, position: GridPosition, props?: Partial<LadderElement>) => string | null;
   /** Remove an element by ID */
   removeElement: (id: string) => void;
@@ -135,6 +109,10 @@ interface LadderActions {
   updateElement: (id: string, updates: Partial<LadderElement>) => void;
   /** Duplicate an element */
   duplicateElement: (id: string) => string | null;
+
+  // Comment
+  /** Update the ladder comment */
+  updateComment: (comment: string) => void;
 
   // Selection operations
   /** Set selection to specific IDs (replaces current) */
@@ -147,7 +125,7 @@ interface LadderActions {
   toggleSelection: (id: string) => void;
   /** Clear all selection */
   clearSelection: () => void;
-  /** Select all elements in current network */
+  /** Select all elements */
   selectAll: () => void;
 
   // Clipboard operations
@@ -210,11 +188,11 @@ const MAX_HISTORY_SIZE = 50;
 // ============================================================================
 
 const initialState: LadderState = {
-  networks: new Map(),
-  currentNetworkId: null,
+  elements: new Map(),
+  wires: [],
+  comment: undefined,
   selectedElementIds: new Set(),
   clipboard: [],
-  networkClipboard: null,
   gridConfig: { ...DEFAULT_LADDER_GRID_CONFIG },
   mode: 'edit',
   monitoringState: null,
@@ -227,7 +205,7 @@ const initialState: LadderState = {
 // Helper Functions
 // ============================================================================
 
-/** Generate unique ID for elements/networks */
+/** Generate unique ID for elements */
 function generateId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
@@ -246,56 +224,35 @@ function cloneWire(wire: LadderWire): LadderWire {
   };
 }
 
-/** Create a deep clone of network for serialization */
-function serializeNetwork(network: LadderNetwork): SerializableNetwork {
-  const elements: Array<[string, LadderElement]> = [];
-  network.elements.forEach((element, id) => {
-    elements.push([id, cloneElementDeep(element)]);
-  });
-
-  return {
-    id: network.id,
-    label: network.label,
-    comment: network.comment,
-    elements,
-    wires: network.wires.map(cloneWire),
-    enabled: network.enabled,
-  };
-}
-
-/** Restore network from serialized format */
-function deserializeNetwork(data: SerializableNetwork): LadderNetwork {
-  const elements = new Map<string, LadderElement>();
-  data.elements.forEach(([id, element]) => {
-    elements.set(id, cloneElementDeep(element));
-  });
-
-  return {
-    id: data.id,
-    label: data.label,
-    comment: data.comment,
-    elements,
-    wires: data.wires.map(cloneWire),
-    enabled: data.enabled,
-  };
-}
-
 /** Create a history snapshot from current state */
-function createSnapshot(networks: Map<string, LadderNetwork>, currentNetworkId: string | null): HistorySnapshot {
+function createSnapshot(elements: Map<string, LadderElement>, wires: LadderWire[], comment?: string): HistorySnapshot {
+  const serializedElements: Array<[string, LadderElement]> = [];
+  elements.forEach((element, id) => {
+    serializedElements.push([id, cloneElementDeep(element)]);
+  });
+
   return {
-    networks: Array.from(networks.entries()).map(([id, network]) => [id, serializeNetwork(network)]),
-    currentNetworkId,
+    elements: serializedElements,
+    wires: wires.map(cloneWire),
+    comment,
   };
 }
 
 /** Restore state from history snapshot */
 function restoreSnapshot(snapshot: HistorySnapshot): {
-  networks: Map<string, LadderNetwork>;
-  currentNetworkId: string | null;
+  elements: Map<string, LadderElement>;
+  wires: LadderWire[];
+  comment?: string;
 } {
+  const elements = new Map<string, LadderElement>();
+  snapshot.elements.forEach(([id, element]) => {
+    elements.set(id, cloneElementDeep(element));
+  });
+
   return {
-    networks: new Map(snapshot.networks.map(([id, network]) => [id, deserializeNetwork(network)])),
-    currentNetworkId: snapshot.currentNetworkId,
+    elements,
+    wires: snapshot.wires.map(cloneWire),
+    comment: snapshot.comment,
   };
 }
 
@@ -329,7 +286,7 @@ function getDefaultProperties(type: LadderElementType): ElementProperties {
 
 /** Check if a position is valid (within grid bounds and not occupied) */
 function isValidPosition(
-  network: LadderNetwork,
+  elements: Map<string, LadderElement>,
   position: GridPosition,
   gridConfig: LadderGridConfig,
   excludeId?: string
@@ -343,7 +300,7 @@ function isValidPosition(
   }
 
   // Check for collision
-  for (const [id, element] of network.elements) {
+  for (const [id, element] of elements) {
     if (excludeId && id === excludeId) continue;
     if (element.position.row === position.row && element.position.col === position.col) {
       return false;
@@ -366,7 +323,7 @@ function cloneElement(element: LadderElement, newId: string): LadderElement {
  * Clears any redo history and enforces MAX_HISTORY_SIZE limit.
  */
 function pushHistorySnapshot(state: LadderState): void {
-  const snapshot = createSnapshot(state.networks, state.currentNetworkId);
+  const snapshot = createSnapshot(state.elements, state.wires, state.comment);
   // Clear any redo history (slice to current position + 1)
   state.history = state.history.slice(0, state.historyIndex + 1);
   state.history.push(snapshot);
@@ -389,207 +346,14 @@ export const useLadderStore = create<LadderStore>()(
       ...initialState,
 
       // ========================================================================
-      // Network Operations
-      // ========================================================================
-
-      addNetwork: (label) => {
-        const id = generateId('network');
-        const newNetwork = createEmptyNetwork(id, label);
-
-        set(
-          (state) => {
-            pushHistorySnapshot(state);
-
-            state.networks.set(id, newNetwork);
-            state.currentNetworkId = id;
-            state.selectedElementIds = new Set();
-            state.isDirty = true;
-          },
-          false,
-          'addNetwork'
-        );
-
-        return id;
-      },
-
-      removeNetwork: (id) => {
-        set(
-          (state) => {
-            if (!state.networks.has(id)) return;
-            if (state.networks.size <= 1) return; // Keep at least one network
-
-            pushHistorySnapshot(state);
-
-            state.networks.delete(id);
-
-            // Update current network if needed
-            if (state.currentNetworkId === id) {
-              const remainingIds = Array.from(state.networks.keys());
-              state.currentNetworkId = remainingIds[0] ?? null;
-              state.selectedElementIds = new Set();
-            }
-
-            state.isDirty = true;
-          },
-          false,
-          `removeNetwork/${id}`
-        );
-      },
-
-      selectNetwork: (id) => {
-        set(
-          (state) => {
-            if (!state.networks.has(id)) return;
-            state.currentNetworkId = id;
-            state.selectedElementIds = new Set();
-          },
-          false,
-          `selectNetwork/${id}`
-        );
-      },
-
-      updateNetwork: (id, updates) => {
-        set(
-          (state) => {
-            const network = state.networks.get(id);
-            if (!network) return;
-
-            pushHistorySnapshot(state);
-
-            if (updates.label !== undefined) network.label = updates.label;
-            if (updates.comment !== undefined) network.comment = updates.comment;
-            if (updates.enabled !== undefined) network.enabled = updates.enabled;
-
-            state.isDirty = true;
-          },
-          false,
-          `updateNetwork/${id}`
-        );
-      },
-
-      reorderNetworks: (fromIndex, toIndex) => {
-        set(
-          (state) => {
-            const networkArray = Array.from(state.networks.entries());
-            if (fromIndex < 0 || fromIndex >= networkArray.length) return;
-            if (toIndex < 0 || toIndex >= networkArray.length) return;
-
-            pushHistorySnapshot(state);
-
-            const [removed] = networkArray.splice(fromIndex, 1);
-            networkArray.splice(toIndex, 0, removed);
-            state.networks = new Map(networkArray);
-            state.isDirty = true;
-          },
-          false,
-          `reorderNetworks/${fromIndex}->${toIndex}`
-        );
-      },
-
-      copyNetwork: (networkId) => {
-        const state = get();
-        const targetId = networkId || state.currentNetworkId;
-        if (!targetId) return;
-
-        const network = state.networks.get(targetId);
-        if (!network) return;
-
-        set(
-          (state) => {
-            state.networkClipboard = serializeNetwork(network);
-          },
-          false,
-          `copyNetwork/${targetId}`
-        );
-      },
-
-      pasteNetwork: (afterNetworkId) => {
-        const state = get();
-        if (!state.networkClipboard) return null;
-
-        const newId = generateId('network');
-        const originalLabel = state.networkClipboard.label || 'Network';
-
-        set(
-          (state) => {
-            if (!state.networkClipboard) return;
-
-            pushHistorySnapshot(state);
-
-            // Create ID mapping for elements
-            const idMap = new Map<string, string>();
-            const newElements: Array<[string, LadderElement]> = [];
-
-            // Clone elements with new IDs
-            state.networkClipboard.elements.forEach(([oldId, element]) => {
-              const newElementId = generateId(element.type);
-              idMap.set(oldId, newElementId);
-              newElements.push([newElementId, {
-                ...cloneElementDeep(element),
-                id: newElementId,
-              }]);
-            });
-
-            // Clone wires with updated element references
-            const newWires = state.networkClipboard.wires.map((wire) => {
-              const newWire = cloneWire(wire);
-              // Update element ID references in wire endpoints
-              if (newWire.from.elementId) {
-                newWire.from.elementId = idMap.get(newWire.from.elementId) || newWire.from.elementId;
-              }
-              if (newWire.to.elementId) {
-                newWire.to.elementId = idMap.get(newWire.to.elementId) || newWire.to.elementId;
-              }
-              return newWire;
-            });
-
-            // Create new network
-            const newNetwork: LadderNetwork = {
-              id: newId,
-              label: `Copy of ${originalLabel}`,
-              comment: state.networkClipboard.comment,
-              elements: new Map(newElements),
-              wires: newWires,
-              enabled: state.networkClipboard.enabled,
-            };
-
-            // Insert at correct position
-            const networkArray = Array.from(state.networks.entries());
-            if (afterNetworkId) {
-              const afterIndex = networkArray.findIndex(([id]) => id === afterNetworkId);
-              if (afterIndex !== -1) {
-                networkArray.splice(afterIndex + 1, 0, [newId, newNetwork]);
-              } else {
-                networkArray.push([newId, newNetwork]);
-              }
-            } else {
-              networkArray.push([newId, newNetwork]);
-            }
-
-            state.networks = new Map(networkArray);
-            state.currentNetworkId = newId;
-            state.isDirty = true;
-          },
-          false,
-          `pasteNetwork/${newId}`
-        );
-
-        return newId;
-      },
-
-      // ========================================================================
       // Element Operations
       // ========================================================================
 
       addElement: (type, position, props = {}) => {
         const state = get();
-        if (!state.currentNetworkId) return null;
-
-        const network = state.networks.get(state.currentNetworkId);
-        if (!network) return null;
 
         // Validate position
-        if (!isValidPosition(network, position, state.gridConfig)) {
+        if (!isValidPosition(state.elements, position, state.gridConfig)) {
           return null;
         }
 
@@ -605,11 +369,7 @@ export const useLadderStore = create<LadderStore>()(
         set(
           (state) => {
             pushHistorySnapshot(state);
-
-            const currentNetwork = state.networks.get(state.currentNetworkId!);
-            if (currentNetwork) {
-              currentNetwork.elements.set(id, newElement);
-            }
+            state.elements.set(id, newElement);
             state.isDirty = true;
           },
           false,
@@ -622,16 +382,14 @@ export const useLadderStore = create<LadderStore>()(
       removeElement: (id) => {
         set(
           (state) => {
-            if (!state.currentNetworkId) return;
-            const network = state.networks.get(state.currentNetworkId);
-            if (!network || !network.elements.has(id)) return;
+            if (!state.elements.has(id)) return;
 
             pushHistorySnapshot(state);
 
-            network.elements.delete(id);
+            state.elements.delete(id);
 
             // Remove connected wires
-            network.wires = network.wires.filter(
+            state.wires = state.wires.filter(
               (wire) => wire.from.elementId !== id && wire.to.elementId !== id
             );
 
@@ -646,13 +404,10 @@ export const useLadderStore = create<LadderStore>()(
 
       moveElement: (id, position) => {
         const state = get();
-        if (!state.currentNetworkId) return;
-
-        const network = state.networks.get(state.currentNetworkId);
-        if (!network || !network.elements.has(id)) return;
+        if (!state.elements.has(id)) return;
 
         // Validate new position
-        if (!isValidPosition(network, position, state.gridConfig, id)) {
+        if (!isValidPosition(state.elements, position, state.gridConfig, id)) {
           return;
         }
 
@@ -660,8 +415,7 @@ export const useLadderStore = create<LadderStore>()(
           (state) => {
             pushHistorySnapshot(state);
 
-            const currentNetwork = state.networks.get(state.currentNetworkId!);
-            const element = currentNetwork?.elements.get(id);
+            const element = state.elements.get(id);
             if (element) {
               element.position = { ...position };
             }
@@ -675,9 +429,7 @@ export const useLadderStore = create<LadderStore>()(
       updateElement: (id, updates) => {
         set(
           (state) => {
-            if (!state.currentNetworkId) return;
-            const network = state.networks.get(state.currentNetworkId);
-            const element = network?.elements.get(id);
+            const element = state.elements.get(id);
             if (!element) return;
 
             pushHistorySnapshot(state);
@@ -702,12 +454,8 @@ export const useLadderStore = create<LadderStore>()(
 
       duplicateElement: (id) => {
         const state = get();
-        if (!state.currentNetworkId) return null;
 
-        const network = state.networks.get(state.currentNetworkId);
-        if (!network) return null;
-
-        const element = network.elements.get(id);
+        const element = state.elements.get(id);
         if (!element) return null;
 
         // Find next available position (offset by 1 row)
@@ -716,11 +464,11 @@ export const useLadderStore = create<LadderStore>()(
           col: element.position.col,
         };
 
-        if (!isValidPosition(network, newPosition, state.gridConfig)) {
+        if (!isValidPosition(state.elements, newPosition, state.gridConfig)) {
           // Try next column
           newPosition.row = element.position.row;
           newPosition.col = element.position.col + 1;
-          if (!isValidPosition(network, newPosition, state.gridConfig)) {
+          if (!isValidPosition(state.elements, newPosition, state.gridConfig)) {
             return null;
           }
         }
@@ -732,11 +480,7 @@ export const useLadderStore = create<LadderStore>()(
         set(
           (state) => {
             pushHistorySnapshot(state);
-
-            const currentNetwork = state.networks.get(state.currentNetworkId!);
-            if (currentNetwork) {
-              currentNetwork.elements.set(newId, newElement);
-            }
+            state.elements.set(newId, newElement);
             state.isDirty = true;
           },
           false,
@@ -744,6 +488,22 @@ export const useLadderStore = create<LadderStore>()(
         );
 
         return newId;
+      },
+
+      // ========================================================================
+      // Comment
+      // ========================================================================
+
+      updateComment: (comment) => {
+        set(
+          (state) => {
+            pushHistorySnapshot(state);
+            state.comment = comment;
+            state.isDirty = true;
+          },
+          false,
+          'updateComment'
+        );
       },
 
       // ========================================================================
@@ -807,10 +567,7 @@ export const useLadderStore = create<LadderStore>()(
       selectAll: () => {
         set(
           (state) => {
-            if (!state.currentNetworkId) return;
-            const network = state.networks.get(state.currentNetworkId);
-            if (!network) return;
-            state.selectedElementIds = new Set(network.elements.keys());
+            state.selectedElementIds = new Set(state.elements.keys());
           },
           false,
           'selectAll'
@@ -823,14 +580,10 @@ export const useLadderStore = create<LadderStore>()(
 
       copyToClipboard: () => {
         const state = get();
-        if (!state.currentNetworkId) return;
-
-        const network = state.networks.get(state.currentNetworkId);
-        if (!network) return;
 
         const selectedElements: LadderElement[] = [];
         state.selectedElementIds.forEach((id) => {
-          const element = network.elements.get(id);
+          const element = state.elements.get(id);
           if (element) {
             selectedElements.push(cloneElement(element, element.id));
           }
@@ -846,26 +599,19 @@ export const useLadderStore = create<LadderStore>()(
       },
 
       cutSelection: () => {
-        const state = get();
-        if (!state.currentNetworkId) return;
-
         // Copy first
         get().copyToClipboard();
 
         // Then delete
         set(
           (state) => {
-            if (!state.currentNetworkId) return;
-            const network = state.networks.get(state.currentNetworkId);
-            if (!network) return;
-
             pushHistorySnapshot(state);
 
             // Remove selected elements
             state.selectedElementIds.forEach((id) => {
-              network.elements.delete(id);
+              state.elements.delete(id);
               // Remove connected wires
-              network.wires = network.wires.filter(
+              state.wires = state.wires.filter(
                 (wire) => wire.from.elementId !== id && wire.to.elementId !== id
               );
             });
@@ -880,10 +626,7 @@ export const useLadderStore = create<LadderStore>()(
 
       pasteFromClipboard: (position) => {
         const state = get();
-        if (!state.currentNetworkId || state.clipboard.length === 0) return;
-
-        const network = state.networks.get(state.currentNetworkId);
-        if (!network) return;
+        if (state.clipboard.length === 0) return;
 
         // Calculate offset from first element in clipboard
         const firstElement = state.clipboard[0];
@@ -896,10 +639,6 @@ export const useLadderStore = create<LadderStore>()(
 
         set(
           (state) => {
-            if (!state.currentNetworkId) return;
-            const currentNetwork = state.networks.get(state.currentNetworkId);
-            if (!currentNetwork) return;
-
             pushHistorySnapshot(state);
 
             const newIds: string[] = [];
@@ -912,10 +651,10 @@ export const useLadderStore = create<LadderStore>()(
               };
 
               // Skip if position is invalid
-              if (isValidPosition(currentNetwork, newPosition, state.gridConfig)) {
+              if (isValidPosition(state.elements, newPosition, state.gridConfig)) {
                 const newElement = cloneElement(element, newId);
                 newElement.position = newPosition;
-                currentNetwork.elements.set(newId, newElement);
+                state.elements.set(newId, newElement);
                 newIds.push(newId);
               }
             });
@@ -940,14 +679,15 @@ export const useLadderStore = create<LadderStore>()(
 
             // Save current state for redo if at the end
             if (state.historyIndex === state.history.length - 1) {
-              const snapshot = createSnapshot(state.networks, state.currentNetworkId);
+              const snapshot = createSnapshot(state.elements, state.wires, state.comment);
               state.history.push(snapshot);
             }
 
             const snapshot = state.history[state.historyIndex];
             const restored = restoreSnapshot(snapshot);
-            state.networks = restored.networks;
-            state.currentNetworkId = restored.currentNetworkId;
+            state.elements = restored.elements;
+            state.wires = restored.wires;
+            state.comment = restored.comment;
             state.historyIndex--;
             state.selectedElementIds = new Set();
             state.isDirty = true;
@@ -961,7 +701,6 @@ export const useLadderStore = create<LadderStore>()(
         set(
           (state) => {
             // Can only redo if there's a snapshot beyond current position
-            // After undo, history[historyIndex] is what we're at, history[historyIndex+1] and beyond are for redo
             const nextSnapshotIndex = state.historyIndex + 2;
             if (nextSnapshotIndex >= state.history.length) return;
 
@@ -969,8 +708,9 @@ export const useLadderStore = create<LadderStore>()(
             const snapshot = state.history[nextSnapshotIndex];
             if (snapshot) {
               const restored = restoreSnapshot(snapshot);
-              state.networks = restored.networks;
-              state.currentNetworkId = restored.currentNetworkId;
+              state.elements = restored.elements;
+              state.wires = restored.wires;
+              state.comment = restored.comment;
               state.selectedElementIds = new Set();
               state.isDirty = true;
             }
@@ -1098,28 +838,22 @@ export const useLadderStore = create<LadderStore>()(
             state.history = [];
             state.historyIndex = -1;
 
-            // Create editor networks from AST networks
-            const newNetworks = new Map<string, LadderNetwork>();
+            // Merge all AST network nodes into flat elements
+            const allElements: LadderElement[] = [];
 
             ast.networks.forEach((astNetwork) => {
-              const networkId = astNetwork.id ?? generateId('network');
-              const network = createEmptyNetwork(
-                networkId,
-                `Step ${astNetwork.step}`
-              );
-              network.comment = astNetwork.comment;
-
-              // Convert AST nodes to elements (stub - full implementation in Task 79)
-              const elements = convertASTToElements(astNetwork.nodes, networkId);
-              elements.forEach((element) => {
-                network.elements.set(element.id, element);
-              });
-
-              newNetworks.set(network.id, network);
+              const elements = convertASTToElements(astNetwork.nodes, astNetwork.id ?? '');
+              allElements.push(...elements);
             });
 
-            state.networks = newNetworks;
-            state.currentNetworkId = newNetworks.size > 0 ? Array.from(newNetworks.keys())[0] : null;
+            const newElements = new Map<string, LadderElement>();
+            allElements.forEach((element) => {
+              newElements.set(element.id, element);
+            });
+
+            state.elements = newElements;
+            state.wires = [];
+            state.comment = ast.networks[0]?.comment;
             state.selectedElementIds = new Set();
             state.isDirty = false;
           },
@@ -1130,21 +864,18 @@ export const useLadderStore = create<LadderStore>()(
 
       exportToAST: () => {
         const state = get();
-        if (state.networks.size === 0) return null;
+        if (state.elements.size === 0) return null;
 
-        const networks: LadderNetworkAST[] = [];
-        let stepCounter = 1;
-
-        state.networks.forEach((network) => {
-          // Convert editor network to AST network (stub - full implementation in Task 80)
-          const nodes = convertElementsToAST(network);
-          networks.push({
-            id: network.id,
-            step: stepCounter++,
+        // Convert flat elements to a single AST network
+        const nodes = convertElementsToAST(state.elements, state.wires);
+        const networks: LadderNetworkAST[] = [
+          {
+            id: 'main',
+            step: 1,
             nodes,
-            comment: network.comment,
-          });
-        });
+            comment: state.comment,
+          },
+        ];
 
         return {
           metadata: {
@@ -1167,10 +898,9 @@ export const useLadderStore = create<LadderStore>()(
           (state) => {
             pushHistorySnapshot(state);
 
-            // Create one empty network
-            const newNetwork = createEmptyNetwork(generateId('network'), 'Network 1');
-            state.networks = new Map([[newNetwork.id, newNetwork]]);
-            state.currentNetworkId = newNetwork.id;
+            state.elements = new Map();
+            state.wires = [];
+            state.comment = undefined;
             state.selectedElementIds = new Set();
             state.clipboard = [];
             state.isDirty = true;
@@ -1194,7 +924,7 @@ export const useLadderStore = create<LadderStore>()(
         set(
           () => ({
             ...initialState,
-            networks: new Map(),
+            elements: new Map(),
             selectedElementIds: new Set(),
             clipboard: [],
             history: [],
@@ -1216,14 +946,12 @@ export const useLadderStore = create<LadderStore>()(
 /** Convert AST nodes to ladder elements (stub - full implementation in Task 79) */
 function convertASTToElements(_nodes: LadderNode[], _networkId: string): LadderElement[] {
   // This is a placeholder - full implementation will be in Task 79 (AST to Grid Conversion)
-  // For now, return empty array
   return [];
 }
 
 /** Convert ladder elements to AST (stub - full implementation in Task 80) */
-function convertElementsToAST(_network: LadderNetwork): LadderNode[] {
+function convertElementsToAST(_elements: Map<string, LadderElement>, _wires: LadderWire[]): LadderNode[] {
   // This is a placeholder - full implementation will be in Task 80 (Grid to AST Conversion)
-  // For now, return empty array
   return [];
 }
 
@@ -1231,33 +959,23 @@ function convertElementsToAST(_network: LadderNetwork): LadderNode[] {
 // Selectors
 // ============================================================================
 
-/** Select all networks */
-export const selectNetworks = (state: LadderStore) => state.networks;
+/** Select elements */
+export const selectElements = (state: LadderStore) => state.elements;
 
-/** Select current network ID */
-export const selectCurrentNetworkId = (state: LadderStore) => state.currentNetworkId;
+/** Select wires */
+export const selectWires = (state: LadderStore) => state.wires;
 
-/** Select current network */
-export const selectCurrentNetwork = (state: LadderStore) =>
-  state.currentNetworkId ? state.networks.get(state.currentNetworkId) : null;
-
-/** Select elements from current network */
-export const selectElements = (state: LadderStore) => {
-  const network = selectCurrentNetwork(state);
-  return network?.elements ?? new Map<string, LadderElement>();
-};
+/** Select comment */
+export const selectComment = (state: LadderStore) => state.comment;
 
 /** Select selected element IDs */
 export const selectSelectedElementIds = (state: LadderStore) => state.selectedElementIds;
 
 /** Select selected elements */
 export const selectSelectedElements = (state: LadderStore) => {
-  const network = selectCurrentNetwork(state);
-  if (!network) return [];
-
   const selected: LadderElement[] = [];
   state.selectedElementIds.forEach((id) => {
-    const element = network.elements.get(id);
+    const element = state.elements.get(id);
     if (element) selected.push(element);
   });
   return selected;
@@ -1286,24 +1004,8 @@ export const selectIsDirty = (state: LadderStore) => state.isDirty;
 export const selectClipboard = (state: LadderStore) => state.clipboard;
 
 /** Select a specific element by ID */
-export const selectElementById = (id: string) => (state: LadderStore) => {
-  const network = selectCurrentNetwork(state);
-  return network?.elements.get(id);
-};
-
-/** Select a specific network by ID */
-export const selectNetworkById = (id: string) => (state: LadderStore) =>
-  state.networks.get(id);
-
-/** Select networks as array (for ordering) */
-export const selectNetworksArray = (state: LadderStore) =>
-  Array.from(state.networks.values());
-
-/** Select wires from current network */
-export const selectWires = (state: LadderStore) => {
-  const network = selectCurrentNetwork(state);
-  return network?.wires ?? [];
-};
+export const selectElementById = (id: string) => (state: LadderStore) =>
+  state.elements.get(id);
 
 // ============================================================================
 // Custom Hooks
@@ -1311,7 +1013,6 @@ export const selectWires = (state: LadderStore) => {
 
 /**
  * Hook to check if undo is available.
- * Provides a cleaner API for components that need to track undo availability.
  */
 export function useCanUndo(): boolean {
   return useLadderStore(selectCanUndo);
@@ -1319,7 +1020,6 @@ export function useCanUndo(): boolean {
 
 /**
  * Hook to check if redo is available.
- * Provides a cleaner API for components that need to track redo availability.
  */
 export function useCanRedo(): boolean {
   return useLadderStore(selectCanRedo);

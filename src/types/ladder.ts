@@ -96,9 +96,7 @@ export {
 } from '../components/OneParser/types';
 
 import type {
-  LadderNode,
   GridPosition,
-  DeviceAddress,
 } from '../components/OneParser/types';
 
 // ============================================================================
@@ -382,26 +380,8 @@ export interface LadderWire {
 }
 
 // ============================================================================
-// Network and Program Structure (Editor)
+// Program Structure (Editor)
 // ============================================================================
-
-/** Editor-specific ladder network (rung) */
-export interface LadderNetwork {
-  /** Unique identifier */
-  id: string;
-  /** Network label/number */
-  label?: string;
-  /** Network comment */
-  comment?: string;
-  /** Elements in this network indexed by ID */
-  elements: Map<string, LadderElement>;
-  /** Wire connections */
-  wires: LadderWire[];
-  /** Computed AST from topology (for code generation) */
-  ast?: LadderNode;
-  /** Whether network is enabled */
-  enabled: boolean;
-}
 
 /** Program metadata for editor */
 export interface LadderProgramMetadata {
@@ -419,20 +399,6 @@ export interface LadderProgramMetadata {
   version?: string;
   /** Target PLC model */
   plcModel?: string;
-}
-
-/** Complete ladder program for editor */
-export interface LadderProgram {
-  /** Unique identifier */
-  id: string;
-  /** Program name */
-  name: string;
-  /** All networks (rungs) */
-  networks: LadderNetwork[];
-  /** Program metadata */
-  metadata: LadderProgramMetadata;
-  /** Symbol table */
-  symbolTable?: Map<string, { address: DeviceAddress; symbol?: string; comment?: string }>;
 }
 
 // ============================================================================
@@ -626,37 +592,6 @@ export function isLogicElement(element: LadderElement): boolean {
 // ============================================================================
 
 /**
- * Create an empty ladder network
- */
-export function createEmptyNetwork(id?: string, label?: string): LadderNetwork {
-  return {
-    id: id ?? crypto.randomUUID(),
-    label,
-    elements: new Map(),
-    wires: [],
-    enabled: true,
-  };
-}
-
-/**
- * Create an empty ladder program
- */
-export function createEmptyEditorProgram(name = 'Untitled Program'): LadderProgram {
-  const now = new Date().toISOString();
-  return {
-    id: crypto.randomUUID(),
-    name,
-    networks: [],
-    metadata: {
-      name,
-      createdAt: now,
-      modifiedAt: now,
-      version: '1.0.0',
-    },
-  };
-}
-
-/**
  * Create a new monitoring state
  */
 export function createEmptyMonitoringState(): LadderMonitoringState {
@@ -669,53 +604,3 @@ export function createEmptyMonitoringState(): LadderMonitoringState {
   };
 }
 
-// ============================================================================
-// Serialization Types
-// ============================================================================
-
-/** Serializable version of LadderNetwork */
-export interface SerializableLadderNetwork {
-  id: string;
-  label?: string;
-  comment?: string;
-  elements: Record<string, LadderElement>;
-  wires: LadderWire[];
-  enabled: boolean;
-}
-
-/** Serializable version of LadderProgram */
-export interface SerializableEditorProgram {
-  id: string;
-  name: string;
-  networks: SerializableLadderNetwork[];
-  metadata: LadderProgramMetadata;
-  symbolTable?: Record<string, { address: DeviceAddress; symbol?: string; comment?: string }>;
-}
-
-/**
- * Convert LadderNetwork to serializable format
- */
-export function networkToSerializable(network: LadderNetwork): SerializableLadderNetwork {
-  return {
-    id: network.id,
-    label: network.label,
-    comment: network.comment,
-    elements: Object.fromEntries(network.elements),
-    wires: network.wires,
-    enabled: network.enabled,
-  };
-}
-
-/**
- * Convert serializable format to LadderNetwork
- */
-export function serializableToNetwork(data: SerializableLadderNetwork): LadderNetwork {
-  return {
-    id: data.id,
-    label: data.label,
-    comment: data.comment,
-    elements: new Map(Object.entries(data.elements)),
-    wires: data.wires,
-    enabled: data.enabled,
-  };
-}

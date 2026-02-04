@@ -86,7 +86,11 @@
       "Bash(python:*)",
       "Bash(pnpm run dev:*)",
       "mcp__chrome-devtools__list_pages",
-      "mcp__chrome-devtools__navigate_page"
+      "mcp__chrome-devtools__navigate_page",
+      "Bash(find:*)",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "Bash(git diff:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
