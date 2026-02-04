@@ -115,7 +115,6 @@ interface WireRendererProps {
   wire: WireData;
   components: Map<string, { type: string; position: Position; size: { width: number; height: number }; ports: Array<{ id: string; position: string; offset?: number }> }>;
   isSelected: boolean;
-  onAddHandle?: (wireId: string, position: Position) => void;
   onContextMenu?: (wireId: string, position: Position, screenPos: { x: number; y: number }) => void;
   onHandleDragStart?: (wireId: string, handleIndex: number, constraint: HandleConstraint, e: React.MouseEvent, handlePosition: Position) => void;
   onHandleContextMenu?: (wireId: string, handleIndex: number, e: React.MouseEvent) => void;
@@ -126,7 +125,6 @@ const WireRenderer = memo(function WireRenderer({
   wire,
   components,
   isSelected,
-  onAddHandle,
   onContextMenu,
   onHandleDragStart,
   onHandleContextMenu,
@@ -199,7 +197,6 @@ const WireRenderer = memo(function WireRenderer({
       toExitDirection={toExitDirection}
       defaultFromDirection={fromData.direction}
       defaultToDirection={toData.direction}
-      onAddHandle={onAddHandle}
       onContextMenu={onContextMenu}
       onHandleDragStart={onHandleDragStart}
       onHandleContextMenu={onHandleContextMenu}
@@ -230,9 +227,7 @@ function useCanvasState(documentId: string | null) {
   const globalAddWire = useCanvasStore((state) => state.addWire);
   const globalMoveComponent = useCanvasStore((state) => state.moveComponent);
   const globalRemoveWire = useCanvasStore((state) => state.removeWire);
-  const globalCreateJunctionOnWire = useCanvasStore((state) => state.createJunctionOnWire);
   const globalMoveJunction = useCanvasStore((state) => state.moveJunction);
-  const globalAddWireHandle = useCanvasStore((state) => state.addWireHandle);
   const globalUpdateWireHandle = useCanvasStore((state) => state.updateWireHandle);
   const globalRemoveWireHandle = useCanvasStore((state) => state.removeWireHandle);
   const globalMoveWireSegment = useCanvasStore((state) => state.moveWireSegment);
@@ -251,8 +246,6 @@ function useCanvasState(documentId: string | null) {
         moveComponent: documentState.moveComponent,
         moveJunction: documentState.moveJunction,
         removeWire: documentState.removeWire,
-        createJunctionOnWire: documentState.createJunctionOnWire,
-        addWireHandle: documentState.addWireHandle,
         updateWireHandle: documentState.updateWireHandle,
         removeWireHandle: documentState.removeWireHandle,
         moveWireSegment: documentState.moveWireSegment,
@@ -271,8 +264,6 @@ function useCanvasState(documentId: string | null) {
       moveComponent: globalMoveComponent,
       moveJunction: globalMoveJunction,
       removeWire: globalRemoveWire,
-      createJunctionOnWire: globalCreateJunctionOnWire,
-      addWireHandle: globalAddWireHandle,
       updateWireHandle: globalUpdateWireHandle,
       removeWireHandle: globalRemoveWireHandle,
       moveWireSegment: globalMoveWireSegment,
@@ -290,8 +281,6 @@ function useCanvasState(documentId: string | null) {
     globalMoveComponent,
     globalMoveJunction,
     globalRemoveWire,
-    globalCreateJunctionOnWire,
-    globalAddWireHandle,
     globalUpdateWireHandle,
     globalRemoveWireHandle,
     globalMoveWireSegment,
@@ -320,8 +309,6 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     moveComponent,
     moveJunction,
     removeWire,
-    createJunctionOnWire,
-    addWireHandle,
     updateWireHandle,
     removeWireHandle,
     moveWireSegment,
@@ -437,20 +424,12 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     (action: WireContextMenuAction) => {
       if (!wireContextMenu) return;
 
-      switch (action) {
-        case 'add_junction':
-          createJunctionOnWire(wireContextMenu.wireId, wireContextMenu.position);
-          break;
-        case 'add_handle':
-          addWireHandle(wireContextMenu.wireId, wireContextMenu.position);
-          break;
-        case 'delete':
-          removeWire(wireContextMenu.wireId);
-          break;
+      if (action === 'delete') {
+        removeWire(wireContextMenu.wireId);
       }
       setWireContextMenu(null);
     },
-    [wireContextMenu, createJunctionOnWire, addWireHandle, removeWire]
+    [wireContextMenu, removeWire]
   );
 
   // Handle right-click on a wire handle to remove it
@@ -672,7 +651,6 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
                     wire={wire}
                     components={components as Map<string, { type: string; position: Position; size: { width: number; height: number }; ports: Array<{ id: string; position: string; offset?: number }> }>}
                     isSelected={selectedIds.has(wire.id)}
-                    onAddHandle={addWireHandle}
                     onContextMenu={handleWireContextMenu}
                     onHandleDragStart={handleWireHandleDragStart}
                     onHandleContextMenu={handleWireHandleContextMenu}

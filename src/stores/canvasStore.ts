@@ -788,6 +788,9 @@ export const useCanvasStore = create<CanvasStore>()(
                 : { x: original.x, y: position.y };
             }
 
+            // Mark as user handle so recalculateAutoHandles won't overwrite
+            handle.source = 'user';
+
             state.isDirty = true;
           },
           false,
@@ -825,17 +828,19 @@ export const useCanvasStore = create<CanvasStore>()(
             const handleA = wire.handles[handleIndexA];
             const handleB = wire.handles[handleIndexB];
 
-            // Apply delta respecting each handle's constraint
-            const applyConstrainedDelta = (handle: typeof handleA) => {
-              const c = handle.constraint;
-              handle.position = {
-                x: handle.position.x + (c === 'vertical' ? 0 : delta.x),
-                y: handle.position.y + (c === 'horizontal' ? 0 : delta.y),
-              };
+            // Apply delta directly — useWireSegmentDrag already constrains by orientation
+            handleA.position = {
+              x: handleA.position.x + delta.x,
+              y: handleA.position.y + delta.y,
+            };
+            handleB.position = {
+              x: handleB.position.x + delta.x,
+              y: handleB.position.y + delta.y,
             };
 
-            applyConstrainedDelta(handleA);
-            applyConstrainedDelta(handleB);
+            // Mark as user handles so recalculateAutoHandles won't overwrite
+            handleA.source = 'user';
+            handleB.source = 'user';
 
             state.isDirty = true;
           },

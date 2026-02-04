@@ -13,7 +13,7 @@ import type { Position } from '../types';
 // ============================================================================
 
 /** Available context menu actions */
-export type WireContextMenuAction = 'add_junction' | 'add_handle' | 'delete';
+export type WireContextMenuAction = 'delete';
 
 interface WireContextMenuProps {
   /** Screen position to display the menu */
@@ -36,8 +36,6 @@ interface WireContextMenuProps {
  * WireContextMenu - Right-click context menu for wire operations.
  *
  * Features:
- * - Add Junction: Creates a junction node splitting the wire
- * - Add Control Point: Adds a draggable handle for custom routing
  * - Delete Wire: Removes the wire connection
  */
 export const WireContextMenu = memo(function WireContextMenu({
@@ -101,36 +99,6 @@ export const WireContextMenu = memo(function WireContextMenu({
       style={menuStyle}
       onClick={handleMenuClick}
     >
-      {/* Add Junction */}
-      <button
-        className="w-full px-4 py-2 text-left text-sm text-neutral-200 hover:bg-neutral-700 flex items-center gap-2 transition-colors"
-        onClick={handleItemClick('add_junction')}
-      >
-        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <circle cx="8" cy="8" r="3" />
-          <line x1="0" y1="8" x2="5" y2="8" />
-          <line x1="11" y1="8" x2="16" y2="8" />
-          <line x1="8" y1="0" x2="8" y2="5" />
-        </svg>
-        Add Junction
-      </button>
-
-      {/* Add Control Point */}
-      <button
-        className="w-full px-4 py-2 text-left text-sm text-neutral-200 hover:bg-neutral-700 flex items-center gap-2 transition-colors"
-        onClick={handleItemClick('add_handle')}
-      >
-        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <circle cx="8" cy="8" r="2.5" fill="currentColor" />
-          <line x1="0" y1="8" x2="5.5" y2="8" />
-          <line x1="10.5" y1="8" x2="16" y2="8" />
-        </svg>
-        Add Control Point
-      </button>
-
-      {/* Separator */}
-      <hr className="my-1 border-neutral-700" />
-
       {/* Delete Wire */}
       <button
         className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-neutral-700 flex items-center gap-2 transition-colors"

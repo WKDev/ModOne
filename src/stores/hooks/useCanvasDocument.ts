@@ -450,6 +450,9 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
             ? { x: position.x, y: original.y }
             : { x: original.x, y: position.y };
         }
+
+        // Mark as user handle so recalculateAutoHandles won't overwrite
+        handle.source = 'user';
       });
     },
     [documentId, updateCanvasData]
@@ -492,6 +495,10 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
           x: handleB.position.x + delta.x,
           y: handleB.position.y + delta.y,
         };
+
+        // Mark as user handles so recalculateAutoHandles won't overwrite
+        handleA.source = 'user';
+        handleB.source = 'user';
       });
     },
     [documentId, pushHistory, updateCanvasData]

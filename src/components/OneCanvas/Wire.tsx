@@ -37,12 +37,8 @@ interface WireProps {
   pathMode?: 'straight' | 'bezier' | 'orthogonal';
   /** Click handler */
   onClick?: (id: string) => void;
-  /** Double-click handler for adding handle */
-  onAddHandle?: (wireId: string, position: Position) => void;
   /** Right-click context menu handler */
   onContextMenu?: (wireId: string, position: Position, screenPos: { x: number; y: number }) => void;
-  /** Double-click handler for creating junction (deprecated - use context menu) */
-  onCreateJunction?: (wireId: string, position: Position) => void;
   /** Wire handles (control points with constraints) */
   handles?: WireHandleData[];
   /** Handler for starting handle drag */
@@ -111,9 +107,7 @@ export const Wire = memo(function Wire({
   isHovered = false,
   pathMode = 'straight',
   onClick,
-  onAddHandle,
   onContextMenu,
-  onCreateJunction,
   handles,
   onHandleDragStart,
   onHandleContextMenu,
@@ -183,22 +177,6 @@ export const Wire = memo(function Wire({
     onClick?.(id);
   };
 
-  // Handle double-click for adding handle or creating junction (legacy)
-  const handleDoubleClick = (e: React.MouseEvent<SVGPathElement>) => {
-    e.stopPropagation();
-
-    const position = getClickPosition(e);
-    if (!position) return;
-
-    // Prefer adding handle if handler is provided
-    if (onAddHandle) {
-      onAddHandle(id, position);
-    } else if (onCreateJunction) {
-      // Legacy: create junction on double-click
-      onCreateJunction(id, position);
-    }
-  };
-
   // Handle right-click for context menu
   const handleRightClick = (e: React.MouseEvent<SVGPathElement>) => {
     e.preventDefault();
@@ -223,7 +201,6 @@ export const Wire = memo(function Wire({
         className="cursor-pointer"
         style={{ pointerEvents: 'auto' }}
         onClick={handleClick}
-        onDoubleClick={handleDoubleClick}
         onContextMenu={handleRightClick}
       />
 
