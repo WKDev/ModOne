@@ -451,7 +451,7 @@ export const useCanvasStore = create<CanvasStore>()(
             for (const wire of connectedWires) {
               const target = state.wires.find((w) => w.id === wire.id);
               if (target) {
-                target.handles = recalculateAutoHandles(target, state.components);
+                target.handles = recalculateAutoHandles(target, state.components, state.junctions);
               }
             }
 
@@ -484,7 +484,7 @@ export const useCanvasStore = create<CanvasStore>()(
             for (const wire of connectedWires) {
               const target = state.wires.find((w) => w.id === wire.id);
               if (target) {
-                target.handles = recalculateAutoHandles(target, state.components);
+                target.handles = recalculateAutoHandles(target, state.components, state.junctions);
               }
             }
 
@@ -547,7 +547,8 @@ export const useCanvasStore = create<CanvasStore>()(
             // Auto-generate bend points
             const handles = computeWireBendPoints(
               from, to, state.components,
-              options?.fromExitDirection, options?.toExitDirection
+              options?.fromExitDirection, options?.toExitDirection,
+              state.junctions
             );
             if (handles) {
               newWire.handles = handles;
@@ -824,14 +825,17 @@ export const useCanvasStore = create<CanvasStore>()(
             const handleA = wire.handles[handleIndexA];
             const handleB = wire.handles[handleIndexB];
 
-            handleA.position = {
-              x: handleA.position.x + delta.x,
-              y: handleA.position.y + delta.y,
+            // Apply delta respecting each handle's constraint
+            const applyConstrainedDelta = (handle: typeof handleA) => {
+              const c = handle.constraint;
+              handle.position = {
+                x: handle.position.x + (c === 'vertical' ? 0 : delta.x),
+                y: handle.position.y + (c === 'horizontal' ? 0 : delta.y),
+              };
             };
-            handleB.position = {
-              x: handleB.position.x + delta.x,
-              y: handleB.position.y + delta.y,
-            };
+
+            applyConstrainedDelta(handleA);
+            applyConstrainedDelta(handleB);
 
             state.isDirty = true;
           },
@@ -1076,18 +1080,16 @@ export const useCanvasStore = create<CanvasStore>()(
       redo: () => {
         set(
           (state) => {
-            if (state.historyIndex >= state.history.length - 1) return;
+            if (state.historyIndex + 1 >= state.history.length - 1) return;
 
             state.historyIndex++;
             const snapshot = state.history[state.historyIndex + 1];
-            if (snapshot) {
-              const restored = restoreSnapshot(snapshot);
-              state.components = restored.components;
-              state.junctions = restored.junctions;
-              state.wires = restored.wires;
-              state.selectedIds = new Set();
-              state.isDirty = true;
-            }
+            const restored = restoreSnapshot(snapshot);
+            state.components = restored.components;
+            state.junctions = restored.junctions;
+            state.wires = restored.wires;
+            state.selectedIds = new Set();
+            state.isDirty = true;
           },
           false,
           'redo'
@@ -1319,7 +1321,7 @@ export const selectCanUndo = (state: CanvasStore) => state.historyIndex >= 0;
 
 /** Select whether redo is available */
 export const selectCanRedo = (state: CanvasStore) =>
-  state.historyIndex < state.history.length - 1;
+  state.historyIndex + 1 < state.history.length - 1;
 
 /** Select whether circuit has unsaved changes */
 export const selectIsDirty = (state: CanvasStore) => state.isDirty;

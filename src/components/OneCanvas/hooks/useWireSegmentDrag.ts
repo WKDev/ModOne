@@ -60,7 +60,7 @@ export function useWireSegmentDrag({
 }: UseWireSegmentDragOptions): UseWireSegmentDragResult {
   const [dragging, setDragging] = useState<SegmentDragState | null>(null);
   const isFirstMoveRef = useRef(false);
-  const lastMouseRef = useRef<Position>({ x: 0, y: 0 });
+  const appliedDeltaRef = useRef<Position>({ x: 0, y: 0 });
 
   const handleSegmentDragStart = useCallback(
     (
@@ -76,7 +76,7 @@ export function useWireSegmentDrag({
       e.stopPropagation();
 
       isFirstMoveRef.current = true;
-      lastMouseRef.current = { x: e.clientX, y: e.clientY };
+      appliedDeltaRef.current = { x: 0, y: 0 };
       setDragging({
         wireId,
         handleIndexA,
@@ -94,17 +94,23 @@ export function useWireSegmentDrag({
     if (!dragging) return;
 
     const handleMove = (e: MouseEvent) => {
-      // Incremental delta from last mouse position
-      const dx = (e.clientX - lastMouseRef.current.x) / zoom;
-      const dy = (e.clientY - lastMouseRef.current.y) / zoom;
-      lastMouseRef.current = { x: e.clientX, y: e.clientY };
+      // Absolute delta from drag start (avoids floating-point accumulation)
+      const absDx = (e.clientX - dragging.startMouse.x) / zoom;
+      const absDy = (e.clientY - dragging.startMouse.y) / zoom;
 
       // Constrain based on segment orientation:
       // horizontal segment → move Y only; vertical segment → move X only
-      const delta: Position =
+      const targetDelta: Position =
         dragging.orientation === 'horizontal'
-          ? { x: 0, y: dy }
-          : { x: dx, y: 0 };
+          ? { x: 0, y: absDy }
+          : { x: absDx, y: 0 };
+
+      // Compute incremental delta to apply (total target minus what's already applied)
+      const delta: Position = {
+        x: targetDelta.x - appliedDeltaRef.current.x,
+        y: targetDelta.y - appliedDeltaRef.current.y,
+      };
+      appliedDeltaRef.current = targetDelta;
 
       moveWireSegment(
         dragging.wireId,

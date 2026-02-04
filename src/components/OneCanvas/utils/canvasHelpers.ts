@@ -113,7 +113,8 @@ export function getWiresConnectedToJunction(wires: Wire[], junctionId: string): 
  */
 export function recalculateAutoHandles(
   wire: Wire,
-  components: Map<string, Block>
+  components: Map<string, Block>,
+  junctions?: Map<string, Junction>
 ): WireHandle[] | undefined {
   const hasUserHandles = wire.handles?.some((h) => h.source === 'user') ?? false;
 
@@ -129,7 +130,8 @@ export function recalculateAutoHandles(
     wire.to,
     components,
     wire.fromExitDirection,
-    wire.toExitDirection
+    wire.toExitDirection,
+    junctions
   );
 }
 
@@ -152,9 +154,48 @@ function getPortRelativePos(
   }
 }
 
+/** Euclidean distance between two points */
+function dist(a: Position, b: Position): number {
+  return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
+}
+
+/**
+ * Find the cumulative path distance from the start of the polyline to the
+ * closest point on the polyline for a given position.
+ */
+function pathDistanceToPoint(polyline: Position[], position: Position): number {
+  let bestDist = Infinity;
+  let bestPathDist = 0;
+  let cumulativeDist = 0;
+
+  for (let i = 0; i < polyline.length - 1; i++) {
+    const a = polyline[i];
+    const b = polyline[i + 1];
+    const segLen = dist(a, b);
+
+    // Project position onto segment a→b
+    let t = 0;
+    if (segLen > 0) {
+      t = ((position.x - a.x) * (b.x - a.x) + (position.y - a.y) * (b.y - a.y)) / (segLen * segLen);
+      t = Math.max(0, Math.min(1, t));
+    }
+    const proj = { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) };
+    const d = dist(position, proj);
+
+    if (d < bestDist) {
+      bestDist = d;
+      bestPathDist = cumulativeDist + t * segLen;
+    }
+
+    cumulativeDist += segLen;
+  }
+
+  return bestPathDist;
+}
+
 /**
  * Find where to insert a new handle in the handles array based on path order.
- * Uses distance from the wire's from-port to determine ordering along the path.
+ * Uses distance along the wire path (not Euclidean) to determine ordering.
  */
 export function findHandleInsertIndex(
   wire: Wire,
@@ -178,15 +219,17 @@ export function findHandleInsertIndex(
     }
   }
 
-  // Calculate distance from fromPort for each existing handle and the new position
-  const distFromStart = (p: Position) =>
-    Math.sqrt(Math.pow(p.x - fromPos.x, 2) + Math.pow(p.y - fromPos.y, 2));
+  // Build polyline: fromPos → handle positions → (implicit toPos, not needed for ordering)
+  const polyline = [fromPos, ...wire.handles.map((h) => h.position)];
 
-  const newDist = distFromStart(position);
+  // Find path distance for the new position
+  const newPathDist = pathDistanceToPoint(polyline, position);
 
-  // Find the correct insertion index to maintain order by distance from start
+  // Find the correct insertion index by comparing cumulative path distances to each handle
+  let cumulative = 0;
   for (let i = 0; i < wire.handles.length; i++) {
-    if (newDist < distFromStart(wire.handles[i].position)) {
+    cumulative += dist(polyline[i], polyline[i + 1]);
+    if (newPathDist < cumulative) {
       return i;
     }
   }
@@ -195,7 +238,50 @@ export function findHandleInsertIndex(
 }
 
 /**
- * Compute auto-generated bend points for a wire based on port directions.
+ * Infer an exit direction for a junction based on the angle to the other endpoint.
+ * Uses the dominant axis to pick the closest cardinal direction.
+ */
+function inferJunctionDirection(junctionPos: Position, otherPos: Position): PortPosition {
+  const dx = otherPos.x - junctionPos.x;
+  const dy = otherPos.y - junctionPos.y;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0 ? 'right' : 'left';
+  }
+  return dy >= 0 ? 'bottom' : 'top';
+}
+
+/**
+ * Resolve an endpoint to its absolute position and exit direction.
+ * Works for both port endpoints and junction endpoints.
+ */
+function resolveEndpoint(
+  endpoint: WireEndpoint,
+  components: Map<string, Block>,
+  junctions?: Map<string, Junction>,
+  exitDirection?: PortPosition,
+  otherPos?: Position
+): { pos: Position; dir: PortPosition } | undefined {
+  if (isPortEndpoint(endpoint)) {
+    const block = components.get(endpoint.componentId);
+    if (!block) return undefined;
+    const port = block.ports.find((p) => p.id === endpoint.portId);
+    if (!port) return undefined;
+    const relPos = getPortRelativePosition(port.position, port.offset ?? 0.5, block.size);
+    return {
+      pos: { x: block.position.x + relPos.x, y: block.position.y + relPos.y },
+      dir: exitDirection || port.position,
+    };
+  } else {
+    const junction = junctions?.get(endpoint.junctionId);
+    if (!junction) return undefined;
+    const pos = junction.position;
+    const dir = exitDirection || (otherPos ? inferJunctionDirection(pos, otherPos) : 'right');
+    return { pos, dir };
+  }
+}
+
+/**
+ * Compute auto-generated bend points for a wire based on port/junction directions.
  * Returns the handles array, or undefined if no bends needed.
  */
 export function computeWireBendPoints(
@@ -203,32 +289,31 @@ export function computeWireBendPoints(
   to: WireEndpoint,
   components: Map<string, Block>,
   fromExitDirection?: PortPosition,
-  toExitDirection?: PortPosition
+  toExitDirection?: PortPosition,
+  junctions?: Map<string, Junction>
 ): WireHandle[] | undefined {
-  // Only compute bend points for port-to-port wires
-  if (!isPortEndpoint(from) || !isPortEndpoint(to)) return undefined;
+  // First pass: resolve what we can to get positions for direction inference
+  const fromResolved = resolveEndpoint(from, components, junctions, fromExitDirection);
+  const toResolved = resolveEndpoint(to, components, junctions, toExitDirection);
 
-  const fromBlock = components.get(from.componentId);
-  const toBlock = components.get(to.componentId);
-  if (!fromBlock || !toBlock) return undefined;
+  // If either endpoint can't be resolved at all, bail
+  if (!fromResolved && !toResolved) return undefined;
 
-  const fromPort = fromBlock.ports.find((p) => p.id === from.portId);
-  const toPort = toBlock.ports.find((p) => p.id === to.portId);
-  if (!fromPort || !toPort) return undefined;
+  // Second pass: re-resolve with the other endpoint's position for junction direction inference
+  const fromFinal = fromResolved || resolveEndpoint(from, components, junctions, fromExitDirection, toResolved?.pos);
+  const toFinal = toResolved || resolveEndpoint(to, components, junctions, toExitDirection, fromFinal?.pos);
 
-  const fromSize = fromBlock.size;
-  const toSize = toBlock.size;
+  // If junction direction needed the other position, re-resolve with it
+  const fromComplete = !isPortEndpoint(from) && fromFinal && toFinal && !fromExitDirection
+    ? resolveEndpoint(from, components, junctions, fromExitDirection, toFinal.pos)
+    : fromFinal;
+  const toComplete = !isPortEndpoint(to) && toFinal && fromFinal && !toExitDirection
+    ? resolveEndpoint(to, components, junctions, toExitDirection, fromFinal.pos)
+    : toFinal;
 
-  const fromRelPos = getPortRelativePosition(fromPort.position, fromPort.offset ?? 0.5, fromSize);
-  const toRelPos = getPortRelativePosition(toPort.position, toPort.offset ?? 0.5, toSize);
+  if (!fromComplete || !toComplete) return undefined;
 
-  const fromPos = { x: fromBlock.position.x + fromRelPos.x, y: fromBlock.position.y + fromRelPos.y };
-  const toPos = { x: toBlock.position.x + toRelPos.x, y: toBlock.position.y + toRelPos.y };
-
-  const fromDir = fromExitDirection || fromPort.position;
-  const toDir = toExitDirection || toPort.position;
-
-  const result = calculateWireBendPoints(fromPos, toPos, fromDir, toDir);
+  const result = calculateWireBendPoints(fromComplete.pos, toComplete.pos, fromComplete.dir, toComplete.dir);
   if (result.points.length === 0) return undefined;
 
   return result.points.map((p, i) => ({

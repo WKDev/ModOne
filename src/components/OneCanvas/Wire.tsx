@@ -284,9 +284,9 @@ export const Wire = memo(function Wire({
           const next = handles[i + 1];
           const dx = Math.abs(handle.position.x - next.position.x);
           const dy = Math.abs(handle.position.y - next.position.y);
-          // Skip diagonal segments
-          if (dx > 5 && dy > 5) return null;
-          const orientation = dx <= 5 ? 'vertical' : 'horizontal';
+          // Skip diagonal segments (threshold tolerates minor floating-point drift)
+          if (dx > 10 && dy > 10) return null;
+          const orientation = dx <= 10 ? 'vertical' : 'horizontal';
           const cursor = orientation === 'vertical' ? 'ew-resize' : 'ns-resize';
           return (
             <line

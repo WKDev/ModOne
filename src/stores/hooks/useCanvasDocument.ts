@@ -250,7 +250,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
           for (const wire of connectedWires) {
             const target = docData.wires.find((w) => w.id === wire.id);
             if (target) {
-              target.handles = recalculateAutoHandles(target, docData.components);
+              target.handles = recalculateAutoHandles(target, docData.components, docData.junctions);
             }
           }
         }
@@ -280,7 +280,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
           for (const wire of connectedWires) {
             const target = docData.wires.find((w) => w.id === wire.id);
             if (target) {
-              target.handles = recalculateAutoHandles(target, docData.components);
+              target.handles = recalculateAutoHandles(target, docData.components, docData.junctions);
             }
           }
         }
@@ -320,7 +320,8 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         // Auto-generate bend points
         const handles = computeWireBendPoints(
           from, to, docData.components,
-          options?.fromExitDirection, options?.toExitDirection
+          options?.fromExitDirection, options?.toExitDirection,
+          docData.junctions
         );
         if (handles) {
           newWire.handles = handles;
