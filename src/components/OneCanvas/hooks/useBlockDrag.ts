@@ -14,6 +14,7 @@
 import { useCallback, useRef, useEffect, useState } from 'react';
 import { useCanvasStore } from '../../../stores/canvasStore';
 import { snapToGrid, screenToCanvas } from '../utils/canvasCoordinates';
+import { isToggleSelection } from '../selection/modifierKeys';
 import type { Position } from '../types';
 import type { CanvasRef } from '../Canvas';
 
@@ -85,7 +86,6 @@ export function useBlockDrag({
   const snapToGridEnabled = useCanvasStore((state) => state.snapToGrid);
   const gridSize = useCanvasStore((state) => state.gridSize);
   const setSelection = useCanvasStore((state) => state.setSelection);
-  const addToSelection = useCanvasStore((state) => state.addToSelection);
 
   // Use custom (document-aware) or fall back to global store
   const components = customComponents ?? globalComponents;
@@ -128,21 +128,34 @@ export function useBlockDrag({
       event.preventDefault();
       event.stopPropagation();
 
-      // Determine which items to drag (components and/or junctions)
+      // STEP 1: Capture current selection synchronously (avoid race condition)
+      const currentSelection = Array.from(selectedIds);
+
+      // STEP 2: Compute new selection locally (synchronous - no async state update yet)
+      let newSelection: string[];
       let itemsToDrag: string[];
 
       if (selectedIds.has(blockId)) {
         // Item is already selected - drag all selected items
-        itemsToDrag = Array.from(selectedIds).filter((id) => components.has(id) || junctions.has(id));
+        newSelection = currentSelection;
+        itemsToDrag = currentSelection.filter((id) => components.has(id) || junctions.has(id));
       } else {
-        // Item is not selected - select it and drag only this item
-        if (event.ctrlKey || event.metaKey) {
-          addToSelection(blockId);
-          itemsToDrag = [...Array.from(selectedIds).filter((id) => components.has(id) || junctions.has(id)), blockId];
+        // Item is not selected - need to update selection
+        if (isToggleSelection(event)) {
+          // Add to selection (Ctrl/Cmd+click)
+          newSelection = [...currentSelection, blockId];
+          itemsToDrag = newSelection.filter((id) => components.has(id) || junctions.has(id));
         } else {
-          setSelection([blockId]);
+          // Replace selection
+          newSelection = [blockId];
           itemsToDrag = [blockId];
         }
+      }
+
+      // STEP 3: Update selection atomically BEFORE starting drag
+      // This ensures state is consistent before any other operations
+      if (!selectedIds.has(blockId) || newSelection.length !== currentSelection.length) {
+        setSelection(newSelection);
       }
 
       // Store original positions and track which are junctions
@@ -186,7 +199,7 @@ export function useBlockDrag({
       setIsDragging(true);
       setDraggedBlockId(blockId);
     },
-    [shouldPreventDrag, selectedIds, components, junctions, addToSelection, setSelection, canvasRef, pan, zoom]
+    [shouldPreventDrag, selectedIds, components, junctions, setSelection, canvasRef, pan, zoom]
   );
 
   // Handle mouse move during drag
