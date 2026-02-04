@@ -603,8 +603,8 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
         }
         setSelection(Array.from(newSelection));
       } else {
-        // If already selected, keep current selection (for drag preparation)
-        if (selectedIds.has(blockId)) {
+        // If already selected AND it's the only selection, keep it (for drag preparation)
+        if (selectedIds.has(blockId) && selectedIds.size === 1) {
           return;
         }
         // Otherwise, replace selection with this block only
