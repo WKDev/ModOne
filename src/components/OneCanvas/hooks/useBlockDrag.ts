@@ -52,6 +52,10 @@ interface DragState {
   isFirstMove: boolean;
   /** Cached container bounding rect (for performance) */
   containerRect: DOMRect | null;
+  /** Whether the mouse has moved past the drag threshold */
+  hasPassedThreshold: boolean;
+  /** Mouse position at mousedown in screen coordinates (for threshold check) */
+  mouseDownScreenPos: Position | null;
 }
 
 interface UseBlockDragReturn {
@@ -62,6 +66,13 @@ interface UseBlockDragReturn {
   /** Handler to attach to block's mousedown event */
   handleBlockDragStart: (blockId: string, event: React.MouseEvent) => void;
 }
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/** Minimum mouse movement (px) before a drag starts (matches useSelectionHandler) */
+const DRAG_THRESHOLD = 5;
 
 // ============================================================================
 // Hook
@@ -104,6 +115,8 @@ export function useBlockDrag({
     junctionIds: new Set(),
     isFirstMove: true,
     containerRect: null,
+    hasPassedThreshold: false,
+    mouseDownScreenPos: null,
   });
 
   // Handle drag start
@@ -194,6 +207,8 @@ export function useBlockDrag({
         junctionIds: junctionIdSet,
         isFirstMove: true,
         containerRect: rect,
+        hasPassedThreshold: false,
+        mouseDownScreenPos: { x: event.clientX, y: event.clientY },
       };
 
       setIsDragging(true);
@@ -207,6 +222,17 @@ export function useBlockDrag({
     (event: MouseEvent) => {
       const state = dragStateRef.current;
       if (!state.isDragging || !state.startCanvasPos || !state.containerRect) return;
+
+      // Check drag threshold: ignore small movements to prevent accidental drags
+      if (!state.hasPassedThreshold) {
+        if (!state.mouseDownScreenPos) return;
+        const dx = Math.abs(event.clientX - state.mouseDownScreenPos.x);
+        const dy = Math.abs(event.clientY - state.mouseDownScreenPos.y);
+        if (dx <= DRAG_THRESHOLD && dy <= DRAG_THRESHOLD) {
+          return;
+        }
+        state.hasPassedThreshold = true;
+      }
 
       // Convert current mouse position to canvas coordinates using cached rect
       const screenPos = {
@@ -260,6 +286,8 @@ export function useBlockDrag({
       junctionIds: new Set(),
       isFirstMove: true,
       containerRect: null,
+      hasPassedThreshold: false,
+      mouseDownScreenPos: null,
     };
 
     setIsDragging(false);
