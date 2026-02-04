@@ -69,6 +69,7 @@ export const BlockRenderer = memo(function BlockRenderer({
     onSelect,
     onStartWire,
     onEndWire,
+    onDragStart,
     connectedPorts,
   };
 

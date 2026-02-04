@@ -107,13 +107,20 @@ export function useSelectionHandler(
       // Only handle left click
       if (e.button !== 0) return;
 
-      // Store initial position
-      mouseDownPos.current = canvasPosition;
-      hasPassedThreshold.current = false;
+      // Check if clicking on a block or wire (don't clear selection)
+      const target = e.target as HTMLElement;
+      const isClickingBlock = target.closest('[data-block-id]');
+      const isClickingWire = target.closest('[data-wire-id]');
 
-      // Clear selection on empty canvas click (unless shift/ctrl held)
-      if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
-        clearSelection();
+      // Store initial position only if not clicking on interactive elements
+      if (!isClickingBlock && !isClickingWire) {
+        mouseDownPos.current = canvasPosition;
+        hasPassedThreshold.current = false;
+
+        // Clear selection on empty canvas click (unless shift/ctrl held)
+        if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+          clearSelection();
+        }
       }
     },
     [clearSelection]
