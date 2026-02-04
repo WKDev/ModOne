@@ -8,7 +8,7 @@
  * This architecture prevents double transformation and coordinates offset issues.
  */
 
-import { useRef, forwardRef, useImperativeHandle } from 'react';
+import { useRef, forwardRef, useImperativeHandle, useMemo } from 'react';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { GridBackground } from './GridBackground';
 import { useCanvasInteraction } from './hooks/useCanvasInteraction';
@@ -154,6 +154,14 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
   // Canvas interaction (pan/zoom)
   const { cursor } = useCanvasInteraction(containerRef);
 
+  // Combine all selected IDs (blocks + wires) for overlays
+  const allSelectedIds = useMemo(() => {
+    const combined = new Set<string>();
+    selectedBlockIds?.forEach(id => combined.add(id));
+    selectedWireIds?.forEach(id => combined.add(id));
+    return combined;
+  }, [selectedBlockIds, selectedWireIds]);
+
   // Expose ref methods
   useImperativeHandle(ref, () => {
     const refObject = {
@@ -225,7 +233,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
               selectionBox={selectionBox}
               debugMode={debugMode}
               canvasRef={canvasRef}
-              selectedIds={selectedBlockIds}
+              selectedIds={allSelectedIds}
               components={blocks}
               wires={wires}
               junctions={junctions}

@@ -159,12 +159,10 @@ export const SelectionBoundingBox = memo(function SelectionBoundingBox({
     return null;
   }
 
-  // Don't show for single block selection (individual highlight is enough)
-  if (selectedIds.size === 1) {
-    const singleId = Array.from(selectedIds)[0];
-    if (components.has(singleId)) {
-      return null;
-    }
+  // Don't show for single selection (individual highlight is enough)
+  // Only show when multiple items are selected
+  if (selectedIds.size <= 1) {
+    return null;
   }
 
   return (
