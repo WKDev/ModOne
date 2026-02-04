@@ -11,7 +11,19 @@
 import { useState, useCallback, useRef } from 'react';
 import { useCanvasStore } from '../../../stores/canvasStore';
 import type { Position } from '../types';
-import { type SelectionBoxState, doesRectIntersectBox } from '../components/SelectionBox';
+import {
+  type SelectionBoxState,
+  doesRectIntersectBox,
+  isRectContainedInBox,
+  getDragDirection,
+} from '../components/SelectionBox';
+import {
+  getWirePathElement,
+  sampleWirePath,
+  isWireContainedInBox,
+  doesWireIntersectBox,
+  getWireBoundingBox,
+} from '../utils/wireSelectionUtils';
 
 // ============================================================================
 // Types
@@ -70,6 +82,8 @@ export function useSelectionHandler(
   const toggleSelection = useCanvasStore((state) => state.toggleSelection);
   const clearSelection = useCanvasStore((state) => state.clearSelection);
   const components = useCanvasStore((state) => state.components);
+  const wires = useCanvasStore((state) => state.wires);
+  const junctions = useCanvasStore((state) => state.junctions);
 
   // Handle mouse down on canvas (not on a component)
   const handleCanvasMouseDown = useCallback(
@@ -120,9 +134,14 @@ export function useSelectionHandler(
   const handleCanvasMouseUp = useCallback(
     (e: React.MouseEvent) => {
       if (selectionBox && isDragSelecting) {
-        // Find all components that intersect the selection box
+        // Find all components and wires that match the selection box
         const selectedIds: string[] = [];
 
+        // Determine drag direction
+        const dragDirection = getDragDirection(selectionBox);
+        const isContainmentMode = dragDirection === 'ltr';
+
+        // Select components based on drag direction
         components.forEach((component) => {
           const rect = {
             x: component.position.x,
@@ -131,8 +150,48 @@ export function useSelectionHandler(
             height: component.size.height,
           };
 
-          if (doesRectIntersectBox(rect, selectionBox)) {
+          // Use appropriate selection mode based on drag direction
+          const isSelected = isContainmentMode
+            ? isRectContainedInBox(rect, selectionBox)
+            : doesRectIntersectBox(rect, selectionBox);
+
+          if (isSelected) {
             selectedIds.push(component.id);
+          }
+        });
+
+        // Select wires based on drag direction
+        wires.forEach((wire) => {
+          // Performance: Skip if wire bounding box doesn't intersect selection
+          const wireBounds = getWireBoundingBox(wire, components, junctions);
+          if (wireBounds) {
+            const boundsRect = {
+              x: wireBounds.minX,
+              y: wireBounds.minY,
+              width: wireBounds.maxX - wireBounds.minX,
+              height: wireBounds.maxY - wireBounds.minY,
+            };
+
+            // Quick rejection if bounds don't intersect
+            if (!doesRectIntersectBox(boundsRect, selectionBox)) {
+              return;
+            }
+          }
+
+          // Get wire SVG path from DOM
+          const pathElement = getWirePathElement(wire.id);
+          if (!pathElement) return;
+
+          // Sample points along wire path
+          const wirePoints = sampleWirePath(pathElement);
+
+          // Check selection based on drag direction
+          const isSelected = isContainmentMode
+            ? isWireContainedInBox(wirePoints, selectionBox)
+            : doesWireIntersectBox(wirePoints, selectionBox);
+
+          if (isSelected) {
+            selectedIds.push(wire.id);
           }
         });
 
@@ -152,7 +211,7 @@ export function useSelectionHandler(
       setSelectionBox(null);
       setIsDragSelecting(false);
     },
-    [selectionBox, isDragSelecting, components, setSelection, addToSelection]
+    [selectionBox, isDragSelecting, components, wires, junctions, setSelection, addToSelection]
   );
 
   // Handle click on a component

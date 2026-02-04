@@ -125,6 +125,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .manage(project_manager)
         .manage(auto_save_manager)
         .manage(modbus_state)
