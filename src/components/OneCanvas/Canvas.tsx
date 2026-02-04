@@ -78,6 +78,12 @@ interface CanvasProps {
     handlePosB: Position,
     skipEndpointCheck?: boolean
   ) => void;
+  onWireEndpointSegmentDragStart?: (
+    wireId: string,
+    end: 'from' | 'to',
+    orientation: 'horizontal' | 'vertical',
+    e: React.MouseEvent
+  ) => void;
 
   // Settings
   className?: string;
@@ -121,6 +127,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
     onWireHandleDragStart,
     onWireHandleContextMenu,
     onWireSegmentDragStart,
+    onWireEndpointSegmentDragStart,
     className = '',
     gridSize: propGridSize,
     showGrid: propShowGrid,
@@ -222,6 +229,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
               onWireHandleDragStart={onWireHandleDragStart}
               onWireHandleContextMenu={onWireHandleContextMenu}
               onWireSegmentDragStart={onWireSegmentDragStart}
+              onWireEndpointSegmentDragStart={onWireEndpointSegmentDragStart}
             />
           </div>
         </TransformedLayer>

@@ -39,6 +39,12 @@ interface CanvasContentProps {
     handlePosB: Position,
     skipEndpointCheck?: boolean
   ) => void;
+  onWireEndpointSegmentDragStart?: (
+    wireId: string,
+    end: 'from' | 'to',
+    orientation: 'horizontal' | 'vertical',
+    e: React.MouseEvent
+  ) => void;
 }
 
 /**
@@ -67,6 +73,7 @@ export function CanvasContent({
   onWireHandleDragStart,
   onWireHandleContextMenu,
   onWireSegmentDragStart,
+  onWireEndpointSegmentDragStart,
 }: CanvasContentProps) {
   // Calculate port positions for wire rendering
   const getPortPosition = (blockId: string, portId: string) => {
@@ -136,6 +143,7 @@ export function CanvasContent({
               onHandleDragStart={onWireHandleDragStart}
               onHandleContextMenu={onWireHandleContextMenu}
               onSegmentDragStart={onWireSegmentDragStart}
+              onEndpointSegmentDragStart={onWireEndpointSegmentDragStart}
             />
           );
         })}

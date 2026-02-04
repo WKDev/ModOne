@@ -276,8 +276,6 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
   });
 
   // Endpoint segment drag handler (port ↔ first/last handle)
-  // TODO: Re-implement in new Canvas architecture
-  // @ts-expect-error - Unused until wire interaction is re-implemented
   const handleEndpointSegmentDragStart = useCallback((
     wireId: string,
     end: 'from' | 'to',
@@ -797,6 +795,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
                 onWireHandleDragStart={handleWireHandleDragStart}
                 onWireHandleContextMenu={handleWireHandleContextMenu}
                 onWireSegmentDragStart={handleSegmentDragStart}
+                onWireEndpointSegmentDragStart={handleEndpointSegmentDragStart}
                 debugMode={process.env.NODE_ENV === 'development'}
               />
             </div>
