@@ -349,6 +349,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
   const { handleDragStart: handleWireHandleDragStart } = useWireHandleDrag({
     updateWireHandle,
     zoom,
+    cleanupOverlappingHandles,
   });
 
   // Wire segment drag hook

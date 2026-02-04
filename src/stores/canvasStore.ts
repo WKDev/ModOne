@@ -38,6 +38,7 @@ import {
   getWiresConnectedToComponent,
   getWiresConnectedToJunction,
   recalculateAutoHandles,
+  cleanupRedundantHandles,
 } from '../components/OneCanvas/utils/canvasHelpers';
 
 // ============================================================================
@@ -450,12 +451,13 @@ export const useCanvasStore = create<CanvasStore>()(
 
             state.components.set(id, { ...component, position: finalPosition } as Block);
 
-            // Recalculate auto handles on connected wires
+            // Recalculate auto handles on connected wires and cleanup redundant handles
             const connectedWires = getWiresConnectedToComponent(state.wires, id);
             for (const wire of connectedWires) {
               const target = state.wires.find((w) => w.id === wire.id);
               if (target) {
                 target.handles = recalculateAutoHandles(target, state.components, state.junctions);
+                cleanupRedundantHandles(target);
               }
             }
 
@@ -483,12 +485,13 @@ export const useCanvasStore = create<CanvasStore>()(
 
             state.junctions.set(id, { ...junction, position: finalPosition });
 
-            // Recalculate auto handles on connected wires
+            // Recalculate auto handles on connected wires and cleanup redundant handles
             const connectedWires = getWiresConnectedToJunction(state.wires, id);
             for (const wire of connectedWires) {
               const target = state.wires.find((w) => w.id === wire.id);
               if (target) {
                 target.handles = recalculateAutoHandles(target, state.components, state.junctions);
+                cleanupRedundantHandles(target);
               }
             }
 
@@ -885,30 +888,9 @@ export const useCanvasStore = create<CanvasStore>()(
         set(
           (state) => {
             const wire = state.wires.find((w) => w.id === wireId);
-            if (!wire?.handles || wire.handles.length < 2) return;
+            if (!wire) return;
 
-            const THRESHOLD = 1;
-            const cleaned: WireHandle[] = [wire.handles[0]];
-
-            for (let i = 1; i < wire.handles.length; i++) {
-              const prev = cleaned[cleaned.length - 1];
-              const curr = wire.handles[i];
-              if (
-                Math.abs(prev.position.x - curr.position.x) <= THRESHOLD &&
-                Math.abs(prev.position.y - curr.position.y) <= THRESHOLD
-              ) {
-                // Overlap: keep the 'user' source handle, remove 'auto'
-                if (prev.source === 'auto' && curr.source !== 'auto') {
-                  cleaned[cleaned.length - 1] = curr;
-                }
-                // else: skip curr (keep prev)
-              } else {
-                cleaned.push(curr);
-              }
-            }
-
-            if (cleaned.length !== wire.handles.length) {
-              wire.handles = cleaned;
+            if (cleanupRedundantHandles(wire)) {
               state.isDirty = true;
             }
           },

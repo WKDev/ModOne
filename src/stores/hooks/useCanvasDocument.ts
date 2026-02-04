@@ -38,6 +38,7 @@ import {
   getWiresConnectedToComponent,
   getWiresConnectedToJunction,
   recalculateAutoHandles,
+  cleanupRedundantHandles,
 } from '../../components/OneCanvas/utils/canvasHelpers';
 
 // ============================================================================
@@ -248,12 +249,13 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         if (component) {
           docData.components.set(id, { ...component, position: finalPosition } as Block);
 
-          // Recalculate auto handles on connected wires
+          // Recalculate auto handles on connected wires and cleanup redundant handles
           const connectedWires = getWiresConnectedToComponent(docData.wires, id);
           for (const wire of connectedWires) {
             const target = docData.wires.find((w) => w.id === wire.id);
             if (target) {
               target.handles = recalculateAutoHandles(target, docData.components, docData.junctions);
+              cleanupRedundantHandles(target);
             }
           }
         }
@@ -278,12 +280,13 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         if (junction) {
           docData.junctions.set(id, { ...junction, position: finalPosition });
 
-          // Recalculate auto handles on connected wires
+          // Recalculate auto handles on connected wires and cleanup redundant handles
           const connectedWires = getWiresConnectedToJunction(docData.wires, id);
           for (const wire of connectedWires) {
             const target = docData.wires.find((w) => w.id === wire.id);
             if (target) {
               target.handles = recalculateAutoHandles(target, docData.components, docData.junctions);
+              cleanupRedundantHandles(target);
             }
           }
         }
@@ -540,29 +543,9 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       // No history push — this is a post-drag cleanup within the same undo unit
       updateCanvasData(documentId, (docData) => {
         const wire = docData.wires.find((w) => w.id === wireId);
-        if (!wire?.handles || wire.handles.length < 2) return;
+        if (!wire) return;
 
-        const THRESHOLD = 1;
-        const cleaned: typeof wire.handles = [wire.handles[0]];
-
-        for (let i = 1; i < wire.handles.length; i++) {
-          const prev = cleaned[cleaned.length - 1];
-          const curr = wire.handles[i];
-          if (
-            Math.abs(prev.position.x - curr.position.x) <= THRESHOLD &&
-            Math.abs(prev.position.y - curr.position.y) <= THRESHOLD
-          ) {
-            if (prev.source === 'auto' && curr.source !== 'auto') {
-              cleaned[cleaned.length - 1] = curr;
-            }
-          } else {
-            cleaned.push(curr);
-          }
-        }
-
-        if (cleaned.length !== wire.handles.length) {
-          wire.handles = cleaned;
-        }
+        cleanupRedundantHandles(wire);
       });
     },
     [documentId, updateCanvasData]

@@ -135,6 +135,59 @@ export function recalculateAutoHandles(
   );
 }
 
+/**
+ * Remove redundant handles from a wire:
+ * 1. Overlapping: two adjacent handles at the same position (±threshold)
+ * 2. Collinear: three consecutive handles on the same axis (middle one is redundant)
+ * Mutates wire.handles in place. Returns true if any handles were removed.
+ */
+export function cleanupRedundantHandles(wire: Wire, threshold: number = 1): boolean {
+  if (!wire.handles || wire.handles.length < 2) return false;
+
+  const cleaned: WireHandle[] = [wire.handles[0]];
+
+  for (let i = 1; i < wire.handles.length; i++) {
+    const prev = cleaned[cleaned.length - 1];
+    const curr = wire.handles[i];
+
+    // 1. Overlap detection — same position within threshold
+    if (
+      Math.abs(prev.position.x - curr.position.x) <= threshold &&
+      Math.abs(prev.position.y - curr.position.y) <= threshold
+    ) {
+      // Keep 'user' source over 'auto'
+      if (prev.source === 'auto' && curr.source !== 'auto') {
+        cleaned[cleaned.length - 1] = curr;
+      }
+      continue;
+    }
+
+    // 2. Collinear detection — three points on the same axis, middle is redundant
+    if (cleaned.length >= 2) {
+      const prevPrev = cleaned[cleaned.length - 2];
+      const sameX =
+        Math.abs(prevPrev.position.x - prev.position.x) <= threshold &&
+        Math.abs(prev.position.x - curr.position.x) <= threshold;
+      const sameY =
+        Math.abs(prevPrev.position.y - prev.position.y) <= threshold &&
+        Math.abs(prev.position.y - curr.position.y) <= threshold;
+      if (sameX || sameY) {
+        // prev is collinear between prevPrev and curr — replace prev with curr
+        cleaned[cleaned.length - 1] = curr;
+        continue;
+      }
+    }
+
+    cleaned.push(curr);
+  }
+
+  if (cleaned.length !== wire.handles.length) {
+    wire.handles = cleaned.length > 0 ? cleaned : undefined;
+    return true;
+  }
+  return false;
+}
+
 // ============================================================================
 // Wire Handle Utilities
 // ============================================================================
