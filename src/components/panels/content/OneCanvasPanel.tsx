@@ -27,11 +27,6 @@ import {
   Canvas,
   Toolbox,
   SimulationToolbar,
-  BlockRenderer,
-  Wire,
-  WirePreview,
-  SelectionBox,
-  SelectionBoundingBox,
   useSimulation,
   useCanvasKeyboardShortcuts,
   useBlockDrag,
@@ -43,8 +38,7 @@ import {
 } from '../../OneCanvas';
 import type { Block, Wire as WireData, HandleConstraint, PortPosition } from '../../OneCanvas/types';
 import { isPortEndpoint } from '../../OneCanvas/types';
-import { WireContextMenu, type WireContextMenuAction } from '../../OneCanvas/components/WireContextMenu';
-import { JunctionDot } from '../../OneCanvas/components/JunctionDot';
+import { WireContextMenu, type WireContextMenuAction } from '../../OneCanvas/overlays/WireContextMenu';
 import { useWireHandleDrag } from '../../OneCanvas/hooks/useWireHandleDrag';
 import { useWireSegmentDrag } from '../../OneCanvas/hooks/useWireSegmentDrag';
 import { PropertiesPanel } from './PropertiesPanel';
@@ -104,110 +98,6 @@ const CanvasDropZone = memo(function CanvasDropZone({ children, className }: Can
     >
       {children}
     </div>
-  );
-});
-
-// ============================================================================
-// Wire Renderer (converts store Wire to component props)
-// ============================================================================
-
-interface WireRendererProps {
-  wire: WireData;
-  components: Map<string, { type: string; position: Position; size: { width: number; height: number }; ports: Array<{ id: string; position: string; offset?: number }> }>;
-  isSelected: boolean;
-  onClick?: (wireId: string) => void;
-  onContextMenu?: (wireId: string, position: Position, screenPos: { x: number; y: number }) => void;
-  onHandleDragStart?: (wireId: string, handleIndex: number, constraint: HandleConstraint, e: React.MouseEvent, handlePosition: Position) => void;
-  onHandleContextMenu?: (wireId: string, handleIndex: number, e: React.MouseEvent) => void;
-  onSegmentDragStart?: (wireId: string, handleIndexA: number, handleIndexB: number, orientation: 'horizontal' | 'vertical', e: React.MouseEvent, startPositionA: Position, startPositionB: Position) => void;
-  onEndpointSegmentDragStart?: (wireId: string, end: 'from' | 'to', orientation: 'horizontal' | 'vertical', e: React.MouseEvent) => void;
-}
-
-const WireRenderer = memo(function WireRenderer({
-  wire,
-  components,
-  isSelected,
-  onClick,
-  onContextMenu,
-  onHandleDragStart,
-  onHandleContextMenu,
-  onSegmentDragStart,
-  onEndpointSegmentDragStart,
-}: WireRendererProps) {
-  const { id: wireId, from, to, handles, fromExitDirection, toExitDirection } = wire;
-
-  // Only render port-to-port wires (junction wires handled separately in future)
-  if (!isPortEndpoint(from) || !isPortEndpoint(to)) return null;
-
-  // Get component positions and calculate wire endpoints
-  const fromComponent = components.get(from.componentId);
-  const toComponent = components.get(to.componentId);
-
-  if (!fromComponent || !toComponent) return null;
-
-  // Calculate port positions using actual block sizes
-  const getPortPosition = (
-    component: { type: string; position: Position; size: { width: number; height: number }; ports: Array<{ id: string; position: string; offset?: number }> },
-    portId: string
-  ): { position: Position; direction: PortPosition } => {
-    const port = component.ports.find((p) => p.id === portId);
-    const basePos = component.position;
-
-    const { width: blockWidth, height: blockHeight } = component.size;
-
-    if (!port) {
-      return {
-        position: { x: basePos.x + blockWidth / 2, y: basePos.y + blockHeight / 2 },
-        direction: 'right',
-      };
-    }
-
-    const offset = port.offset ?? 0.5;
-    let position: Position;
-    const direction = port.position as PortPosition;
-
-    switch (port.position) {
-      case 'top':
-        position = { x: basePos.x + blockWidth * offset, y: basePos.y };
-        break;
-      case 'bottom':
-        position = { x: basePos.x + blockWidth * offset, y: basePos.y + blockHeight };
-        break;
-      case 'left':
-        position = { x: basePos.x, y: basePos.y + blockHeight * offset };
-        break;
-      case 'right':
-        position = { x: basePos.x + blockWidth, y: basePos.y + blockHeight * offset };
-        break;
-      default:
-        position = { x: basePos.x + blockWidth / 2, y: basePos.y + blockHeight / 2 };
-    }
-
-    return { position, direction };
-  };
-
-  const fromData = getPortPosition(fromComponent, from.portId);
-  const toData = getPortPosition(toComponent, to.portId);
-
-  return (
-    <Wire
-      id={wireId}
-      from={fromData.position}
-      to={toData.position}
-      isSelected={isSelected}
-      pathMode="orthogonal"
-      handles={handles}
-      fromExitDirection={fromExitDirection}
-      toExitDirection={toExitDirection}
-      defaultFromDirection={fromData.direction}
-      defaultToDirection={toData.direction}
-      onClick={onClick}
-      onContextMenu={onContextMenu}
-      onHandleDragStart={onHandleDragStart}
-      onHandleContextMenu={onHandleContextMenu}
-      onSegmentDragStart={onSegmentDragStart}
-      onEndpointSegmentDragStart={onEndpointSegmentDragStart}
-    />
   );
 });
 
@@ -386,6 +276,8 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
   });
 
   // Endpoint segment drag handler (port ↔ first/last handle)
+  // TODO: Re-implement in new Canvas architecture
+  // @ts-expect-error - Unused until wire interaction is re-implemented
   const handleEndpointSegmentDragStart = useCallback((
     wireId: string,
     end: 'from' | 'to',
@@ -874,113 +766,39 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
               onMouseMove={handleCanvasMouseMove}
               onMouseUp={handleCanvasMouseUp}
             >
-              <Canvas ref={canvasRef} className="w-full h-full">
-                {/* Render blocks */}
-                {Array.from(components.values())
-                  .map((block) => (
-                    <BlockRenderer
-                      key={block.id}
-                      block={block}
-                      isSelected={selectedIds.has(block.id)}
-                      onSelect={handleBlockSelect}
-                      onStartWire={handleStartWire}
-                      onEndWire={handleEndWire}
-                      onDragStart={handleBlockDragStart}
-                      portVoltages={portVoltages}
-                      connectedPorts={getConnectedPorts(block.id)}
-                      onButtonPress={handleButtonPress}
-                      onButtonRelease={handleButtonRelease}
-                    />
-                  ))}
-
-              {/* SVG layer for wires - must wrap SVG elements */}
-              <svg
-                className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-visible"
-                style={{ minWidth: '10000px', minHeight: '10000px' }}
-              >
-                {/* Render wires */}
-                {wires.map((wire) => (
-                  <WireRenderer
-                    key={wire.id}
-                    wire={wire}
-                    components={components as Map<string, { type: string; position: Position; size: { width: number; height: number }; ports: Array<{ id: string; position: string; offset?: number }> }>}
-                    isSelected={selectedIds.has(wire.id)}
-                    onClick={handleWireClick}
-                    onContextMenu={handleWireContextMenu}
-                    onHandleDragStart={handleWireHandleDragStart}
-                    onHandleContextMenu={handleWireHandleContextMenu}
-                    onSegmentDragStart={handleSegmentDragStart}
-                    onEndpointSegmentDragStart={handleEndpointSegmentDragStart}
-                  />
-                ))}
-
-                {/* Render junction dots in SVG layer */}
-                {Array.from(junctions.values()).map((junction) => (
-                    <JunctionDot
-                      key={junction.id}
-                      junction={junction}
-                      isSelected={selectedIds.has(junction.id)}
-                      onSelect={handleBlockSelect}
-                      onDragStart={handleBlockDragStart}
-                      isWireDrawing={wireDrawing !== null}
-                    />
-                  ))}
-
-                {/* Wire preview during drawing */}
-                {wireDrawing && (() => {
-                  // Only handle port endpoints for wire preview
-                  if (!isPortEndpoint(wireDrawing.from)) return null;
-                  const drawingFrom = wireDrawing.from;
-
-                  // Calculate the from position from the endpoint
-                  const fromComponent = components.get(drawingFrom.componentId);
-                  if (!fromComponent) return null;
-
-                  const fromPort = fromComponent.ports.find((p) => p.id === drawingFrom.portId);
-                  const portOffset = fromPort?.offset ?? 0.5;
-                  let fromPos: Position = { x: fromComponent.position.x + fromComponent.size.width / 2, y: fromComponent.position.y + fromComponent.size.height / 2 };
-                  let defaultFromDir: PortPosition | undefined;
-
-                  if (fromPort) {
-                    defaultFromDir = fromPort.position as PortPosition;
-                    switch (fromPort.position) {
-                      case 'top':
-                        fromPos = { x: fromComponent.position.x + fromComponent.size.width * portOffset, y: fromComponent.position.y };
-                        break;
-                      case 'bottom':
-                        fromPos = { x: fromComponent.position.x + fromComponent.size.width * portOffset, y: fromComponent.position.y + fromComponent.size.height };
-                        break;
-                      case 'left':
-                        fromPos = { x: fromComponent.position.x, y: fromComponent.position.y + fromComponent.size.height * portOffset };
-                        break;
-                      case 'right':
-                        fromPos = { x: fromComponent.position.x + fromComponent.size.width, y: fromComponent.position.y + fromComponent.size.height * portOffset };
-                        break;
-                    }
-                  }
-
-                  return (
-                    <WirePreview
-                      from={fromPos}
-                      to={wireDrawing.tempPosition}
-                      fromExitDirection={wireDrawing.exitDirection}
-                      defaultFromDirection={defaultFromDir}
-                    />
-                  );
-                })()}
-              </svg>
-
-              {/* Selection box (drag-to-select) */}
-              <SelectionBox box={selectionHandler.selectionBox} />
-
-              {/* Selection bounding box (multi-selection) */}
-              <SelectionBoundingBox
-                selectedIds={selectedIds}
-                components={components}
+              <Canvas
+                ref={canvasRef}
+                className="w-full h-full"
+                blocks={components}
                 wires={wires}
                 junctions={junctions}
+                selectionBox={selectionHandler.selectionBox}
+                wirePreview={wireDrawing}
+                onBlockClick={(blockId, e) => {
+                  const addToSelection = e.ctrlKey || e.metaKey;
+                  handleBlockSelect(blockId, addToSelection);
+                }}
+                onWireClick={handleWireClick}
+                selectedBlockIds={selectedIds}
+                selectedWireIds={selectedIds}
+                connectedPorts={Array.from(components.keys()).reduce((acc, blockId) => {
+                  const ports = getConnectedPorts(blockId);
+                  ports.forEach(portId => acc.add(portId));
+                  return acc;
+                }, new Set<string>())}
+                portVoltages={portVoltages}
+                plcOutputStates={new Map()}
+                onButtonPress={handleButtonPress}
+                onButtonRelease={handleButtonRelease}
+                onStartWire={handleStartWire}
+                onEndWire={handleEndWire}
+                onBlockDragStart={handleBlockDragStart}
+                onWireContextMenu={handleWireContextMenu}
+                onWireHandleDragStart={handleWireHandleDragStart}
+                onWireHandleContextMenu={handleWireHandleContextMenu}
+                onWireSegmentDragStart={handleSegmentDragStart}
+                debugMode={process.env.NODE_ENV === 'development'}
               />
-            </Canvas>
             </div>
           </CanvasDropZone>
 

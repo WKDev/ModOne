@@ -30,6 +30,37 @@ export interface Position {
   y: number;
 }
 
+/**
+ * Container Space Position (컨테이너 기준 상대 좌표)
+ * - getBoundingClientRect 기준
+ * - zoom/pan 영향 없음
+ */
+export interface ContainerPosition {
+  readonly _brand: 'ContainerPosition';
+  x: number;
+  y: number;
+}
+
+/**
+ * Canvas Space Position (논리적 캔버스 좌표)
+ * - Block, Wire 등의 실제 위치
+ * - zoom/pan 독립적
+ */
+export interface CanvasPosition {
+  readonly _brand: 'CanvasPosition';
+  x: number;
+  y: number;
+}
+
+// Helper functions for type conversion
+export function toContainerPos(pos: Position): ContainerPosition {
+  return { ...pos, _brand: 'ContainerPosition' as const };
+}
+
+export function toCanvasPos(pos: Position): CanvasPosition {
+  return { ...pos, _brand: 'CanvasPosition' as const };
+}
+
 /** Size of a block */
 export interface Size {
   width: number;

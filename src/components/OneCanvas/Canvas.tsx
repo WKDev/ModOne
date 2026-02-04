@@ -1,62 +1,138 @@
 /**
- * Canvas Component
+ * Canvas Component (Redesigned Architecture)
  *
- * Main canvas container with pan/zoom transformation, grid background,
- * and coordinate system management.
+ * Main canvas container with clear separation between:
+ * - Transformed Layer (Canvas Space - blocks, wires)
+ * - Overlay Layer (Container Space - selection box, UI)
+ *
+ * This architecture prevents double transformation and coordinates offset issues.
  */
 
 import { useRef, forwardRef, useImperativeHandle } from 'react';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { GridBackground } from './GridBackground';
 import { useCanvasInteraction } from './hooks/useCanvasInteraction';
+import { useCoordinateSystem } from './coordinate-system/useCoordinateSystem';
+import { CoordinateSystemProvider } from './coordinate-system/CoordinateSystemContext';
+import { TransformedLayer } from './layers/TransformedLayer';
+import { OverlayLayer } from './layers/OverlayLayer';
+import { CanvasContent } from './content/CanvasContent';
+import { CanvasOverlays } from './overlays/CanvasOverlays';
+import type { Block, Wire, Junction, Position, HandleConstraint } from './types';
+import type { SelectionBoxState } from './overlays/SelectionBox';
+import type { WirePreviewState } from './overlays/WirePreview';
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface CanvasProps {
-  /** Canvas content (blocks, wires, etc.) */
-  children?: React.ReactNode;
-  /** Additional CSS classes */
-  className?: string;
-  /** Grid cell size in pixels */
-  gridSize?: number;
-  /** Whether to show the grid */
-  showGrid?: boolean;
-  /** Callback when canvas is clicked (not on a component) */
+  // Content (Canvas Space)
+  blocks: Map<string, Block>;
+  wires: Wire[];
+  junctions: Map<string, Junction>;
+
+  // Overlays (Screen/Container Space)
+  selectionBox: SelectionBoxState | null;
+  wirePreview?: WirePreviewState | null;
+
+  // Callbacks
+  onBlockClick?: (blockId: string, e: React.MouseEvent) => void;
+  onWireClick?: (wireId: string) => void;
   onCanvasClick?: (event: React.MouseEvent) => void;
-  /** Callback when canvas is double-clicked */
   onCanvasDoubleClick?: (event: React.MouseEvent) => void;
+
+  // Selection state
+  selectedBlockIds?: Set<string>;
+  selectedWireIds?: Set<string>;
+
+  // Simulation state
+  connectedPorts?: Set<string>;
+  portVoltages?: Map<string, number>;
+  plcOutputStates?: Map<string, boolean>;
+
+  // Interaction callbacks
+  onButtonPress?: (blockId: string) => void;
+  onButtonRelease?: (blockId: string) => void;
+  onStartWire?: (blockId: string, portId: string) => void;
+  onEndWire?: (blockId: string, portId: string) => void;
+  onBlockDragStart?: (blockId: string, event: React.MouseEvent) => void;
+
+  // Wire interaction callbacks
+  onWireContextMenu?: (wireId: string, position: Position, screenPos: { x: number; y: number }) => void;
+  onWireHandleDragStart?: (
+    wireId: string,
+    handleIndex: number,
+    constraint: HandleConstraint,
+    e: React.MouseEvent,
+    handlePosition: Position
+  ) => void;
+  onWireHandleContextMenu?: (wireId: string, handleIndex: number, e: React.MouseEvent) => void;
+  onWireSegmentDragStart?: (
+    wireId: string,
+    handleIndexA: number,
+    handleIndexB: number,
+    orientation: 'horizontal' | 'vertical',
+    e: React.MouseEvent,
+    handlePosA: Position,
+    handlePosB: Position,
+    skipEndpointCheck?: boolean
+  ) => void;
+
+  // Settings
+  className?: string;
+  gridSize?: number;
+  showGrid?: boolean;
+  debugMode?: boolean;
 }
 
 export interface CanvasRef {
-  /** Get the canvas container element */
   getContainer: () => HTMLDivElement | null;
-  /** Get the content element */
   getContent: () => HTMLDivElement | null;
+  getOverlay: () => HTMLDivElement | null;
 }
 
 // ============================================================================
 // Component
 // ============================================================================
 
-/**
- * Infinite canvas with pan, zoom, and grid support.
- */
 export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
   {
-    children,
+    blocks,
+    wires,
+    junctions,
+    selectionBox,
+    wirePreview,
+    onBlockClick,
+    onWireClick,
+    onCanvasClick,
+    onCanvasDoubleClick,
+    selectedBlockIds,
+    selectedWireIds,
+    connectedPorts,
+    portVoltages,
+    plcOutputStates,
+    onButtonPress,
+    onButtonRelease,
+    onStartWire,
+    onEndWire,
+    onBlockDragStart,
+    onWireContextMenu,
+    onWireHandleDragStart,
+    onWireHandleContextMenu,
+    onWireSegmentDragStart,
     className = '',
     gridSize: propGridSize,
     showGrid: propShowGrid,
-    onCanvasClick,
-    onCanvasDoubleClick,
+    debugMode = false,
   },
   ref
 ) {
   // Refs
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<CanvasRef | null>(null);
 
   // Store state
   const zoom = useCanvasStore((state) => state.zoom);
@@ -65,25 +141,32 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
   const storeShowGrid = useCanvasStore((state) => state.showGrid);
   const clearSelection = useCanvasStore((state) => state.clearSelection);
 
-  // Use prop values if provided, otherwise use store values
   const gridSize = propGridSize ?? storeGridSize;
   const showGrid = propShowGrid ?? storeShowGrid;
+
+  // Coordinate system
+  const coordinateSystem = useCoordinateSystem({
+    containerRef,
+    zoom,
+    pan,
+  });
 
   // Canvas interaction (pan/zoom)
   const { cursor } = useCanvasInteraction(containerRef);
 
   // Expose ref methods
-  useImperativeHandle(ref, () => ({
-    getContainer: () => containerRef.current,
-    getContent: () => contentRef.current,
-  }));
+  useImperativeHandle(ref, () => {
+    const refObject = {
+      getContainer: () => containerRef.current,
+      getContent: () => contentRef.current,
+      getOverlay: () => overlayRef.current,
+    };
+    canvasRef.current = refObject;
+    return refObject;
+  });
 
-  // Calculate transform
-  const transform = `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`;
-
-  // Handle canvas click (clear selection if clicking on empty space)
+  // Handle canvas click
   const handleClick = (event: React.MouseEvent) => {
-    // Only handle if clicking directly on the canvas container
     if (event.target === containerRef.current || event.target === contentRef.current) {
       clearSelection();
       onCanvasClick?.(event);
@@ -97,29 +180,61 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
   };
 
   return (
-    <div
-      ref={containerRef}
-      className={`relative w-full h-full overflow-hidden select-none ${className}`}
-      style={{ cursor }}
-      onClick={handleClick}
-      onDoubleClick={handleDoubleClick}
-    >
-      {/* Grid background */}
-      <GridBackground
-        gridSize={gridSize}
-        showGrid={showGrid}
-        zoom={zoom}
-      />
-
-      {/* Transformed content layer */}
+    <CoordinateSystemProvider value={coordinateSystem}>
       <div
-        ref={contentRef}
-        className="absolute top-0 left-0 origin-top-left"
-        style={{ transform }}
+        ref={containerRef}
+        className={`relative w-full h-full overflow-hidden select-none ${className}`}
+        style={{ cursor }}
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
       >
-        {children}
+        {/* Grid background */}
+        <GridBackground gridSize={gridSize} showGrid={showGrid} zoom={zoom} />
+
+        {/* Transformed Layer - Canvas Space */}
+        <TransformedLayer zoom={zoom} pan={pan}>
+          <div ref={contentRef}>
+            <CanvasContent
+              blocks={blocks}
+              wires={wires}
+              junctions={junctions}
+              onBlockClick={onBlockClick}
+              onWireClick={onWireClick}
+              selectedBlockIds={selectedBlockIds}
+              selectedWireIds={selectedWireIds}
+              connectedPorts={connectedPorts}
+              portVoltages={portVoltages}
+              onButtonPress={onButtonPress}
+              onButtonRelease={onButtonRelease}
+              plcOutputStates={plcOutputStates}
+              onStartWire={onStartWire}
+              onEndWire={onEndWire}
+              onBlockDragStart={onBlockDragStart}
+              onWireContextMenu={onWireContextMenu}
+              onWireHandleDragStart={onWireHandleDragStart}
+              onWireHandleContextMenu={onWireHandleContextMenu}
+              onWireSegmentDragStart={onWireSegmentDragStart}
+            />
+          </div>
+        </TransformedLayer>
+
+        {/* Overlay Layer - Screen/Container Space */}
+        <OverlayLayer>
+          <div ref={overlayRef}>
+            <CanvasOverlays
+              selectionBox={selectionBox}
+              debugMode={debugMode}
+              canvasRef={canvasRef}
+              selectedIds={selectedBlockIds}
+              components={blocks}
+              wires={wires}
+              junctions={junctions}
+              wirePreview={wirePreview}
+            />
+          </div>
+        </OverlayLayer>
       </div>
-    </div>
+    </CoordinateSystemProvider>
   );
 });
 

@@ -12,6 +12,21 @@ export { Canvas } from './Canvas';
 export type { CanvasRef } from './Canvas';
 export { GridBackground } from './GridBackground';
 
+// Coordinate System
+export { useCoordinateSystem } from './coordinate-system/useCoordinateSystem';
+export { useCoordinateSystemContext, CoordinateSystemProvider } from './coordinate-system/CoordinateSystemContext';
+export type { CoordinateSystem } from './coordinate-system/useCoordinateSystem';
+
+// Layers
+export { TransformedLayer } from './layers/TransformedLayer';
+export { OverlayLayer } from './layers/OverlayLayer';
+
+// Content
+export { CanvasContent } from './content/CanvasContent';
+
+// Overlays
+export { CanvasOverlays } from './overlays/CanvasOverlays';
+
 // Block Components (named to avoid conflicts with types)
 export { Port as PortComponent } from './components/Port';
 export { BlockRenderer } from './components/BlockRenderer';
@@ -34,8 +49,8 @@ export { Wire, WirePreview } from './Wire';
 export type { WireType } from './Wire';
 export { AnimatedWire, wireAnimationStyles } from './components/AnimatedWire';
 export { WireHandle } from './components/WireHandle';
-export { WireContextMenu } from './components/WireContextMenu';
-export type { WireContextMenuAction } from './components/WireContextMenu';
+export { WireContextMenu } from './overlays/WireContextMenu';
+export type { WireContextMenuAction } from './overlays/WireContextMenu';
 
 // Hooks
 export { useCanvasInteraction } from './hooks/useCanvasInteraction';
@@ -57,11 +72,14 @@ export { useSelectionHandler } from './hooks/useSelectionHandler';
 export { useWireHandleDrag } from './hooks/useWireHandleDrag';
 
 // Selection
-export { SelectionBox, type SelectionBoxState, isPointInBox, doesRectIntersectBox } from './components/SelectionBox';
-export { SelectionBoundingBox } from './components/SelectionBoundingBox';
+export { SelectionBox, type SelectionBoxState, isPointInBox, doesRectIntersectBox } from './overlays/SelectionBox';
+export { SelectionBoundingBox } from './overlays/SelectionBoundingBox';
+
+// Wire Overlays
+export { WirePreview as WirePreviewOverlay, type WirePreviewState } from './overlays/WirePreview';
 
 // Debug Tools
-export { CoordinateDebugger } from './components/CoordinateDebugger';
+export { CoordinateDebugger } from './overlays/CoordinateDebugger';
 export { CoordinateVerifier } from './components/CoordinateVerifier';
 
 // Simulation UI
