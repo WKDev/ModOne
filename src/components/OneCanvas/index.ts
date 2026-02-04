@@ -58,6 +58,10 @@ export { useWireHandleDrag } from './hooks/useWireHandleDrag';
 
 // Selection
 export { SelectionBox, type SelectionBoxState, isPointInBox, doesRectIntersectBox } from './components/SelectionBox';
+export { SelectionBoundingBox } from './components/SelectionBoundingBox';
+
+// Debug Tools
+export { CoordinateDebugger } from './components/CoordinateDebugger';
 
 // Simulation UI
 export { SimulationToolbar } from './SimulationToolbar';
