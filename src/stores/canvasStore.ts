@@ -155,8 +155,8 @@ interface CanvasActions {
   removeWireHandle: (wireId: string, handleIndex: number) => void;
   /** Move a wire segment (two adjacent handles) by delta. Set isFirstMove=true on drag start to record history. */
   moveWireSegment: (wireId: string, handleIndexA: number, handleIndexB: number, delta: Position, isFirstMove?: boolean) => void;
-  /** Insert a handle at the endpoint (from/to) of a wire for endpoint segment drag */
-  insertEndpointHandle: (wireId: string, end: 'from' | 'to', position: Position, constraint: HandleConstraint) => void;
+  /** Insert handles at the endpoint (from/to) of a wire for endpoint segment drag */
+  insertEndpointHandle: (wireId: string, end: 'from' | 'to', newHandles: Array<{position: Position, constraint: HandleConstraint}>) => void;
 
   // Selection operations
   /** Set selection to specific IDs (replaces current) */
@@ -851,7 +851,7 @@ export const useCanvasStore = create<CanvasStore>()(
         );
       },
 
-      insertEndpointHandle: (wireId, end, position, constraint) => {
+      insertEndpointHandle: (wireId, end, newHandles) => {
         set(
           (state) => {
             const wire = state.wires.find((w) => w.id === wireId);
@@ -860,12 +860,16 @@ export const useCanvasStore = create<CanvasStore>()(
             pushHistorySnapshot(state);
 
             wire.handles = wire.handles || [];
-            const newHandle: WireHandle = { position, constraint, source: 'user' as const };
+            const handles = newHandles.map((h) => ({
+              position: h.position,
+              constraint: h.constraint,
+              source: 'user' as const,
+            }));
 
             if (end === 'from') {
-              wire.handles.unshift(newHandle);
+              wire.handles.unshift(...handles);
             } else {
-              wire.handles.push(newHandle);
+              wire.handles.push(...handles);
             }
 
             state.isDirty = true;

@@ -410,28 +410,43 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
       const exitPos = computeExitPos(fromEndpoint, wire.fromExitDirection);
       if (!exitPos) return;
 
-      const firstHandlePos = { ...wire.handles[0].position };
+      const firstHandlePos = wire.handles[0].position;
 
-      // Insert new handle at exit position (pushes history)
-      insertEndpointHandle(wireId, 'from', exitPos, constraint);
+      // Insert TWO handles to maintain orthogonal routing:
+      // handleA at exit position, handleB connecting to h0's perpendicular coordinate.
+      // This ensures h0 doesn't move, so h0→h1 alignment is preserved.
+      const secondPos: Position = orientation === 'vertical'
+        ? { x: exitPos.x, y: firstHandlePos.y }  // same X as exit, same Y as h0
+        : { x: firstHandlePos.x, y: exitPos.y };  // same Y as exit, same X as h0
 
-      // Start segment drag on indices 0,1 (new handle + original first handle)
-      // historyAlreadyPushed=true to avoid double history push
-      handleSegmentDragStart(wireId, 0, 1, orientation, e, exitPos, firstHandlePos, true);
+      insertEndpointHandle(wireId, 'from', [
+        { position: exitPos, constraint },
+        { position: secondPos, constraint },
+      ]);
+
+      // Drag the two new handles (indices 0, 1). h0 is now at index 2 and doesn't move.
+      handleSegmentDragStart(wireId, 0, 1, orientation, e, exitPos, secondPos, true);
     } else {
       const toEndpoint = wire.to as { componentId: string; portId: string };
       const exitPos = computeExitPos(toEndpoint, wire.toExitDirection);
       if (!exitPos) return;
 
       const lastIdx = wire.handles.length - 1;
-      const lastHandlePos = { ...wire.handles[lastIdx].position };
+      const lastHandlePos = wire.handles[lastIdx].position;
 
-      // Insert new handle at exit position (pushes history)
-      insertEndpointHandle(wireId, 'to', exitPos, constraint);
+      // Insert TWO handles: handleA connecting from lastH, handleB at exit position.
+      const firstPos: Position = orientation === 'vertical'
+        ? { x: exitPos.x, y: lastHandlePos.y }  // same X as exit, same Y as lastH
+        : { x: lastHandlePos.x, y: exitPos.y };  // same Y as exit, same X as lastH
 
-      // After insert, indices shift: original last handle is still at lastIdx,
-      // new handle is at lastIdx + 1
-      handleSegmentDragStart(wireId, lastIdx, lastIdx + 1, orientation, e, lastHandlePos, exitPos, true);
+      insertEndpointHandle(wireId, 'to', [
+        { position: firstPos, constraint },
+        { position: exitPos, constraint },
+      ]);
+
+      // After insert: lastH is at lastIdx, firstPos is at lastIdx+1, exitPos is at lastIdx+2.
+      // Drag the two new handles.
+      handleSegmentDragStart(wireId, lastIdx + 1, lastIdx + 2, orientation, e, firstPos, exitPos, true);
     }
   }, [wires, components, insertEndpointHandle, handleSegmentDragStart]);
 
