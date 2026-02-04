@@ -10,8 +10,9 @@
  */
 
 import { memo, useCallback, useMemo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { Settings2 } from 'lucide-react';
-import { useCanvasStore, selectSelectedComponents } from '../../../stores/canvasStore';
+import { useCanvasStore } from '../../../stores/canvasStore';
 import type { Block } from '../../OneCanvas/types';
 import {
   PlcOutProperties,
@@ -43,8 +44,19 @@ export const PropertiesPanel = memo(function PropertiesPanel({
   selectedComponents: externalSelectedComponents,
   onUpdateComponent: externalUpdateComponent,
 }: PropertiesPanelProps) {
-  // Use external props if provided, otherwise fall back to global store
-  const storeSelectedComponents = useCanvasStore(selectSelectedComponents);
+  // Use external props if provided, otherwise fall back to global store.
+  // useShallow ensures the derived array is compared shallowly, avoiding
+  // infinite re-renders from a new array reference on every selector call.
+  const storeSelectedComponents = useCanvasStore(
+    useShallow((state) => {
+      const selected: Block[] = [];
+      state.selectedIds.forEach((id) => {
+        const component = state.components.get(id);
+        if (component) selected.push(component);
+      });
+      return selected;
+    })
+  );
   const storeUpdateComponent = useCanvasStore((state) => state.updateComponent);
 
   const selectedComponents = externalSelectedComponents ?? storeSelectedComponents;
