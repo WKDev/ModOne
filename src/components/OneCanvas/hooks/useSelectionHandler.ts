@@ -1,29 +1,32 @@
 /**
- * Selection Handler Hook
+ * Selection Handler Hook (DOM-Free)
  *
- * Manages canvas selection state including:
+ * Manages canvas selection state using pure geometric calculations:
  * - Click to select
  * - Shift+click to add to selection
  * - Ctrl+click to toggle selection
- * - Drag-to-select with selection box
+ * - Drag-to-select with selection box (LTR=contain, RTL=intersect)
+ *
+ * Wire selection uses pre-computed geometry cache (no DOM queries).
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import { useCanvasStore } from '../../../stores/canvasStore';
 import type { Position, Block, Wire, Junction } from '../types';
+import type { SelectionBoxState } from '../components/SelectionBox';
+import { getDragDirection } from '../components/SelectionBox';
+import { WireGeometryCache } from '../geometry/geometryCache';
 import {
-  type SelectionBoxState,
-  doesRectIntersectBox,
-  isRectContainedInBox,
-  getDragDirection,
-} from '../components/SelectionBox';
+  selectWiresInBox,
+  isBlockInBox,
+  isJunctionInBox,
+  type SelectionBox,
+} from '../geometry/collision';
 import {
-  getWirePathElement,
-  sampleWirePath,
-  isWireContainedInBox,
-  doesWireIntersectBox,
-  getWireBoundingBox,
-} from '../utils/wireSelectionUtils';
+  isToggleSelection,
+  isAddToSelection,
+  hasModifier,
+} from '../selection/modifierKeys';
 
 // ============================================================================
 // Types
@@ -34,7 +37,7 @@ interface UseSelectionHandlerOptions {
   components?: Map<string, Block>;
   /** Wires array to select from (pass from OneCanvasPanel) */
   wires?: Wire[];
-  /** Junctions map (for wire bounding box calculation) */
+  /** Junctions map (for wire geometry calculation) */
   junctions?: Map<string, Junction>;
   /** Current zoom level (needed for threshold calculation) */
   zoom?: number;
@@ -59,6 +62,9 @@ interface SelectionHandlerResult {
   /** Handle click on a wire */
   handleWireClick: (wireId: string, e: React.MouseEvent) => void;
 
+  /** Handle click on a junction */
+  handleJunctionClick: (junctionId: string, e: React.MouseEvent) => void;
+
   /** Whether a drag-select is in progress */
   isDragSelecting: boolean;
 }
@@ -68,6 +74,22 @@ interface SelectionHandlerResult {
 // ============================================================================
 
 const DRAG_THRESHOLD = 5; // Pixels to move before starting drag-select
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Convert SelectionBoxState to SelectionBox format used by collision detection
+ */
+function toCollisionBox(boxState: SelectionBoxState): SelectionBox {
+  return {
+    startX: boxState.start.x,
+    startY: boxState.start.y,
+    endX: boxState.end.x,
+    endY: boxState.end.y,
+  };
+}
 
 // ============================================================================
 // Hook
@@ -85,6 +107,10 @@ export function useSelectionHandler(
   const mouseDownPos = useRef<Position | null>(null);
   const hasPassedThreshold = useRef(false);
 
+  // State version for geometry cache invalidation
+  // Increment whenever components/wires/junctions change
+  const stateVersionRef = useRef(0);
+
   // Store actions
   const setSelection = useCanvasStore((state) => state.setSelection);
   const addToSelection = useCanvasStore((state) => state.addToSelection);
@@ -101,6 +127,15 @@ export function useSelectionHandler(
   const junctions = options.junctions ?? globalJunctions;
   const zoom = options.zoom ?? 1;
 
+  // Increment state version whenever data changes (triggers geometry recomputation)
+  // Using useMemo with size checks to detect changes
+  useMemo(() => {
+    stateVersionRef.current++;
+  }, [components.size, wires.length, junctions.size]);
+
+  // Wire geometry cache (persistent across renders)
+  const geometryCache = useRef(new WireGeometryCache());
+
   // Handle mouse down on canvas (not on a component)
   const handleCanvasMouseDown = useCallback(
     (e: React.MouseEvent, canvasPosition: Position) => {
@@ -116,10 +151,11 @@ export function useSelectionHandler(
       const isClickingBlock = target.closest('[data-block-id]');
       const isClickingWire = target.closest('[data-wire-id]');
       const isClickingPort = target.closest('[data-port-id]');
+      const isClickingJunction = target.closest('[data-junction-id]');
 
-      // Clear selection on empty canvas click (unless shift/ctrl held or clicking interactive elements)
-      const isClickingInteractive = isClickingBlock || isClickingWire || isClickingPort;
-      if (!isClickingInteractive && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      // Clear selection on empty canvas click (unless modifier held or clicking interactive elements)
+      const isClickingInteractive = isClickingBlock || isClickingWire || isClickingPort || isClickingJunction;
+      if (!isClickingInteractive && !hasModifier(e)) {
         clearSelection();
       }
     },
@@ -160,69 +196,47 @@ export function useSelectionHandler(
   const handleCanvasMouseUp = useCallback(
     (e: React.MouseEvent) => {
       if (selectionBox && isDragSelecting) {
-        // Find all components and wires that match the selection box
+        // Find all components, wires, and junctions that match the selection box
         const selectedIds: string[] = [];
 
         // Determine drag direction
         const dragDirection = getDragDirection(selectionBox);
         const isContainmentMode = dragDirection === 'ltr';
+        const collisionMode = isContainmentMode ? 'contain' : 'intersect';
 
-        // Select components based on drag direction
+        // Convert to collision box format
+        const collisionBox = toCollisionBox(selectionBox);
+
+        // Select blocks based on drag direction
         components.forEach((component) => {
-          const rect = {
-            x: component.position.x,
-            y: component.position.y,
-            width: component.size.width,
-            height: component.size.height,
-          };
-
-          // Use appropriate selection mode based on drag direction
-          const isSelected = isContainmentMode
-            ? isRectContainedInBox(rect, selectionBox)
-            : doesRectIntersectBox(rect, selectionBox);
-
+          const isSelected = isBlockInBox(component, collisionBox, collisionMode);
           if (isSelected) {
             selectedIds.push(component.id);
           }
         });
 
-        // Select wires based on drag direction
-        wires.forEach((wire) => {
-          // Performance: Skip if wire bounding box doesn't intersect selection
-          const wireBounds = getWireBoundingBox(wire, components, junctions);
-          if (wireBounds) {
-            const boundsRect = {
-              x: wireBounds.minX,
-              y: wireBounds.minY,
-              width: wireBounds.maxX - wireBounds.minX,
-              height: wireBounds.maxY - wireBounds.minY,
-            };
-
-            // Quick rejection if bounds don't intersect
-            if (!doesRectIntersectBox(boundsRect, selectionBox)) {
-              return;
-            }
-          }
-
-          // Get wire SVG path from DOM
-          const pathElement = getWirePathElement(wire.id);
-          if (!pathElement) return;
-
-          // Sample points along wire path
-          const wirePoints = sampleWirePath(pathElement);
-
-          // Check selection based on drag direction
-          const isSelected = isContainmentMode
-            ? isWireContainedInBox(wirePoints, selectionBox)
-            : doesWireIntersectBox(wirePoints, selectionBox);
-
+        // Select junctions based on drag direction
+        junctions.forEach((junction) => {
+          const isSelected = isJunctionInBox(junction, collisionBox);
           if (isSelected) {
-            selectedIds.push(wire.id);
+            selectedIds.push(junction.id);
           }
         });
 
+        // Select wires using geometry cache (DOM-free)
+        const selectedWireIds = selectWiresInBox(
+          wires,
+          collisionBox,
+          geometryCache.current,
+          components,
+          junctions,
+          stateVersionRef.current,
+          collisionMode
+        );
+        selectedIds.push(...selectedWireIds);
+
         // Apply selection based on modifier keys
-        if (e.shiftKey || e.ctrlKey || e.metaKey) {
+        if (hasModifier(e)) {
           // Add to existing selection
           selectedIds.forEach((id) => addToSelection(id));
         } else {
@@ -242,7 +256,15 @@ export function useSelectionHandler(
       setSelectionBox(null);
       setIsDragSelecting(false);
     },
-    [selectionBox, isDragSelecting, components, wires, junctions, setSelection, addToSelection]
+    [
+      selectionBox,
+      isDragSelecting,
+      components,
+      wires,
+      junctions,
+      setSelection,
+      addToSelection,
+    ]
   );
 
   // Handle click on a component
@@ -250,10 +272,10 @@ export function useSelectionHandler(
     (componentId: string, e: React.MouseEvent) => {
       e.stopPropagation();
 
-      if (e.ctrlKey || e.metaKey) {
-        // Ctrl+click: Toggle selection
+      if (isToggleSelection(e)) {
+        // Ctrl/Cmd+click: Toggle selection
         toggleSelection(componentId);
-      } else if (e.shiftKey) {
+      } else if (isAddToSelection(e)) {
         // Shift+click: Add to selection
         addToSelection(componentId);
       } else {
@@ -269,12 +291,28 @@ export function useSelectionHandler(
     (wireId: string, e: React.MouseEvent) => {
       e.stopPropagation();
 
-      if (e.ctrlKey || e.metaKey) {
+      if (isToggleSelection(e)) {
         toggleSelection(wireId);
-      } else if (e.shiftKey) {
+      } else if (isAddToSelection(e)) {
         addToSelection(wireId);
       } else {
         setSelection([wireId]);
+      }
+    },
+    [setSelection, addToSelection, toggleSelection]
+  );
+
+  // Handle click on a junction
+  const handleJunctionClick = useCallback(
+    (junctionId: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+
+      if (isToggleSelection(e)) {
+        toggleSelection(junctionId);
+      } else if (isAddToSelection(e)) {
+        addToSelection(junctionId);
+      } else {
+        setSelection([junctionId]);
       }
     },
     [setSelection, addToSelection, toggleSelection]
@@ -287,6 +325,7 @@ export function useSelectionHandler(
     handleCanvasMouseUp,
     handleComponentClick,
     handleWireClick,
+    handleJunctionClick,
     isDragSelecting,
   };
 }
