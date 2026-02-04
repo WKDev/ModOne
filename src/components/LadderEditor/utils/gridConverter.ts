@@ -134,12 +134,16 @@ function mapComparisonOperatorToType(operator: string): LadderElementType {
 // Element Creation
 // ============================================================================
 
+/** Module-level counter for globally unique IDs */
+let globalIdCounter = 0;
+
 /**
  * Generate unique ID for elements
  */
 function generateId(context: ConversionContext, prefix: string = 'elem'): string {
   context.idCounter++;
-  return `${prefix}-${context.idCounter}-${Date.now().toString(36)}`;
+  globalIdCounter++;
+  return `${prefix}-${globalIdCounter}-${Date.now().toString(36)}`;
 }
 
 /**
@@ -567,7 +571,8 @@ export function convertToEditorNetwork(
 }
 
 /**
- * Batch convert multiple AST networks and merge into a single flat structure
+ * Batch convert multiple AST networks and merge into a single flat structure.
+ * Each network's elements are offset by row to avoid position collisions.
  */
 export function convertMultipleNetworks(
   networks: LadderNetworkAST[],
@@ -575,13 +580,23 @@ export function convertMultipleNetworks(
 ): EditorNetworkData {
   const mergedElements = new Map<string, LadderElement>();
   const mergedWires: LadderWire[] = [];
+  let rowOffset = options.startRow ?? 0;
 
   for (const network of networks) {
-    const data = convertToEditorNetwork(network, options);
+    const data = convertToEditorNetwork(network, { ...options, startRow: rowOffset });
     for (const [id, element] of data.elements) {
       mergedElements.set(id, element);
     }
     mergedWires.push(...data.wires);
+
+    // Calculate the max row used by this network's elements to offset the next one
+    let maxRow = rowOffset;
+    for (const element of data.elements.values()) {
+      if (element.position.row > maxRow) {
+        maxRow = element.position.row;
+      }
+    }
+    rowOffset = maxRow + 1;
   }
 
   return {
