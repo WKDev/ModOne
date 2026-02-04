@@ -115,6 +115,7 @@ interface WireRendererProps {
   wire: WireData;
   components: Map<string, { type: string; position: Position; size: { width: number; height: number }; ports: Array<{ id: string; position: string; offset?: number }> }>;
   isSelected: boolean;
+  onClick?: (wireId: string) => void;
   onContextMenu?: (wireId: string, position: Position, screenPos: { x: number; y: number }) => void;
   onHandleDragStart?: (wireId: string, handleIndex: number, constraint: HandleConstraint, e: React.MouseEvent, handlePosition: Position) => void;
   onHandleContextMenu?: (wireId: string, handleIndex: number, e: React.MouseEvent) => void;
@@ -125,6 +126,7 @@ const WireRenderer = memo(function WireRenderer({
   wire,
   components,
   isSelected,
+  onClick,
   onContextMenu,
   onHandleDragStart,
   onHandleContextMenu,
@@ -197,6 +199,7 @@ const WireRenderer = memo(function WireRenderer({
       toExitDirection={toExitDirection}
       defaultFromDirection={fromData.direction}
       defaultToDirection={toData.direction}
+      onClick={onClick}
       onContextMenu={onContextMenu}
       onHandleDragStart={onHandleDragStart}
       onHandleContextMenu={onHandleContextMenu}
@@ -533,6 +536,14 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     [selectedIds, setSelection]
   );
 
+  // Handle wire selection
+  const handleWireClick = useCallback(
+    (wireId: string) => {
+      setSelection([wireId]);
+    },
+    [setSelection]
+  );
+
   // Selection box state for drag-to-select
   const [selectionBox] = useState<SelectionBoxState | null>(null);
 
@@ -651,6 +662,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
                     wire={wire}
                     components={components as Map<string, { type: string; position: Position; size: { width: number; height: number }; ports: Array<{ id: string; position: string; offset?: number }> }>}
                     isSelected={selectedIds.has(wire.id)}
+                    onClick={handleWireClick}
                     onContextMenu={handleWireContextMenu}
                     onHandleDragStart={handleWireHandleDragStart}
                     onHandleContextMenu={handleWireHandleContextMenu}
