@@ -90,7 +90,10 @@
       "Bash(find:*)",
       "mcp__plugin_context7_context7__resolve-library-id",
       "mcp__plugin_context7_context7__query-docs",
-      "Bash(git diff:*)"
+      "Bash(git diff:*)",
+      "Bash(pnpm run test:*)",
+      "Bash(git stash:*)",
+      "Bash(git restore:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

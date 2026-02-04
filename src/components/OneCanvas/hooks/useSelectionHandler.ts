@@ -10,7 +10,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { useCanvasStore } from '../../../stores/canvasStore';
-import type { Position } from '../types';
+import type { Position, Block, Wire, Junction } from '../types';
 import {
   type SelectionBoxState,
   doesRectIntersectBox,
@@ -29,7 +29,16 @@ import {
 // Types
 // ============================================================================
 
-interface UseSelectionHandlerOptions {}
+interface UseSelectionHandlerOptions {
+  /** Components map to select from (pass from OneCanvasPanel) */
+  components?: Map<string, Block>;
+  /** Wires array to select from (pass from OneCanvasPanel) */
+  wires?: Wire[];
+  /** Junctions map (for wire bounding box calculation) */
+  junctions?: Map<string, Junction>;
+  /** Current zoom level (needed for threshold calculation) */
+  zoom?: number;
+}
 
 interface SelectionHandlerResult {
   /** Current selection box state (null when not dragging) */
@@ -65,7 +74,7 @@ const DRAG_THRESHOLD = 5; // Pixels to move before starting drag-select
 // ============================================================================
 
 export function useSelectionHandler(
-  _options: UseSelectionHandlerOptions = {}
+  options: UseSelectionHandlerOptions = {}
 ): SelectionHandlerResult {
 
   // Selection box state
@@ -81,9 +90,16 @@ export function useSelectionHandler(
   const addToSelection = useCanvasStore((state) => state.addToSelection);
   const toggleSelection = useCanvasStore((state) => state.toggleSelection);
   const clearSelection = useCanvasStore((state) => state.clearSelection);
-  const components = useCanvasStore((state) => state.components);
-  const wires = useCanvasStore((state) => state.wires);
-  const junctions = useCanvasStore((state) => state.junctions);
+
+  // Use provided state or fall back to global store
+  const globalComponents = useCanvasStore((state) => state.components);
+  const globalWires = useCanvasStore((state) => state.wires);
+  const globalJunctions = useCanvasStore((state) => state.junctions);
+
+  const components = options.components ?? globalComponents;
+  const wires = options.wires ?? globalWires;
+  const junctions = options.junctions ?? globalJunctions;
+  const zoom = options.zoom ?? 1;
 
   // Handle mouse down on canvas (not on a component)
   const handleCanvasMouseDown = useCallback(
@@ -113,7 +129,10 @@ export function useSelectionHandler(
         const dx = Math.abs(canvasPosition.x - mouseDownPos.current.x);
         const dy = Math.abs(canvasPosition.y - mouseDownPos.current.y);
 
-        if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+        // Threshold is in screen pixels, so adjust for zoom when comparing in canvas space
+        const canvasThreshold = DRAG_THRESHOLD / zoom;
+
+        if (dx > canvasThreshold || dy > canvasThreshold) {
           hasPassedThreshold.current = true;
           setIsDragSelecting(true);
         } else {
@@ -127,7 +146,7 @@ export function useSelectionHandler(
         end: canvasPosition,
       });
     },
-    []
+    [zoom]
   );
 
   // Handle mouse up on canvas
@@ -203,6 +222,11 @@ export function useSelectionHandler(
           // Replace selection
           setSelection(selectedIds);
         }
+
+        // CRITICAL: Prevent click event after drag-select
+        // This prevents Canvas onClick from clearing the selection
+        e.preventDefault();
+        e.stopPropagation();
       }
 
       // Reset drag state

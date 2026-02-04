@@ -58,7 +58,10 @@ export const BlockWrapper = memo(function BlockWrapper({
     <div
       className={`
         relative cursor-grab active:cursor-grabbing
-        ${isSelected ? 'outline outline-2 outline-blue-500 outline-offset-2 rounded' : ''}
+        ${isSelected
+          ? 'ring-4 ring-blue-500 ring-offset-2 bg-blue-50/30 rounded shadow-lg shadow-blue-500/50'
+          : ''
+        }
         ${className}
       `}
       style={{

@@ -31,6 +31,7 @@ import {
   Wire,
   WirePreview,
   SelectionBox,
+  SelectionBoundingBox,
   useSimulation,
   useCanvasKeyboardShortcuts,
   useBlockDrag,
@@ -614,6 +615,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     components,
     wires,
     junctions,
+    zoom,
   });
 
   // Handle canvas mouse down - for selection box
@@ -960,8 +962,16 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
                 })()}
               </svg>
 
-              {/* Selection box */}
+              {/* Selection box (drag-to-select) */}
               <SelectionBox box={selectionHandler.selectionBox} />
+
+              {/* Selection bounding box (multi-selection) */}
+              <SelectionBoundingBox
+                selectedIds={selectedIds}
+                components={components}
+                wires={wires}
+                junctions={junctions}
+              />
             </Canvas>
             </div>
           </CanvasDropZone>

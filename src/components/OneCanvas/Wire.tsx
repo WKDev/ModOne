@@ -251,16 +251,31 @@ export const Wire = memo(function Wire({
 
       {/* Selection highlight */}
       {isSelected && (
-        <path
-          d={pathD}
-          fill="none"
-          stroke={SELECTED_COLOR}
-          strokeWidth={strokeWidth + 6}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          opacity={0.2}
-          className="pointer-events-none"
-        />
+        <>
+          {/* Outer glow */}
+          <path
+            d={pathD}
+            fill="none"
+            stroke="#3b82f6"
+            strokeWidth={strokeWidth + 10}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity={0.3}
+            className="pointer-events-none"
+            style={{ filter: 'blur(2px)' }}
+          />
+          {/* Inner highlight */}
+          <path
+            d={pathD}
+            fill="none"
+            stroke={SELECTED_COLOR}
+            strokeWidth={strokeWidth + 4}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity={0.6}
+            className="pointer-events-none"
+          />
+        </>
       )}
 
       {/* Segment drag hit areas (between adjacent handles) */}
