@@ -6,6 +6,8 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useCanvasStore } from '../../../stores/canvasStore';
+import { snapToGrid } from '../utils/canvasCoordinates';
 import type { Position, HandleConstraint } from '../types';
 
 // ============================================================================
@@ -63,6 +65,8 @@ export function useWireHandleDrag({
 }: UseWireHandleDragOptions): UseWireHandleDragResult {
   const [dragging, setDragging] = useState<DragState | null>(null);
   const isFirstMoveRef = useRef(false);
+  const snapToGridEnabled = useCanvasStore((state) => state.snapToGrid);
+  const gridSize = useCanvasStore((state) => state.gridSize);
 
   // Start drag operation
   const handleDragStart = useCallback(
@@ -117,6 +121,10 @@ export function useWireHandleDrag({
         };
       }
 
+      if (snapToGridEnabled) {
+        newPos = snapToGrid(newPos, gridSize);
+      }
+
       updateWireHandle(dragging.wireId, dragging.handleIndex, newPos, isFirstMoveRef.current);
       isFirstMoveRef.current = false;
     };
@@ -134,7 +142,7 @@ export function useWireHandleDrag({
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
-  }, [dragging, zoom, updateWireHandle, onDragEnd]);
+  }, [dragging, zoom, snapToGridEnabled, gridSize, updateWireHandle, onDragEnd]);
 
   return {
     handleDragStart,

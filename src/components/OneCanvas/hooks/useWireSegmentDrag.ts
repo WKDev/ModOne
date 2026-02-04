@@ -6,6 +6,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useCanvasStore } from '../../../stores/canvasStore';
 import type { Position } from '../types';
 
 // ============================================================================
@@ -61,6 +62,8 @@ export function useWireSegmentDrag({
   const [dragging, setDragging] = useState<SegmentDragState | null>(null);
   const isFirstMoveRef = useRef(false);
   const appliedDeltaRef = useRef<Position>({ x: 0, y: 0 });
+  const snapToGridEnabled = useCanvasStore((state) => state.snapToGrid);
+  const gridSize = useCanvasStore((state) => state.gridSize);
 
   const handleSegmentDragStart = useCallback(
     (
@@ -100,10 +103,20 @@ export function useWireSegmentDrag({
 
       // Constrain based on segment orientation:
       // horizontal segment → move Y only; vertical segment → move X only
-      const targetDelta: Position =
-        dragging.orientation === 'horizontal'
-          ? { x: 0, y: absDy }
-          : { x: absDx, y: 0 };
+      let targetDelta: Position;
+      if (dragging.orientation === 'horizontal') {
+        let targetY = dragging.startPositionA.y + absDy;
+        if (snapToGridEnabled) {
+          targetY = Math.round(targetY / gridSize) * gridSize;
+        }
+        targetDelta = { x: 0, y: targetY - dragging.startPositionA.y };
+      } else {
+        let targetX = dragging.startPositionA.x + absDx;
+        if (snapToGridEnabled) {
+          targetX = Math.round(targetX / gridSize) * gridSize;
+        }
+        targetDelta = { x: targetX - dragging.startPositionA.x, y: 0 };
+      }
 
       // Compute incremental delta to apply (total target minus what's already applied)
       const delta: Position = {
@@ -133,7 +146,7 @@ export function useWireSegmentDrag({
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
-  }, [dragging, zoom, moveWireSegment]);
+  }, [dragging, zoom, snapToGridEnabled, gridSize, moveWireSegment]);
 
   return {
     handleSegmentDragStart,
