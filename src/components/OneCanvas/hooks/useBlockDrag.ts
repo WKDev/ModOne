@@ -11,7 +11,7 @@
  * - Screen-to-canvas coordinate transformation
  */
 
-import { useCallback, useRef, useEffect, useState } from 'react';
+import { useCallback, useRef, useLayoutEffect, useState } from 'react';
 import { useCanvasStore } from '../../../stores/canvasStore';
 import { snapToGrid, screenToCanvas } from '../utils/canvasCoordinates';
 import { isToggleSelection } from '../selection/modifierKeys';
@@ -295,14 +295,14 @@ export function useBlockDrag({
   }, []);
 
   // Attach global mouse event listeners during drag
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (isDragging) {
       window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('mouseup', handleMouseUp, true);
 
       return () => {
         window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
+        window.removeEventListener('mouseup', handleMouseUp, true);
       };
     }
   }, [isDragging, handleMouseMove, handleMouseUp]);
