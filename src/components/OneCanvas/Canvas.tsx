@@ -148,7 +148,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
   const pan = useCanvasStore((state) => state.pan);
   const storeGridSize = useCanvasStore((state) => state.gridSize);
   const storeShowGrid = useCanvasStore((state) => state.showGrid);
-  const clearSelection = useCanvasStore((state) => state.clearSelection);
 
   const gridSize = propGridSize ?? storeGridSize;
   const showGrid = propShowGrid ?? storeShowGrid;
@@ -185,7 +184,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
   // Handle canvas click
   const handleClick = (event: React.MouseEvent) => {
     if (event.target === containerRef.current || event.target === contentRef.current) {
-      clearSelection();
+      // Selection clearing is now handled by useSelectionHandler in OneCanvasPanel
       onCanvasClick?.(event);
     }
   };
