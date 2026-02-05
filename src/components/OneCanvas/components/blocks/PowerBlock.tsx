@@ -21,6 +21,8 @@ interface PowerBlockProps {
   isSelected?: boolean;
   /** Block click handler */
   onBlockClick?: (blockId: string, e: React.MouseEvent) => void;
+  /** Drag start handler */
+  onDragStart?: (blockId: string, event: React.MouseEvent) => void;
   /** Legacy selection handler */
   onSelect?: (blockId: string, addToSelection: boolean) => void;
   /** Wire start handler */
@@ -83,6 +85,7 @@ export const PowerBlock = memo(function PowerBlock({
   block,
   isSelected,
   onBlockClick,
+  onDragStart,
   onSelect,
   onStartWire,
   onEndWire,
@@ -95,6 +98,7 @@ export const PowerBlock = memo(function PowerBlock({
       blockId={block.id}
       isSelected={isSelected}
       onBlockClick={onBlockClick}
+      onDragStart={onDragStart}
       onSelect={onSelect}
       width={block.size.width}
       height={block.size.height}
