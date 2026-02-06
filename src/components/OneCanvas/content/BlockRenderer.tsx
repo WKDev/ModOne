@@ -12,6 +12,7 @@ import { PlcOutBlock } from '../components/blocks/PlcOutBlock';
 import { PlcInBlock } from '../components/blocks/PlcInBlock';
 import { ButtonBlock } from '../components/blocks/ButtonBlock';
 import { ScopeBlock } from '../components/blocks/ScopeBlock';
+import { TextBlock } from '../components/blocks/TextBlock';
 // JunctionBlock is now rendered as SVG dot in the wire layer (JunctionDot.tsx)
 
 // ============================================================================
@@ -41,6 +42,8 @@ interface BlockRendererProps {
   onButtonRelease?: (blockId: string) => void;
   /** PLC output active states (for plc_out blocks) */
   plcOutputStates?: Map<string, boolean>;
+  /** Component update handler (for text blocks inline editing) */
+  onUpdateComponent?: (id: string, updates: Partial<Block>) => void;
 }
 
 // ============================================================================
@@ -62,6 +65,7 @@ export const BlockRenderer = memo(function BlockRenderer({
   onButtonPress,
   onButtonRelease,
   plcOutputStates,
+  onUpdateComponent,
 }: BlockRendererProps) {
   // Common props for all block types
   const commonProps = {
@@ -71,6 +75,7 @@ export const BlockRenderer = memo(function BlockRenderer({
     onStartWire,
     onEndWire,
     connectedPorts,
+    portVoltages,
   };
 
   // Position wrapper
@@ -128,6 +133,15 @@ export const BlockRenderer = memo(function BlockRenderer({
                 .slice(0, block.channels)
                 .map((p) => portVoltages?.get(`${block.id}:${p.id}`) ?? 0)
             }
+          />
+        );
+
+      case 'text':
+        return (
+          <TextBlock
+            block={block}
+            {...commonProps}
+            onUpdateComponent={onUpdateComponent}
           />
         );
 

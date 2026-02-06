@@ -73,6 +73,18 @@ const BLOCK_DEFINITIONS: Record<BlockType, BlockDefinition> = {
     ],
     defaultProps: { channels: 1, triggerMode: 'auto', timeBase: 100, voltageScale: 5 },
   },
+  text: {
+    size: { width: 160, height: 40 },
+    defaultPorts: [],
+    defaultProps: {
+      content: 'Text',
+      textStyle: 'label',
+      fontSize: 14,
+      textColor: '#e5e5e5',
+      backgroundColor: '',
+      showBorder: false,
+    },
+  },
 };
 
 // ============================================================================

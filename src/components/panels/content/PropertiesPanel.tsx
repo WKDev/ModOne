@@ -21,6 +21,7 @@ import {
   ButtonProperties,
   ScopeProperties,
   PowerSourceProperties,
+  TextProperties,
 } from './properties';
 
 // ============================================================================
@@ -163,6 +164,14 @@ const PropertyEditorRouter = memo(function PropertyEditorRouter({
     case 'powersource':
       return (
         <PowerSourceProperties
+          component={component}
+          onChange={onChange}
+        />
+      );
+
+    case 'text':
+      return (
+        <TextProperties
           component={component}
           onChange={onChange}
         />

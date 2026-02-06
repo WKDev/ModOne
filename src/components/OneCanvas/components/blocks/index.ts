@@ -11,3 +11,4 @@ export { PlcOutBlock } from './PlcOutBlock';
 export { PlcInBlock } from './PlcInBlock';
 export { ButtonBlock } from './ButtonBlock';
 export { ScopeBlock } from './ScopeBlock';
+export { TextBlock } from './TextBlock';

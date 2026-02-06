@@ -21,8 +21,8 @@ interface PortProps {
   blockSize: { width: number; height: number };
   /** Whether this port is connected to a wire */
   isConnected?: boolean;
-  /** Current voltage at this port (for visual feedback) - reserved for future use */
-  _voltage?: number;
+  /** Current voltage at this port (for visual feedback) */
+  voltage?: number;
   /** Callback when starting wire from this port */
   onStartWire?: (blockId: string, portId: string) => void;
   /** Callback when completing wire at this port */
@@ -84,6 +84,7 @@ export const Port = memo(function Port({
   blockId,
   blockSize,
   isConnected = false,
+  voltage,
   onStartWire,
   onEndWire,
 }: PortProps) {
@@ -158,20 +159,25 @@ export const Port = memo(function Port({
         }}
       />
 
-      {/* Port label (shown on hover) */}
+      {/* Port label + voltage tooltip (shown on hover) */}
       {isHovered && (
         <div
-          className="absolute whitespace-nowrap text-xs bg-neutral-800 text-white px-1 rounded pointer-events-none"
+          className="absolute whitespace-nowrap text-xs bg-neutral-800 text-white px-1.5 py-0.5 rounded pointer-events-none shadow-lg border border-neutral-600 z-50"
           style={{
             left: port.position === 'left' ? -4 : port.position === 'right' ? PORT_SIZE + 4 : '50%',
-            top: port.position === 'top' ? -20 : port.position === 'bottom' ? PORT_SIZE + 4 : '50%',
+            top: port.position === 'top' ? -24 : port.position === 'bottom' ? PORT_SIZE + 4 : '50%',
             transform:
               port.position === 'top' || port.position === 'bottom'
                 ? 'translateX(-50%)'
                 : 'translateY(-50%)',
           }}
         >
-          {port.label}
+          <span>{port.label}</span>
+          {voltage !== undefined && (
+            <span className="ml-1 text-yellow-400 font-mono">
+              {voltage.toFixed(1)}V
+            </span>
+          )}
         </div>
       )}
     </div>

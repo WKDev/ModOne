@@ -37,6 +37,7 @@ export { PlcOutBlock as PlcOutBlockComponent } from './components/blocks/PlcOutB
 export { PlcInBlock as PlcInBlockComponent } from './components/blocks/PlcInBlock';
 export { ButtonBlock as ButtonBlockComponent } from './components/blocks/ButtonBlock';
 export { ScopeBlock as ScopeBlockComponent } from './components/blocks/ScopeBlock';
+export { TextBlock as TextBlockComponent } from './components/blocks/TextBlock';
 
 // Toolbox and Drag/Drop
 export { Toolbox } from './Toolbox';

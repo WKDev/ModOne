@@ -16,7 +16,8 @@ export type BlockType =
   | 'plc_in'
   | 'led'
   | 'button'
-  | 'scope';
+  | 'scope'
+  | 'text';
 
 /** Legacy block types (for migration) */
 export type LegacyBlockType = 'power_24v' | 'power_12v' | 'gnd';
@@ -298,6 +299,9 @@ export interface ButtonBlock extends BaseBlock<'button'> {
   pressed?: boolean;
 }
 
+/** Text block style variant */
+export type TextStyle = 'label' | 'title' | 'note' | 'section';
+
 /** Oscilloscope trigger mode */
 export type TriggerMode = 'auto' | 'normal' | 'single';
 
@@ -313,6 +317,22 @@ export interface ScopeBlock extends BaseBlock<'scope'> {
   voltageScale?: number;
 }
 
+/** Text/Annotation block - non-electrical, for labeling and documentation */
+export interface TextBlock extends BaseBlock<'text'> {
+  /** Text content to display */
+  content: string;
+  /** Text style variant */
+  textStyle: TextStyle;
+  /** Font size in pixels */
+  fontSize: number;
+  /** Text color (CSS color string) */
+  textColor: string;
+  /** Background color (CSS color string, empty = transparent) */
+  backgroundColor: string;
+  /** Whether to show a border */
+  showBorder: boolean;
+}
+
 /** Discriminated union of all block types */
 export type Block =
   | PowerSourceBlock
@@ -320,7 +340,8 @@ export type Block =
   | PlcInBlock
   | LedBlock
   | ButtonBlock
-  | ScopeBlock;
+  | ScopeBlock
+  | TextBlock;
 
 // ============================================================================
 // Junction (wire-level concept)
@@ -404,6 +425,10 @@ export interface Wire {
   fromExitDirection?: PortPosition;
   /** Direction wire enters target port (user-specified via drag direction) */
   toExitDirection?: PortPosition;
+  /** Wire label (display name, e.g., "L1", "N", "PE", "101") */
+  label?: string;
+  /** IEC 60204-1 wire number for documentation */
+  wireNumber?: string;
 }
 
 // ============================================================================
@@ -579,6 +604,7 @@ export function isValidBlockType(type: string): type is BlockType {
     'led',
     'button',
     'scope',
+    'text',
   ].includes(type);
 }
 
@@ -619,6 +645,11 @@ export function isInteractiveBlock(
   block: Block
 ): block is ButtonBlock | LedBlock {
   return block.type === 'button' || block.type === 'led';
+}
+
+/** Check if a block is a non-electrical annotation (excluded from simulation) */
+export function isAnnotationBlock(block: Block): block is TextBlock {
+  return block.type === 'text';
 }
 
 // ============================================================================

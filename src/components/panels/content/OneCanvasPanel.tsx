@@ -68,6 +68,7 @@ const BlockDragPreview = memo(function BlockDragPreview({ type, presetLabel }: {
     led: 'LED',
     button: 'Button',
     scope: 'Scope',
+    text: 'Text',
   };
 
   return (
@@ -761,6 +762,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
                 onWireHandleContextMenu={handleWireHandleContextMenu}
                 onWireSegmentDragStart={handleSegmentDragStart}
                 onWireEndpointSegmentDragStart={handleEndpointSegmentDragStart}
+                onUpdateComponent={handleUpdateComponent}
                 debugMode={process.env.NODE_ENV === 'development'}
               />
             </div>

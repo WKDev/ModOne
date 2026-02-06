@@ -12,3 +12,4 @@ export * from './pathFinder';
 export * from './switchEvaluator';
 export * from './circuitSimulator';
 export * from './serialization';
+export * from './bomGenerator';

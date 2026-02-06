@@ -76,6 +76,10 @@ interface WireProps {
   defaultFromDirection?: PortPosition;
   /** Default to direction based on port position */
   defaultToDirection?: PortPosition;
+  /** Wire label (e.g., "L1", "N", "PE") */
+  label?: string;
+  /** Wire number (IEC 60204-1) */
+  wireNumber?: string;
 }
 
 // ============================================================================
@@ -124,6 +128,8 @@ export const Wire = memo(function Wire({
   toExitDirection,
   defaultFromDirection,
   defaultToDirection,
+  label,
+  wireNumber,
 }: WireProps) {
   // Extract positions from handles
   const handlePositions = handles?.map((h) => h.position);
@@ -399,6 +405,46 @@ export const Wire = memo(function Wire({
           ))}
         </>
       )}
+
+      {/* Wire label / wire number */}
+      {(label || wireNumber) && (() => {
+        // Calculate label position at midpoint of wire
+        const midX = (from.x + to.x) / 2;
+        const midY = (from.y + to.y) / 2;
+        // Use first handle's midpoint if handles exist for better placement
+        let labelX = midX;
+        let labelY = midY;
+        if (handles && handles.length > 0) {
+          const midIdx = Math.floor(handles.length / 2);
+          labelX = handles[midIdx].position.x;
+          labelY = handles[midIdx].position.y;
+        }
+        const displayText = wireNumber ? `${wireNumber}${label ? ` (${label})` : ''}` : label;
+        return (
+          <g className="pointer-events-none">
+            {/* Background for readability */}
+            <rect
+              x={labelX - 2}
+              y={labelY - 12}
+              width={(displayText?.length ?? 0) * 6.5 + 4}
+              height={14}
+              rx={2}
+              fill="#1a1a1a"
+              opacity={0.85}
+            />
+            <text
+              x={labelX}
+              y={labelY - 2}
+              fill="#d4d4d4"
+              fontSize={10}
+              fontFamily="monospace"
+              style={{ userSelect: 'none' }}
+            >
+              {displayText}
+            </text>
+          </g>
+        );
+      })()}
     </g>
   );
 });

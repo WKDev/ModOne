@@ -37,6 +37,8 @@ interface ScopeBlockProps {
   connectedPorts?: Set<string>;
   /** Channel voltages for display */
   channelVoltages?: number[];
+  /** Port voltage map for simulation display */
+  portVoltages?: Map<string, number>;
 }
 
 // ============================================================================
@@ -108,6 +110,7 @@ export const ScopeBlock = memo(function ScopeBlock({
   onStartWire,
   onEndWire,
   connectedPorts,
+  portVoltages,
 }: ScopeBlockProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { isRunning } = useSimulation();
@@ -212,6 +215,7 @@ export const ScopeBlock = memo(function ScopeBlock({
             isConnected={connectedPorts?.has(port.id)}
             onStartWire={onStartWire}
             onEndWire={onEndWire}
+            voltage={portVoltages?.get(`${block.id}:${port.id}`)}
           />
         ))}
       </BlockWrapper>

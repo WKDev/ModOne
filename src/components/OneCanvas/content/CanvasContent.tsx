@@ -19,6 +19,7 @@ interface CanvasContentProps {
   onStartWire?: (blockId: string, portId: string) => void;
   onEndWire?: (blockId: string, portId: string) => void;
   onBlockDragStart?: (blockId: string, event: React.MouseEvent) => void;
+  onUpdateComponent?: (id: string, updates: Partial<Block>) => void;
 
   // Wire interaction handlers
   onWireContextMenu?: (wireId: string, position: Position, screenPos: { x: number; y: number }) => void;
@@ -76,6 +77,7 @@ export function CanvasContent({
   onWireHandleContextMenu,
   onWireSegmentDragStart,
   onWireEndpointSegmentDragStart,
+  onUpdateComponent,
 }: CanvasContentProps) {
   // Calculate port positions for wire rendering
   const getPortPosition = (blockId: string, portId: string) => {
@@ -146,6 +148,8 @@ export function CanvasContent({
               onHandleContextMenu={onWireHandleContextMenu}
               onSegmentDragStart={onWireSegmentDragStart}
               onEndpointSegmentDragStart={onWireEndpointSegmentDragStart}
+              label={wire.label}
+              wireNumber={wire.wireNumber}
             />
           );
         })}
@@ -166,6 +170,7 @@ export function CanvasContent({
           onButtonPress={onButtonPress}
           onButtonRelease={onButtonRelease}
           plcOutputStates={plcOutputStates}
+          onUpdateComponent={onUpdateComponent}
         />
       ))}
 

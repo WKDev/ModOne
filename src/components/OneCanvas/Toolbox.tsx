@@ -7,7 +7,7 @@
 import { memo, useState } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { ChevronDown, ChevronRight, Zap, Cpu, Lightbulb, Activity } from 'lucide-react';
+import { ChevronDown, ChevronRight, Zap, Cpu, Lightbulb, Activity, Type } from 'lucide-react';
 import type { BlockType } from './types';
 import type { Block } from './types';
 
@@ -89,6 +89,36 @@ const BLOCK_CATEGORIES: BlockCategory[] = [
     icon: <Activity size={16} />,
     blocks: [
       { type: 'scope', label: 'Scope', description: 'Oscilloscope' },
+    ],
+  },
+  {
+    name: 'Annotation',
+    icon: <Type size={16} />,
+    blocks: [
+      {
+        type: 'text',
+        label: 'Label',
+        description: 'Simple text label',
+        presetProps: { content: 'Label', textStyle: 'label', fontSize: 14 } as Partial<Block>,
+      },
+      {
+        type: 'text',
+        label: 'Title',
+        description: 'Section title (bold)',
+        presetProps: { content: 'Title', textStyle: 'title', fontSize: 18, showBorder: false } as Partial<Block>,
+      },
+      {
+        type: 'text',
+        label: 'Note',
+        description: 'Annotation note (italic)',
+        presetProps: { content: 'Note...', textStyle: 'note', fontSize: 12, showBorder: true } as Partial<Block>,
+      },
+      {
+        type: 'text',
+        label: 'Section',
+        description: 'Section divider header',
+        presetProps: { content: 'SECTION', textStyle: 'section', fontSize: 12, showBorder: true } as Partial<Block>,
+      },
     ],
   },
 ];

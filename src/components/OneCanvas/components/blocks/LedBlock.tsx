@@ -32,6 +32,8 @@ interface LedBlockProps {
   connectedPorts?: Set<string>;
   /** Current voltage (for glow effect) */
   voltage?: number;
+  /** Port voltage map for simulation display */
+  portVoltages?: Map<string, number>;
 }
 
 // ============================================================================
@@ -64,6 +66,7 @@ export const LedBlock = memo(function LedBlock({
   onEndWire,
   connectedPorts,
   voltage,
+  portVoltages,
 }: LedBlockProps) {
   const isPowered = block.lit || (voltage !== undefined && voltage > 0);
   const colors = LED_COLORS[block.color] || LED_COLORS.red;
@@ -133,6 +136,7 @@ export const LedBlock = memo(function LedBlock({
           isConnected={connectedPorts?.has(port.id)}
           onStartWire={onStartWire}
           onEndWire={onEndWire}
+          voltage={portVoltages?.get(`${block.id}:${port.id}`)}
         />
       ))}
     </BlockWrapper>

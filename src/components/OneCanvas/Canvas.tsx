@@ -86,6 +86,9 @@ interface CanvasProps {
     e: React.MouseEvent
   ) => void;
 
+  // Component update
+  onUpdateComponent?: (id: string, updates: Partial<Block>) => void;
+
   // Settings
   className?: string;
   gridSize?: number;
@@ -130,6 +133,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
     onWireHandleContextMenu,
     onWireSegmentDragStart,
     onWireEndpointSegmentDragStart,
+    onUpdateComponent,
     className = '',
     gridSize: propGridSize,
     showGrid: propShowGrid,
@@ -232,6 +236,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
               onWireHandleContextMenu={onWireHandleContextMenu}
               onWireSegmentDragStart={onWireSegmentDragStart}
               onWireEndpointSegmentDragStart={onWireEndpointSegmentDragStart}
+              onUpdateComponent={onUpdateComponent}
             />
           </div>
         </TransformedLayer>

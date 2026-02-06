@@ -35,6 +35,8 @@ interface PlcOutBlockProps {
   connectedPorts?: Set<string>;
   /** Override active state (if not using Modbus integration) */
   isActiveOverride?: boolean;
+  /** Port voltage map for simulation display */
+  portVoltages?: Map<string, number>;
 }
 
 // ============================================================================
@@ -54,6 +56,7 @@ export const PlcOutBlock = memo(function PlcOutBlock({
   onEndWire,
   connectedPorts,
   isActiveOverride,
+  portVoltages,
 }: PlcOutBlockProps) {
   // Parse address from string format (e.g., "C:0x0001" -> 1)
   const parsedAddress = parsePlcAddress(block.address);
@@ -152,6 +155,7 @@ export const PlcOutBlock = memo(function PlcOutBlock({
           isConnected={connectedPorts?.has(port.id)}
           onStartWire={onStartWire}
           onEndWire={onEndWire}
+          voltage={portVoltages?.get(`${block.id}:${port.id}`)}
         />
       ))}
     </BlockWrapper>

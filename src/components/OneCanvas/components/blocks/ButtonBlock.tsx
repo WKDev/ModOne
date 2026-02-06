@@ -36,6 +36,8 @@ interface ButtonBlockProps {
   onPress?: (blockId: string) => void;
   /** Button release handler */
   onRelease?: (blockId: string) => void;
+  /** Port voltage map for simulation display */
+  portVoltages?: Map<string, number>;
 }
 
 /**
@@ -124,6 +126,7 @@ export const ButtonBlock = memo(function ButtonBlock({
   connectedPorts,
   onPress,
   onRelease,
+  portVoltages,
 }: ButtonBlockProps) {
   const isPressed = block.pressed ?? false;
   const isMomentary = block.mode === 'momentary';
@@ -327,6 +330,7 @@ export const ButtonBlock = memo(function ButtonBlock({
           isConnected={connectedPorts?.has(port.id)}
           onStartWire={onStartWire}
           onEndWire={onEndWire}
+          voltage={portVoltages?.get(`${block.id}:${port.id}`)}
         />
       ))}
     </BlockWrapper>

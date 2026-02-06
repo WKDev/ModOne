@@ -31,6 +31,8 @@ interface PowerBlockProps {
   onEndWire?: (blockId: string, portId: string) => void;
   /** Connected port IDs */
   connectedPorts?: Set<string>;
+  /** Port voltage map for simulation display */
+  portVoltages?: Map<string, number>;
 }
 
 // ============================================================================
@@ -90,6 +92,7 @@ export const PowerBlock = memo(function PowerBlock({
   onStartWire,
   onEndWire,
   connectedPorts,
+  portVoltages,
 }: PowerBlockProps) {
   const displayLabel = block.label || getDefaultLabel(block.voltage, block.polarity);
 
@@ -129,6 +132,7 @@ export const PowerBlock = memo(function PowerBlock({
           isConnected={connectedPorts?.has(port.id)}
           onStartWire={onStartWire}
           onEndWire={onEndWire}
+          voltage={portVoltages?.get(`${block.id}:${port.id}`)}
         />
       ))}
     </BlockWrapper>

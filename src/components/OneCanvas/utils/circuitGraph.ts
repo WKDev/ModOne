@@ -106,6 +106,9 @@ function getNodeType(block: Block, portType: Port['type']): CircuitNodeType {
       return 'load';
     case 'plc_in':
       return 'input';
+    case 'text':
+      // Text blocks are non-electrical annotations - should never have nodes
+      return 'junction';
     default:
       return portType === 'input' ? 'load' : 'junction';
   }

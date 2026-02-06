@@ -35,6 +35,8 @@ interface PlcInBlockProps {
   connectedPorts?: Set<string>;
   /** Current input voltage */
   voltage?: number;
+  /** Port voltage map for simulation display */
+  portVoltages?: Map<string, number>;
 }
 
 // ============================================================================
@@ -54,6 +56,7 @@ export const PlcInBlock = memo(function PlcInBlock({
   onEndWire,
   connectedPorts,
   voltage = 0,
+  portVoltages,
 }: PlcInBlockProps) {
   // Parse address from string format (e.g., "DI:0x0001" -> 1)
   const parsedAddress = parsePlcAddress(block.address);
@@ -156,6 +159,7 @@ export const PlcInBlock = memo(function PlcInBlock({
           isConnected={connectedPorts?.has(port.id)}
           onStartWire={onStartWire}
           onEndWire={onEndWire}
+          voltage={portVoltages?.get(`${block.id}:${port.id}`)}
         />
       ))}
     </BlockWrapper>
