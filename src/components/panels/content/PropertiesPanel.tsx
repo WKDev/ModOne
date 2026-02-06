@@ -22,6 +22,7 @@ import {
   ScopeProperties,
   PowerSourceProperties,
   TextProperties,
+  IndustrialProperties,
 } from './properties';
 
 // ============================================================================
@@ -172,6 +173,22 @@ const PropertyEditorRouter = memo(function PropertyEditorRouter({
     case 'text':
       return (
         <TextProperties
+          component={component}
+          onChange={onChange}
+        />
+      );
+
+    // Industrial components - use generic properties for now
+    case 'relay':
+    case 'fuse':
+    case 'motor':
+    case 'emergency_stop':
+    case 'selector_switch':
+    case 'solenoid_valve':
+    case 'sensor':
+    case 'pilot_lamp':
+      return (
+        <IndustrialProperties
           component={component}
           onChange={onChange}
         />

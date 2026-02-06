@@ -10,3 +10,4 @@ export { ButtonProperties } from './ButtonProperties';
 export { ScopeProperties } from './ScopeProperties';
 export { PowerSourceProperties } from './PowerSourceProperties';
 export { TextProperties } from './TextProperties';
+export { IndustrialProperties } from './IndustrialProperties';

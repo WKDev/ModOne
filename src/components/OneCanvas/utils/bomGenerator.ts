@@ -57,6 +57,14 @@ const TYPE_DISPLAY_NAMES: Record<BlockType, string> = {
   button: 'Button / Switch',
   scope: 'Oscilloscope',
   text: 'Text Annotation',
+  relay: 'Relay / Contactor',
+  fuse: 'Fuse / Circuit Breaker',
+  motor: 'Motor',
+  emergency_stop: 'Emergency Stop',
+  selector_switch: 'Selector Switch',
+  solenoid_valve: 'Solenoid Valve',
+  sensor: 'Sensor',
+  pilot_lamp: 'Pilot Lamp',
 };
 
 // ============================================================================
@@ -137,6 +145,22 @@ function getBlockDetails(block: Block): string {
       return `${block.channels}ch ${block.timeBase}ms/div`;
     case 'text':
       return block.content.substring(0, 30);
+    case 'relay':
+      return `${block.designation} ${block.coilVoltage}V ${block.contacts}`;
+    case 'fuse':
+      return `${block.designation} ${block.fuseType} ${block.ratingAmps}A`;
+    case 'motor':
+      return `${block.designation} ${block.powerKw}kW ${block.voltageRating}V`;
+    case 'emergency_stop':
+      return `${block.designation}`;
+    case 'selector_switch':
+      return `${block.designation} ${block.positions}pos`;
+    case 'solenoid_valve':
+      return `${block.designation} ${block.valveType} ${block.coilVoltage}V`;
+    case 'sensor':
+      return `${block.designation} ${block.sensorType} ${block.outputType}`;
+    case 'pilot_lamp':
+      return `${block.designation} ${block.lampColor} ${block.voltageRating}V`;
     default:
       return '';
   }

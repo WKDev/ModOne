@@ -17,7 +17,15 @@ export type BlockType =
   | 'led'
   | 'button'
   | 'scope'
-  | 'text';
+  | 'text'
+  | 'relay'
+  | 'fuse'
+  | 'motor'
+  | 'emergency_stop'
+  | 'selector_switch'
+  | 'solenoid_valve'
+  | 'sensor'
+  | 'pilot_lamp';
 
 /** Legacy block types (for migration) */
 export type LegacyBlockType = 'power_24v' | 'power_12v' | 'gnd';
@@ -333,6 +341,120 @@ export interface TextBlock extends BaseBlock<'text'> {
   showBorder: boolean;
 }
 
+// ============================================================================
+// Industrial Component Block Types
+// ============================================================================
+
+/** Relay/Contactor contact type */
+export type RelayContactType = 'NO' | 'NC';
+
+/** Relay/Contactor block (K) - coil that controls contacts */
+export interface RelayBlock extends BaseBlock<'relay'> {
+  /** Device designation (e.g., "K1", "K2") */
+  designation: string;
+  /** Coil voltage rating */
+  coilVoltage: number;
+  /** Contact configuration */
+  contacts: RelayContactType;
+  /** Whether coil is energized */
+  energized?: boolean;
+}
+
+/** Fuse/Circuit breaker type */
+export type FuseType = 'fuse' | 'mcb' | 'mpcb';
+
+/** Fuse/Circuit breaker block (F) */
+export interface FuseBlock extends BaseBlock<'fuse'> {
+  /** Device designation (e.g., "F1", "QF1") */
+  designation: string;
+  /** Fuse type */
+  fuseType: FuseType;
+  /** Current rating in Amps */
+  ratingAmps: number;
+  /** Whether the fuse is blown/tripped */
+  tripped?: boolean;
+}
+
+/** Motor block */
+export interface MotorBlock extends BaseBlock<'motor'> {
+  /** Device designation (e.g., "M1") */
+  designation: string;
+  /** Motor power rating in kW */
+  powerKw: number;
+  /** Voltage rating */
+  voltageRating: number;
+  /** Whether motor is running */
+  running?: boolean;
+}
+
+/** Emergency stop block */
+export interface EmergencyStopBlock extends BaseBlock<'emergency_stop'> {
+  /** Device designation (e.g., "ES1", "S0") */
+  designation: string;
+  /** Whether currently engaged (circuit broken) */
+  engaged?: boolean;
+}
+
+/** Selector switch position count */
+export type SelectorPositions = 2 | 3;
+
+/** Selector switch block */
+export interface SelectorSwitchBlock extends BaseBlock<'selector_switch'> {
+  /** Device designation (e.g., "S1") */
+  designation: string;
+  /** Number of positions */
+  positions: SelectorPositions;
+  /** Current position (0-indexed) */
+  currentPosition: number;
+  /** Whether switch maintains position */
+  maintained: boolean;
+}
+
+/** Solenoid valve type */
+export type ValveType = '2-2' | '3-2' | '5-2' | '5-3';
+
+/** Solenoid valve block */
+export interface SolenoidValveBlock extends BaseBlock<'solenoid_valve'> {
+  /** Device designation (e.g., "Y1") */
+  designation: string;
+  /** Valve type (ports-positions) */
+  valveType: ValveType;
+  /** Coil voltage */
+  coilVoltage: number;
+  /** Whether energized */
+  energized?: boolean;
+}
+
+/** Sensor type */
+export type SensorType = 'proximity_inductive' | 'proximity_capacitive' | 'photoelectric' | 'limit_switch';
+
+/** Sensor block */
+export interface SensorBlock extends BaseBlock<'sensor'> {
+  /** Device designation (e.g., "B1", "SQ1") */
+  designation: string;
+  /** Sensor type */
+  sensorType: SensorType;
+  /** Output type: NPN (sinking) or PNP (sourcing) */
+  outputType: 'NPN' | 'PNP';
+  /** Whether sensor is detecting */
+  detecting?: boolean;
+}
+
+/** Pilot lamp color */
+export type PilotLampColor = 'red' | 'green' | 'yellow' | 'blue' | 'white';
+
+/** Pilot lamp / indicator light block */
+export interface PilotLampBlock extends BaseBlock<'pilot_lamp'> {
+  /** Device designation (e.g., "H1", "P1") */
+  designation: string;
+  /** Lamp color */
+  lampColor: PilotLampColor;
+  /** Voltage rating */
+  voltageRating: number;
+  /** Whether lit */
+  lit?: boolean;
+}
+
 /** Discriminated union of all block types */
 export type Block =
   | PowerSourceBlock
@@ -341,7 +463,15 @@ export type Block =
   | LedBlock
   | ButtonBlock
   | ScopeBlock
-  | TextBlock;
+  | TextBlock
+  | RelayBlock
+  | FuseBlock
+  | MotorBlock
+  | EmergencyStopBlock
+  | SelectorSwitchBlock
+  | SolenoidValveBlock
+  | SensorBlock
+  | PilotLampBlock;
 
 // ============================================================================
 // Junction (wire-level concept)
@@ -598,13 +728,9 @@ export interface YamlCircuitSchema {
 /** Check if a string is a valid BlockType */
 export function isValidBlockType(type: string): type is BlockType {
   return [
-    'powersource',
-    'plc_out',
-    'plc_in',
-    'led',
-    'button',
-    'scope',
-    'text',
+    'powersource', 'plc_out', 'plc_in', 'led', 'button', 'scope', 'text',
+    'relay', 'fuse', 'motor', 'emergency_stop', 'selector_switch',
+    'solenoid_valve', 'sensor', 'pilot_lamp',
   ].includes(type);
 }
 

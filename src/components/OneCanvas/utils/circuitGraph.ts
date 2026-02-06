@@ -100,11 +100,19 @@ function getNodeType(block: Block, portType: Port['type']): CircuitNodeType {
   switch (block.type) {
     case 'plc_out':
     case 'button':
+    case 'relay':
+    case 'fuse':
+    case 'emergency_stop':
+    case 'selector_switch':
       return 'switch';
     case 'led':
     case 'scope':
+    case 'motor':
+    case 'solenoid_valve':
+    case 'pilot_lamp':
       return 'load';
     case 'plc_in':
+    case 'sensor':
       return 'input';
     case 'text':
       // Text blocks are non-electrical annotations - should never have nodes
@@ -128,7 +136,9 @@ function getSourceVoltage(block: Block): number | undefined {
  * Check if a block type represents a switch (can open/close circuit).
  */
 export function isSwitchBlock(blockType: Block['type']): boolean {
-  return blockType === 'plc_out' || blockType === 'button';
+  return blockType === 'plc_out' || blockType === 'button' ||
+    blockType === 'relay' || blockType === 'fuse' ||
+    blockType === 'emergency_stop' || blockType === 'selector_switch';
 }
 
 // ============================================================================

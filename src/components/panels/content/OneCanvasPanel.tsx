@@ -69,6 +69,14 @@ const BlockDragPreview = memo(function BlockDragPreview({ type, presetLabel }: {
     button: 'Button',
     scope: 'Scope',
     text: 'Text',
+    relay: 'Relay',
+    fuse: 'Fuse',
+    motor: 'Motor',
+    emergency_stop: 'E-Stop',
+    selector_switch: 'Selector',
+    solenoid_valve: 'Solenoid',
+    sensor: 'Sensor',
+    pilot_lamp: 'Pilot Lamp',
   };
 
   return (

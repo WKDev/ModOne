@@ -13,3 +13,6 @@ export * from './switchEvaluator';
 export * from './circuitSimulator';
 export * from './serialization';
 export * from './bomGenerator';
+export * from './electricalRuleCheck';
+export * from './canvasExport';
+export * from './circuitSearch';

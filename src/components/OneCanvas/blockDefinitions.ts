@@ -85,6 +85,82 @@ const BLOCK_DEFINITIONS: Record<BlockType, BlockDefinition> = {
       showBorder: false,
     },
   },
+
+  // ========================================================================
+  // Industrial Components
+  // ========================================================================
+
+  relay: {
+    size: { width: 60, height: 60 },
+    defaultPorts: [
+      { id: 'coil_in', type: 'input', label: 'A1', position: 'top' },
+      { id: 'coil_out', type: 'output', label: 'A2', position: 'bottom' },
+      { id: 'com', type: 'input', label: 'COM', position: 'left', offset: 0.5 },
+      { id: 'no', type: 'output', label: 'NO', position: 'right', offset: 0.35 },
+      { id: 'nc', type: 'output', label: 'NC', position: 'right', offset: 0.65 },
+    ],
+    defaultProps: { designation: 'K1', coilVoltage: 24, contacts: 'NO', energized: false },
+  },
+  fuse: {
+    size: { width: 40, height: 50 },
+    defaultPorts: [
+      { id: 'in', type: 'input', label: 'LINE', position: 'top' },
+      { id: 'out', type: 'output', label: 'LOAD', position: 'bottom' },
+    ],
+    defaultProps: { designation: 'F1', fuseType: 'fuse', ratingAmps: 10, tripped: false },
+  },
+  motor: {
+    size: { width: 60, height: 60 },
+    defaultPorts: [
+      { id: 'l1', type: 'input', label: 'U', position: 'top', offset: 0.25 },
+      { id: 'l2', type: 'input', label: 'V', position: 'top', offset: 0.5 },
+      { id: 'l3', type: 'input', label: 'W', position: 'top', offset: 0.75 },
+      { id: 'pe', type: 'input', label: 'PE', position: 'bottom' },
+    ],
+    defaultProps: { designation: 'M1', powerKw: 1.5, voltageRating: 400, running: false },
+  },
+  emergency_stop: {
+    size: { width: 50, height: 50 },
+    defaultPorts: [
+      { id: 'in', type: 'input', label: 'IN', position: 'left' },
+      { id: 'out', type: 'output', label: 'OUT', position: 'right' },
+    ],
+    defaultProps: { designation: 'ES1', engaged: false },
+  },
+  selector_switch: {
+    size: { width: 50, height: 50 },
+    defaultPorts: [
+      { id: 'com', type: 'input', label: 'COM', position: 'left' },
+      { id: 'pos1', type: 'output', label: '1', position: 'right', offset: 0.35 },
+      { id: 'pos2', type: 'output', label: '2', position: 'right', offset: 0.65 },
+    ],
+    defaultProps: { designation: 'S1', positions: 2, currentPosition: 0, maintained: true },
+  },
+  solenoid_valve: {
+    size: { width: 60, height: 50 },
+    defaultPorts: [
+      { id: 'coil_in', type: 'input', label: 'A1', position: 'top' },
+      { id: 'coil_out', type: 'output', label: 'A2', position: 'bottom' },
+    ],
+    defaultProps: { designation: 'Y1', valveType: '5-2', coilVoltage: 24, energized: false },
+  },
+  sensor: {
+    size: { width: 60, height: 40 },
+    defaultPorts: [
+      { id: 'vcc', type: 'input', label: '+V', position: 'top' },
+      { id: 'out', type: 'output', label: 'OUT', position: 'right' },
+      { id: 'gnd', type: 'output', label: '0V', position: 'bottom' },
+    ],
+    defaultProps: { designation: 'B1', sensorType: 'proximity_inductive', outputType: 'PNP', detecting: false },
+  },
+  pilot_lamp: {
+    size: { width: 40, height: 40 },
+    defaultPorts: [
+      { id: 'in', type: 'input', label: '+', position: 'top' },
+      { id: 'out', type: 'output', label: '-', position: 'bottom' },
+    ],
+    defaultProps: { designation: 'H1', lampColor: 'green', voltageRating: 24, lit: false },
+  },
 };
 
 // ============================================================================

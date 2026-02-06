@@ -7,7 +7,7 @@
 import { memo, useState } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { ChevronDown, ChevronRight, Zap, Cpu, Lightbulb, Activity, Type } from 'lucide-react';
+import { ChevronDown, ChevronRight, Zap, Cpu, Lightbulb, Activity, Type, Cog, Shield } from 'lucide-react';
 import type { BlockType } from './types';
 import type { Block } from './types';
 
@@ -89,6 +89,26 @@ const BLOCK_CATEGORIES: BlockCategory[] = [
     icon: <Activity size={16} />,
     blocks: [
       { type: 'scope', label: 'Scope', description: 'Oscilloscope' },
+    ],
+  },
+  {
+    name: 'Industrial',
+    icon: <Cog size={16} />,
+    blocks: [
+      { type: 'relay', label: 'Relay (K)', description: 'Relay / Contactor' },
+      { type: 'fuse', label: 'Fuse (F)', description: 'Fuse / Circuit breaker' },
+      { type: 'motor', label: 'Motor (M)', description: '3-phase motor' },
+      { type: 'pilot_lamp', label: 'Pilot Lamp', description: 'Indicator light' },
+      { type: 'emergency_stop', label: 'E-Stop', description: 'Emergency stop button' },
+      { type: 'solenoid_valve', label: 'Solenoid', description: 'Solenoid valve' },
+    ],
+  },
+  {
+    name: 'Sensors & Switches',
+    icon: <Shield size={16} />,
+    blocks: [
+      { type: 'sensor', label: 'Sensor', description: 'Proximity / Photoelectric sensor' },
+      { type: 'selector_switch', label: 'Selector', description: 'Selector switch' },
     ],
   },
   {

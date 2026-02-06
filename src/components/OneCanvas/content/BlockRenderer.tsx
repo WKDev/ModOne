@@ -13,6 +13,14 @@ import { PlcInBlock } from '../components/blocks/PlcInBlock';
 import { ButtonBlock } from '../components/blocks/ButtonBlock';
 import { ScopeBlock } from '../components/blocks/ScopeBlock';
 import { TextBlock } from '../components/blocks/TextBlock';
+import { RelayBlock } from '../components/blocks/RelayBlock';
+import { FuseBlock } from '../components/blocks/FuseBlock';
+import { MotorBlock } from '../components/blocks/MotorBlock';
+import { EmergencyStopBlock } from '../components/blocks/EmergencyStopBlock';
+import { SelectorSwitchBlock } from '../components/blocks/SelectorSwitchBlock';
+import { SolenoidValveBlock } from '../components/blocks/SolenoidValveBlock';
+import { SensorBlock } from '../components/blocks/SensorBlock';
+import { PilotLampBlock } from '../components/blocks/PilotLampBlock';
 // JunctionBlock is now rendered as SVG dot in the wire layer (JunctionDot.tsx)
 
 // ============================================================================
@@ -144,6 +152,30 @@ export const BlockRenderer = memo(function BlockRenderer({
             onUpdateComponent={onUpdateComponent}
           />
         );
+
+      case 'relay':
+        return <RelayBlock block={block} {...commonProps} />;
+
+      case 'fuse':
+        return <FuseBlock block={block} {...commonProps} />;
+
+      case 'motor':
+        return <MotorBlock block={block} {...commonProps} />;
+
+      case 'emergency_stop':
+        return <EmergencyStopBlock block={block} {...commonProps} />;
+
+      case 'selector_switch':
+        return <SelectorSwitchBlock block={block} {...commonProps} />;
+
+      case 'solenoid_valve':
+        return <SolenoidValveBlock block={block} {...commonProps} />;
+
+      case 'sensor':
+        return <SensorBlock block={block} {...commonProps} />;
+
+      case 'pilot_lamp':
+        return <PilotLampBlock block={block} {...commonProps} />;
 
       default:
         // Unknown block type - render a placeholder
