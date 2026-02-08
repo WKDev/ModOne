@@ -20,13 +20,15 @@ import type {
   Scenario,
   ScenarioExecutionState,
 } from './scenario';
+import type { MultiPageSchematic } from '../components/OneCanvas/utils/multiPageSchematic';
+import { createMultiPageSchematic } from '../components/OneCanvas/utils/multiPageSchematic';
 
 // ============================================================================
 // Document Core Types
 // ============================================================================
 
 /** Supported document types */
-export type DocumentType = 'canvas' | 'ladder' | 'scenario';
+export type DocumentType = 'canvas' | 'ladder' | 'scenario' | 'schematic';
 
 /** Document lifecycle status */
 export type DocumentStatus = 'empty' | 'loading' | 'loaded' | 'error' | 'saving';
@@ -167,6 +169,30 @@ export interface ScenarioDocumentState extends DocumentMeta {
 }
 
 // ============================================================================
+// Schematic Document State
+// ============================================================================
+
+/** Snapshot data for schematic history */
+export interface SchematicHistoryData {
+  /** JSON.stringify(MultiPageSchematic) for whole-schematic snapshots */
+  snapshot: string;
+}
+
+/** Schematic document data */
+export interface SchematicDocumentData {
+  /** Multi-page schematic data */
+  schematic: MultiPageSchematic;
+}
+
+/** Complete schematic document state */
+export interface SchematicDocumentState extends DocumentMeta {
+  type: 'schematic';
+  data: SchematicDocumentData;
+  history: HistorySnapshot<SchematicHistoryData>[];
+  historyIndex: number;
+}
+
+// ============================================================================
 // Discriminated Union
 // ============================================================================
 
@@ -176,7 +202,8 @@ export interface ScenarioDocumentState extends DocumentMeta {
 export type DocumentState =
   | CanvasDocumentState
   | LadderDocumentState
-  | ScenarioDocumentState;
+  | ScenarioDocumentState
+  | SchematicDocumentState;
 
 // ============================================================================
 // Type Guards
@@ -195,6 +222,11 @@ export function isLadderDocument(doc: DocumentState): doc is LadderDocumentState
 /** Check if document is a scenario document */
 export function isScenarioDocument(doc: DocumentState): doc is ScenarioDocumentState {
   return doc.type === 'scenario';
+}
+
+/** Check if document is a schematic document */
+export function isSchematicDocument(doc: DocumentState): doc is SchematicDocumentState {
+  return doc.type === 'schematic';
 }
 
 // ============================================================================
@@ -235,6 +267,11 @@ export const DEFAULT_LADDER_DATA: LadderDocumentData = {
 /** Default scenario document data */
 export const DEFAULT_SCENARIO_DATA: ScenarioDocumentData = {
   scenario: null,
+};
+
+/** Default schematic document data */
+export const DEFAULT_SCHEMATIC_DATA: SchematicDocumentData = {
+  schematic: createMultiPageSchematic('Untitled Schematic'),
 };
 
 // ============================================================================
@@ -328,6 +365,24 @@ export function createEmptyScenarioDocument(
       currentEventIndex: 0,
       completedEvents: [],
       currentLoopIteration: 1,
+    },
+    history: [],
+    historyIndex: -1,
+  };
+}
+
+/**
+ * Create an empty schematic document
+ */
+export function createEmptySchematicDocument(
+  name: string = 'Untitled Schematic',
+  filePath: string | null = null
+): SchematicDocumentState {
+  return {
+    ...createDocumentMeta('schematic', name, filePath),
+    type: 'schematic',
+    data: {
+      schematic: createMultiPageSchematic(name),
     },
     history: [],
     historyIndex: -1,

@@ -63,3 +63,4 @@ export {
   default as UseWindowClose,
   type UseWindowCloseResult,
 } from './useWindowClose';
+export { useUndoRedoKeyboard, default as UseUndoRedoKeyboard } from './useUndoRedoKeyboard';

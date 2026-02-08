@@ -96,7 +96,11 @@
       "Bash(git restore:*)",
       "Bash(pnpm run:*)",
       "Bash(grep:*)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(git -C \"C:\\\\Users\\\\chanh\\\\Projects\\\\ModOne\" log --oneline -10)",
+      "Bash(git -C \"C:\\\\Users\\\\chanh\\\\Projects\\\\ModOne\" show 5d8e782)",
+      "Bash(git -C \"C:\\\\Users\\\\chanh\\\\Projects\\\\ModOne\" show 68ed0c7)",
+      "Bash(git -C \"C:\\\\Users\\\\chanh\\\\Projects\\\\ModOne\" show 1c0dd4a)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -33,6 +33,12 @@ export interface Command {
   category: CommandCategory;
   /** Display label shown in the palette */
   label: string;
+  /**
+   * Optional function to get a dynamic label.
+   * If provided, this will be used instead of the static label when rendering.
+   * Useful for showing context like "Undo 'Add Contact at (0, 1)'"
+   */
+  getLabel?: () => string;
   /** Optional description for additional context */
   description?: string;
   /** Optional icon to display next to the command */

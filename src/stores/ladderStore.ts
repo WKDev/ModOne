@@ -56,6 +56,8 @@ interface HistorySnapshot {
   elements: Array<[string, LadderElement]>;
   wires: LadderWire[];
   comment?: string;
+  /** Human-readable description of the action that created this snapshot */
+  description?: string;
 }
 
 /** Ladder editor mode */
@@ -142,7 +144,7 @@ interface LadderActions {
   /** Redo previously undone action */
   redo: () => void;
   /** Push current state to history (manual) */
-  pushHistory: () => void;
+  pushHistory: (description?: string) => void;
 
   // Monitoring operations
   /** Start monitoring mode */
@@ -225,7 +227,12 @@ function cloneWire(wire: LadderWire): LadderWire {
 }
 
 /** Create a history snapshot from current state */
-function createSnapshot(elements: Map<string, LadderElement>, wires: LadderWire[], comment?: string): HistorySnapshot {
+function createSnapshot(
+  elements: Map<string, LadderElement>,
+  wires: LadderWire[],
+  comment?: string,
+  description?: string
+): HistorySnapshot {
   const serializedElements: Array<[string, LadderElement]> = [];
   elements.forEach((element, id) => {
     serializedElements.push([id, cloneElementDeep(element)]);
@@ -235,6 +242,7 @@ function createSnapshot(elements: Map<string, LadderElement>, wires: LadderWire[
     elements: serializedElements,
     wires: wires.map(cloneWire),
     comment,
+    description,
   };
 }
 
@@ -321,9 +329,11 @@ function cloneElement(element: LadderElement, newId: string): LadderElement {
 /**
  * Push current state to history for undo support.
  * Clears any redo history and enforces MAX_HISTORY_SIZE limit.
+ * @param state - Current ladder state
+ * @param description - Human-readable description of the action
  */
-function pushHistorySnapshot(state: LadderState): void {
-  const snapshot = createSnapshot(state.elements, state.wires, state.comment);
+function pushHistorySnapshot(state: LadderState, description?: string): void {
+  const snapshot = createSnapshot(state.elements, state.wires, state.comment, description);
   // Clear any redo history (slice to current position + 1)
   state.history = state.history.slice(0, state.historyIndex + 1);
   state.history.push(snapshot);
@@ -368,7 +378,7 @@ export const useLadderStore = create<LadderStore>()(
 
         set(
           (state) => {
-            pushHistorySnapshot(state);
+            pushHistorySnapshot(state, `Add ${type} at (${position.row}, ${position.col})`);
             state.elements.set(id, newElement);
             state.isDirty = true;
           },
@@ -384,7 +394,9 @@ export const useLadderStore = create<LadderStore>()(
           (state) => {
             if (!state.elements.has(id)) return;
 
-            pushHistorySnapshot(state);
+            const element = state.elements.get(id);
+            const desc = element ? `Delete ${element.type}` : 'Delete element';
+            pushHistorySnapshot(state, desc);
 
             state.elements.delete(id);
 
@@ -413,9 +425,12 @@ export const useLadderStore = create<LadderStore>()(
 
         set(
           (state) => {
-            pushHistorySnapshot(state);
-
             const element = state.elements.get(id);
+            const desc = element
+              ? `Move ${element.type} to (${position.row}, ${position.col})`
+              : 'Move element';
+            pushHistorySnapshot(state, desc);
+
             if (element) {
               element.position = { ...position };
             }
@@ -432,7 +447,8 @@ export const useLadderStore = create<LadderStore>()(
             const element = state.elements.get(id);
             if (!element) return;
 
-            pushHistorySnapshot(state);
+            const desc = `Edit ${element.type} properties`;
+            pushHistorySnapshot(state, desc);
 
             // Apply updates
             if (updates.address !== undefined) {
@@ -479,7 +495,7 @@ export const useLadderStore = create<LadderStore>()(
 
         set(
           (state) => {
-            pushHistorySnapshot(state);
+            pushHistorySnapshot(state, `Duplicate ${element.type}`);
             state.elements.set(newId, newElement);
             state.isDirty = true;
           },
@@ -497,7 +513,7 @@ export const useLadderStore = create<LadderStore>()(
       updateComment: (comment) => {
         set(
           (state) => {
-            pushHistorySnapshot(state);
+            pushHistorySnapshot(state, 'Update comment');
             state.comment = comment;
             state.isDirty = true;
           },
@@ -602,10 +618,12 @@ export const useLadderStore = create<LadderStore>()(
         // Copy first
         get().copyToClipboard();
 
+        const count = get().selectedElementIds.size;
+
         // Then delete
         set(
           (state) => {
-            pushHistorySnapshot(state);
+            pushHistorySnapshot(state, `Cut ${count} element(s)`);
 
             // Remove selected elements
             state.selectedElementIds.forEach((id) => {
@@ -639,7 +657,7 @@ export const useLadderStore = create<LadderStore>()(
 
         set(
           (state) => {
-            pushHistorySnapshot(state);
+            pushHistorySnapshot(state, `Paste ${state.clipboard.length} element(s)`);
 
             const newIds: string[] = [];
 
@@ -720,10 +738,10 @@ export const useLadderStore = create<LadderStore>()(
         );
       },
 
-      pushHistory: () => {
+      pushHistory: (description?: string) => {
         set(
           (state) => {
-            pushHistorySnapshot(state);
+            pushHistorySnapshot(state, description);
           },
           false,
           'pushHistory'
@@ -896,7 +914,7 @@ export const useLadderStore = create<LadderStore>()(
       clearAll: () => {
         set(
           (state) => {
-            pushHistorySnapshot(state);
+            pushHistorySnapshot(state, 'Clear all elements');
 
             state.elements = new Map();
             state.wires = [];
@@ -997,6 +1015,29 @@ export const selectCanUndo = (state: LadderStore) => state.historyIndex >= 0;
 export const selectCanRedo = (state: LadderStore) =>
   state.historyIndex + 2 < state.history.length;
 
+/**
+ * Select description of the next undo action.
+ * Returns the description of the snapshot that would be undone.
+ */
+export const selectUndoDescription = (state: LadderStore): string | undefined => {
+  if (state.historyIndex >= 0) {
+    return state.history[state.historyIndex]?.description;
+  }
+  return undefined;
+};
+
+/**
+ * Select description of the next redo action.
+ * Returns the description of the snapshot that would be redone.
+ */
+export const selectRedoDescription = (state: LadderStore): string | undefined => {
+  const nextIndex = state.historyIndex + 2;
+  if (nextIndex < state.history.length) {
+    return state.history[nextIndex]?.description;
+  }
+  return undefined;
+};
+
 /** Select whether there are unsaved changes */
 export const selectIsDirty = (state: LadderStore) => state.isDirty;
 
@@ -1023,6 +1064,20 @@ export function useCanUndo(): boolean {
  */
 export function useCanRedo(): boolean {
   return useLadderStore(selectCanRedo);
+}
+
+/**
+ * Hook to get the description of the next undo action.
+ */
+export function useUndoDescription(): string | undefined {
+  return useLadderStore(selectUndoDescription);
+}
+
+/**
+ * Hook to get the description of the next redo action.
+ */
+export function useRedoDescription(): string | undefined {
+  return useLadderStore(selectRedoDescription);
 }
 
 export default useLadderStore;

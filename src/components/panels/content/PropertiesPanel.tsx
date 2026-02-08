@@ -187,6 +187,13 @@ const PropertyEditorRouter = memo(function PropertyEditorRouter({
     case 'solenoid_valve':
     case 'sensor':
     case 'pilot_lamp':
+    case 'net_label':
+    case 'transformer':
+    case 'terminal_block':
+    case 'overload_relay':
+    case 'contactor':
+    case 'disconnect_switch':
+    case 'off_page_connector':
       return (
         <IndustrialProperties
           component={component}

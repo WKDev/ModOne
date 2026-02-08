@@ -9,8 +9,10 @@
  *   wraps them in a standalone SVG document with foreignObject for HTML content.
  * - PNG export: Renders the SVG export result onto an offscreen <canvas>,
  *   then extracts a PNG blob.
- * - PDF: TODO (requires jsPDF or similar library).
+ * - PDF export: Generates PNG first, then embeds in a jsPDF document.
  */
+
+import { jsPDF } from 'jspdf';
 
 // ============================================================================
 // Types
@@ -432,29 +434,162 @@ export async function exportToSvg(
   return serializeSvgContent(container, bounds, opts);
 }
 
+/** PDF export options (extends standard export options) */
+export interface PdfExportOptions extends ExportOptions {
+  /** PDF page orientation (default: auto-detect based on content aspect ratio) */
+  orientation?: 'portrait' | 'landscape' | 'auto';
+  /** PDF page format (default: 'a4') */
+  pageFormat?: 'a4' | 'a3' | 'letter' | 'legal';
+  /** Whether to fit content to page (default: true) */
+  fitToPage?: boolean;
+  /** Page margins in mm (default: 10) */
+  pageMargin?: number;
+}
+
 /**
  * Export the canvas content as PDF.
  *
- * @todo Requires a library such as jsPDF. Currently throws an informative error.
+ * Generates a PNG image first, then embeds it in a PDF document using jsPDF.
+ * Automatically adjusts page orientation based on content aspect ratio.
+ *
+ * @param container - The DOM element containing the canvas content
+ * @param options   - Export configuration including PDF-specific options
+ * @returns A Promise resolving to a PDF Blob
  */
 export async function exportToPdf(
-  _container: HTMLElement,
-  _options?: ExportOptions,
+  container: HTMLElement,
+  options?: PdfExportOptions,
 ): Promise<Blob> {
-  // TODO: Implement PDF export using jsPDF or similar library.
-  // Approach: generate PNG via exportToPng(), then embed in a PDF page.
-  //
-  // Example implementation outline:
-  //   import { jsPDF } from 'jspdf';
-  //   const pngBlob = await exportToPng(container, options);
-  //   const pngUrl = URL.createObjectURL(pngBlob);
-  //   const doc = new jsPDF({ orientation: 'landscape' });
-  //   doc.addImage(pngUrl, 'PNG', 0, 0, doc.internal.pageSize.getWidth(), ...);
-  //   return doc.output('blob');
-  throw new Error(
-    'PDF export is not yet implemented. Install jsPDF (`pnpm add jspdf`) and ' +
-    'implement exportToPdf in canvasExport.ts.',
-  );
+  const {
+    orientation = 'auto',
+    pageFormat = 'a4',
+    fitToPage = true,
+    pageMargin = 10,
+    ...exportOptions
+  } = options || {};
+
+  // First, generate PNG from the canvas
+  const pngBlob = await exportToPng(container, exportOptions);
+
+  // Convert blob to base64 data URL for jsPDF
+  const pngDataUrl = await blobToDataUrl(pngBlob);
+
+  // Get image dimensions
+  const imgDimensions = await getImageDimensions(pngDataUrl);
+
+  // Determine page orientation based on content aspect ratio
+  let pdfOrientation: 'portrait' | 'landscape';
+  if (orientation === 'auto') {
+    pdfOrientation = imgDimensions.width > imgDimensions.height ? 'landscape' : 'portrait';
+  } else {
+    pdfOrientation = orientation;
+  }
+
+  // Create PDF document
+  const doc = new jsPDF({
+    orientation: pdfOrientation,
+    unit: 'mm',
+    format: pageFormat,
+  });
+
+  // Get page dimensions
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const contentWidth = pageWidth - pageMargin * 2;
+  const contentHeight = pageHeight - pageMargin * 2;
+
+  // Calculate image placement
+  let imgWidth: number;
+  let imgHeight: number;
+  let imgX: number;
+  let imgY: number;
+
+  if (fitToPage) {
+    // Scale to fit within the content area while maintaining aspect ratio
+    const imgAspect = imgDimensions.width / imgDimensions.height;
+    const pageAspect = contentWidth / contentHeight;
+
+    if (imgAspect > pageAspect) {
+      // Width-constrained
+      imgWidth = contentWidth;
+      imgHeight = contentWidth / imgAspect;
+    } else {
+      // Height-constrained
+      imgHeight = contentHeight;
+      imgWidth = contentHeight * imgAspect;
+    }
+
+    // Center on page
+    imgX = pageMargin + (contentWidth - imgWidth) / 2;
+    imgY = pageMargin + (contentHeight - imgHeight) / 2;
+  } else {
+    // Use actual pixel dimensions, converting to mm (assuming 96 DPI)
+    const scale = (options?.scale ?? 2);
+    const dpi = 96 * scale;
+    const mmPerPx = 25.4 / dpi;
+
+    imgWidth = imgDimensions.width * mmPerPx;
+    imgHeight = imgDimensions.height * mmPerPx;
+    imgX = pageMargin;
+    imgY = pageMargin;
+
+    // Handle multi-page if content is too large
+    // For now, just use the first page with content at origin
+  }
+
+  // Add title if provided
+  if (exportOptions.title) {
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(exportOptions.title, pageMargin, pageMargin / 2 + 3);
+    // Adjust image position to account for title
+    imgY = Math.max(imgY, pageMargin + 5);
+  }
+
+  // Add the image to the PDF
+  doc.addImage(pngDataUrl, 'PNG', imgX, imgY, imgWidth, imgHeight);
+
+  // Add footer with timestamp
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(128, 128, 128);
+  const timestamp = new Date().toLocaleString();
+  doc.text(`Exported: ${timestamp}`, pageMargin, pageHeight - 5);
+
+  // Return as blob
+  return doc.output('blob');
+}
+
+/**
+ * Convert a Blob to a data URL.
+ */
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+      } else {
+        reject(new Error('Failed to convert blob to data URL'));
+      }
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Get the dimensions of an image from its data URL.
+ */
+function getImageDimensions(dataUrl: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      resolve({ width: img.width, height: img.height });
+    };
+    img.onerror = () => reject(new Error('Failed to load image for dimension check'));
+    img.src = dataUrl;
+  });
 }
 
 // ============================================================================

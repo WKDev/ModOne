@@ -3,12 +3,14 @@
  *
  * Relay/contactor coil with NO/NC contact status indicator.
  * Shows energized state with blue glow.
+ * Includes cross-reference indicator for related components.
  */
 
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { BlockWrapper } from './BlockWrapper';
 import { Port } from '../Port';
 import type { RelayBlock as RelayBlockType } from '../../types';
+import type { CrossReferenceInfo } from '../../utils/crossReference';
 
 // ============================================================================
 // Types
@@ -33,6 +35,10 @@ interface RelayBlockProps {
   connectedPorts?: Set<string>;
   /** Port voltage map for simulation display */
   portVoltages?: Map<string, number>;
+  /** Cross-reference info for related components */
+  crossReferenceInfo?: CrossReferenceInfo | null;
+  /** Handler to navigate to a related component */
+  onNavigateToBlock?: (blockId: string) => void;
 }
 
 // ============================================================================
@@ -52,8 +58,13 @@ export const RelayBlock = memo(function RelayBlock({
   onEndWire,
   connectedPorts,
   portVoltages,
+  crossReferenceInfo,
+  onNavigateToBlock,
 }: RelayBlockProps) {
   const isEnergized = block.energized ?? false;
+  const [showXrefTooltip, setShowXrefTooltip] = useState(false);
+
+  const hasReferences = crossReferenceInfo && crossReferenceInfo.relatedBlocks.length > 0;
 
   return (
     <BlockWrapper
@@ -70,6 +81,54 @@ export const RelayBlock = memo(function RelayBlock({
         <div className="text-[10px] text-gray-400 font-mono absolute top-1 left-1/2 -translate-x-1/2">
           {block.designation}
         </div>
+
+        {/* Cross-reference indicator */}
+        {hasReferences && (
+          <div
+            className="absolute -top-1 -right-1 z-10"
+            onMouseEnter={() => setShowXrefTooltip(true)}
+            onMouseLeave={() => setShowXrefTooltip(false)}
+          >
+            <div
+              className="w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center cursor-pointer hover:bg-amber-400 transition-colors"
+              title="Cross-references"
+            >
+              {crossReferenceInfo!.relatedBlocks.length}
+            </div>
+
+            {/* Tooltip */}
+            {showXrefTooltip && (
+              <div
+                className="absolute right-0 top-5 bg-gray-900 border border-gray-700 rounded-md shadow-lg p-2 min-w-[160px] z-50"
+                style={{ pointerEvents: 'auto' }}
+              >
+                <div className="text-[10px] text-gray-400 mb-1 font-semibold border-b border-gray-700 pb-1">
+                  {crossReferenceInfo!.designation} References
+                </div>
+                <div className="space-y-1">
+                  {crossReferenceInfo!.relatedBlocks.map((ref) => (
+                    <button
+                      key={ref.id}
+                      className="w-full text-left text-[10px] text-gray-300 hover:text-white hover:bg-gray-800 px-1 py-0.5 rounded flex items-center justify-between gap-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onNavigateToBlock?.(ref.id);
+                      }}
+                    >
+                      <span>
+                        {ref.label}
+                        {ref.info && <span className="text-gray-500 ml-1">[{ref.info}]</span>}
+                      </span>
+                      <span className="text-gray-600 text-[9px]">
+                        ({Math.round(ref.position.x)},{Math.round(ref.position.y)})
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Coil symbol */}
         <div

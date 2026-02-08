@@ -161,6 +161,121 @@ const BLOCK_DEFINITIONS: Record<BlockType, BlockDefinition> = {
     ],
     defaultProps: { designation: 'H1', lampColor: 'green', voltageRating: 24, lit: false },
   },
+  net_label: {
+    size: { width: 80, height: 24 },
+    defaultPorts: [
+      { id: 'conn', type: 'input', label: '', position: 'left' },
+    ],
+    defaultProps: { netName: '+24V', direction: 'right', description: '' },
+  },
+
+  // ========================================================================
+  // Additional Industrial Components
+  // ========================================================================
+
+  transformer: {
+    size: { width: 70, height: 80 },
+    defaultPorts: [
+      { id: 'pri_1', type: 'input', label: 'L1', position: 'top', offset: 0.3 },
+      { id: 'pri_2', type: 'input', label: 'N', position: 'top', offset: 0.7 },
+      { id: 'sec_1', type: 'output', label: 'L', position: 'bottom', offset: 0.3 },
+      { id: 'sec_2', type: 'output', label: 'N', position: 'bottom', offset: 0.7 },
+    ],
+    defaultProps: {
+      designation: 'T1',
+      transformerType: 'control',
+      primaryVoltage: 400,
+      secondaryVoltage: 24,
+      powerVa: 100,
+    },
+  },
+  terminal_block: {
+    size: { width: 40, height: 50 },
+    defaultPorts: [
+      { id: 'in', type: 'input', label: 'IN', position: 'top' },
+      { id: 'out', type: 'output', label: 'OUT', position: 'bottom' },
+    ],
+    defaultProps: {
+      designation: 'X1:1',
+      terminalType: 'feed_through',
+      wireSizeMm2: 2.5,
+      terminalCount: 1,
+    },
+  },
+  overload_relay: {
+    size: { width: 60, height: 70 },
+    defaultPorts: [
+      { id: 'l1_in', type: 'input', label: '1', position: 'top', offset: 0.25 },
+      { id: 'l2_in', type: 'input', label: '3', position: 'top', offset: 0.5 },
+      { id: 'l3_in', type: 'input', label: '5', position: 'top', offset: 0.75 },
+      { id: 'l1_out', type: 'output', label: '2', position: 'bottom', offset: 0.25 },
+      { id: 'l2_out', type: 'output', label: '4', position: 'bottom', offset: 0.5 },
+      { id: 'l3_out', type: 'output', label: '6', position: 'bottom', offset: 0.75 },
+      { id: 'nc', type: 'output', label: '95-96', position: 'right', offset: 0.35 },
+      { id: 'no', type: 'output', label: '97-98', position: 'right', offset: 0.65 },
+    ],
+    defaultProps: {
+      designation: 'F1',
+      overloadClass: '10',
+      currentMin: 1.0,
+      currentMax: 1.6,
+      tripped: false,
+    },
+  },
+  contactor: {
+    size: { width: 70, height: 80 },
+    defaultPorts: [
+      { id: 'coil_a1', type: 'input', label: 'A1', position: 'left', offset: 0.25 },
+      { id: 'coil_a2', type: 'output', label: 'A2', position: 'left', offset: 0.75 },
+      { id: 'l1_in', type: 'input', label: '1', position: 'top', offset: 0.25 },
+      { id: 'l2_in', type: 'input', label: '3', position: 'top', offset: 0.5 },
+      { id: 'l3_in', type: 'input', label: '5', position: 'top', offset: 0.75 },
+      { id: 'l1_out', type: 'output', label: '2', position: 'bottom', offset: 0.25 },
+      { id: 'l2_out', type: 'output', label: '4', position: 'bottom', offset: 0.5 },
+      { id: 'l3_out', type: 'output', label: '6', position: 'bottom', offset: 0.75 },
+    ],
+    defaultProps: {
+      designation: 'KM1',
+      contactorType: 'main',
+      coilVoltage: 24,
+      powerRating: 4,
+      mainContacts: 3,
+      auxContacts: 1,
+      energized: false,
+    },
+  },
+  disconnect_switch: {
+    size: { width: 60, height: 70 },
+    defaultPorts: [
+      { id: 'l1_in', type: 'input', label: '1', position: 'top', offset: 0.25 },
+      { id: 'l2_in', type: 'input', label: '3', position: 'top', offset: 0.5 },
+      { id: 'l3_in', type: 'input', label: '5', position: 'top', offset: 0.75 },
+      { id: 'l1_out', type: 'output', label: '2', position: 'bottom', offset: 0.25 },
+      { id: 'l2_out', type: 'output', label: '4', position: 'bottom', offset: 0.5 },
+      { id: 'l3_out', type: 'output', label: '6', position: 'bottom', offset: 0.75 },
+    ],
+    defaultProps: {
+      designation: 'Q1',
+      disconnectType: 'rotary',
+      poles: 3,
+      currentRating: 25,
+      open: false,
+    },
+  },
+  off_page_connector: {
+    size: { width: 80, height: 32 },
+    defaultPorts: [
+      { id: 'conn', type: 'bidirectional', label: '', position: 'left' },
+    ],
+    defaultProps: {
+      signalLabel: 'SIGNAL',
+      direction: 'outgoing',
+      targetPageId: undefined,
+      targetPageNumber: undefined,
+      targetPageName: undefined,
+      dangling: true,
+    },
+  },
 };
 
 // ============================================================================

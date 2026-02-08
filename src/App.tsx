@@ -6,6 +6,7 @@ import { useEditorAreaStore } from './stores/editorAreaStore';
 import { ThemeProvider } from './providers/ThemeProvider';
 import { useStateSync } from './hooks/useStateSync';
 import { useWindowClose } from './hooks/useWindowClose';
+import { useUndoRedoKeyboard } from './hooks/useUndoRedoKeyboard';
 import { FloatingWindowContent } from './components/floating/FloatingWindowContent';
 import { FloatingWindowRenderer } from './components/floating/FloatingWindowRenderer';
 import { CommandPalette, useCommandPalette, registerAllCommands } from './components/CommandPalette';
@@ -67,8 +68,11 @@ function MainWindowContent() {
     handleCancel: handleWindowCloseCancel,
   } = useWindowClose();
 
-  // Initialize cross-window state synchronization
+// Initialize cross-window state synchronization
   useStateSync();
+
+  // Initialize global undo/redo keyboard shortcuts (Ctrl+Z, Ctrl+Y)
+  useUndoRedoKeyboard();
 
   // Register all commands on mount
   useEffect(() => {

@@ -11,6 +11,7 @@ use std::sync::RwLock;
 use tauri::State;
 
 use crate::canvas::scope::{ScopeDisplayData, ScopeEngine, ScopeSettings};
+use crate::canvas::scope_sync::ScopeChannelMapping;
 
 // ============================================================================
 // Scope State Management
@@ -23,13 +24,28 @@ use crate::canvas::scope::{ScopeDisplayData, ScopeEngine, ScopeSettings};
 pub struct ScopeState {
     /// Map of scope ID to scope engine
     scopes: RwLock<HashMap<String, ScopeEngine>>,
+    /// Channel mappings for scope-simulation integration
+    mappings: RwLock<Vec<ScopeChannelMapping>>,
 }
 
 impl Default for ScopeState {
     fn default() -> Self {
         Self {
             scopes: RwLock::new(HashMap::new()),
+            mappings: RwLock::new(Vec::new()),
         }
+    }
+}
+
+impl ScopeState {
+    /// Get read access to scopes
+    pub fn scopes(&self) -> &RwLock<HashMap<String, ScopeEngine>> {
+        &self.scopes
+    }
+
+    /// Get read access to mappings
+    pub fn mappings(&self) -> &RwLock<Vec<ScopeChannelMapping>> {
+        &self.mappings
     }
 }
 
@@ -467,4 +483,124 @@ pub async fn scope_exists(
         .map_err(|e| format!("Failed to acquire read lock: {}", e))?;
 
     Ok(scopes.contains_key(&scope_id))
+}
+
+// ============================================================================
+// Scope-Simulation Integration Commands
+// ============================================================================
+
+/// Register a scope channel mapping to link a device address to a scope channel.
+///
+/// # Arguments
+/// * `mapping` - The channel mapping configuration
+#[tauri::command]
+pub async fn scope_register_mapping(
+    mapping: ScopeChannelMapping,
+    state: State<'_, ScopeState>,
+) -> Result<(), String> {
+    let mut mappings = state
+        .mappings
+        .write()
+        .map_err(|e| format!("Failed to acquire write lock: {}", e))?;
+
+    // Remove existing mapping for same scope/channel
+    mappings.retain(|m| !(m.scope_id == mapping.scope_id && m.channel == mapping.channel));
+
+    log::info!(
+        "Registered scope mapping: {} ch{} -> {}{}",
+        mapping.scope_id,
+        mapping.channel,
+        mapping.device_type,
+        mapping.address
+    );
+
+    mappings.push(mapping);
+    Ok(())
+}
+
+/// Register multiple scope channel mappings at once.
+///
+/// # Arguments
+/// * `mappings` - List of channel mapping configurations
+#[tauri::command]
+pub async fn scope_register_mappings(
+    new_mappings: Vec<ScopeChannelMapping>,
+    state: State<'_, ScopeState>,
+) -> Result<(), String> {
+    for mapping in new_mappings {
+        scope_register_mapping(mapping, state.clone()).await?;
+    }
+    Ok(())
+}
+
+/// Remove a scope channel mapping.
+///
+/// # Arguments
+/// * `scope_id` - The scope identifier
+/// * `channel` - The channel index to remove mapping for
+#[tauri::command]
+pub async fn scope_remove_mapping(
+    scope_id: String,
+    channel: usize,
+    state: State<'_, ScopeState>,
+) -> Result<(), String> {
+    let mut mappings = state
+        .mappings
+        .write()
+        .map_err(|e| format!("Failed to acquire write lock: {}", e))?;
+
+    let initial_len = mappings.len();
+    mappings.retain(|m| !(m.scope_id == scope_id && m.channel == channel));
+
+    if mappings.len() < initial_len {
+        log::debug!("Removed scope mapping: {} ch{}", scope_id, channel);
+        Ok(())
+    } else {
+        Err(format!(
+            "Mapping not found for scope {} channel {}",
+            scope_id, channel
+        ))
+    }
+}
+
+/// Clear all mappings for a specific scope.
+///
+/// # Arguments
+/// * `scope_id` - The scope identifier
+#[tauri::command]
+pub async fn scope_clear_mappings(
+    scope_id: String,
+    state: State<'_, ScopeState>,
+) -> Result<usize, String> {
+    let mut mappings = state
+        .mappings
+        .write()
+        .map_err(|e| format!("Failed to acquire write lock: {}", e))?;
+
+    let initial_len = mappings.len();
+    mappings.retain(|m| m.scope_id != scope_id);
+    let removed = initial_len - mappings.len();
+
+    log::debug!("Cleared {} mappings for scope '{}'", removed, scope_id);
+    Ok(removed)
+}
+
+/// Get all channel mappings for a scope.
+///
+/// # Arguments
+/// * `scope_id` - The scope identifier (optional, returns all if not specified)
+#[tauri::command]
+pub async fn scope_get_mappings(
+    scope_id: Option<String>,
+    state: State<'_, ScopeState>,
+) -> Result<Vec<ScopeChannelMapping>, String> {
+    let mappings = state
+        .mappings
+        .read()
+        .map_err(|e| format!("Failed to acquire read lock: {}", e))?;
+
+    match scope_id {
+        Some(id) => Ok(mappings.iter().filter(|m| m.scope_id == id).cloned().collect()),
+        None => Ok(mappings.clone()),
+    }
 }

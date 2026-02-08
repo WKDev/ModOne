@@ -55,7 +55,9 @@ export const CommandItem = memo(
 
         {/* Command Label and Description */}
         <div className="flex-1 min-w-0">
-          <div className="truncate text-sm text-neutral-100">{command.label}</div>
+          <div className="truncate text-sm text-neutral-100">
+            {command.getLabel ? command.getLabel() : command.label}
+          </div>
           {command.description && (
             <div className="truncate text-xs text-neutral-400">
               {command.description}

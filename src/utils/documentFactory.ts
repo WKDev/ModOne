@@ -28,6 +28,10 @@ const DOCUMENT_EXTENSIONS: Record<string, DocumentType> = {
   // Scenario files
   '.scenario': 'scenario',
   '.scn': 'scenario',
+
+  // Schematic files
+  '.schematic': 'schematic',
+  '.sch': 'schematic',
 };
 
 /**
@@ -55,6 +59,9 @@ export function getDocumentTypeFromPath(filePath: string): DocumentType | null {
   if (normalizedPath.includes('/scenarios/')) {
     return 'scenario';
   }
+  if (normalizedPath.includes('/schematics/')) {
+    return 'schematic';
+  }
 
   return null;
 }
@@ -73,6 +80,8 @@ export function getDocumentTypeFromFileType(fileTypeInfo: FileTypeInfo): Documen
       return 'ladder';
     case 'scenario':
       return 'scenario';
+    case 'schematic':
+      return 'schematic';
     default:
       return null;
   }
@@ -170,7 +179,7 @@ export function shouldUseDocumentMode(filePath: string): boolean {
   const fileTypeInfo = resolveFileType(filePath);
 
   // Only certain file categories support document mode
-  const documentCategories = ['canvas', 'ladder', 'scenario'];
+  const documentCategories = ['canvas', 'ladder', 'scenario', 'schematic'];
   return documentCategories.includes(fileTypeInfo.category);
 }
 

@@ -16,3 +16,31 @@ export * from './bomGenerator';
 export * from './electricalRuleCheck';
 export * from './canvasExport';
 export * from './circuitSearch';
+export * from './crossReference';
+export * from './netLabelResolver';
+export * from './circuitLibrary';
+export * from './iecWireColors';
+export * from './multiPageSchematic';
+export * from './symbolEditor';
+export * from './wireNumbering';
+export {
+  alignBlocks,
+  alignLeft,
+  alignRight,
+  alignTop,
+  alignBottom,
+  alignCenterH,
+  alignCenterV,
+  distributeBlocks,
+  distributeHorizontal,
+  distributeVertical,
+  setEqualHorizontalSpacing,
+  setEqualVerticalSpacing,
+  applyAlignmentResults,
+  canAlign,
+  canDistribute,
+  type AlignmentDirection,
+  type DistributionDirection,
+  type AlignmentResult,
+} from './alignmentTools';
+export * from './printSupport';

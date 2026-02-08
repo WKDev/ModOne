@@ -6,8 +6,30 @@
 
 import { Undo2, Redo2, Scissors, Copy, Clipboard, CheckSquare } from 'lucide-react';
 import { commandRegistry } from '../commandRegistry';
-import { useLadderStore, selectCanUndo, selectCanRedo } from '../../../stores/ladderStore';
+import {
+  useLadderStore,
+  selectCanUndo,
+  selectCanRedo,
+  selectUndoDescription,
+  selectRedoDescription,
+} from '../../../stores/ladderStore';
 import type { Command } from '../types';
+
+/**
+ * Get the current undo description for display.
+ */
+function getUndoLabel(): string {
+  const desc = selectUndoDescription(useLadderStore.getState());
+  return desc ? `Undo '${desc}'` : 'Undo';
+}
+
+/**
+ * Get the current redo description for display.
+ */
+function getRedoLabel(): string {
+  const desc = selectRedoDescription(useLadderStore.getState());
+  return desc ? `Redo '${desc}'` : 'Redo';
+}
 
 /**
  * Register all edit-related commands.
@@ -18,6 +40,7 @@ export function registerEditCommands(): void {
       id: 'edit.undo',
       category: 'edit',
       label: 'Undo',
+      getLabel: getUndoLabel,
       description: 'Undo the last action',
       icon: <Undo2 size={16} />,
       shortcut: 'Ctrl+Z',
@@ -31,6 +54,7 @@ export function registerEditCommands(): void {
       id: 'edit.redo',
       category: 'edit',
       label: 'Redo',
+      getLabel: getRedoLabel,
       description: 'Redo the last undone action',
       icon: <Redo2 size={16} />,
       shortcut: 'Ctrl+Y',

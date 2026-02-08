@@ -4,5 +4,7 @@
 //! function generators, and other virtual instruments.
 
 pub mod scope;
+pub mod scope_sync;
 
 pub use scope::*;
+pub use scope_sync::*;

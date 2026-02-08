@@ -65,6 +65,13 @@ const TYPE_DISPLAY_NAMES: Record<BlockType, string> = {
   solenoid_valve: 'Solenoid Valve',
   sensor: 'Sensor',
   pilot_lamp: 'Pilot Lamp',
+  net_label: 'Net Label',
+  transformer: 'Transformer',
+  terminal_block: 'Terminal Block',
+  overload_relay: 'Overload Relay',
+  contactor: 'Contactor',
+  disconnect_switch: 'Disconnect Switch',
+  off_page_connector: 'Off-Page Connector',
 };
 
 // ============================================================================

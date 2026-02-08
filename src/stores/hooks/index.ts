@@ -7,3 +7,4 @@
 export { useCanvasDocument, type UseCanvasDocumentReturn } from './useCanvasDocument';
 export { useLadderDocument, type UseLadderDocumentReturn } from './useLadderDocument';
 export { useScenarioDocument, type UseScenarioDocumentReturn } from './useScenarioDocument';
+export { useSchematicDocument, type UseSchematicDocumentReturn } from './useSchematicDocument';

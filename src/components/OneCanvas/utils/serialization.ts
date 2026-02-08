@@ -276,6 +276,10 @@ function getDefaultPorts(type: string, properties?: Record<string, unknown>): Po
         { id: 'ch3', type: 'input', label: 'CH3', position: 'left', offset: 0.75 },
         { id: 'ch4', type: 'input', label: 'CH4', position: 'left', offset: 1.0 },
       ];
+    case 'off_page_connector':
+      return [
+        { id: 'conn', type: 'bidirectional', label: '', position: 'left' },
+      ];
     default:
       return [];
   }

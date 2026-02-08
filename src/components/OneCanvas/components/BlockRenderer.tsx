@@ -21,6 +21,13 @@ import { SelectorSwitchBlock } from './blocks/SelectorSwitchBlock';
 import { SolenoidValveBlock } from './blocks/SolenoidValveBlock';
 import { SensorBlock } from './blocks/SensorBlock';
 import { PilotLampBlock } from './blocks/PilotLampBlock';
+import { NetLabelBlock } from './blocks/NetLabelBlock';
+import { TransformerBlock } from './blocks/TransformerBlock';
+import { TerminalBlockComp } from './blocks/TerminalBlockComp';
+import { OverloadRelayBlock } from './blocks/OverloadRelayBlock';
+import { ContactorBlock } from './blocks/ContactorBlock';
+import { DisconnectSwitchBlock } from './blocks/DisconnectSwitchBlock';
+import { OffPageConnectorBlock } from './blocks/OffPageConnectorBlock';
 // JunctionBlock is now rendered as SVG dot in the wire layer (JunctionDot.tsx)
 
 // ============================================================================
@@ -167,6 +174,20 @@ export const BlockRenderer = memo(function BlockRenderer({
         return <SensorBlock block={block} {...commonProps} />;
       case 'pilot_lamp':
         return <PilotLampBlock block={block} {...commonProps} />;
+      case 'net_label':
+        return <NetLabelBlock block={block} {...commonProps} />;
+      case 'transformer':
+        return <TransformerBlock block={block} {...commonProps} />;
+      case 'terminal_block':
+        return <TerminalBlockComp block={block} {...commonProps} />;
+      case 'overload_relay':
+        return <OverloadRelayBlock block={block} {...commonProps} />;
+      case 'contactor':
+        return <ContactorBlock block={block} {...commonProps} />;
+      case 'disconnect_switch':
+        return <DisconnectSwitchBlock block={block} {...commonProps} />;
+      case 'off_page_connector':
+        return <OffPageConnectorBlock block={block} {...commonProps} />;
 
       default:
         // Unknown block type - render a placeholder

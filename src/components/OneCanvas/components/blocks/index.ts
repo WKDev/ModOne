@@ -22,3 +22,16 @@ export { SelectorSwitchBlock } from './SelectorSwitchBlock';
 export { SolenoidValveBlock } from './SolenoidValveBlock';
 export { SensorBlock } from './SensorBlock';
 export { PilotLampBlock } from './PilotLampBlock';
+
+// Virtual connection components
+export { NetLabelBlock } from './NetLabelBlock';
+
+// Additional industrial components
+export { TransformerBlock } from './TransformerBlock';
+export { TerminalBlockComp } from './TerminalBlockComp';
+export { OverloadRelayBlock } from './OverloadRelayBlock';
+export { ContactorBlock } from './ContactorBlock';
+export { DisconnectSwitchBlock } from './DisconnectSwitchBlock';
+
+// Off-page connector for multi-page schematics
+export { OffPageConnectorBlock } from './OffPageConnectorBlock';

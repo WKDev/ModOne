@@ -9,5 +9,16 @@ export { parserService, default as ParserService } from './parserService';
 export { explorerService, default as ExplorerService, ExplorerServiceError } from './explorerService';
 export { projectDialogService, default as ProjectDialogService } from './projectDialogService';
 export { fileDialogService, default as FileDialogService } from './fileDialogService';
+export { scopeService, default as ScopeService } from './scopeService';
 export type { LogEntry } from './loggingService';
 export type { FileType, NewFileRequest } from './fileDialogService';
+export type {
+  ScopeDisplayData,
+  ScopeSettings,
+  ScopeChannelMapping,
+  ScopeSampleResult,
+  ChannelDisplayData,
+  TriggerMode,
+  TriggerEdge,
+  RunMode,
+} from './scopeService';

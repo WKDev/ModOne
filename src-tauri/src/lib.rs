@@ -48,6 +48,11 @@ use commands::{
     // Scope commands
     scope_create, scope_get_data, scope_update_settings, scope_add_sample, scope_add_samples,
     scope_run_stop, scope_reset, scope_arm_trigger, scope_delete, scope_list, scope_exists,
+    // Scope mapping commands
+    scope_register_mapping, scope_register_mappings, scope_remove_mapping,
+    scope_clear_mappings, scope_get_mappings,
+    // Scope-simulation integration commands
+    scope_tick, scope_read_device_voltage,
     ScopeState,
     // Canvas sync commands
     canvas_sync_clear_mappings, canvas_sync_force_update_outputs, canvas_sync_get_changed_blocks,
@@ -56,6 +61,8 @@ use commands::{
     canvas_sync_register_mapping, canvas_sync_register_mappings, canvas_sync_remove_mapping,
     canvas_sync_reset_stats, canvas_sync_shutdown, canvas_sync_update_outputs,
     CanvasSyncState,
+    // Schematic commands
+    schematic_save, schematic_load, schematic_list, schematic_exists, schematic_delete,
     // Scenario commands
     scenario_create, scenario_delete, scenario_exists, scenario_export_csv, scenario_import_csv,
     scenario_list, scenario_load, scenario_save,
@@ -228,6 +235,15 @@ pub fn run() {
             scope_delete,
             scope_list,
             scope_exists,
+            // Scope mapping commands
+            scope_register_mapping,
+            scope_register_mappings,
+            scope_remove_mapping,
+            scope_clear_mappings,
+            scope_get_mappings,
+            // Scope-simulation integration commands
+            scope_tick,
+            scope_read_device_voltage,
             // Canvas sync commands
             canvas_sync_init,
             canvas_sync_shutdown,
@@ -310,6 +326,12 @@ pub fn run() {
             window_minimize_floating,
             window_maximize_floating,
             window_floating_exists,
+            // Schematic commands
+            schematic_save,
+            schematic_load,
+            schematic_list,
+            schematic_exists,
+            schematic_delete,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

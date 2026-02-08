@@ -25,7 +25,14 @@ export type BlockType =
   | 'selector_switch'
   | 'solenoid_valve'
   | 'sensor'
-  | 'pilot_lamp';
+  | 'pilot_lamp'
+  | 'net_label'
+  | 'transformer'
+  | 'terminal_block'
+  | 'overload_relay'
+  | 'contactor'
+  | 'disconnect_switch'
+  | 'off_page_connector';
 
 /** Legacy block types (for migration) */
 export type LegacyBlockType = 'power_24v' | 'power_12v' | 'gnd';
@@ -455,6 +462,129 @@ export interface PilotLampBlock extends BaseBlock<'pilot_lamp'> {
   lit?: boolean;
 }
 
+/** Net label direction for visual indication */
+export type NetLabelDirection = 'left' | 'right' | 'up' | 'down';
+
+/** Net label block for virtual electrical connections */
+export interface NetLabelBlock extends BaseBlock<'net_label'> {
+  /** Net name (e.g., "+24V", "GND", "MOTOR_RUN") */
+  netName: string;
+  /** Visual direction of the label arrow */
+  direction: NetLabelDirection;
+  /** Optional description */
+  description?: string;
+}
+
+// ============================================================================
+// Additional Industrial Components
+// ============================================================================
+
+/** Transformer type */
+export type TransformerType = 'power' | 'control' | 'isolation';
+
+/** Transformer block (T) - power/control transformer */
+export interface TransformerBlock extends BaseBlock<'transformer'> {
+  /** Device designation (e.g., "T1") */
+  designation: string;
+  /** Transformer type */
+  transformerType: TransformerType;
+  /** Primary voltage */
+  primaryVoltage: number;
+  /** Secondary voltage */
+  secondaryVoltage: number;
+  /** Power rating in VA */
+  powerVa: number;
+}
+
+/** Terminal block type */
+export type TerminalType = 'feed_through' | 'ground' | 'fused' | 'disconnect';
+
+/** Terminal block (X) - connection terminal */
+export interface TerminalBlockType extends BaseBlock<'terminal_block'> {
+  /** Device designation (e.g., "X1:1") */
+  designation: string;
+  /** Terminal type */
+  terminalType: TerminalType;
+  /** Wire size rating (mm²) */
+  wireSizeMm2: number;
+  /** Number of terminals in this block */
+  terminalCount: number;
+}
+
+/** Overload relay class */
+export type OverloadClass = '10' | '10A' | '20' | '30';
+
+/** Overload relay block (F) - thermal/electronic overload */
+export interface OverloadRelayBlock extends BaseBlock<'overload_relay'> {
+  /** Device designation (e.g., "F1", "OL1") */
+  designation: string;
+  /** Overload class */
+  overloadClass: OverloadClass;
+  /** Current setting range min */
+  currentMin: number;
+  /** Current setting range max */
+  currentMax: number;
+  /** Whether tripped */
+  tripped?: boolean;
+}
+
+/** Contactor type */
+export type ContactorType = 'main' | 'auxiliary';
+
+/** Contactor block (K) - higher current contactor distinct from relay */
+export interface ContactorBlock extends BaseBlock<'contactor'> {
+  /** Device designation (e.g., "KM1") */
+  designation: string;
+  /** Contactor type */
+  contactorType: ContactorType;
+  /** Coil voltage rating */
+  coilVoltage: number;
+  /** Power rating (AC3) in kW */
+  powerRating: number;
+  /** Main contact count */
+  mainContacts: number;
+  /** Auxiliary contact count */
+  auxContacts: number;
+  /** Whether energized */
+  energized?: boolean;
+}
+
+/** Disconnect switch type */
+export type DisconnectType = 'rotary' | 'knife' | 'fusible';
+
+/** Disconnect switch block (Q) - main disconnect/isolator */
+export interface DisconnectSwitchBlock extends BaseBlock<'disconnect_switch'> {
+  /** Device designation (e.g., "Q1", "QS1") */
+  designation: string;
+  /** Disconnect type */
+  disconnectType: DisconnectType;
+  /** Number of poles */
+  poles: 1 | 2 | 3 | 4;
+  /** Current rating in Amps */
+  currentRating: number;
+  /** Whether switch is open (circuit broken) */
+  open?: boolean;
+}
+
+/** Off-page connector direction */
+export type OffPageConnectorDirection = 'outgoing' | 'incoming';
+
+/** Off-page connector block - connects signals across schematic pages */
+export interface OffPageConnectorBlock extends BaseBlock<'off_page_connector'> {
+  /** Signal label (e.g., "MOTOR_RUN", "+24V") */
+  signalLabel: string;
+  /** Direction: outgoing = signal leaves this page, incoming = signal arrives */
+  direction: OffPageConnectorDirection;
+  /** Target page ID (set when cross-reference is established) */
+  targetPageId?: string;
+  /** Target page number for display */
+  targetPageNumber?: number;
+  /** Target page name for display */
+  targetPageName?: string;
+  /** Whether this connector is "dangling" (no paired connector on another page) */
+  dangling?: boolean;
+}
+
 /** Discriminated union of all block types */
 export type Block =
   | PowerSourceBlock
@@ -471,7 +601,14 @@ export type Block =
   | SelectorSwitchBlock
   | SolenoidValveBlock
   | SensorBlock
-  | PilotLampBlock;
+  | PilotLampBlock
+  | NetLabelBlock
+  | TransformerBlock
+  | TerminalBlockType
+  | OverloadRelayBlock
+  | ContactorBlock
+  | DisconnectSwitchBlock
+  | OffPageConnectorBlock;
 
 // ============================================================================
 // Junction (wire-level concept)
@@ -730,7 +867,9 @@ export function isValidBlockType(type: string): type is BlockType {
   return [
     'powersource', 'plc_out', 'plc_in', 'led', 'button', 'scope', 'text',
     'relay', 'fuse', 'motor', 'emergency_stop', 'selector_switch',
-    'solenoid_valve', 'sensor', 'pilot_lamp',
+    'solenoid_valve', 'sensor', 'pilot_lamp', 'net_label',
+    'transformer', 'terminal_block', 'overload_relay', 'contactor',
+    'disconnect_switch', 'off_page_connector',
   ].includes(type);
 }
 

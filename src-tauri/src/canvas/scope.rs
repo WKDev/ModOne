@@ -3,8 +3,8 @@
 //! Provides an oscilloscope-like simulation engine for capturing and buffering
 //! voltage samples with trigger detection.
 
-use std::collections::VecDeque;
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 
 // ============================================================================
 // Enums

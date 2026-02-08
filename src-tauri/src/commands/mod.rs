@@ -12,9 +12,11 @@ pub mod modbus;
 pub mod parser;
 pub mod project;
 pub mod scenario;
+pub mod scope_sim;
 pub mod settings;
 pub mod sim;
 pub mod window;
+pub mod schematic;
 
 // Re-export all project commands for convenient registration in lib.rs
 pub use project::{
@@ -56,8 +58,14 @@ pub use canvas::{
     // Scope commands and state
     scope_create, scope_get_data, scope_update_settings, scope_add_sample, scope_add_samples,
     scope_run_stop, scope_reset, scope_arm_trigger, scope_delete, scope_list, scope_exists,
+    // Scope mapping commands
+    scope_register_mapping, scope_register_mappings, scope_remove_mapping,
+    scope_clear_mappings, scope_get_mappings,
     ScopeState,
 };
+
+// Re-export scope-simulation integration commands
+pub use scope_sim::{scope_tick, scope_read_device_voltage};
 
 // Re-export scenario commands and state
 pub use scenario::{
@@ -106,4 +114,9 @@ pub use window::{
     window_focus_floating, window_list_floating, window_get_floating_info,
     window_minimize_floating, window_maximize_floating, window_floating_exists,
     FloatingWindowState, FloatingWindowRegistry, FloatingWindowInfo, WindowBounds,
+};
+
+// Re-export schematic commands
+pub use schematic::{
+    schematic_save, schematic_load, schematic_list, schematic_exists, schematic_delete,
 };

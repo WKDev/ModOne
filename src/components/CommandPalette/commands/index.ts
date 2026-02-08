@@ -9,10 +9,13 @@ import { registerFileCommands } from './fileCommands';
 import { registerEditCommands } from './editCommands';
 import { registerViewCommands } from './viewCommands';
 import { registerSimulationCommands } from './simulationCommands';
+import { registerScenarioCommands } from './scenarioCommands';
 import { registerModbusCommands } from './modbusCommands';
 import { registerLadderCommands } from './ladderCommands';
 import { registerSettingsCommands } from './settingsCommands';
 import { registerHelpCommands } from './helpCommands';
+import { registerCanvasCommands } from './canvasCommands';
+import { registerDebugCommands } from './debugCommands';
 
 // Track whether commands have been registered
 let commandsRegistered = false;
@@ -31,8 +34,11 @@ export function registerAllCommands(): void {
   registerEditCommands();
   registerViewCommands();
   registerSimulationCommands();
+  registerScenarioCommands();
   registerModbusCommands();
   registerLadderCommands();
+  registerCanvasCommands();
+  registerDebugCommands();
   registerSettingsCommands();
   registerHelpCommands();
 
@@ -53,8 +59,11 @@ export {
   registerEditCommands,
   registerViewCommands,
   registerSimulationCommands,
+  registerScenarioCommands,
   registerModbusCommands,
   registerLadderCommands,
+  registerCanvasCommands,
+  registerDebugCommands,
   registerSettingsCommands,
   registerHelpCommands,
 };

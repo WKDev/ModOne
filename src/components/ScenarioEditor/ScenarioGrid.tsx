@@ -13,7 +13,7 @@ import {
   type KeyboardEvent,
   type MouseEvent,
 } from 'react';
-import { Plus, Trash2, Copy, ToggleLeft, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, Copy, ToggleLeft, ChevronDown, ChevronUp, Check } from 'lucide-react';
 import { useScenarioStore, selectEvents, selectExecutionState, selectSelectedEventIds } from '../../stores/scenarioStore';
 import type { ScenarioEvent, ScenarioExecutionState } from '../../types/scenario';
 import { isValidModbusAddress } from '../../types/scenario';
@@ -85,9 +85,9 @@ function getRowClassName(
   const isCurrent = executionState.currentEventIndex === eventIndex && executionState.status === 'running';
 
   if (isCurrent) {
-    classes.push('bg-yellow-900/30 animate-pulse');
+    classes.push('bg-green-500/20 animate-pulse');
   } else if (isCompleted) {
-    classes.push('bg-green-900/20');
+    classes.push('bg-green-500/5');
   }
 
   return classes.join(' ');
@@ -112,6 +112,7 @@ interface CellProps {
   column: ColumnKey;
   isFocused: boolean;
   isEditing: boolean;
+  isCompleted?: boolean;
   onFocus: () => void;
   onEdit: () => void;
   onUpdate: (value: unknown) => void;
@@ -124,6 +125,7 @@ const Cell = memo(function Cell({
   column,
   isFocused,
   isEditing: _isEditing,
+  isCompleted,
   onFocus,
   onEdit,
   onUpdate,
@@ -144,7 +146,7 @@ const Cell = memo(function Cell({
   switch (column) {
     case 'enabled':
       return (
-        <div className="flex items-center justify-center h-8">
+        <div className="flex items-center justify-center h-8 relative">
           <input
             type="checkbox"
             checked={event.enabled}
@@ -154,6 +156,12 @@ const Cell = memo(function Cell({
             disabled={readonly}
             className="w-4 h-4 accent-blue-500 cursor-pointer"
           />
+          {isCompleted && (
+            <Check
+              size={12}
+              className="absolute -top-0.5 -right-0.5 text-green-500 bg-neutral-800 rounded-full p-0.5"
+            />
+          )}
         </div>
       );
 
@@ -327,11 +335,13 @@ const Row = memo(function Row({
   );
 
   const rowClassName = getRowClassName(event, executionState, isSelected, events);
+  const isCompleted = executionState.completedEvents.includes(event.id);
 
   return (
     <div
       className={rowClassName}
       style={{ gridTemplateColumns: GRID_TEMPLATE_COLUMNS }}
+      data-event-id={event.id}
       onClick={(e) => onRowClick(e, rowIndex)}
       onContextMenu={(e) => onContextMenu(e, rowIndex)}
     >
@@ -342,6 +352,7 @@ const Row = memo(function Row({
           column={col.key}
           isFocused={focusedCell?.row === rowIndex && focusedCell?.column === colIndex}
           isEditing={false}
+          isCompleted={col.key === 'enabled' ? isCompleted : undefined}
           onFocus={() => onCellFocus(rowIndex, colIndex)}
           onEdit={() => onCellEdit(rowIndex, colIndex)}
           onUpdate={(value) => handleUpdate(col.key, value)}
@@ -458,6 +469,37 @@ export const ScenarioGrid = memo(function ScenarioGrid({
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; rowIndex: number } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to active event row during execution
+  useEffect(() => {
+    if (
+      executionState.status === 'running' &&
+      executionState.currentEventIndex !== null &&
+      executionState.currentEventIndex >= 0 &&
+      executionState.currentEventIndex < events.length
+    ) {
+      const activeEvent = events[executionState.currentEventIndex];
+      if (activeEvent) {
+        const row = containerRef.current?.querySelector(
+          `[data-event-id="${activeEvent.id}"]`
+        ) as HTMLElement | null;
+        if (row) {
+          // Check if row is visible in the container
+          const container = containerRef.current;
+          if (container) {
+            const containerRect = container.getBoundingClientRect();
+            const rowRect = row.getBoundingClientRect();
+            const isVisible =
+              rowRect.top >= containerRect.top &&
+              rowRect.bottom <= containerRect.bottom;
+            if (!isVisible) {
+              row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+          }
+        }
+      }
+    }
+  }, [executionState.currentEventIndex, executionState.status, events]);
 
   // Get selected row indices
   const selectedIndices = new Set(

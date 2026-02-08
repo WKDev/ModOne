@@ -18,22 +18,28 @@ import type {
   DocumentState,
   CanvasDocumentState,
   ScenarioDocumentState,
+  SchematicDocumentState,
   CanvasHistoryData,
   LadderHistoryData,
   ScenarioHistoryData,
+  SchematicHistoryData,
   HistorySnapshot,
   CanvasDocumentData,
   LadderDocumentData,
+  SchematicDocumentData,
 } from '../types/document';
 import {
   createEmptyCanvasDocument,
   createEmptyLadderDocument,
   createEmptyScenarioDocument,
+  createEmptySchematicDocument,
   isCanvasDocument,
   isLadderDocument,
   isScenarioDocument,
+  isSchematicDocument,
 } from '../types/document';
 import type { SerializableCircuitState } from '../components/OneCanvas/types';
+import type { MultiPageSchematic } from '../components/OneCanvas/utils/multiPageSchematic';
 import type { LadderElement, LadderWire } from '../types/ladder';
 import type { Scenario, ScenarioExecutionState } from '../types/scenario';
 
@@ -118,6 +124,15 @@ interface DocumentRegistryActions {
     documentId: string,
     executionState: Partial<ScenarioExecutionState>
   ) => void;
+
+  // Schematic-specific data updates
+  /** Update schematic document data */
+  updateSchematicData: (
+    documentId: string,
+    updater: (data: SchematicDocumentData) => void
+  ) => void;
+  /** Get schematic data for saving */
+  getSchematicData: (documentId: string) => MultiPageSchematic | null;
 
   // History operations
   /** Push current state to history */
@@ -267,6 +282,9 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
           case 'scenario':
             doc = createEmptyScenarioDocument(name);
             break;
+          case 'schematic':
+            doc = createEmptySchematicDocument(name);
+            break;
           default:
             throw new Error(`Unknown document type: ${type}`);
         }
@@ -321,6 +339,13 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
             doc = createEmptyScenarioDocument(name, filePath);
             const scenarioDoc = doc as ScenarioDocumentState;
             scenarioDoc.data.scenario = data as Scenario;
+            break;
+          }
+          case 'schematic': {
+            doc = createEmptySchematicDocument(name, filePath);
+            // data is expected to be MultiPageSchematic
+            const schematicDoc = doc as SchematicDocumentState;
+            schematicDoc.data.schematic = data as MultiPageSchematic;
             break;
           }
           default:
@@ -580,6 +605,33 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
       },
 
       // ========================================================================
+      // Schematic-specific Operations
+      // ========================================================================
+
+      updateSchematicData: (documentId, updater) => {
+        set(
+          (state) => {
+            const doc = state.documents.get(documentId);
+            if (doc && isSchematicDocument(doc)) {
+              updater(doc.data);
+              doc.isDirty = true;
+              doc.lastModified = Date.now();
+            }
+          },
+          false,
+          `updateSchematicData/${documentId}`
+        );
+      },
+
+      getSchematicData: (documentId) => {
+        const doc = get().documents.get(documentId);
+        if (doc && isSchematicDocument(doc)) {
+          return doc.data.schematic;
+        }
+        return null;
+      },
+
+      // ========================================================================
       // History Operations
       // ========================================================================
 
@@ -624,6 +676,20 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
               };
               doc.history = doc.history.slice(0, doc.historyIndex + 1);
               doc.history.push(snapshot as HistorySnapshot<ScenarioHistoryData>);
+              if (doc.history.length > MAX_HISTORY_SIZE) {
+                doc.history.shift();
+              } else {
+                doc.historyIndex++;
+              }
+            } else if (isSchematicDocument(doc)) {
+              snapshot = {
+                timestamp: Date.now(),
+                data: {
+                  snapshot: JSON.stringify(doc.data.schematic),
+                } as SchematicHistoryData,
+              };
+              doc.history = doc.history.slice(0, doc.historyIndex + 1);
+              doc.history.push(snapshot as HistorySnapshot<SchematicHistoryData>);
               if (doc.history.length > MAX_HISTORY_SIZE) {
                 doc.history.shift();
               } else {
@@ -688,6 +754,21 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
               doc.data.scenario = JSON.parse(JSON.stringify(snapshot.data.scenario));
               doc.historyIndex--;
               doc.isDirty = true;
+            } else if (isSchematicDocument(doc)) {
+              if (doc.historyIndex === doc.history.length - 1) {
+                const snapshot: HistorySnapshot<SchematicHistoryData> = {
+                  timestamp: Date.now(),
+                  data: {
+                    snapshot: JSON.stringify(doc.data.schematic),
+                  },
+                };
+                doc.history.push(snapshot);
+              }
+
+              const snapshot = doc.history[doc.historyIndex];
+              doc.data.schematic = JSON.parse(snapshot.data.snapshot);
+              doc.historyIndex--;
+              doc.isDirty = true;
             }
           },
           false,
@@ -734,6 +815,15 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
                 doc.data.scenario = JSON.parse(JSON.stringify(snapshot.data.scenario));
                 doc.isDirty = true;
               }
+            } else if (isSchematicDocument(doc)) {
+              if (doc.historyIndex >= doc.history.length - 1) return;
+
+              doc.historyIndex++;
+              const snapshot = doc.history[doc.historyIndex + 1];
+              if (snapshot) {
+                doc.data.schematic = JSON.parse(snapshot.data.snapshot);
+                doc.isDirty = true;
+              }
             }
           },
           false,
@@ -750,7 +840,7 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
         const doc = get().documents.get(documentId);
         if (!doc) return false;
 
-        if (isCanvasDocument(doc) || isLadderDocument(doc) || isScenarioDocument(doc)) {
+        if (isCanvasDocument(doc) || isLadderDocument(doc) || isScenarioDocument(doc) || isSchematicDocument(doc)) {
           return doc.historyIndex < doc.history.length - 1;
         }
         return false;

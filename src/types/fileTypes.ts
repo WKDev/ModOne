@@ -12,6 +12,7 @@ export type FileCategory =
   | 'canvas'      // OneCanvas circuit files (.yaml in one_canvas/)
   | 'ladder'      // Ladder logic files (.lad)
   | 'scenario'    // Scenario files (.json in scenario/)
+  | 'schematic'   // Schematic files (.schematic, .sch)
   | 'memory-map'  // Memory map CSV files (in plc_csv/)
   | 'config'      // Configuration files (config.yml)
   | 'csv'         // Generic CSV files

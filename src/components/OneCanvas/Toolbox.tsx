@@ -7,7 +7,7 @@
 import { memo, useState } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { ChevronDown, ChevronRight, Zap, Cpu, Lightbulb, Activity, Type, Cog, Shield } from 'lucide-react';
+import { ChevronDown, ChevronRight, Zap, Cpu, Lightbulb, Activity, Type, Cog, Shield, Link2, FolderOpen, ArrowRightLeft } from 'lucide-react';
 import type { BlockType } from './types';
 import type { Block } from './types';
 
@@ -30,6 +30,8 @@ interface BlockCategory {
 interface ToolboxProps {
   /** Additional CSS classes */
   className?: string;
+  /** Callback to open the circuit library */
+  onOpenLibrary?: () => void;
 }
 
 interface DraggableBlockItemProps {
@@ -96,8 +98,13 @@ const BLOCK_CATEGORIES: BlockCategory[] = [
     icon: <Cog size={16} />,
     blocks: [
       { type: 'relay', label: 'Relay (K)', description: 'Relay / Contactor' },
+      { type: 'contactor', label: 'Contactor (KM)', description: 'Main contactor' },
       { type: 'fuse', label: 'Fuse (F)', description: 'Fuse / Circuit breaker' },
+      { type: 'overload_relay', label: 'Overload (F)', description: 'Thermal overload relay' },
       { type: 'motor', label: 'Motor (M)', description: '3-phase motor' },
+      { type: 'disconnect_switch', label: 'Disconnect (Q)', description: 'Main disconnect switch' },
+      { type: 'transformer', label: 'Transformer (T)', description: 'Control transformer' },
+      { type: 'terminal_block', label: 'Terminal (X)', description: 'Terminal block' },
       { type: 'pilot_lamp', label: 'Pilot Lamp', description: 'Indicator light' },
       { type: 'emergency_stop', label: 'E-Stop', description: 'Emergency stop button' },
       { type: 'solenoid_valve', label: 'Solenoid', description: 'Solenoid valve' },
@@ -109,6 +116,60 @@ const BLOCK_CATEGORIES: BlockCategory[] = [
     blocks: [
       { type: 'sensor', label: 'Sensor', description: 'Proximity / Photoelectric sensor' },
       { type: 'selector_switch', label: 'Selector', description: 'Selector switch' },
+    ],
+  },
+  {
+    name: 'Schematic',
+    icon: <ArrowRightLeft size={16} />,
+    blocks: [
+      {
+        type: 'off_page_connector',
+        label: 'Off-Page Out',
+        description: 'Signal continues on another page (outgoing)',
+        presetProps: { signalLabel: 'SIGNAL', direction: 'outgoing', dangling: true } as Partial<Block>,
+      },
+      {
+        type: 'off_page_connector',
+        label: 'Off-Page In',
+        description: 'Signal arrives from another page (incoming)',
+        presetProps: { signalLabel: 'SIGNAL', direction: 'incoming', dangling: true } as Partial<Block>,
+      },
+    ],
+  },
+  {
+    name: 'Connections',
+    icon: <Link2 size={16} />,
+    blocks: [
+      {
+        type: 'net_label',
+        label: '+24V Net',
+        description: 'Virtual connection to +24V net',
+        presetProps: { netName: '+24V', direction: 'bidirectional' } as Partial<Block>,
+      },
+      {
+        type: 'net_label',
+        label: 'GND Net',
+        description: 'Virtual connection to GND net',
+        presetProps: { netName: 'GND', direction: 'bidirectional' } as Partial<Block>,
+      },
+      {
+        type: 'net_label',
+        label: 'Net Label',
+        description: 'Custom net label (edit name)',
+        presetProps: { netName: 'NET1', direction: 'bidirectional' } as Partial<Block>,
+      },
+      {
+        type: 'net_label',
+        label: 'Input Net',
+        description: 'Net label (input direction)',
+        presetProps: { netName: 'INPUT', direction: 'input' } as Partial<Block>,
+      },
+      {
+        type: 'net_label',
+        label: 'Output Net',
+        description: 'Net label (output direction)',
+        presetProps: { netName: 'OUTPUT', direction: 'output' } as Partial<Block>,
+      },
     ],
   },
   {
@@ -250,7 +311,7 @@ const CategorySection = memo(function CategorySection({
 /**
  * Toolbox panel with draggable block items.
  */
-export const Toolbox = memo(function Toolbox({ className = '' }: ToolboxProps) {
+export const Toolbox = memo(function Toolbox({ className = '', onOpenLibrary }: ToolboxProps) {
   // Track expanded categories (all expanded by default)
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(BLOCK_CATEGORIES.map((c) => c.name))
@@ -277,8 +338,17 @@ export const Toolbox = memo(function Toolbox({ className = '' }: ToolboxProps) {
       `}
     >
       {/* Header */}
-      <div className="px-3 py-2 border-b border-neutral-700">
+      <div className="px-3 py-2 border-b border-neutral-700 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-white">Toolbox</h3>
+        {onOpenLibrary && (
+          <button
+            onClick={onOpenLibrary}
+            className="p-1 text-neutral-400 hover:text-white hover:bg-neutral-700 rounded transition-colors"
+            title="Open Circuit Library"
+          >
+            <FolderOpen size={16} />
+          </button>
+        )}
       </div>
 
       {/* Categories */}

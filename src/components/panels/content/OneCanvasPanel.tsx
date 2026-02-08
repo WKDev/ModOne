@@ -36,12 +36,23 @@ import {
   type BlockType,
   type Position,
 } from '../../OneCanvas';
-import type { Block, Wire as WireData, HandleConstraint, PortPosition } from '../../OneCanvas/types';
+import { CanvasMinimap } from '../../OneCanvas/components/CanvasMinimap';
+import { CircuitLibraryPanel } from '../../OneCanvas/components/CircuitLibraryPanel';
+import { WireNumberingDialog } from '../../OneCanvas/components/WireNumberingDialog';
+import { PrintDialog } from '../../OneCanvas/components/PrintDialog';
+import { CanvasToolbar } from '../../OneCanvas/CanvasToolbar';
+import { generateWireNumbers, applyWireNumbers, type WireNumberingOptions } from '../../OneCanvas/utils/wireNumbering';
+import { openPrintDialog, type PrintLayoutConfig } from '../../OneCanvas/utils/printSupport';
+import type { Block, Wire, Wire as WireData, HandleConstraint, PortPosition, Junction } from '../../OneCanvas/types';
 import { isPortEndpoint } from '../../OneCanvas/types';
 import { WireContextMenu, type WireContextMenuAction } from '../../OneCanvas/overlays/WireContextMenu';
 import { useWireHandleDrag } from '../../OneCanvas/hooks/useWireHandleDrag';
 import { useWireSegmentDrag } from '../../OneCanvas/hooks/useWireSegmentDrag';
 import { PropertiesPanel } from './PropertiesPanel';
+import { SchematicPageBar } from '../../OneCanvas/components/SchematicPageBar';
+import { useSchematicDocument } from '../../../stores/hooks/useSchematicDocument';
+import { updatePageCircuitInDocument } from '../../OneCanvas/utils/schematicHelpers';
+import { useDocumentRegistry } from '../../../stores/documentRegistry';
 
 
 // Import simulation styles
@@ -77,6 +88,13 @@ const BlockDragPreview = memo(function BlockDragPreview({ type, presetLabel }: {
     solenoid_valve: 'Solenoid',
     sensor: 'Sensor',
     pilot_lamp: 'Pilot Lamp',
+    net_label: 'Net Label',
+    transformer: 'Transformer',
+    terminal_block: 'Terminal',
+    overload_relay: 'Overload',
+    contactor: 'Contactor',
+    disconnect_switch: 'Disconnect',
+    off_page_connector: 'Off-Page',
   };
 
   return (
@@ -235,6 +253,38 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     cleanupOverlappingHandles,
   } = useCanvasState(documentId);
 
+  // Schematic document state (for multi-page schematic support)
+  const schematicDoc = useSchematicDocument(documentId);
+
+  // Page switch handler: implements the 6-step page switch protocol
+  const handleSchematicPageSwitch = useCallback(
+    (targetPageId: string) => {
+      if (!schematicDoc || !documentId) return;
+      const currentPageId = schematicDoc.schematic.activePageId;
+      if (targetPageId === currentPageId) return;
+
+      // Step 1: Get current circuit from canvasStore
+      const currentCircuit = useCanvasStore.getState().getCircuitData();
+
+      // Step 2: Save current circuit to the active page in documentRegistry
+      updatePageCircuitInDocument(documentId, currentPageId, currentCircuit);
+
+      // Step 3: Push history for undo support
+      useDocumentRegistry.getState().pushHistory(documentId);
+
+      // Step 4: Set active page to the target
+      schematicDoc.setActivePage(targetPageId);
+
+      // Step 5: Get the target page's circuit
+      const targetPage = schematicDoc.schematic.pages.find(p => p.id === targetPageId);
+      if (!targetPage) return;
+
+      // Step 6: Load target page circuit into canvasStore (resets canvas history)
+      useCanvasStore.getState().loadCircuit(targetPage.circuit);
+    },
+    [schematicDoc, documentId]
+  );
+
   // Wire drawing state and selection from global store (shared across modes)
   const wireDrawing = useCanvasStore((state) => state.wireDrawing);
   const startWireDrawing = useCanvasStore((state) => state.startWireDrawing);
@@ -252,6 +302,27 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     screenPosition: { x: number; y: number };
   } | null>(null);
 
+  // Minimap state
+  const [minimapCollapsed, setMinimapCollapsed] = useState(false);
+  const [viewportSize, setViewportSize] = useState({ width: 800, height: 600 });
+
+  // Circuit Library state
+  const [libraryOpen, setLibraryOpen] = useState(false);
+
+  // Wire Numbering Dialog state
+  const [wireNumberingOpen, setWireNumberingOpen] = useState(false);
+
+  // Print Dialog state
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+
+  // Get setPan from the store for minimap navigation
+  const setPan = useCanvasStore((state) => state.setPan);
+
+  // Get alignment/distribution/flip actions from store
+  const alignSelected = useCanvasStore((state) => state.alignSelected);
+  const distributeSelected = useCanvasStore((state) => state.distributeSelected);
+  const flipSelected = useCanvasStore((state) => state.flipSelected);
+
   // Cache container bounding rect to avoid getBoundingClientRect on every mouse event
   useEffect(() => {
     const container = canvasRef.current?.getContainer();
@@ -259,10 +330,14 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
 
     // Initial rect calculation
     containerRectRef.current = container.getBoundingClientRect();
+    setViewportSize({ width: containerRectRef.current.width, height: containerRectRef.current.height });
 
     // ResizeObserver to update rect when container size changes
     const observer = new ResizeObserver(() => {
       containerRectRef.current = container.getBoundingClientRect();
+      if (containerRectRef.current) {
+        setViewportSize({ width: containerRectRef.current.width, height: containerRectRef.current.height });
+      }
     });
     observer.observe(container);
 
@@ -710,6 +785,52 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     simulation.setButtonState(blockId, false);
   }, [simulation]);
 
+  // Handle wire numbering
+  const handleApplyWireNumbering = useCallback((options: WireNumberingOptions) => {
+    const result = generateWireNumbers(wires, components, options);
+    // Apply the numbering - returns updated wires with labels
+    const updatedWires = applyWireNumbers(wires, result.wireNumbers);
+    // Log the result for now - a full implementation would update the store
+    console.log('Wire numbering applied:', result.stats);
+    console.log('Updated wires:', updatedWires.length);
+    // TODO: Add updateWires action to store to persist wire labels
+  }, [wires, components]);
+
+  // Handle print
+  const handlePrint = useCallback((config: PrintLayoutConfig) => {
+    // Get the SVG content from canvas for printing
+    const container = canvasRef.current?.getContainer();
+    const svgElement = container?.querySelector('svg');
+    if (svgElement) {
+      const svgContent = svgElement.outerHTML;
+      openPrintDialog(svgContent, config);
+    }
+  }, []);
+
+  // Handle loading circuit templates
+  const handleLoadTemplate = useCallback((
+    templateComponents: Map<string, Block>,
+    templateWires: Wire[],
+    _templateJunctions: Map<string, Junction>,
+    _offset: Position
+  ) => {
+    // Add each component from the template
+    templateComponents.forEach((block) => {
+      addComponent(block.type, block.position, block);
+    });
+    
+    // Note: Wires need special handling as they reference the NEW component IDs
+    // The CircuitLibraryPanel handles ID remapping via prepareTemplateForInsertion
+    templateWires.forEach((wire) => {
+      if (isPortEndpoint(wire.from) && isPortEndpoint(wire.to)) {
+        addWire(wire.from, wire.to, {
+          fromExitDirection: wire.fromExitDirection,
+          toExitDirection: wire.toExitDirection,
+        });
+      }
+    });
+  }, [addComponent, addWire]);
+
   return (
     <DndContext
       sensors={sensors}
@@ -727,10 +848,23 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
           measuredRate={simulation.measuredRate}
         />
 
+        {/* Canvas Toolbar (Align, Distribute, Flip, Wire Numbering, Print) */}
+        <div className="flex items-center justify-center px-2 py-1 bg-neutral-900 border-b border-neutral-800">
+          <CanvasToolbar
+            onAlignSelected={alignSelected}
+            onDistributeSelected={distributeSelected}
+            onFlipSelected={flipSelected}
+            onOpenWireNumbering={() => setWireNumberingOpen(true)}
+            onOpenPrint={() => setPrintDialogOpen(true)}
+            hasSelection={selectedIds.size > 0}
+            selectionCount={selectedIds.size}
+          />
+        </div>
+
         {/* Main Content Area */}
         <div className="flex-1 flex overflow-hidden">
           {/* Toolbox */}
-          <Toolbox />
+          <Toolbox onOpenLibrary={() => setLibraryOpen(true)} />
 
           {/* Canvas Area */}
           <CanvasDropZone className="flex-1 relative overflow-hidden">
@@ -773,7 +907,37 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
                 onUpdateComponent={handleUpdateComponent}
                 debugMode={process.env.NODE_ENV === 'development'}
               />
+
+              {/* Minimap overlay */}
+              <CanvasMinimap
+                components={components}
+                wires={wires}
+                zoom={zoom}
+                pan={pan}
+                viewportWidth={viewportSize.width}
+                viewportHeight={viewportSize.height}
+                onNavigate={setPan}
+                collapsed={minimapCollapsed}
+                onToggleCollapse={() => setMinimapCollapsed(!minimapCollapsed)}
+              />
             </div>
+
+            {/* Schematic Page Bar - only shown for schematic documents */}
+            {schematicDoc && (
+              <SchematicPageBar
+                pages={schematicDoc.schematic.pages}
+                activePageId={schematicDoc.schematic.activePageId}
+                onActivatePage={handleSchematicPageSwitch}
+                onAddPage={() => schematicDoc.addPage()}
+                onRemovePage={schematicDoc.removePage}
+                onRenamePage={(pageId, newName) => schematicDoc.updatePage(pageId, { name: newName })}
+                onDuplicatePage={schematicDoc.duplicatePage}
+                hasNextPage={schematicDoc.navigationInfo.hasNext}
+                hasPreviousPage={schematicDoc.navigationInfo.hasPrevious}
+                onNextPage={schematicDoc.goToNextPage}
+                onPreviousPage={schematicDoc.goToPreviousPage}
+              />
+            )}
           </CanvasDropZone>
 
           {/* Properties Sidebar */}
@@ -803,6 +967,33 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
       <DragOverlay>
         {draggedType && <BlockDragPreview type={draggedType} presetLabel={draggedLabel} />}
       </DragOverlay>
+
+      {/* Circuit Library Panel */}
+      <CircuitLibraryPanel
+        isOpen={libraryOpen}
+        onClose={() => setLibraryOpen(false)}
+        selectedIds={selectedIds}
+        components={components}
+        wires={wires}
+        junctions={junctions}
+        onLoadTemplate={handleLoadTemplate}
+      />
+
+      {/* Wire Numbering Dialog */}
+      <WireNumberingDialog
+        isOpen={wireNumberingOpen}
+        onClose={() => setWireNumberingOpen(false)}
+        wireCount={wires.length}
+        onApply={handleApplyWireNumbering}
+      />
+
+      {/* Print Dialog */}
+      <PrintDialog
+        isOpen={printDialogOpen}
+        onClose={() => setPrintDialogOpen(false)}
+        onPrint={handlePrint}
+        defaultProjectTitle="ModOne Project"
+      />
     </DndContext>
   );
 });
