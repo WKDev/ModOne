@@ -6,7 +6,7 @@
  * Handles component unmounting during async operations and provides callbacks for success/error.
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 // ============================================================================
 // Types

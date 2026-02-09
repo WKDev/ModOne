@@ -29,8 +29,10 @@ export const LadderEditorPanel = React.memo(function LadderEditorPanel(
   }
 
   return (
-    <div className="h-full flex flex-col bg-neutral-950">
-      <LadderEditor />
-    </div>
+    <PanelErrorBoundary panelName="Ladder Editor">
+      <div className="h-full flex flex-col bg-neutral-950">
+        <LadderEditor />
+      </div>
+    </PanelErrorBoundary>
   );
 });
