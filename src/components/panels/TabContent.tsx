@@ -74,7 +74,7 @@ export const TabContent = memo(function TabContent({ tabs, activeTabId }: TabCon
   // Wrap with DocumentProvider if we have a document
   if (documentId && documentType) {
     return (
-      <div className="flex-1 overflow-auto animate-tab-fade-in">
+      <div className="flex-1 overflow-hidden animate-tab-fade-in">
         <DocumentProvider
           documentId={documentId}
           documentType={documentType}
@@ -88,7 +88,7 @@ export const TabContent = memo(function TabContent({ tabs, activeTabId }: TabCon
 
   // No document - render without provider (will use global store)
   return (
-    <div className="flex-1 overflow-auto animate-tab-fade-in">
+    <div className="flex-1 overflow-hidden animate-tab-fade-in">
       <ContentComponent data={activeTab.data} />
     </div>
   );

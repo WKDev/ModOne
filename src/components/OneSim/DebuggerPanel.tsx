@@ -19,6 +19,7 @@ import {
   Pause,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { PanelErrorBoundary } from '../error/PanelErrorBoundary';
 import type {
   SimStatus,
   SimStats,
@@ -424,13 +425,14 @@ export const DebuggerPanel = memo(function DebuggerPanel({
   // ============================================================================
 
   return (
-    <div
-      className={cn(
-        'flex items-center gap-2 bg-neutral-800 border border-neutral-700 rounded-lg',
-        compact ? 'px-2 py-1' : 'px-3 py-2',
-        className
-      )}
-    >
+    <PanelErrorBoundary panelName="Debugger">
+      <div
+        className={cn(
+          'flex items-center gap-2 bg-neutral-800 border border-neutral-700 rounded-lg',
+          compact ? 'px-2 py-1' : 'px-3 py-2',
+          className
+        )}
+      >
       {/* Control Buttons */}
       <div className="flex items-center gap-1">
         {/* Run/Pause Button */}
@@ -545,8 +547,9 @@ export const DebuggerPanel = memo(function DebuggerPanel({
           <div className="w-px h-6 bg-neutral-600" />
           <BreakpointHitDisplay hit={breakpointHit} />
         </>
-      )}
-    </div>
+       )}
+      </div>
+    </PanelErrorBoundary>
   );
 });
 

@@ -23,6 +23,7 @@ import {
 import { useCanvasStore } from '../../../stores/canvasStore';
 import { useDocumentContext } from '../../../contexts/DocumentContext';
 import { useCanvasDocument } from '../../../stores/hooks/useCanvasDocument';
+import { PanelErrorBoundary } from '../../error/PanelErrorBoundary';
 import {
   Canvas,
   Toolbox,
@@ -314,6 +315,23 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
 
   // Print Dialog state
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
+
+  // Debug mode state (hidden by default, toggle via console: window.canvasDebug())
+  const [debugMode, setDebugMode] = useState(false);
+
+  useEffect(() => {
+    const toggle = () => {
+      setDebugMode((prev) => {
+        const next = !prev;
+        console.log(`[OneCanvas] Debug mode ${next ? 'ON' : 'OFF'}`);
+        return next;
+      });
+    };
+    (window as unknown as Record<string, unknown>).canvasDebug = toggle;
+    return () => {
+      delete (window as unknown as Record<string, unknown>).canvasDebug;
+    };
+  }, []);
 
   // Get setPan from the store for minimap navigation
   const setPan = useCanvasStore((state) => state.setPan);
@@ -832,12 +850,13 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
   }, [addComponent, addWire]);
 
   return (
-    <DndContext
-      sensors={sensors}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <div className="h-full flex flex-col bg-neutral-950">
+    <PanelErrorBoundary panelName="Canvas">
+      <DndContext
+        sensors={sensors}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="h-full flex flex-col bg-neutral-950">
         {/* Simulation Toolbar */}
         <SimulationToolbar
           running={simulation.running}
@@ -905,7 +924,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
                 onWireSegmentDragStart={handleSegmentDragStart}
                 onWireEndpointSegmentDragStart={handleEndpointSegmentDragStart}
                 onUpdateComponent={handleUpdateComponent}
-                debugMode={process.env.NODE_ENV === 'development'}
+                debugMode={debugMode}
               />
 
               {/* Minimap overlay */}
@@ -942,7 +961,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
 
           {/* Properties Sidebar */}
           {selectedComponentsForPanel.length === 1 && (
-            <div className="w-64 border-l border-neutral-700 overflow-y-auto flex-shrink-0 bg-neutral-900">
+            <div className="w-64 min-h-0 border-l border-neutral-700 overflow-y-auto flex-shrink-0 bg-neutral-900">
               <PropertiesPanel
                 selectedComponents={selectedComponentsForPanel}
                 onUpdateComponent={handleUpdateComponent}
@@ -993,8 +1012,9 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
         onClose={() => setPrintDialogOpen(false)}
         onPrint={handlePrint}
         defaultProjectTitle="ModOne Project"
-      />
-    </DndContext>
+       />
+     </DndContext>
+    </PanelErrorBoundary>
   );
 });
 

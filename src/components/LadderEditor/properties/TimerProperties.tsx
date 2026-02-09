@@ -4,9 +4,10 @@
  * Property editor for timer elements (TON, TOF, TMR).
  */
 
-import { useCallback, useState, useMemo } from 'react';
+import { useCallback, useState } from 'react';
 import { PropertyField, type SelectOption } from './PropertyField';
-import { validateDeviceAddress, validateTimerPreset, validateLabel } from '../utils/validation';
+import { validateTimerPreset } from '../utils/validation';
+import { usePropertyForm } from './usePropertyForm';
 import type { TimerElement, TimerType, TimerProperties as TimerPropsType } from '../../../types/ladder';
 
 export interface TimerPropertiesProps {
@@ -42,31 +43,12 @@ export function TimerProperties({
   disabled = false,
   onDeviceSelect,
 }: TimerPropertiesProps) {
-  // Validation error states
-  const [addressError, setAddressError] = useState<string | undefined>();
   const [presetError, setPresetError] = useState<string | undefined>();
-  const [labelError, setLabelError] = useState<string | undefined>();
-
-  // Check if there are any validation errors
-  const hasErrors = useMemo(() => {
-    return !!addressError || !!presetError || !!labelError;
-  }, [addressError, presetError, labelError]);
-
-  const handleAddressChange = useCallback(
-    (value: string | number) => {
-      const strValue = String(value);
-      const validation = validateDeviceAddress(strValue);
-
-      if (!validation.valid) {
-        setAddressError(validation.error);
-        return;
-      }
-
-      setAddressError(undefined);
-      onUpdate({ address: strValue });
-    },
-    [onUpdate]
-  );
+  const { addressError, labelError, hasErrors, handleAddressChange, handleLabelChange } =
+    usePropertyForm({
+      onUpdate,
+      additionalErrors: { preset: presetError },
+    });
 
   const handleTypeChange = useCallback(
     (value: string | number) => {
@@ -115,22 +97,6 @@ export function TimerProperties({
       });
     },
     [onUpdate, element.properties]
-  );
-
-  const handleLabelChange = useCallback(
-    (value: string | number) => {
-      const strValue = String(value);
-      const validation = validateLabel(strValue);
-
-      if (!validation.valid) {
-        setLabelError(validation.error);
-        return;
-      }
-
-      setLabelError(undefined);
-      onUpdate({ label: strValue || undefined });
-    },
-    [onUpdate]
   );
 
   return (

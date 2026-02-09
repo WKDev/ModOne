@@ -4,9 +4,9 @@
  * Property editor for contact elements (NO, NC, P, N).
  */
 
-import { useCallback, useState, useMemo } from 'react';
+import { useCallback } from 'react';
 import { PropertyField, type SelectOption } from './PropertyField';
-import { validateDeviceAddress, validateLabel } from '../utils/validation';
+import { usePropertyForm } from './usePropertyForm';
 import type { ContactElement, ContactType } from '../../../types/ladder';
 
 export interface ContactPropertiesProps {
@@ -37,50 +37,12 @@ export function ContactProperties({
   disabled = false,
   onDeviceSelect,
 }: ContactPropertiesProps) {
-  // Validation error states
-  const [addressError, setAddressError] = useState<string | undefined>();
-  const [labelError, setLabelError] = useState<string | undefined>();
-
-  // Validate current element values
-  const hasErrors = useMemo(() => {
-    return !!addressError || !!labelError;
-  }, [addressError, labelError]);
-
-  const handleAddressChange = useCallback(
-    (value: string | number) => {
-      const strValue = String(value);
-      const validation = validateDeviceAddress(strValue);
-
-      if (!validation.valid) {
-        setAddressError(validation.error);
-        return; // Don't update store with invalid address
-      }
-
-      setAddressError(undefined);
-      onUpdate({ address: strValue });
-    },
-    [onUpdate]
-  );
+  const { addressError, labelError, hasErrors, handleAddressChange, handleLabelChange } =
+    usePropertyForm({ onUpdate });
 
   const handleTypeChange = useCallback(
     (value: string | number) => {
       onUpdate({ type: value as ContactType });
-    },
-    [onUpdate]
-  );
-
-  const handleLabelChange = useCallback(
-    (value: string | number) => {
-      const strValue = String(value);
-      const validation = validateLabel(strValue);
-
-      if (!validation.valid) {
-        setLabelError(validation.error);
-        return;
-      }
-
-      setLabelError(undefined);
-      onUpdate({ label: strValue || undefined });
     },
     [onUpdate]
   );

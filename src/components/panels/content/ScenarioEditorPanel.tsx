@@ -19,6 +19,7 @@ import {
 import { useScenarioStore } from '../../../stores/scenarioStore';
 import { useDocumentContext } from '../../../contexts/DocumentContext';
 import { UnsavedChangesDialog } from '../../project/UnsavedChangesDialog';
+import { PanelErrorBoundary } from '../../error/PanelErrorBoundary';
 
 // ============================================================================
 // Types
@@ -67,9 +68,10 @@ export const ScenarioEditorPanel = memo(function ScenarioEditorPanel(
   // ============================================================================
 
   return (
-    <div className="h-full flex flex-col bg-neutral-950">
-      {/* Toolbar */}
-      <ScenarioToolbar
+    <PanelErrorBoundary panelName="Scenario Editor">
+      <div className="h-full flex flex-col bg-neutral-950">
+        {/* Toolbar */}
+        <ScenarioToolbar
         onNew={fileOps.newScenario}
         onOpen={fileOps.openScenario}
         onSave={fileOps.saveScenario}
@@ -95,7 +97,8 @@ export const ScenarioEditorPanel = memo(function ScenarioEditorPanel(
 
       {/* Unsaved Changes Dialog */}
       <UnsavedChangesDialog {...fileOps.unsavedDialog} />
-    </div>
+      </div>
+    </PanelErrorBoundary>
   );
 });
 

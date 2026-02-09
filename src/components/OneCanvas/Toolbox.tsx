@@ -332,7 +332,7 @@ export const Toolbox = memo(function Toolbox({ className = '', onOpenLibrary }: 
   return (
     <div
       className={`
-        w-48 bg-neutral-900 border-r border-neutral-700
+        w-48 min-h-0 bg-neutral-900 border-r border-neutral-700
         flex flex-col overflow-hidden
         ${className}
       `}

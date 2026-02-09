@@ -9,6 +9,7 @@
 import React from 'react';
 import { LadderEditor } from '../../LadderEditor';
 import { useDocumentContext } from '../../../contexts/DocumentContext';
+import { PanelErrorBoundary } from '../../error/PanelErrorBoundary';
 
 interface LadderEditorPanelProps {
   /** Tab data (contains documentId, filePath) */

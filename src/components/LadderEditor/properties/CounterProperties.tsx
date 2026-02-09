@@ -4,9 +4,10 @@
  * Property editor for counter elements (CTU, CTD, CTUD).
  */
 
-import { useCallback, useState, useMemo } from 'react';
+import { useCallback, useState } from 'react';
 import { PropertyField, type SelectOption } from './PropertyField';
-import { validateDeviceAddress, validateCounterPreset, validateLabel } from '../utils/validation';
+import { validateCounterPreset } from '../utils/validation';
+import { usePropertyForm } from './usePropertyForm';
 import type { CounterElement, CounterType } from '../../../types/ladder';
 
 export interface CounterPropertiesProps {
@@ -36,31 +37,12 @@ export function CounterProperties({
   disabled = false,
   onDeviceSelect,
 }: CounterPropertiesProps) {
-  // Validation error states
-  const [addressError, setAddressError] = useState<string | undefined>();
   const [presetError, setPresetError] = useState<string | undefined>();
-  const [labelError, setLabelError] = useState<string | undefined>();
-
-  // Check if there are any validation errors
-  const hasErrors = useMemo(() => {
-    return !!addressError || !!presetError || !!labelError;
-  }, [addressError, presetError, labelError]);
-
-  const handleAddressChange = useCallback(
-    (value: string | number) => {
-      const strValue = String(value);
-      const validation = validateDeviceAddress(strValue);
-
-      if (!validation.valid) {
-        setAddressError(validation.error);
-        return;
-      }
-
-      setAddressError(undefined);
-      onUpdate({ address: strValue });
-    },
-    [onUpdate]
-  );
+  const { addressError, labelError, hasErrors, handleAddressChange, handleLabelChange } =
+    usePropertyForm({
+      onUpdate,
+      additionalErrors: { preset: presetError },
+    });
 
   const handleTypeChange = useCallback(
     (value: string | number) => {
@@ -88,22 +70,6 @@ export function CounterProperties({
       });
     },
     [onUpdate, element.properties]
-  );
-
-  const handleLabelChange = useCallback(
-    (value: string | number) => {
-      const strValue = String(value);
-      const validation = validateLabel(strValue);
-
-      if (!validation.valid) {
-        setLabelError(validation.error);
-        return;
-      }
-
-      setLabelError(undefined);
-      onUpdate({ label: strValue || undefined });
-    },
-    [onUpdate]
   );
 
   return (
