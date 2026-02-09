@@ -120,27 +120,25 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
 
   // Initialize base path and set default save path when dialog opens
   useEffect(() => {
+    if (!isOpen) return;
+
+    // Reset form
+    setPlcManufacturer('LS');
+    setPlcModel('');
+    setScanTimeMs(10);
+    setError(null);
+    setProjectNameError(null);
+    setSavePathError(null);
+    userSelectedPath.current = false;
+
     const initDialog = async () => {
-      if (!isOpen) return;
-
-      // Reset form
-      setPlcManufacturer('LS');
-      setPlcModel('');
-      setScanTimeMs(10);
-      setError(null);
-      setProjectNameError(null);
-      setSavePathError(null);
-      userSelectedPath.current = false;
-
       // Initialize base path if not already set
       if (!modOneBasePath.current) {
         try {
           const docPath = await documentDir();
           modOneBasePath.current = await join(docPath, 'ModOne');
-          console.log('ModOne base path initialized:', modOneBasePath.current);
         } catch (err) {
           console.error('Failed to get documents directory:', err);
-          // Fallback: leave modOneBasePath as null, user must browse
         }
       }
 
@@ -150,7 +148,6 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
           const nextNumber = await getNextProjectNumber(modOneBasePath.current);
           const defaultName = `ModOneProject${nextNumber}`;
           setProjectName(defaultName);
-          // Set default save path
           const defaultPath = await join(modOneBasePath.current, defaultName);
           setSavePath(defaultPath);
         } catch (err) {
@@ -166,50 +163,50 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
     initDialog();
   }, [isOpen]);
 
-  // Validate and auto-update save path when project name changes
-  useEffect(() => {
-    const updateDefaultPath = async () => {
-      // Validate project name
-      const validation = validateProjectName(projectName);
-      if (!validation.valid) {
-        setProjectNameError(projectName.trim() ? validation.error || null : null);
-      } else {
-        setProjectNameError(null);
-      }
+  // Handle project name change — validates inline and auto-updates save path
+  const handleProjectNameChange = useCallback(
+    async (name: string) => {
+      setProjectName(name);
+
+      // Validate project name inline
+      const validation = validateProjectName(name);
+      setProjectNameError(name.trim() && !validation.valid ? validation.error || null : null);
 
       // Auto-update save path if user hasn't manually selected
-      if (!userSelectedPath.current && projectName.trim() && modOneBasePath.current) {
+      if (!userSelectedPath.current && name.trim() && modOneBasePath.current) {
         try {
-          const defaultPath = await join(modOneBasePath.current, projectName.trim());
+          const defaultPath = await join(modOneBasePath.current, name.trim());
           setSavePath(defaultPath);
+          setSavePathError(null);
         } catch (err) {
           console.error('Failed to construct default path:', err);
         }
       }
-    };
-    updateDefaultPath();
-  }, [projectName]);
+    },
+    []
+  );
 
-  // Validate save path when it changes
-  useEffect(() => {
-    if (savePath) {
-      const validation = validateSavePath(savePath);
+  // Handle save path manual edit — validates inline
+  const handleSavePathChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newPath = e.target.value;
+    setSavePath(newPath);
+    userSelectedPath.current = true;
+
+    // Validate save path inline
+    if (newPath) {
+      const validation = validateSavePath(newPath);
       setSavePathError(validation.valid ? null : validation.error || null);
     } else {
       setSavePathError(null);
     }
-  }, [savePath]);
-
-  // Handle save path manual edit
-  const handleSavePathChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSavePath(e.target.value);
-    userSelectedPath.current = true; // User manually edited, don't auto-update
   }, []);
 
-  // Handle ESC key
+  // Handle ESC key to close dialog
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen && !isSubmitting) {
+      if (e.key === 'Escape' && !isSubmitting) {
         e.preventDefault();
         onClose();
       }
@@ -344,7 +341,7 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
                 data-testid="project-name-input"
                 type="text"
                 value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
+                onChange={(e) => handleProjectNameChange(e.target.value)}
                 placeholder="MyProject"
                 disabled={isSubmitting}
                 className={`w-full px-3 py-2 bg-gray-700 border rounded text-sm text-gray-100 placeholder:text-gray-500 focus:outline-none disabled:opacity-50 ${

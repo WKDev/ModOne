@@ -9,232 +9,61 @@
  * 2. Global store editing (single document via useCanvasStore)
  */
 
-import { memo, useCallback, useRef, useState, useMemo, useEffect } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
+  PointerSensor,
   useSensor,
   useSensors,
-  PointerSensor,
-  useDroppable,
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { useCanvasStore } from '../../../stores/canvasStore';
 import { useDocumentContext } from '../../../contexts/DocumentContext';
-import { useCanvasDocument } from '../../../stores/hooks/useCanvasDocument';
 import { PanelErrorBoundary } from '../../error/PanelErrorBoundary';
 import {
   Canvas,
-  Toolbox,
   SimulationToolbar,
-  useSimulation,
-  useCanvasKeyboardShortcuts,
-  useBlockDrag,
-  useSelectionHandler,
+  Toolbox,
   screenToCanvas,
-  type CanvasRef,
   type BlockType,
+  type CanvasRef,
   type Position,
 } from '../../OneCanvas';
+import type { Block, Junction, Wire } from '../../OneCanvas/types';
 import { CanvasMinimap } from '../../OneCanvas/components/CanvasMinimap';
-import { CircuitLibraryPanel } from '../../OneCanvas/components/CircuitLibraryPanel';
-import { WireNumberingDialog } from '../../OneCanvas/components/WireNumberingDialog';
-import { PrintDialog } from '../../OneCanvas/components/PrintDialog';
 import { CanvasToolbar } from '../../OneCanvas/CanvasToolbar';
-import { generateWireNumbers, applyWireNumbers, type WireNumberingOptions } from '../../OneCanvas/utils/wireNumbering';
-import { openPrintDialog, type PrintLayoutConfig } from '../../OneCanvas/utils/printSupport';
-import type { Block, Wire, Wire as WireData, HandleConstraint, PortPosition, Junction } from '../../OneCanvas/types';
-import { isPortEndpoint } from '../../OneCanvas/types';
-import { WireContextMenu, type WireContextMenuAction } from '../../OneCanvas/overlays/WireContextMenu';
+import { SchematicPageBar } from '../../OneCanvas/components/SchematicPageBar';
+import { WireContextMenu } from '../../OneCanvas/overlays/WireContextMenu';
 import { useWireHandleDrag } from '../../OneCanvas/hooks/useWireHandleDrag';
 import { useWireSegmentDrag } from '../../OneCanvas/hooks/useWireSegmentDrag';
-import { PropertiesPanel } from './PropertiesPanel';
-import { SchematicPageBar } from '../../OneCanvas/components/SchematicPageBar';
-import { useSchematicDocument } from '../../../stores/hooks/useSchematicDocument';
+import { generateWireNumbers, applyWireNumbers, type WireNumberingOptions } from '../../OneCanvas/utils/wireNumbering';
+import { openPrintDialog, type PrintLayoutConfig } from '../../OneCanvas/utils/printSupport';
 import { updatePageCircuitInDocument } from '../../OneCanvas/utils/schematicHelpers';
+import { isPortEndpoint } from '../../OneCanvas/types';
+import { useBlockDrag, useCanvasKeyboardShortcuts, useSelectionHandler, useSimulation } from '../../OneCanvas';
 import { useDocumentRegistry } from '../../../stores/documentRegistry';
+import { useSchematicDocument } from '../../../stores/hooks/useSchematicDocument';
+import { PropertiesPanel } from './PropertiesPanel';
+import { BlockDragPreview } from './canvas/BlockDragPreview';
+import { CanvasDropZone } from './canvas/CanvasDropZone';
+import { CanvasDialogs } from './canvas/CanvasDialogs';
+import { useCanvasState } from './canvas/useCanvasState';
+import { useCanvasInteractions } from './canvas/CanvasInteractionHandlers';
 
-
-// Import simulation styles
 import '../../OneCanvas/styles/simulation.css';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 interface OneCanvasPanelProps {
-  /** Tab data (contains documentId, filePath) - reserved for future use */
   data?: unknown;
 }
-
-// ============================================================================
-// Block Preview Component (for drag overlay)
-// ============================================================================
-
-const BlockDragPreview = memo(function BlockDragPreview({ type, presetLabel }: { type: BlockType; presetLabel?: string }) {
-  const labels: Record<BlockType, string> = {
-    powersource: '+24V',
-    plc_out: 'PLC Out',
-    plc_in: 'PLC In',
-    led: 'LED',
-    button: 'Button',
-    scope: 'Scope',
-    text: 'Text',
-    relay: 'Relay',
-    fuse: 'Fuse',
-    motor: 'Motor',
-    emergency_stop: 'E-Stop',
-    selector_switch: 'Selector',
-    solenoid_valve: 'Solenoid',
-    sensor: 'Sensor',
-    pilot_lamp: 'Pilot Lamp',
-    net_label: 'Net Label',
-    transformer: 'Transformer',
-    terminal_block: 'Terminal',
-    overload_relay: 'Overload',
-    contactor: 'Contactor',
-    disconnect_switch: 'Disconnect',
-    off_page_connector: 'Off-Page',
-  };
-
-  return (
-    <div className="px-3 py-2 bg-neutral-700 border border-neutral-500 rounded shadow-lg text-white text-sm font-medium">
-      {presetLabel || labels[type] || type}
-    </div>
-  );
-});
-
-// ============================================================================
-// Canvas Drop Zone
-// ============================================================================
-
-interface CanvasDropZoneProps {
-  children: React.ReactNode;
-  className?: string;
-}
-
-const CanvasDropZone = memo(function CanvasDropZone({ children, className }: CanvasDropZoneProps) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: 'canvas-dropzone',
-  });
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={`${className} ${isOver ? 'ring-2 ring-blue-500 ring-inset' : ''}`}
-    >
-      {children}
-    </div>
-  );
-});
-
-// ============================================================================
-// Canvas State Hook (Document or Global)
-// ============================================================================
-
-/**
- * Hook that returns canvas state from either document registry or global store.
- * This allows OneCanvasPanel to work in both modes seamlessly.
- */
-function useCanvasState(documentId: string | null) {
-  // Try document-based state first
-  const documentState = useCanvasDocument(documentId);
-
-  // Global store state (used when no document)
-  const globalComponents = useCanvasStore((state) => state.components);
-  const globalJunctions = useCanvasStore((state) => state.junctions);
-  const globalWires = useCanvasStore((state) => state.wires);
-  const globalZoom = useCanvasStore((state) => state.zoom);
-  const globalPan = useCanvasStore((state) => state.pan);
-  const globalAddComponent = useCanvasStore((state) => state.addComponent);
-  const globalAddWire = useCanvasStore((state) => state.addWire);
-  const globalMoveComponent = useCanvasStore((state) => state.moveComponent);
-  const globalRemoveWire = useCanvasStore((state) => state.removeWire);
-  const globalMoveJunction = useCanvasStore((state) => state.moveJunction);
-  const globalUpdateWireHandle = useCanvasStore((state) => state.updateWireHandle);
-  const globalRemoveWireHandle = useCanvasStore((state) => state.removeWireHandle);
-  const globalMoveWireSegment = useCanvasStore((state) => state.moveWireSegment);
-  const globalInsertEndpointHandle = useCanvasStore((state) => state.insertEndpointHandle);
-  const globalCleanupOverlappingHandles = useCanvasStore((state) => state.cleanupOverlappingHandles);
-  const globalUpdateComponent = useCanvasStore((state) => state.updateComponent);
-
-  // Return document state if available, otherwise global state
-  return useMemo(() => {
-    if (documentState) {
-      return {
-        components: documentState.components,
-        junctions: documentState.junctions,
-        wires: documentState.wires,
-        zoom: documentState.zoom,
-        pan: documentState.pan,
-        addComponent: documentState.addComponent,
-        addWire: documentState.addWire,
-        moveComponent: documentState.moveComponent,
-        moveJunction: documentState.moveJunction,
-        removeWire: documentState.removeWire,
-        updateComponent: documentState.updateComponent,
-        updateWireHandle: documentState.updateWireHandle,
-        removeWireHandle: documentState.removeWireHandle,
-        moveWireSegment: documentState.moveWireSegment,
-        insertEndpointHandle: documentState.insertEndpointHandle,
-        cleanupOverlappingHandles: documentState.cleanupOverlappingHandles,
-        isDocumentMode: true,
-      };
-    }
-
-    return {
-      components: globalComponents,
-      junctions: globalJunctions,
-      wires: globalWires,
-      zoom: globalZoom,
-      pan: globalPan,
-      addComponent: globalAddComponent,
-      addWire: globalAddWire,
-      moveComponent: globalMoveComponent,
-      moveJunction: globalMoveJunction,
-      removeWire: globalRemoveWire,
-      updateComponent: globalUpdateComponent,
-      updateWireHandle: globalUpdateWireHandle,
-      removeWireHandle: globalRemoveWireHandle,
-      moveWireSegment: globalMoveWireSegment,
-      insertEndpointHandle: globalInsertEndpointHandle,
-      cleanupOverlappingHandles: globalCleanupOverlappingHandles,
-      isDocumentMode: false,
-    };
-  }, [
-    documentState,
-    globalComponents,
-    globalJunctions,
-    globalWires,
-    globalZoom,
-    globalPan,
-    globalAddComponent,
-    globalAddWire,
-    globalMoveComponent,
-    globalMoveJunction,
-    globalRemoveWire,
-    globalUpdateComponent,
-    globalUpdateWireHandle,
-    globalRemoveWireHandle,
-    globalMoveWireSegment,
-    globalInsertEndpointHandle,
-    globalCleanupOverlappingHandles,
-  ]);
-}
-
-// ============================================================================
-// Component
-// ============================================================================
 
 export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPanelProps) {
   const canvasRef = useRef<CanvasRef>(null);
   const containerRectRef = useRef<DOMRect | null>(null);
 
-  // Get document context (may be null if not in document mode)
   const { documentId } = useDocumentContext();
 
-  // Get canvas state (from document or global store)
   const {
     components,
     junctions,
@@ -252,71 +81,42 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     moveWireSegment,
     insertEndpointHandle,
     cleanupOverlappingHandles,
+    wireDrawing,
+    startWireDrawing,
+    updateWireDrawing,
+    cancelWireDrawing,
+    selectedIds,
+    setPan,
+    alignSelected,
+    distributeSelected,
+    flipSelected,
   } = useCanvasState(documentId);
 
-  // Schematic document state (for multi-page schematic support)
   const schematicDoc = useSchematicDocument(documentId);
 
-  // Page switch handler: implements the 6-step page switch protocol
   const handleSchematicPageSwitch = useCallback(
     (targetPageId: string) => {
       if (!schematicDoc || !documentId) return;
       const currentPageId = schematicDoc.schematic.activePageId;
       if (targetPageId === currentPageId) return;
 
-      // Step 1: Get current circuit from canvasStore
       const currentCircuit = useCanvasStore.getState().getCircuitData();
-
-      // Step 2: Save current circuit to the active page in documentRegistry
       updatePageCircuitInDocument(documentId, currentPageId, currentCircuit);
-
-      // Step 3: Push history for undo support
       useDocumentRegistry.getState().pushHistory(documentId);
-
-      // Step 4: Set active page to the target
       schematicDoc.setActivePage(targetPageId);
 
-      // Step 5: Get the target page's circuit
-      const targetPage = schematicDoc.schematic.pages.find(p => p.id === targetPageId);
+      const targetPage = schematicDoc.schematic.pages.find((p) => p.id === targetPageId);
       if (!targetPage) return;
-
-      // Step 6: Load target page circuit into canvasStore (resets canvas history)
       useCanvasStore.getState().loadCircuit(targetPage.circuit);
     },
     [schematicDoc, documentId]
   );
 
-  // Wire drawing state and selection from global store (shared across modes)
-  const wireDrawing = useCanvasStore((state) => state.wireDrawing);
-  const startWireDrawing = useCanvasStore((state) => state.startWireDrawing);
-  const updateWireDrawing = useCanvasStore((state) => state.updateWireDrawing);
-  const cancelWireDrawing = useCanvasStore((state) => state.cancelWireDrawing);
-  const selectedIds = useCanvasStore((state) => state.selectedIds);
-
-  // DEBUG: Log when selectedIds changes
-  console.log('[OneCanvasPanel] selectedIds:', Array.from(selectedIds));
-
-  // Wire context menu state
-  const [wireContextMenu, setWireContextMenu] = useState<{
-    wireId: string;
-    position: Position;
-    screenPosition: { x: number; y: number };
-  } | null>(null);
-
-  // Minimap state
   const [minimapCollapsed, setMinimapCollapsed] = useState(false);
   const [viewportSize, setViewportSize] = useState({ width: 800, height: 600 });
-
-  // Circuit Library state
   const [libraryOpen, setLibraryOpen] = useState(false);
-
-  // Wire Numbering Dialog state
   const [wireNumberingOpen, setWireNumberingOpen] = useState(false);
-
-  // Print Dialog state
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
-
-  // Debug mode state (hidden by default, toggle via console: window.canvasDebug())
   const [debugMode, setDebugMode] = useState(false);
 
   useEffect(() => {
@@ -333,24 +133,13 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     };
   }, []);
 
-  // Get setPan from the store for minimap navigation
-  const setPan = useCanvasStore((state) => state.setPan);
-
-  // Get alignment/distribution/flip actions from store
-  const alignSelected = useCanvasStore((state) => state.alignSelected);
-  const distributeSelected = useCanvasStore((state) => state.distributeSelected);
-  const flipSelected = useCanvasStore((state) => state.flipSelected);
-
-  // Cache container bounding rect to avoid getBoundingClientRect on every mouse event
   useEffect(() => {
     const container = canvasRef.current?.getContainer();
     if (!container) return;
 
-    // Initial rect calculation
     containerRectRef.current = container.getBoundingClientRect();
     setViewportSize({ width: containerRectRef.current.width, height: containerRectRef.current.height });
 
-    // ResizeObserver to update rect when container size changes
     const observer = new ResizeObserver(() => {
       containerRectRef.current = container.getBoundingClientRect();
       if (containerRectRef.current) {
@@ -362,131 +151,62 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     return () => observer.disconnect();
   }, []);
 
-  // Wire handle drag hook
   const { handleDragStart: handleWireHandleDragStart } = useWireHandleDrag({
     updateWireHandle,
     canvasRef,
     cleanupOverlappingHandles,
   });
 
-  // Wire segment drag hook
   const { handleSegmentDragStart } = useWireSegmentDrag({
     moveWireSegment,
     cleanupOverlappingHandles,
     canvasRef,
   });
 
-  // Endpoint segment drag handler (port ↔ first/last handle)
-  const handleEndpointSegmentDragStart = useCallback((
-    wireId: string,
-    end: 'from' | 'to',
-    orientation: 'horizontal' | 'vertical',
-    e: React.MouseEvent
-  ) => {
-    const wire = wires.find((w) => w.id === wireId);
-    if (!wire?.handles?.length) return;
+  const selectionHandler = useSelectionHandler({
+    components,
+    wires,
+    junctions,
+    zoom,
+  });
 
-    // Only handle port endpoints
-    if (!isPortEndpoint(wire.from) || !isPortEndpoint(wire.to)) return;
+  const {
+    wireContextMenu,
+    handleStartWire,
+    handleEndWire,
+    handleWireContextMenu,
+    handleCloseWireContextMenu,
+    handleWireContextMenuAction,
+    handleWireHandleContextMenu,
+    handleCanvasMouseDown,
+    handleCanvasMouseMove,
+    handleCanvasMouseUp,
+    handleEndpointSegmentDragStart,
+  } = useCanvasInteractions({
+    canvasRef,
+    components,
+    wires,
+    pan,
+    zoom,
+    selectionHandler,
+    wireDrawing,
+    startWireDrawing,
+    updateWireDrawing,
+    cancelWireDrawing,
+    addWire,
+    removeWire,
+    removeWireHandle,
+    insertEndpointHandle,
+    handleSegmentDragStart,
+  });
 
-    // Compute exit position for the endpoint
-    const computeExitPos = (endpoint: { componentId: string; portId: string }, exitDir?: PortPosition): Position | null => {
-      const comp = components.get(endpoint.componentId);
-      if (!comp) return null;
-
-      const port = comp.ports.find((p: { id: string; position: string; offset?: number }) => p.id === endpoint.portId);
-      if (!port) return null;
-
-      const offset = port.offset ?? 0.5;
-      const dir = exitDir || (port.position as PortPosition);
-      let portPos: Position;
-
-      switch (port.position) {
-        case 'top':
-          portPos = { x: comp.position.x + comp.size.width * offset, y: comp.position.y };
-          break;
-        case 'bottom':
-          portPos = { x: comp.position.x + comp.size.width * offset, y: comp.position.y + comp.size.height };
-          break;
-        case 'left':
-          portPos = { x: comp.position.x, y: comp.position.y + comp.size.height * offset };
-          break;
-        case 'right':
-          portPos = { x: comp.position.x + comp.size.width, y: comp.position.y + comp.size.height * offset };
-          break;
-        default:
-          portPos = { x: comp.position.x + comp.size.width / 2, y: comp.position.y + comp.size.height / 2 };
-      }
-
-      const dist = 20;
-      switch (dir) {
-        case 'top': return { x: portPos.x, y: portPos.y - dist };
-        case 'bottom': return { x: portPos.x, y: portPos.y + dist };
-        case 'left': return { x: portPos.x - dist, y: portPos.y };
-        case 'right': return { x: portPos.x + dist, y: portPos.y };
-      }
-    };
-
-    const constraint: HandleConstraint = orientation === 'horizontal' ? 'vertical' : 'horizontal';
-
-    if (end === 'from') {
-      const fromEndpoint = wire.from as { componentId: string; portId: string };
-      const exitPos = computeExitPos(fromEndpoint, wire.fromExitDirection);
-      if (!exitPos) return;
-
-      const firstHandlePos = wire.handles[0].position;
-
-      // Insert TWO handles to maintain orthogonal routing:
-      // handleA at exit position, handleB connecting to h0's perpendicular coordinate.
-      // This ensures h0 doesn't move, so h0→h1 alignment is preserved.
-      const secondPos: Position = orientation === 'vertical'
-        ? { x: exitPos.x, y: firstHandlePos.y }  // same X as exit, same Y as h0
-        : { x: firstHandlePos.x, y: exitPos.y };  // same Y as exit, same X as h0
-
-      insertEndpointHandle(wireId, 'from', [
-        { position: exitPos, constraint },
-        { position: secondPos, constraint },
-      ]);
-
-      // Drag the two new handles (indices 0, 1). h0 is now at index 2 and doesn't move.
-      handleSegmentDragStart(wireId, 0, 1, orientation, e, exitPos, secondPos, true);
-    } else {
-      const toEndpoint = wire.to as { componentId: string; portId: string };
-      const exitPos = computeExitPos(toEndpoint, wire.toExitDirection);
-      if (!exitPos) return;
-
-      const lastIdx = wire.handles.length - 1;
-      const lastHandlePos = wire.handles[lastIdx].position;
-
-      // Insert TWO handles: handleA connecting from lastH, handleB at exit position.
-      const firstPos: Position = orientation === 'vertical'
-        ? { x: exitPos.x, y: lastHandlePos.y }  // same X as exit, same Y as lastH
-        : { x: lastHandlePos.x, y: exitPos.y };  // same Y as exit, same X as lastH
-
-      insertEndpointHandle(wireId, 'to', [
-        { position: firstPos, constraint },
-        { position: exitPos, constraint },
-      ]);
-
-      // After insert: lastH is at lastIdx, firstPos is at lastIdx+1, exitPos is at lastIdx+2.
-      // Drag the two new handles.
-      handleSegmentDragStart(wireId, lastIdx + 1, lastIdx + 2, orientation, e, firstPos, exitPos, true);
-    }
-  }, [wires, components, insertEndpointHandle, handleSegmentDragStart]);
-
-  // Convert Maps to Arrays for simulation
   const componentsArray = useMemo(() => Array.from(components.values()), [components]);
   const junctionsArray = useMemo(() => Array.from(junctions.values()), [junctions]);
+  const simulation = useSimulation(componentsArray, wires, junctionsArray);
 
-  // Simulation hook
-  const simulation = useSimulation(componentsArray, wires as WireData[], junctionsArray);
-
-  // Keyboard shortcuts
   useCanvasKeyboardShortcuts();
 
-  // Block drag hook - prevent drag during wire drawing
-  // Pass document-aware components and moveComponent to override global store
-  const { isDragging: _isDragging, handleBlockDragStart } = useBlockDrag({
+  const { handleBlockDragStart } = useBlockDrag({
     canvasRef,
     shouldPreventDrag: useCallback(() => wireDrawing !== null, [wireDrawing]),
     components: components as Map<string, { position: Position }>,
@@ -495,191 +215,6 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     moveJunction,
   });
 
-  // Wire drawing handlers
-  const handleStartWire = useCallback(
-    (blockId: string, portId: string) => {
-      // Validate against document/local components first
-      const block = components.get(blockId);
-      if (!block || !block.ports.some((p) => p.id === portId)) {
-        console.warn('Invalid wire start endpoint:', { blockId, portId });
-        return;
-      }
-
-      // Calculate port position for exit direction detection
-      const port = block.ports.find((p) => p.id === portId);
-      let startPosition: Position | undefined;
-
-      if (port) {
-        const offset = port.offset ?? 0.5;
-        let portRelativePos: Position;
-        switch (port.position) {
-          case 'top':
-            portRelativePos = { x: block.size.width * offset, y: 0 };
-            break;
-          case 'bottom':
-            portRelativePos = { x: block.size.width * offset, y: block.size.height };
-            break;
-          case 'left':
-            portRelativePos = { x: 0, y: block.size.height * offset };
-            break;
-          case 'right':
-            portRelativePos = { x: block.size.width, y: block.size.height * offset };
-            break;
-          default:
-            portRelativePos = { x: block.size.width / 2, y: block.size.height / 2 };
-        }
-        startPosition = {
-          x: block.position.x + portRelativePos.x,
-          y: block.position.y + portRelativePos.y,
-        };
-      }
-
-      // Skip global store validation since we validated locally
-      // Pass start position for exit direction detection
-      startWireDrawing({ componentId: blockId, portId }, { skipValidation: true, startPosition });
-    },
-    [components, startWireDrawing]
-  );
-
-  // Wire context menu handlers
-  const handleWireContextMenu = useCallback(
-    (wireId: string, position: Position, screenPos: { x: number; y: number }) => {
-      setWireContextMenu({ wireId, position, screenPosition: screenPos });
-    },
-    []
-  );
-
-  const handleCloseWireContextMenu = useCallback(() => {
-    setWireContextMenu(null);
-  }, []);
-
-  const handleWireContextMenuAction = useCallback(
-    (action: WireContextMenuAction) => {
-      if (!wireContextMenu) return;
-
-      if (action === 'delete') {
-        removeWire(wireContextMenu.wireId);
-      }
-      setWireContextMenu(null);
-    },
-    [wireContextMenu, removeWire]
-  );
-
-  // Handle right-click on a wire handle to remove it
-  const handleWireHandleContextMenu = useCallback(
-    (wireId: string, handleIndex: number, e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      removeWireHandle(wireId, handleIndex);
-    },
-    [removeWireHandle]
-  );
-
-  const handleEndWire = useCallback(
-    (blockId: string, portId: string) => {
-      if (wireDrawing) {
-        // Use document-aware addWire with exit direction info from store wireDrawing
-        const to = { componentId: blockId, portId };
-
-        // Get toExitDirection from target port's position
-        const toBlock = components.get(blockId);
-        let toExitDirection: PortPosition | undefined;
-        if (toBlock) {
-          const toPort = toBlock.ports.find((p: { id: string; position: string }) => p.id === portId);
-          if (toPort) {
-            toExitDirection = toPort.position as PortPosition;
-          }
-        }
-
-        addWire(wireDrawing.from, to, {
-          fromExitDirection: wireDrawing.exitDirection,
-          toExitDirection,
-        });
-        cancelWireDrawing();
-      }
-    },
-    [wireDrawing, components, addWire, cancelWireDrawing]
-  );
-
-  // Selection handler for drag-to-select (pass current state)
-  const selectionHandler = useSelectionHandler({
-    components,
-    wires,
-    junctions,
-    zoom,
-  });
-
-  // Handle canvas mouse down - for selection box
-  const handleCanvasMouseDown = useCallback(
-    (event: React.MouseEvent) => {
-      console.log('[OneCanvasPanel] MouseDown - wireDrawing:', !!wireDrawing);
-
-      // Don't start selection if wire drawing is active
-      if (wireDrawing) {
-        console.log('[OneCanvasPanel] Skipping selection - wire drawing active');
-        return;
-      }
-
-      // TEMPORARY FIX: Use fresh rect instead of cached
-      const container = canvasRef.current?.getContainer();
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
-
-      const screenPos = {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
-      };
-      const canvasPos = screenToCanvas(screenPos, pan, zoom);
-
-      console.log('[OneCanvasPanel] Calling selectionHandler.handleCanvasMouseDown');
-      selectionHandler.handleCanvasMouseDown(event, canvasPos);
-    },
-    [wireDrawing, pan, zoom, selectionHandler, canvasRef]
-  );
-
-  // Handle canvas mouse move for wire preview and selection box
-  const handleCanvasMouseMove = useCallback(
-    (event: React.MouseEvent) => {
-      // TEMPORARY FIX: Use fresh rect instead of cached
-      const container = canvasRef.current?.getContainer();
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
-
-      const screenPos = {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
-      };
-      const canvasPos = screenToCanvas(screenPos, pan, zoom);
-
-      // Update wire drawing if active
-      if (wireDrawing) {
-        updateWireDrawing(canvasPos);
-      }
-
-      // Update selection box if dragging
-      selectionHandler.handleCanvasMouseMove(event, canvasPos);
-    },
-    [wireDrawing, pan, zoom, updateWireDrawing, selectionHandler, canvasRef]
-  );
-
-  // Handle canvas mouse up for wire cancellation and selection completion
-  const handleCanvasMouseUp = useCallback(
-    (event: React.MouseEvent) => {
-      // Handle wire drawing cancellation
-      if (wireDrawing) {
-        const target = event.target as HTMLElement;
-        if (!target.closest('[data-port-id]')) {
-          cancelWireDrawing();
-        }
-      }
-
-      // Handle selection completion
-      selectionHandler.handleCanvasMouseUp(event);
-    },
-    [wireDrawing, cancelWireDrawing, selectionHandler]
-  );
-
-  // Handle escape key to cancel wire drawing
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && wireDrawing) {
@@ -691,7 +226,6 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [wireDrawing, cancelWireDrawing]);
 
-  // DnD sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -700,11 +234,9 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     })
   );
 
-  // Track dragging state
   const [draggedType, setDraggedType] = useState<BlockType | null>(null);
   const [draggedLabel, setDraggedLabel] = useState<string | undefined>(undefined);
 
-  // Handle drag start from toolbox
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const { active } = event;
     const blockType = active.data.current?.blockType as BlockType | undefined;
@@ -714,33 +246,23 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     }
   }, []);
 
-  // Handle drag end
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event;
       setDraggedType(null);
       setDraggedLabel(undefined);
 
-      // Check if dropped over canvas
       if (over?.id === 'canvas-dropzone') {
         const blockType = active.data.current?.blockType as BlockType | undefined;
         if (blockType) {
-          // Use cached container rect for coordinate calculation
           const rect = containerRectRef.current;
           if (!rect) return;
 
-          // Calculate drop position in canvas coordinates
-          // activatorEvent contains the original pointer position when drag started
           const activatorEvent = event.activatorEvent as PointerEvent;
-          // Final screen position = start position + delta
           const dropScreenX = activatorEvent.clientX + event.delta.x;
           const dropScreenY = activatorEvent.clientY + event.delta.y;
-
-          // Convert to position relative to canvas container
           const relativeX = dropScreenX - rect.left;
           const relativeY = dropScreenY - rect.top;
-
-          // Apply pan/zoom transformation to get canvas coordinates
           const canvasPos = screenToCanvas({ x: relativeX, y: relativeY }, pan, zoom);
           const position: Position = { x: canvasPos.x, y: canvasPos.y };
           const presetProps = active.data.current?.presetProps as Partial<Block> | undefined;
@@ -751,7 +273,6 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     [addComponent, zoom, pan]
   );
 
-  // Derive selected components for the Properties sidebar
   const selectedComponentsForPanel = useMemo(() => {
     const result: Block[] = [];
     selectedIds.forEach((id) => {
@@ -761,7 +282,6 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     return result;
   }, [selectedIds, components]);
 
-  // Wrap updateComponent as (id, updates) for PropertiesPanel
   const handleUpdateComponent = useCallback(
     (id: string, updates: Partial<Block>) => {
       updateComponent(id, updates);
@@ -769,54 +289,52 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     [updateComponent]
   );
 
-  // ============================================================================
-  // Simulation Integration
-  // ============================================================================
-
-  // Extract port voltages from simulation result
   const portVoltages = useMemo(() => {
     if (!simulation.result) return undefined;
     return simulation.result.nodeVoltages;
   }, [simulation.result]);
 
-  // Calculate connected ports for each block
-  const getConnectedPorts = useCallback((blockId: string): Set<string> => {
-    const ports = new Set<string>();
-    wires.forEach((wire) => {
-      if (isPortEndpoint(wire.from) && wire.from.componentId === blockId) {
-        ports.add(wire.from.portId);
-      }
-      if (isPortEndpoint(wire.to) && wire.to.componentId === blockId) {
-        ports.add(wire.to.portId);
-      }
-    });
-    return ports;
-  }, [wires]);
+  const getConnectedPorts = useCallback(
+    (blockId: string): Set<string> => {
+      const ports = new Set<string>();
+      wires.forEach((wire) => {
+        if (isPortEndpoint(wire.from) && wire.from.componentId === blockId) {
+          ports.add(wire.from.portId);
+        }
+        if (isPortEndpoint(wire.to) && wire.to.componentId === blockId) {
+          ports.add(wire.to.portId);
+        }
+      });
+      return ports;
+    },
+    [wires]
+  );
 
-  // Button press handler - updates simulation runtime state
-  const handleButtonPress = useCallback((blockId: string) => {
-    simulation.setButtonState(blockId, true);
-  }, [simulation]);
+  const handleButtonPress = useCallback(
+    (blockId: string) => {
+      simulation.setButtonState(blockId, true);
+    },
+    [simulation]
+  );
 
-  // Button release handler - updates simulation runtime state
-  const handleButtonRelease = useCallback((blockId: string) => {
-    simulation.setButtonState(blockId, false);
-  }, [simulation]);
+  const handleButtonRelease = useCallback(
+    (blockId: string) => {
+      simulation.setButtonState(blockId, false);
+    },
+    [simulation]
+  );
 
-  // Handle wire numbering
-  const handleApplyWireNumbering = useCallback((options: WireNumberingOptions) => {
-    const result = generateWireNumbers(wires, components, options);
-    // Apply the numbering - returns updated wires with labels
-    const updatedWires = applyWireNumbers(wires, result.wireNumbers);
-    // Log the result for now - a full implementation would update the store
-    console.log('Wire numbering applied:', result.stats);
-    console.log('Updated wires:', updatedWires.length);
-    // TODO: Add updateWires action to store to persist wire labels
-  }, [wires, components]);
+  const handleApplyWireNumbering = useCallback(
+    (options: WireNumberingOptions) => {
+      const result = generateWireNumbers(wires, components, options);
+      const updatedWires = applyWireNumbers(wires, result.wireNumbers);
+      console.log('Wire numbering applied:', result.stats);
+      console.log('Updated wires:', updatedWires.length);
+    },
+    [wires, components]
+  );
 
-  // Handle print
   const handlePrint = useCallback((config: PrintLayoutConfig) => {
-    // Get the SVG content from canvas for printing
     const container = canvasRef.current?.getContainer();
     const svgElement = container?.querySelector('svg');
     if (svgElement) {
@@ -825,195 +343,159 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     }
   }, []);
 
-  // Handle loading circuit templates
-  const handleLoadTemplate = useCallback((
-    templateComponents: Map<string, Block>,
-    templateWires: Wire[],
-    _templateJunctions: Map<string, Junction>,
-    _offset: Position
-  ) => {
-    // Add each component from the template
-    templateComponents.forEach((block) => {
-      addComponent(block.type, block.position, block);
-    });
-    
-    // Note: Wires need special handling as they reference the NEW component IDs
-    // The CircuitLibraryPanel handles ID remapping via prepareTemplateForInsertion
-    templateWires.forEach((wire) => {
-      if (isPortEndpoint(wire.from) && isPortEndpoint(wire.to)) {
-        addWire(wire.from, wire.to, {
-          fromExitDirection: wire.fromExitDirection,
-          toExitDirection: wire.toExitDirection,
-        });
-      }
-    });
-  }, [addComponent, addWire]);
+  const handleLoadTemplate = useCallback(
+    (
+      templateComponents: Map<string, Block>,
+      templateWires: Wire[],
+      _templateJunctions: Map<string, Junction>,
+      _offset: Position
+    ) => {
+      templateComponents.forEach((block) => {
+        addComponent(block.type, block.position, block);
+      });
+
+      templateWires.forEach((wire) => {
+        if (isPortEndpoint(wire.from) && isPortEndpoint(wire.to)) {
+          addWire(wire.from, wire.to, {
+            fromExitDirection: wire.fromExitDirection,
+            toExitDirection: wire.toExitDirection,
+          });
+        }
+      });
+    },
+    [addComponent, addWire]
+  );
 
   return (
     <PanelErrorBoundary panelName="Canvas">
-      <DndContext
-        sensors={sensors}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
+      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="h-full flex flex-col bg-neutral-950">
-        {/* Simulation Toolbar */}
-        <SimulationToolbar
-          running={simulation.running}
-          onStart={simulation.start}
-          onStop={simulation.stop}
-          onReset={simulation.reset}
-          onStep={simulation.step}
-          measuredRate={simulation.measuredRate}
-        />
-
-        {/* Canvas Toolbar (Align, Distribute, Flip, Wire Numbering, Print) */}
-        <div className="flex items-center justify-center px-2 py-1 bg-neutral-900 border-b border-neutral-800">
-          <CanvasToolbar
-            onAlignSelected={alignSelected}
-            onDistributeSelected={distributeSelected}
-            onFlipSelected={flipSelected}
-            onOpenWireNumbering={() => setWireNumberingOpen(true)}
-            onOpenPrint={() => setPrintDialogOpen(true)}
-            hasSelection={selectedIds.size > 0}
-            selectionCount={selectedIds.size}
+          <SimulationToolbar
+            running={simulation.running}
+            onStart={simulation.start}
+            onStop={simulation.stop}
+            onReset={simulation.reset}
+            onStep={simulation.step}
+            measuredRate={simulation.measuredRate}
           />
-        </div>
 
-        {/* Main Content Area */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* Toolbox */}
-          <Toolbox onOpenLibrary={() => setLibraryOpen(true)} />
+          <div className="flex items-center justify-center px-2 py-1 bg-neutral-900 border-b border-neutral-800">
+            <CanvasToolbar
+              onAlignSelected={alignSelected}
+              onDistributeSelected={distributeSelected}
+              onFlipSelected={flipSelected}
+              onOpenWireNumbering={() => setWireNumberingOpen(true)}
+              onOpenPrint={() => setPrintDialogOpen(true)}
+              hasSelection={selectedIds.size > 0}
+              selectionCount={selectedIds.size}
+            />
+          </div>
 
-          {/* Canvas Area */}
-          <CanvasDropZone className="flex-1 relative overflow-hidden">
-            <div
-              className="w-full h-full"
-              onMouseDown={handleCanvasMouseDown}
-              onMouseMove={handleCanvasMouseMove}
-              onMouseUp={handleCanvasMouseUp}
-            >
-              <Canvas
-                ref={canvasRef}
-                className="w-full h-full"
-                blocks={components}
-                wires={wires}
-                junctions={junctions}
-                selectionBox={selectionHandler.selectionBox}
-                wirePreview={wireDrawing}
-                onBlockClick={selectionHandler.handleComponentClick}
-                onWireClick={selectionHandler.handleWireClick}
-                onJunctionClick={selectionHandler.handleJunctionClick}
-                selectedBlockIds={selectedIds}
-                selectedWireIds={selectedIds}
-                connectedPorts={Array.from(components.keys()).reduce((acc, blockId) => {
-                  const ports = getConnectedPorts(blockId);
-                  ports.forEach(portId => acc.add(portId));
-                  return acc;
-                }, new Set<string>())}
-                portVoltages={portVoltages}
-                plcOutputStates={new Map()}
-                onButtonPress={handleButtonPress}
-                onButtonRelease={handleButtonRelease}
-                onStartWire={handleStartWire}
-                onEndWire={handleEndWire}
-                onBlockDragStart={handleBlockDragStart}
-                onWireContextMenu={handleWireContextMenu}
-                onWireHandleDragStart={handleWireHandleDragStart}
-                onWireHandleContextMenu={handleWireHandleContextMenu}
-                onWireSegmentDragStart={handleSegmentDragStart}
-                onWireEndpointSegmentDragStart={handleEndpointSegmentDragStart}
-                onUpdateComponent={handleUpdateComponent}
-                debugMode={debugMode}
-              />
+          <div className="flex-1 flex overflow-hidden">
+            <Toolbox onOpenLibrary={() => setLibraryOpen(true)} />
 
-              {/* Minimap overlay */}
-              <CanvasMinimap
-                components={components}
-                wires={wires}
-                zoom={zoom}
-                pan={pan}
-                viewportWidth={viewportSize.width}
-                viewportHeight={viewportSize.height}
-                onNavigate={setPan}
-                collapsed={minimapCollapsed}
-                onToggleCollapse={() => setMinimapCollapsed(!minimapCollapsed)}
-              />
-            </div>
+            <CanvasDropZone className="flex-1 relative overflow-hidden">
+              <div className="w-full h-full" onMouseDown={handleCanvasMouseDown} onMouseMove={handleCanvasMouseMove} onMouseUp={handleCanvasMouseUp}>
+                <Canvas
+                  ref={canvasRef}
+                  className="w-full h-full"
+                  blocks={components}
+                  wires={wires}
+                  junctions={junctions}
+                  selectionBox={selectionHandler.selectionBox}
+                  wirePreview={wireDrawing}
+                  onBlockClick={selectionHandler.handleComponentClick}
+                  onWireClick={selectionHandler.handleWireClick}
+                  onJunctionClick={selectionHandler.handleJunctionClick}
+                  selectedBlockIds={selectedIds}
+                  selectedWireIds={selectedIds}
+                  connectedPorts={Array.from(components.keys()).reduce((acc, blockId) => {
+                    const ports = getConnectedPorts(blockId);
+                    ports.forEach((portId) => acc.add(portId));
+                    return acc;
+                  }, new Set<string>())}
+                  portVoltages={portVoltages}
+                  plcOutputStates={new Map()}
+                  onButtonPress={handleButtonPress}
+                  onButtonRelease={handleButtonRelease}
+                  onStartWire={handleStartWire}
+                  onEndWire={handleEndWire}
+                  onBlockDragStart={handleBlockDragStart}
+                  onWireContextMenu={handleWireContextMenu}
+                  onWireHandleDragStart={handleWireHandleDragStart}
+                  onWireHandleContextMenu={handleWireHandleContextMenu}
+                  onWireSegmentDragStart={handleSegmentDragStart}
+                  onWireEndpointSegmentDragStart={handleEndpointSegmentDragStart}
+                  onUpdateComponent={handleUpdateComponent}
+                  debugMode={debugMode}
+                />
 
-            {/* Schematic Page Bar - only shown for schematic documents */}
-            {schematicDoc && (
-              <SchematicPageBar
-                pages={schematicDoc.schematic.pages}
-                activePageId={schematicDoc.schematic.activePageId}
-                onActivatePage={handleSchematicPageSwitch}
-                onAddPage={() => schematicDoc.addPage()}
-                onRemovePage={schematicDoc.removePage}
-                onRenamePage={(pageId, newName) => schematicDoc.updatePage(pageId, { name: newName })}
-                onDuplicatePage={schematicDoc.duplicatePage}
-                hasNextPage={schematicDoc.navigationInfo.hasNext}
-                hasPreviousPage={schematicDoc.navigationInfo.hasPrevious}
-                onNextPage={schematicDoc.goToNextPage}
-                onPreviousPage={schematicDoc.goToPreviousPage}
-              />
+                <CanvasMinimap
+                  components={components}
+                  wires={wires}
+                  zoom={zoom}
+                  pan={pan}
+                  viewportWidth={viewportSize.width}
+                  viewportHeight={viewportSize.height}
+                  onNavigate={setPan}
+                  collapsed={minimapCollapsed}
+                  onToggleCollapse={() => setMinimapCollapsed(!minimapCollapsed)}
+                />
+              </div>
+
+              {schematicDoc && (
+                <SchematicPageBar
+                  pages={schematicDoc.schematic.pages}
+                  activePageId={schematicDoc.schematic.activePageId}
+                  onActivatePage={handleSchematicPageSwitch}
+                  onAddPage={() => schematicDoc.addPage()}
+                  onRemovePage={schematicDoc.removePage}
+                  onRenamePage={(pageId, newName) => schematicDoc.updatePage(pageId, { name: newName })}
+                  onDuplicatePage={schematicDoc.duplicatePage}
+                  hasNextPage={schematicDoc.navigationInfo.hasNext}
+                  hasPreviousPage={schematicDoc.navigationInfo.hasPrevious}
+                  onNextPage={schematicDoc.goToNextPage}
+                  onPreviousPage={schematicDoc.goToPreviousPage}
+                />
+              )}
+            </CanvasDropZone>
+
+            {selectedComponentsForPanel.length === 1 && (
+              <div className="w-64 min-h-0 border-l border-neutral-700 overflow-y-auto flex-shrink-0 bg-neutral-900">
+                <PropertiesPanel selectedComponents={selectedComponentsForPanel} onUpdateComponent={handleUpdateComponent} />
+              </div>
             )}
-          </CanvasDropZone>
-
-          {/* Properties Sidebar */}
-          {selectedComponentsForPanel.length === 1 && (
-            <div className="w-64 min-h-0 border-l border-neutral-700 overflow-y-auto flex-shrink-0 bg-neutral-900">
-              <PropertiesPanel
-                selectedComponents={selectedComponentsForPanel}
-                onUpdateComponent={handleUpdateComponent}
-              />
-            </div>
-          )}
+          </div>
         </div>
-      </div>
 
-      {/* Wire Context Menu */}
-      {wireContextMenu && (
-        <WireContextMenu
-          screenPosition={wireContextMenu.screenPosition}
-          wireId={wireContextMenu.wireId}
-          wireClickPosition={wireContextMenu.position}
-          onClose={handleCloseWireContextMenu}
-          onAction={handleWireContextMenuAction}
+        {wireContextMenu && (
+          <WireContextMenu
+            screenPosition={wireContextMenu.screenPosition}
+            wireId={wireContextMenu.wireId}
+            wireClickPosition={wireContextMenu.position}
+            onClose={handleCloseWireContextMenu}
+            onAction={handleWireContextMenuAction}
+          />
+        )}
+
+        <DragOverlay>{draggedType && <BlockDragPreview type={draggedType} presetLabel={draggedLabel} />}</DragOverlay>
+
+        <CanvasDialogs
+          libraryOpen={libraryOpen}
+          onCloseLibrary={() => setLibraryOpen(false)}
+          selectedIds={selectedIds}
+          components={components}
+          wires={wires}
+          junctions={junctions}
+          onLoadTemplate={handleLoadTemplate}
+          wireNumberingOpen={wireNumberingOpen}
+          onCloseWireNumbering={() => setWireNumberingOpen(false)}
+          onApplyWireNumbering={handleApplyWireNumbering}
+          printDialogOpen={printDialogOpen}
+          onClosePrintDialog={() => setPrintDialogOpen(false)}
+          onPrint={handlePrint}
         />
-      )}
-
-      {/* Drag Overlay */}
-      <DragOverlay>
-        {draggedType && <BlockDragPreview type={draggedType} presetLabel={draggedLabel} />}
-      </DragOverlay>
-
-      {/* Circuit Library Panel */}
-      <CircuitLibraryPanel
-        isOpen={libraryOpen}
-        onClose={() => setLibraryOpen(false)}
-        selectedIds={selectedIds}
-        components={components}
-        wires={wires}
-        junctions={junctions}
-        onLoadTemplate={handleLoadTemplate}
-      />
-
-      {/* Wire Numbering Dialog */}
-      <WireNumberingDialog
-        isOpen={wireNumberingOpen}
-        onClose={() => setWireNumberingOpen(false)}
-        wireCount={wires.length}
-        onApply={handleApplyWireNumbering}
-      />
-
-      {/* Print Dialog */}
-      <PrintDialog
-        isOpen={printDialogOpen}
-        onClose={() => setPrintDialogOpen(false)}
-        onPrint={handlePrint}
-        defaultProjectTitle="ModOne Project"
-       />
-     </DndContext>
+      </DndContext>
     </PanelErrorBoundary>
   );
 });

@@ -90,6 +90,14 @@ export function useAsyncOperation<T = void>(
   // Update operation ref to avoid stale closures
   operationRef.current = operation;
 
+  // Track mounted state for safe state updates after async operations
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   // ============================================================================
   // Handlers
   // ============================================================================
