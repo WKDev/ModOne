@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useCallback, useRef } from 'react';
-import { useCanvasStore } from '../../../stores/canvasStore';
+import type { Block, BlockType, Wire, WireEndpoint, Position, PortPosition } from '../types';
 import { isPortEndpoint } from '../types';
 
 // ============================================================================
@@ -70,35 +70,52 @@ interface UseCanvasKeyboardShortcutsOptions {
   enabled?: boolean;
   /** Callback when components are deleted */
   onDelete?: () => void;
+  // Injected canvas state (from facade)
+  components: Map<string, Block>;
+  wires: Wire[];
+  selectedIds: Set<string>;
+  selectAll?: () => void;
+  clearSelection: () => void;
+  removeComponent?: (id: string) => void;
+  removeWire?: (id: string) => void;
+  addComponent: (type: BlockType, position: Position, props?: Partial<Block>) => string;
+  addWire: (from: WireEndpoint, to: WireEndpoint, options?: { fromExitDirection?: PortPosition; toExitDirection?: PortPosition }) => string | null;
+  toggleGrid?: () => void;
+  toggleSnap?: () => void;
+  undo: () => void;
+  redo: () => void;
+  rotateSelectedComponents?: (degrees: number) => void;
 }
 
 /**
  * Hook for handling canvas keyboard shortcuts.
+ * All canvas state is injected via options (no direct store access).
  *
- * @param options - Configuration options
+ * @param options - Configuration options with injected canvas state
  */
-export function useCanvasKeyboardShortcuts(options: UseCanvasKeyboardShortcutsOptions = {}) {
-  const { enabled = true, onDelete } = options;
+export function useCanvasKeyboardShortcuts(options: UseCanvasKeyboardShortcutsOptions) {
+  const {
+    enabled = true,
+    onDelete,
+    components,
+    wires,
+    selectedIds,
+    selectAll,
+    clearSelection,
+    removeComponent,
+    removeWire,
+    addComponent,
+    addWire,
+    toggleGrid,
+    toggleSnap,
+    undo,
+    redo,
+    rotateSelectedComponents,
+  } = options;
 
-  // Store refs for latest values
+  // Store ref for enabled so event handler always sees latest
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
-
-  // Get store actions
-  const components = useCanvasStore((state) => state.components);
-  const wires = useCanvasStore((state) => state.wires);
-  const selectedIds = useCanvasStore((state) => state.selectedIds);
-  const selectAll = useCanvasStore((state) => state.selectAll);
-  const clearSelection = useCanvasStore((state) => state.clearSelection);
-  const removeComponent = useCanvasStore((state) => state.removeComponent);
-  const removeWire = useCanvasStore((state) => state.removeWire);
-  const addComponent = useCanvasStore((state) => state.addComponent);
-  const addWire = useCanvasStore((state) => state.addWire);
-  const toggleGrid = useCanvasStore((state) => state.toggleGrid);
-  const toggleSnap = useCanvasStore((state) => state.toggleSnap);
-  const undo = useCanvasStore((state) => state.undo);
-  const redo = useCanvasStore((state) => state.redo);
-  const rotateSelectedComponents = useCanvasStore((state) => state.rotateSelectedComponents);
 
   // Store refs for callbacks
   const selectedIdsRef = useRef(selectedIds);
@@ -115,9 +132,9 @@ export function useCanvasKeyboardShortcuts(options: UseCanvasKeyboardShortcutsOp
 
     ids.forEach((id) => {
       if (componentsRef.current.has(id)) {
-        removeComponent(id);
+        removeComponent?.(id);
       } else if (wiresRef.current.some((w) => w.id === id)) {
-        removeWire(id);
+        removeWire?.(id);
       }
     });
 
@@ -136,7 +153,7 @@ export function useCanvasKeyboardShortcuts(options: UseCanvasKeyboardShortcutsOp
     );
 
     if (hasComponents) {
-      rotateSelectedComponents(90);
+      rotateSelectedComponents?.(90);
     }
   }, [rotateSelectedComponents]);
 
@@ -254,7 +271,7 @@ export function useCanvasKeyboardShortcuts(options: UseCanvasKeyboardShortcutsOp
         case 'a':
           if (ctrl) {
             e.preventDefault();
-            selectAll();
+            selectAll?.();
           }
           break;
 
@@ -314,7 +331,7 @@ export function useCanvasKeyboardShortcuts(options: UseCanvasKeyboardShortcutsOp
         case 'g':
           if (!ctrl && !shift) {
             e.preventDefault();
-            toggleGrid();
+            toggleGrid?.();
           }
           break;
 
@@ -322,7 +339,7 @@ export function useCanvasKeyboardShortcuts(options: UseCanvasKeyboardShortcutsOp
         case 's':
           if (!ctrl && !shift) {
             e.preventDefault();
-            toggleSnap();
+            toggleSnap?.();
           }
           break;
 

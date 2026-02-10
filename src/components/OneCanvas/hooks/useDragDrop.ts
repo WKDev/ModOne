@@ -6,9 +6,8 @@
 
 import { useState, useCallback } from 'react';
 import type { DragEndEvent, DragStartEvent, DragMoveEvent } from '@dnd-kit/core';
-import { useCanvasStore } from '../../../stores/canvasStore';
 import { screenToCanvas, snapToGrid } from '../utils/canvasCoordinates';
-import type { BlockType, Position } from '../types';
+import type { Block, BlockType, Position } from '../types';
 
 // ============================================================================
 // Types
@@ -30,6 +29,22 @@ export interface DragState {
 interface UseDragDropOptions {
   /** Canvas container element for coordinate transformation */
   canvasRef: React.RefObject<HTMLElement | null>;
+  /** Current zoom level */
+  zoom: number;
+  /** Current pan offset */
+  pan: Position;
+  /** Grid size */
+  gridSize: number;
+  /** Whether snapping to grid is enabled */
+  snapToGridEnabled: boolean;
+  /** Add a new component from toolbox */
+  addComponent: (type: BlockType, position: Position) => string;
+  /** Move an existing component */
+  moveComponent: (id: string, position: Position) => void;
+  /** Currently selected component IDs */
+  selectedIds: Set<string>;
+  /** Current component map for lookup during multi-move */
+  components: Map<string, Block>;
 }
 
 interface UseDragDropReturn {
@@ -61,17 +76,18 @@ const initialDragState: DragState = {
 // Hook
 // ============================================================================
 
-export function useDragDrop({ canvasRef }: UseDragDropOptions): UseDragDropReturn {
+export function useDragDrop({
+  canvasRef,
+  zoom,
+  pan,
+  gridSize,
+  snapToGridEnabled,
+  addComponent,
+  moveComponent,
+  selectedIds,
+  components,
+}: UseDragDropOptions): UseDragDropReturn {
   const [dragState, setDragState] = useState<DragState>(initialDragState);
-
-  // Store access
-  const zoom = useCanvasStore((state) => state.zoom);
-  const pan = useCanvasStore((state) => state.pan);
-  const gridSize = useCanvasStore((state) => state.gridSize);
-  const snapToGridEnabled = useCanvasStore((state) => state.snapToGrid);
-  const addComponent = useCanvasStore((state) => state.addComponent);
-  const moveComponent = useCanvasStore((state) => state.moveComponent);
-  const selectedIds = useCanvasStore((state) => state.selectedIds);
 
   // Get canvas-relative position from screen coordinates
   const getCanvasPosition = useCallback(
@@ -183,7 +199,7 @@ export function useDragDrop({ canvasRef }: UseDragDropOptions): UseDragDropRetur
 
                 // Move all selected components
                 selectedIds.forEach((id) => {
-                  const comp = useCanvasStore.getState().components.get(id);
+                  const comp = components.get(id);
                   if (comp) {
                     const newPos = {
                       x: comp.position.x + delta.x,
@@ -204,7 +220,7 @@ export function useDragDrop({ canvasRef }: UseDragDropOptions): UseDragDropRetur
       // Reset drag state
       setDragState(initialDragState);
     },
-    [getCanvasPosition, addComponent, moveComponent, selectedIds, snapToGridEnabled, gridSize]
+    [getCanvasPosition, addComponent, moveComponent, selectedIds, snapToGridEnabled, gridSize, components]
   );
 
   // Handle drag cancel (e.g., Escape key)

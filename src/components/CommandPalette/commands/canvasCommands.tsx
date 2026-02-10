@@ -28,7 +28,14 @@ import {
   Printer,
 } from 'lucide-react';
 import { commandRegistry } from '../commandRegistry';
-import { useCanvasStore } from '../../../stores/canvasStore';
+import { useDocumentRegistry } from '../../../stores/documentRegistry';
+import { useEditorAreaStore } from '../../../stores/editorAreaStore';
+import { isCanvasDocument } from '../../../types/document';
+import type { CanvasDocumentData } from '../../../types/document';
+import type { BlockType, Block } from '../../OneCanvas/types';
+import { getBlockSize, getDefaultPorts, getDefaultBlockProps, getPowerSourcePorts } from '../../OneCanvas/blockDefinitions';
+import { generateId, snapToGridPosition } from '../../OneCanvas/utils/canvasHelpers';
+import { alignComponents, distributeComponents } from '../../OneCanvas/utils/canvas-commands';
 import {
   exportToPng,
   downloadBlob,
@@ -42,11 +49,89 @@ import type { Command } from '../types';
 // Helpers
 // ============================================================================
 
+function getActiveCanvasDocumentId(): string | null {
+  const { tabs, activeTabId } = useEditorAreaStore.getState();
+  const activeTab = tabs.find((tab) => tab.id === activeTabId);
+  const documentId = activeTab?.data?.documentId;
+  return typeof documentId === 'string' ? documentId : null;
+}
+
+function withActiveCanvasData(
+  updater: (data: CanvasDocumentData) => void,
+  options?: { pushHistory?: boolean }
+): boolean {
+  const documentId = getActiveCanvasDocumentId();
+  if (!documentId) return false;
+
+  const registry = useDocumentRegistry.getState();
+  const doc = registry.documents.get(documentId);
+  if (!doc || !isCanvasDocument(doc)) return false;
+
+  if (options?.pushHistory !== false) {
+    registry.pushHistory(documentId);
+  }
+  registry.updateCanvasData(documentId, updater);
+  return true;
+}
+
+function getActiveCanvasSnapshot() {
+  const documentId = getActiveCanvasDocumentId();
+  if (!documentId) return null;
+
+  const doc = useDocumentRegistry.getState().documents.get(documentId);
+  if (!doc || !isCanvasDocument(doc)) return null;
+
+  return {
+    documentId,
+    data: doc.data,
+  };
+}
+
+function getSelectedComponentIds(): Set<string> {
+  const snapshot = getActiveCanvasSnapshot();
+  if (!snapshot) return new Set();
+
+  const selected = new Set<string>();
+  snapshot.data.components.forEach((component, id) => {
+    if (component.selected) {
+      selected.add(id);
+    }
+  });
+  return selected;
+}
+
+function addComponent(type: BlockType, position: { x: number; y: number }) {
+  withActiveCanvasData((docData) => {
+    const id = generateId(type);
+    const finalPosition = docData.snapToGrid
+      ? snapToGridPosition(position, docData.gridSize)
+      : position;
+
+    let ports = getDefaultPorts(type);
+    if (type === 'powersource') {
+      ports = getPowerSourcePorts('positive');
+    }
+
+    const newBlock: Block = {
+      id,
+      type,
+      position: finalPosition,
+      size: getBlockSize(type),
+      ports,
+      ...getDefaultBlockProps(type),
+    } as Block;
+
+    docData.components.set(id, newBlock);
+  });
+}
+
 /**
  * Calculate center position of the current viewport
  */
 function getViewportCenter(): { x: number; y: number } {
-  const { zoom, pan } = useCanvasStore.getState();
+  const snapshot = getActiveCanvasSnapshot();
+  const zoom = snapshot?.data.zoom ?? 1;
+  const pan = snapshot?.data.pan ?? { x: 0, y: 0 };
   // Approximate viewport size - commands don't have access to container dimensions
   // Use a reasonable default centered position
   const viewWidth = 800;
@@ -61,21 +146,21 @@ function getViewportCenter(): { x: number; y: number } {
  * Check if there are selected items
  */
 function hasSelection(): boolean {
-  return useCanvasStore.getState().selectedIds.size > 0;
+  return getSelectedComponentIds().size > 0;
 }
 
 /**
  * Check if alignment can be performed (need 2+ selected)
  */
 function canAlignSelected(): boolean {
-  return useCanvasStore.getState().selectedIds.size >= 2;
+  return getSelectedComponentIds().size >= 2;
 }
 
 /**
  * Check if distribution can be performed (need 3+ selected)
  */
 function canDistributeSelected(): boolean {
-  return useCanvasStore.getState().selectedIds.size >= 3;
+  return getSelectedComponentIds().size >= 3;
 }
 
 // ============================================================================
@@ -99,7 +184,7 @@ export function registerCanvasCommands(): void {
       keywords: ['button', 'pushbutton', 'input', 'add', 'block'],
       execute: () => {
         const pos = getViewportCenter();
-        useCanvasStore.getState().addComponent('button', pos);
+        addComponent('button', pos);
       },
     },
     {
@@ -111,7 +196,7 @@ export function registerCanvasCommands(): void {
       keywords: ['led', 'light', 'indicator', 'output', 'add', 'block'],
       execute: () => {
         const pos = getViewportCenter();
-        useCanvasStore.getState().addComponent('led', pos);
+        addComponent('led', pos);
       },
     },
     {
@@ -123,7 +208,7 @@ export function registerCanvasCommands(): void {
       keywords: ['scope', 'oscilloscope', 'waveform', 'monitor', 'add', 'block'],
       execute: () => {
         const pos = getViewportCenter();
-        useCanvasStore.getState().addComponent('scope', pos);
+        addComponent('scope', pos);
       },
     },
     {
@@ -135,7 +220,7 @@ export function registerCanvasCommands(): void {
       keywords: ['plc', 'input', 'di', 'digital', 'add', 'block'],
       execute: () => {
         const pos = getViewportCenter();
-        useCanvasStore.getState().addComponent('plc_in', pos);
+        addComponent('plc_in', pos);
       },
     },
     {
@@ -147,7 +232,7 @@ export function registerCanvasCommands(): void {
       keywords: ['plc', 'output', 'do', 'digital', 'add', 'block'],
       execute: () => {
         const pos = getViewportCenter();
-        useCanvasStore.getState().addComponent('plc_out', pos);
+        addComponent('plc_out', pos);
       },
     },
 
@@ -163,8 +248,9 @@ export function registerCanvasCommands(): void {
       shortcut: 'Ctrl++',
       keywords: ['zoom', 'in', 'magnify', 'larger'],
       execute: () => {
-        const { zoom, setZoom } = useCanvasStore.getState();
-        setZoom(Math.min(zoom * 1.2, 4.0));
+        withActiveCanvasData((data) => {
+          data.zoom = Math.min(data.zoom * 1.2, 4.0);
+        }, { pushHistory: false });
       },
     },
     {
@@ -176,8 +262,9 @@ export function registerCanvasCommands(): void {
       shortcut: 'Ctrl+-',
       keywords: ['zoom', 'out', 'smaller'],
       execute: () => {
-        const { zoom, setZoom } = useCanvasStore.getState();
-        setZoom(Math.max(zoom / 1.2, 0.1));
+        withActiveCanvasData((data) => {
+          data.zoom = Math.max(data.zoom / 1.2, 0.1);
+        }, { pushHistory: false });
       },
     },
     {
@@ -189,7 +276,9 @@ export function registerCanvasCommands(): void {
       shortcut: 'Ctrl+0',
       keywords: ['zoom', 'reset', '100%', 'default'],
       execute: () => {
-        useCanvasStore.getState().setZoom(1.0);
+        withActiveCanvasData((data) => {
+          data.zoom = 1.0;
+        }, { pushHistory: false });
       },
     },
     {
@@ -200,7 +289,9 @@ export function registerCanvasCommands(): void {
       icon: <Grid3X3 size={16} />,
       keywords: ['grid', 'toggle', 'show', 'hide', 'lines'],
       execute: () => {
-        useCanvasStore.getState().toggleGrid();
+        withActiveCanvasData((data) => {
+          data.showGrid = !data.showGrid;
+        }, { pushHistory: false });
       },
     },
     {
@@ -211,7 +302,9 @@ export function registerCanvasCommands(): void {
       icon: <Magnet size={16} />,
       keywords: ['snap', 'grid', 'toggle', 'align'],
       execute: () => {
-        useCanvasStore.getState().toggleSnap();
+        withActiveCanvasData((data) => {
+          data.snapToGrid = !data.snapToGrid;
+        }, { pushHistory: false });
       },
     },
 
@@ -228,8 +321,17 @@ export function registerCanvasCommands(): void {
       keywords: ['delete', 'remove', 'clear', 'selected'],
       when: hasSelection,
       execute: () => {
-        const { selectedIds, removeComponent } = useCanvasStore.getState();
-        selectedIds.forEach((id) => removeComponent(id));
+        const selectedIds = getSelectedComponentIds();
+        withActiveCanvasData((data) => {
+          selectedIds.forEach((id) => {
+            data.components.delete(id);
+          });
+          data.wires = data.wires.filter(
+            (wire) =>
+              !(("componentId" in wire.from && selectedIds.has(wire.from.componentId)) ||
+                ("componentId" in wire.to && selectedIds.has(wire.to.componentId)))
+          );
+        });
       },
     },
     {
@@ -241,7 +343,13 @@ export function registerCanvasCommands(): void {
       shortcut: 'Ctrl+A',
       keywords: ['select', 'all', 'blocks'],
       execute: () => {
-        useCanvasStore.getState().selectAll();
+        withActiveCanvasData((data) => {
+          data.components.forEach((component, id) => {
+            if (!component.selected) {
+              data.components.set(id, { ...component, selected: true });
+            }
+          });
+        }, { pushHistory: false });
       },
     },
     {
@@ -253,7 +361,10 @@ export function registerCanvasCommands(): void {
       keywords: ['align', 'left', 'blocks'],
       when: canAlignSelected,
       execute: () => {
-        useCanvasStore.getState().alignSelected('left');
+        const selectedIds = getSelectedComponentIds();
+        withActiveCanvasData((data) => {
+          data.components = alignComponents(data.components, selectedIds, 'left');
+        });
       },
     },
     {
@@ -265,7 +376,10 @@ export function registerCanvasCommands(): void {
       keywords: ['align', 'right', 'blocks'],
       when: canAlignSelected,
       execute: () => {
-        useCanvasStore.getState().alignSelected('right');
+        const selectedIds = getSelectedComponentIds();
+        withActiveCanvasData((data) => {
+          data.components = alignComponents(data.components, selectedIds, 'right');
+        });
       },
     },
     {
@@ -277,7 +391,10 @@ export function registerCanvasCommands(): void {
       keywords: ['align', 'top', 'blocks'],
       when: canAlignSelected,
       execute: () => {
-        useCanvasStore.getState().alignSelected('top');
+        const selectedIds = getSelectedComponentIds();
+        withActiveCanvasData((data) => {
+          data.components = alignComponents(data.components, selectedIds, 'top');
+        });
       },
     },
     {
@@ -289,7 +406,10 @@ export function registerCanvasCommands(): void {
       keywords: ['align', 'bottom', 'blocks'],
       when: canAlignSelected,
       execute: () => {
-        useCanvasStore.getState().alignSelected('bottom');
+        const selectedIds = getSelectedComponentIds();
+        withActiveCanvasData((data) => {
+          data.components = alignComponents(data.components, selectedIds, 'bottom');
+        });
       },
     },
     {
@@ -301,7 +421,10 @@ export function registerCanvasCommands(): void {
       keywords: ['distribute', 'horizontal', 'space', 'even', 'blocks'],
       when: canDistributeSelected,
       execute: () => {
-        useCanvasStore.getState().distributeSelected('horizontal');
+        const selectedIds = getSelectedComponentIds();
+        withActiveCanvasData((data) => {
+          data.components = distributeComponents(data.components, selectedIds, 'horizontal');
+        });
       },
     },
     {
@@ -313,7 +436,10 @@ export function registerCanvasCommands(): void {
       keywords: ['distribute', 'vertical', 'space', 'even', 'blocks'],
       when: canDistributeSelected,
       execute: () => {
-        useCanvasStore.getState().distributeSelected('vertical');
+        const selectedIds = getSelectedComponentIds();
+        withActiveCanvasData((data) => {
+          data.components = distributeComponents(data.components, selectedIds, 'vertical');
+        });
       },
     },
 
@@ -351,8 +477,9 @@ export function registerCanvasCommands(): void {
       keywords: ['export', 'bom', 'bill', 'materials', 'csv', 'components'],
       execute: () => {
         try {
-          const { components } = useCanvasStore.getState();
-          const bom = generateBom(components);
+          const snapshot = getActiveCanvasSnapshot();
+          if (!snapshot) return;
+          const bom = generateBom(snapshot.data.components);
           const csv = bomToCsv(bom);
           downloadText(csv, 'bom.csv', 'text/csv');
         } catch (error) {

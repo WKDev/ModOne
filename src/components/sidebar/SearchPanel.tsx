@@ -1,6 +1,9 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Search, File, Replace, ChevronDown, ChevronRight } from 'lucide-react';
-import { useCanvasStore } from '../../stores/canvasStore';
+import { useDocumentRegistry } from '../../stores/documentRegistry';
+import { useEditorAreaStore } from '../../stores/editorAreaStore';
+import { isCanvasDocument } from '../../types/document';
+import type { Block } from '../OneCanvas/types';
 import { searchComponents, replaceInComponents, type SearchResult as CircuitSearchResult } from '../OneCanvas/utils/circuitSearch';
 
 // ============================================================================
@@ -25,6 +28,8 @@ interface SearchOptions {
   showReplace: boolean;
 }
 
+const EMPTY_COMPONENTS = new Map<string, Block>();
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -41,12 +46,24 @@ export function SearchPanel() {
   });
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
 
-  // Canvas store
-  const components = useCanvasStore((state) => state.components);
-  const setSelection = useCanvasStore((state) => state.setSelection);
-  const updateComponent = useCanvasStore((state) => state.updateComponent);
-  const setPan = useCanvasStore((state) => state.setPan);
-  const setZoom = useCanvasStore((state) => state.setZoom);
+  const { tabs, activeTabId } = useEditorAreaStore((state) => ({
+    tabs: state.tabs,
+    activeTabId: state.activeTabId,
+  }));
+
+  const activeDocumentId = useMemo(() => {
+    const activeTab = tabs.find((tab) => tab.id === activeTabId);
+    return activeTab?.data?.documentId ?? null;
+  }, [tabs, activeTabId]);
+
+  const activeCanvasDocument = useDocumentRegistry((state) => {
+    if (!activeDocumentId) return null;
+    const doc = state.documents.get(activeDocumentId);
+    return doc && isCanvasDocument(doc) ? doc : null;
+  });
+
+  const updateCanvasData = useDocumentRegistry((state) => state.updateCanvasData);
+  const components = activeCanvasDocument?.data.components ?? EMPTY_COMPONENTS;
 
   /**
    * Perform search across canvas components
@@ -102,9 +119,16 @@ export function SearchPanel() {
   const handleResultClick = useCallback(
     (result: SearchResult) => {
       if (!result.blockId) return;
+      if (!activeCanvasDocument) return;
 
-      // Select the component (setSelection takes an array of IDs)
-      setSelection([result.blockId]);
+      updateCanvasData(activeCanvasDocument.id, (data) => {
+        data.components.forEach((component, id) => {
+          const shouldSelect = id === result.blockId;
+          if (component.selected !== shouldSelect) {
+            data.components.set(id, { ...component, selected: shouldSelect });
+          }
+        });
+      });
 
       // Find the component and pan to it
       const block = components.get(result.blockId);
@@ -114,14 +138,16 @@ export function SearchPanel() {
         const viewportHeight = window.innerHeight - 200; // Subtract header/status bar
 
         // Pan to center the block
-        setPan({
-          x: -block.position.x + viewportWidth / 2 - block.size.width / 2,
-          y: -block.position.y + viewportHeight / 2 - block.size.height / 2,
+        updateCanvasData(activeCanvasDocument.id, (data) => {
+          data.pan = {
+            x: -block.position.x + viewportWidth / 2 - block.size.width / 2,
+            y: -block.position.y + viewportHeight / 2 - block.size.height / 2,
+          };
+          data.zoom = 1;
         });
-        setZoom(1); // Reset zoom for clarity
       }
     },
-    [components, setSelection, setPan, setZoom]
+    [activeCanvasDocument, components, updateCanvasData]
   );
 
   /**
@@ -143,16 +169,22 @@ export function SearchPanel() {
       };
 
       const updates = replaceInComponents(components, [circuitResult], replaceText);
+      if (!activeCanvasDocument) return;
 
       // Apply updates
-      for (const [blockId, update] of updates) {
-        updateComponent(blockId, update);
-      }
+      updateCanvasData(activeCanvasDocument.id, (data) => {
+        for (const [blockId, update] of updates) {
+          const existing = data.components.get(blockId);
+          if (existing) {
+            data.components.set(blockId, { ...existing, ...update } as Block);
+          }
+        }
+      });
 
       // Refresh search
       performSearch(query);
     },
-    [components, replaceText, updateComponent, performSearch, query]
+    [activeCanvasDocument, components, replaceText, updateCanvasData, performSearch, query]
   );
 
   /**
@@ -175,15 +207,21 @@ export function SearchPanel() {
       }));
 
     const updates = replaceInComponents(components, circuitResults, replaceText);
+    if (!activeCanvasDocument) return;
 
     // Apply updates
-    for (const [blockId, update] of updates) {
-      updateComponent(blockId, update);
-    }
+    updateCanvasData(activeCanvasDocument.id, (data) => {
+      for (const [blockId, update] of updates) {
+        const existing = data.components.get(blockId);
+        if (existing) {
+          data.components.set(blockId, { ...existing, ...update } as Block);
+        }
+      }
+    });
 
     // Refresh search
     performSearch(query);
-  }, [results, components, replaceText, updateComponent, performSearch, query]);
+  }, [results, activeCanvasDocument, components, replaceText, updateCanvasData, performSearch, query]);
 
   // Group results by file
   const groupedResults = useMemo(() => {

@@ -41,6 +41,14 @@ interface UseSelectionHandlerOptions {
   junctions?: Map<string, Junction>;
   /** Current zoom level (needed for threshold calculation) */
   zoom?: number;
+  /** Override selection setter */
+  setSelection?: (ids: string[]) => void;
+  /** Override add-to-selection behavior */
+  addToSelection?: (id: string) => void;
+  /** Override toggle-selection behavior */
+  toggleSelection?: (id: string) => void;
+  /** Override clear-selection behavior */
+  clearSelection?: () => void;
 }
 
 interface SelectionHandlerResult {
@@ -112,10 +120,10 @@ export function useSelectionHandler(
   const stateVersionRef = useRef(0);
 
   // Store actions
-  const setSelection = useCanvasStore((state) => state.setSelection);
-  const addToSelection = useCanvasStore((state) => state.addToSelection);
-  const toggleSelection = useCanvasStore((state) => state.toggleSelection);
-  const clearSelection = useCanvasStore((state) => state.clearSelection);
+  const globalSetSelection = useCanvasStore((state) => state.setSelection);
+  const globalAddToSelection = useCanvasStore((state) => state.addToSelection);
+  const globalToggleSelection = useCanvasStore((state) => state.toggleSelection);
+  const globalClearSelection = useCanvasStore((state) => state.clearSelection);
 
   // Use provided state or fall back to global store
   const globalComponents = useCanvasStore((state) => state.components);
@@ -126,6 +134,10 @@ export function useSelectionHandler(
   const wires = options.wires ?? globalWires;
   const junctions = options.junctions ?? globalJunctions;
   const zoom = options.zoom ?? 1;
+  const setSelection = options.setSelection ?? globalSetSelection;
+  const addToSelection = options.addToSelection ?? globalAddToSelection;
+  const toggleSelection = options.toggleSelection ?? globalToggleSelection;
+  const clearSelection = options.clearSelection ?? globalClearSelection;
 
   // Increment state version whenever data changes (triggers geometry recomputation)
   // Using useMemo with size checks to detect changes

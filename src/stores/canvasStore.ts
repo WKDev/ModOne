@@ -53,6 +53,7 @@ import {
   recalculateAutoHandles,
   cleanupRedundantHandles,
 } from '../components/OneCanvas/utils/canvasHelpers';
+import { alignComponents, distributeComponents, flipComponents } from '../components/OneCanvas/utils/canvas-commands';
 
 // ============================================================================
 // Types
@@ -600,152 +601,44 @@ export const useCanvasStore = create<CanvasStore>()(
         );
       },
 
-      alignSelected: (direction) => {
-        set(
-          (state) => {
-            const selectedComponents = Array.from(state.selectedIds)
-              .filter((id) => state.components.has(id))
-              .map((id) => state.components.get(id)!)
-              .filter(Boolean);
+       alignSelected: (direction) => {
+         set(
+           (state) => {
+             pushHistorySnapshot(state);
+             const result = alignComponents(state.components, state.selectedIds, direction);
+             state.components = result;
+             state.isDirty = true;
+           },
+           false,
+           `alignSelected/${direction}`
+         );
+       },
 
-            if (selectedComponents.length < 2) return;
+       distributeSelected: (direction) => {
+         set(
+           (state) => {
+             pushHistorySnapshot(state);
+             const result = distributeComponents(state.components, state.selectedIds, direction);
+             state.components = result;
+             state.isDirty = true;
+           },
+           false,
+           `distributeSelected/${direction}`
+         );
+       },
 
-            pushHistorySnapshot(state);
-
-            let target: number;
-            switch (direction) {
-              case 'left':
-                target = Math.min(...selectedComponents.map((c) => c.position.x));
-                selectedComponents.forEach((c) => {
-                  state.components.set(c.id, { ...c, position: { ...c.position, x: target } } as Block);
-                });
-                break;
-              case 'right':
-                target = Math.max(...selectedComponents.map((c) => c.position.x + c.size.width));
-                selectedComponents.forEach((c) => {
-                  state.components.set(c.id, { ...c, position: { ...c.position, x: target - c.size.width } } as Block);
-                });
-                break;
-              case 'top':
-                target = Math.min(...selectedComponents.map((c) => c.position.y));
-                selectedComponents.forEach((c) => {
-                  state.components.set(c.id, { ...c, position: { ...c.position, y: target } } as Block);
-                });
-                break;
-              case 'bottom':
-                target = Math.max(...selectedComponents.map((c) => c.position.y + c.size.height));
-                selectedComponents.forEach((c) => {
-                  state.components.set(c.id, { ...c, position: { ...c.position, y: target - c.size.height } } as Block);
-                });
-                break;
-              case 'centerH': {
-                const centerX = selectedComponents.reduce((sum, c) => sum + c.position.x + c.size.width / 2, 0) / selectedComponents.length;
-                selectedComponents.forEach((c) => {
-                  state.components.set(c.id, { ...c, position: { ...c.position, x: centerX - c.size.width / 2 } } as Block);
-                });
-                break;
-              }
-              case 'centerV': {
-                const centerY = selectedComponents.reduce((sum, c) => sum + c.position.y + c.size.height / 2, 0) / selectedComponents.length;
-                selectedComponents.forEach((c) => {
-                  state.components.set(c.id, { ...c, position: { ...c.position, y: centerY - c.size.height / 2 } } as Block);
-                });
-                break;
-              }
-            }
-
-            state.isDirty = true;
-          },
-          false,
-          `alignSelected/${direction}`
-        );
-      },
-
-      distributeSelected: (direction) => {
-        set(
-          (state) => {
-            const selectedComponents = Array.from(state.selectedIds)
-              .filter((id) => state.components.has(id))
-              .map((id) => state.components.get(id)!)
-              .filter(Boolean);
-
-            if (selectedComponents.length < 3) return;
-
-            pushHistorySnapshot(state);
-
-            if (direction === 'horizontal') {
-              const sorted = [...selectedComponents].sort((a, b) => a.position.x - b.position.x);
-              const first = sorted[0];
-              const last = sorted[sorted.length - 1];
-              const totalSpan = (last.position.x + last.size.width) - first.position.x;
-              const totalWidths = sorted.reduce((sum, c) => sum + c.size.width, 0);
-              const gap = (totalSpan - totalWidths) / (sorted.length - 1);
-
-              let currentX = first.position.x;
-              sorted.forEach((c) => {
-                state.components.set(c.id, { ...c, position: { ...c.position, x: currentX } } as Block);
-                currentX += c.size.width + gap;
-              });
-            } else {
-              const sorted = [...selectedComponents].sort((a, b) => a.position.y - b.position.y);
-              const first = sorted[0];
-              const last = sorted[sorted.length - 1];
-              const totalSpan = (last.position.y + last.size.height) - first.position.y;
-              const totalHeights = sorted.reduce((sum, c) => sum + c.size.height, 0);
-              const gap = (totalSpan - totalHeights) / (sorted.length - 1);
-
-              let currentY = first.position.y;
-              sorted.forEach((c) => {
-                state.components.set(c.id, { ...c, position: { ...c.position, y: currentY } } as Block);
-                currentY += c.size.height + gap;
-              });
-            }
-
-            state.isDirty = true;
-          },
-          false,
-          `distributeSelected/${direction}`
-        );
-      },
-
-      flipSelected: (axis) => {
-        set(
-          (state) => {
-            const selectedComponents = Array.from(state.selectedIds)
-              .filter((id) => state.components.has(id))
-              .map((id) => state.components.get(id)!)
-              .filter(Boolean);
-
-            if (selectedComponents.length === 0) return;
-
-            pushHistorySnapshot(state);
-
-            // Calculate bounding box center of selection
-            const minX = Math.min(...selectedComponents.map((c) => c.position.x));
-            const maxX = Math.max(...selectedComponents.map((c) => c.position.x + c.size.width));
-            const minY = Math.min(...selectedComponents.map((c) => c.position.y));
-            const maxY = Math.max(...selectedComponents.map((c) => c.position.y + c.size.height));
-            const centerX = (minX + maxX) / 2;
-            const centerY = (minY + maxY) / 2;
-
-            selectedComponents.forEach((c) => {
-              if (axis === 'horizontal') {
-                // Mirror around vertical center axis
-                const newX = 2 * centerX - c.position.x - c.size.width;
-                state.components.set(c.id, { ...c, position: { ...c.position, x: newX } } as Block);
-              } else {
-                // Mirror around horizontal center axis
-                const newY = 2 * centerY - c.position.y - c.size.height;
-                state.components.set(c.id, { ...c, position: { ...c.position, y: newY } } as Block);
-              }
-            });
-
-            state.isDirty = true;
-          },
-          false,
-          `flipSelected/${axis}`
-        );
-      },
+       flipSelected: (axis) => {
+         set(
+           (state) => {
+             pushHistorySnapshot(state);
+             const result = flipComponents(state.components, state.selectedIds, axis);
+             state.components = result;
+             state.isDirty = true;
+           },
+           false,
+           `flipSelected/${axis}`
+         );
+       },
 
       moveJunction: (id, position, skipHistory) => {
         const state = get();

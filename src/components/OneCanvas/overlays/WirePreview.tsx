@@ -17,7 +17,7 @@ import { toCanvasPos } from '../types';
 export interface WirePreviewState {
   /** Starting endpoint (Canvas Space) */
   from: WireEndpoint;
-  /** Current mouse position (Container Space - already converted) */
+  /** Current mouse position (Canvas Space) */
   tempPosition: Position;
   /** Starting port position for direction detection (Canvas Space) */
   startPosition?: Position;
@@ -98,8 +98,8 @@ export const WirePreview = memo(function WirePreview({ preview }: WirePreviewPro
   // Convert Canvas Space start position to Container Space
   const fromContainer = coordinateSystem.toContainer(toCanvasPos(preview.startPosition));
 
-  // tempPosition is already in Container Space (from mouse event)
-  const toContainer = preview.tempPosition;
+  // Convert Canvas Space cursor position to Container Space
+  const toContainer = coordinateSystem.toContainer(toCanvasPos(preview.tempPosition));
 
   // Generate path in Container Space
   const path = generateWirePath(

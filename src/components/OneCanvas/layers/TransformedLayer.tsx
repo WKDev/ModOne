@@ -23,7 +23,7 @@ export function TransformedLayer({
 
   return (
     <div
-      className={`absolute top-0 left-0 origin-top-left ${className}`}
+      className={`absolute top-0 left-0 w-full h-full origin-top-left ${className}`}
       style={{ transform }}
     >
       {children}

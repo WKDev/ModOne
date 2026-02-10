@@ -1,9 +1,9 @@
-import { useCallback, useState, type MouseEvent as ReactMouseEvent, type RefObject } from 'react';
+import { useCallback, useRef, useState, type MouseEvent as ReactMouseEvent, type RefObject } from 'react';
 import { screenToCanvas, type CanvasRef, type Position } from '../../../OneCanvas';
 import type { Block, HandleConstraint, PortPosition, PortEndpoint, Wire, WireEndpoint } from '../../../OneCanvas/types';
 import { isPortEndpoint } from '../../../OneCanvas/types';
 import type { WireContextMenuAction } from '../../../OneCanvas/overlays/WireContextMenu';
-import type { WireDrawingState as StoreWireDrawingState } from '../../../../stores/canvasStore';
+import type { WireDrawingState as StoreWireDrawingState } from '../../../../types/canvasFacade';
 
 interface SelectionHandler {
   handleCanvasMouseDown: (event: ReactMouseEvent, canvasPos: Position) => void;
@@ -20,6 +20,7 @@ interface WireContextMenuState {
 interface UseCanvasInteractionsParams {
   canvasRef: RefObject<CanvasRef | null>;
   components: Map<string, Block>;
+  junctions: Map<string, { id: string; position: Position }>;
   wires: Wire[];
   pan: Position;
   zoom: number;
@@ -36,6 +37,7 @@ interface UseCanvasInteractionsParams {
     to: WireEndpoint,
     options?: { fromExitDirection?: PortPosition; toExitDirection?: PortPosition }
   ) => void;
+  createJunctionOnWire: (wireId: string, position: Position) => string | null;
   removeWire: (wireId: string) => void;
   removeWireHandle: (wireId: string, handleIndex: number) => void;
   insertEndpointHandle: (
@@ -55,9 +57,87 @@ interface UseCanvasInteractionsParams {
   ) => void;
 }
 
+const WIRE_INTERACTION_CONFIG = {
+  snapRadiusPx: {
+    port: 16,
+    junction: 14,
+    wire: 12,
+  },
+  snapPriority: ['port', 'junction', 'wire'] as const,
+};
+
+type WireInteractionMode = 'idle' | 'drawing';
+
+type WireSnapTarget =
+  | { kind: 'port'; endpoint: PortEndpoint; position: Position }
+  | { kind: 'junction'; endpoint: { junctionId: string }; position: Position }
+  | { kind: 'wire'; wireId: string; position: Position };
+
+interface WireSnapPolicy {
+  enablePort: boolean;
+  enableJunction: boolean;
+  enableWire: boolean;
+}
+
+function isSameEndpoint(a: WireEndpoint, b: WireEndpoint): boolean {
+  if (isPortEndpoint(a) && isPortEndpoint(b)) {
+    return a.componentId === b.componentId && a.portId === b.portId;
+  }
+  if (!isPortEndpoint(a) && !isPortEndpoint(b)) {
+    return a.junctionId === b.junctionId;
+  }
+  return false;
+}
+
+function distanceSquared(a: Position, b: Position): number {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return dx * dx + dy * dy;
+}
+
+function closestPointOnSegment(point: Position, start: Position, end: Position): Position {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSq = dx * dx + dy * dy;
+
+  if (lengthSq === 0) return start;
+
+  const t = ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSq;
+  const clamped = Math.max(0, Math.min(1, t));
+  return {
+    x: start.x + clamped * dx,
+    y: start.y + clamped * dy,
+  };
+}
+
+function getWireSnapPolicy(event: ReactMouseEvent): WireSnapPolicy {
+  if (event.shiftKey) {
+    return {
+      enablePort: false,
+      enableJunction: false,
+      enableWire: false,
+    };
+  }
+
+  if (event.altKey) {
+    return {
+      enablePort: true,
+      enableJunction: true,
+      enableWire: false,
+    };
+  }
+
+  return {
+    enablePort: true,
+    enableJunction: true,
+    enableWire: true,
+  };
+}
+
 export function useCanvasInteractions({
   canvasRef,
   components,
+  junctions,
   wires,
   pan,
   zoom,
@@ -67,12 +147,132 @@ export function useCanvasInteractions({
   updateWireDrawing,
   cancelWireDrawing,
   addWire,
+  createJunctionOnWire,
   removeWire,
   removeWireHandle,
   insertEndpointHandle,
   handleSegmentDragStart,
 }: UseCanvasInteractionsParams) {
   const [wireContextMenu, setWireContextMenu] = useState<WireContextMenuState | null>(null);
+  const wireInteractionRef = useRef<{ mode: WireInteractionMode; snapTarget: WireSnapTarget | null }>({
+    mode: 'idle',
+    snapTarget: null,
+  });
+
+  const getPortPosition = useCallback(
+    (blockId: string, portId: string): Position | null => {
+      const block = components.get(blockId);
+      if (!block) return null;
+
+      const port = block.ports.find((p) => p.id === portId);
+      if (!port) return null;
+
+      const offset = port.offset ?? 0.5;
+      switch (port.position) {
+        case 'top':
+          return { x: block.position.x + block.size.width * offset, y: block.position.y };
+        case 'bottom':
+          return { x: block.position.x + block.size.width * offset, y: block.position.y + block.size.height };
+        case 'left':
+          return { x: block.position.x, y: block.position.y + block.size.height * offset };
+        case 'right':
+          return { x: block.position.x + block.size.width, y: block.position.y + block.size.height * offset };
+        default:
+          return { x: block.position.x + block.size.width / 2, y: block.position.y + block.size.height / 2 };
+      }
+    },
+    [components]
+  );
+
+  const resolveEndpointPosition = useCallback(
+    (endpoint: WireEndpoint): Position | null => {
+      if (isPortEndpoint(endpoint)) {
+        return getPortPosition(endpoint.componentId, endpoint.portId);
+      }
+      return junctions.get(endpoint.junctionId)?.position ?? null;
+    },
+    [getPortPosition, junctions]
+  );
+
+  const findMagnetTarget = useCallback(
+    (position: Position, drawingFrom: WireEndpoint, policy: WireSnapPolicy): WireSnapTarget | null => {
+      const portThresholdSq = Math.pow(WIRE_INTERACTION_CONFIG.snapRadiusPx.port / zoom, 2);
+      const junctionThresholdSq = Math.pow(WIRE_INTERACTION_CONFIG.snapRadiusPx.junction / zoom, 2);
+      const wireThresholdSq = Math.pow(WIRE_INTERACTION_CONFIG.snapRadiusPx.wire / zoom, 2);
+
+      let nearestPort: WireSnapTarget | null = null;
+      let nearestPortDist = Infinity;
+
+      if (policy.enablePort) {
+        for (const [blockId, block] of components.entries()) {
+          for (const port of block.ports) {
+            const endpoint: PortEndpoint = { componentId: blockId, portId: port.id };
+            if (isSameEndpoint(drawingFrom, endpoint)) continue;
+
+            const portPos = getPortPosition(blockId, port.id);
+            if (!portPos) continue;
+
+            const dist = distanceSquared(position, portPos);
+            if (dist < nearestPortDist && dist <= portThresholdSq) {
+              nearestPortDist = dist;
+              nearestPort = { kind: 'port', endpoint, position: portPos };
+            }
+          }
+        }
+      }
+
+      let nearestJunction: WireSnapTarget | null = null;
+      let nearestJunctionDist = Infinity;
+      if (policy.enableJunction) {
+        for (const junction of junctions.values()) {
+          const endpoint = { junctionId: junction.id };
+          if (isSameEndpoint(drawingFrom, endpoint)) continue;
+
+          const dist = distanceSquared(position, junction.position);
+          if (dist < nearestJunctionDist && dist <= junctionThresholdSq) {
+            nearestJunctionDist = dist;
+            nearestJunction = { kind: 'junction', endpoint, position: junction.position };
+          }
+        }
+      }
+
+      let nearestWire: WireSnapTarget | null = null;
+      let nearestWireDist = Infinity;
+      if (policy.enableWire) {
+        for (const wire of wires) {
+          const fromPos = resolveEndpointPosition(wire.from);
+          const toPos = resolveEndpointPosition(wire.to);
+          if (!fromPos || !toPos) continue;
+
+          const polyline = [fromPos, ...(wire.handles?.map((h) => h.position) ?? []), toPos];
+          for (let i = 0; i < polyline.length - 1; i++) {
+            const closest = closestPointOnSegment(position, polyline[i], polyline[i + 1]);
+            const dist = distanceSquared(position, closest);
+            if (dist < nearestWireDist && dist <= wireThresholdSq) {
+              nearestWireDist = dist;
+              nearestWire = { kind: 'wire', wireId: wire.id, position: closest };
+            }
+          }
+        }
+      }
+
+      const candidates: Record<(typeof WIRE_INTERACTION_CONFIG.snapPriority)[number], WireSnapTarget | null> = {
+        port: nearestPort,
+        junction: nearestJunction,
+        wire: nearestWire,
+      };
+
+      for (const kind of WIRE_INTERACTION_CONFIG.snapPriority) {
+        const candidate = candidates[kind];
+        if (candidate) {
+          return candidate;
+        }
+      }
+
+      return null;
+    },
+    [components, getPortPosition, junctions, resolveEndpointPosition, wires, zoom]
+  );
 
   const handleStartWire = useCallback(
     (blockId: string, portId: string) => {
@@ -111,6 +311,7 @@ export function useCanvasInteractions({
       }
 
       startWireDrawing({ componentId: blockId, portId }, { skipValidation: true, startPosition });
+      wireInteractionRef.current = { mode: 'drawing', snapTarget: null };
     },
     [components, startWireDrawing]
   );
@@ -136,6 +337,7 @@ export function useCanvasInteractions({
         toExitDirection,
       });
       cancelWireDrawing();
+      wireInteractionRef.current = { mode: 'idle', snapTarget: null };
     },
     [wireDrawing, components, addWire, cancelWireDrawing]
   );
@@ -261,10 +463,7 @@ export function useCanvasInteractions({
 
   const handleCanvasMouseDown = useCallback(
     (event: ReactMouseEvent) => {
-      console.log('[OneCanvasPanel] MouseDown - wireDrawing:', !!wireDrawing);
-
       if (wireDrawing) {
-        console.log('[OneCanvasPanel] Skipping selection - wire drawing active');
         return;
       }
 
@@ -278,7 +477,6 @@ export function useCanvasInteractions({
       };
       const canvasPos = screenToCanvas(screenPos, pan, zoom);
 
-      console.log('[OneCanvasPanel] Calling selectionHandler.handleCanvasMouseDown');
       selectionHandler.handleCanvasMouseDown(event, canvasPos);
     },
     [wireDrawing, canvasRef, pan, zoom, selectionHandler]
@@ -297,12 +495,16 @@ export function useCanvasInteractions({
       const canvasPos = screenToCanvas(screenPos, pan, zoom);
 
       if (wireDrawing) {
-        updateWireDrawing(canvasPos);
+        const snapPolicy = getWireSnapPolicy(event);
+        const snapTarget = findMagnetTarget(canvasPos, wireDrawing.from, snapPolicy);
+        wireInteractionRef.current = { mode: 'drawing', snapTarget };
+        updateWireDrawing(snapTarget?.position ?? canvasPos);
+        return;
       }
 
       selectionHandler.handleCanvasMouseMove(event, canvasPos);
     },
-    [wireDrawing, canvasRef, pan, zoom, updateWireDrawing, selectionHandler]
+    [wireDrawing, canvasRef, pan, zoom, updateWireDrawing, selectionHandler, findMagnetTarget]
   );
 
   const handleCanvasMouseUp = useCallback(
@@ -310,13 +512,37 @@ export function useCanvasInteractions({
       if (wireDrawing) {
         const target = event.target as HTMLElement;
         if (!target.closest('[data-port-id]')) {
+          const snapTarget = wireInteractionRef.current.snapTarget;
+
+          if (snapTarget?.kind === 'port') {
+            const toBlock = components.get(snapTarget.endpoint.componentId);
+            const toPort = toBlock?.ports.find((p) => p.id === snapTarget.endpoint.portId);
+            addWire(wireDrawing.from, snapTarget.endpoint, {
+              fromExitDirection: wireDrawing.exitDirection,
+              toExitDirection: toPort?.position,
+            });
+          } else if (snapTarget?.kind === 'junction') {
+            addWire(wireDrawing.from, snapTarget.endpoint, {
+              fromExitDirection: wireDrawing.exitDirection,
+            });
+          } else if (snapTarget?.kind === 'wire') {
+            const junctionId = createJunctionOnWire(snapTarget.wireId, snapTarget.position);
+            if (junctionId) {
+              addWire(wireDrawing.from, { junctionId }, {
+                fromExitDirection: wireDrawing.exitDirection,
+              });
+            }
+          }
+
           cancelWireDrawing();
         }
+        wireInteractionRef.current = { mode: 'idle', snapTarget: null };
+        return;
       }
 
       selectionHandler.handleCanvasMouseUp(event);
     },
-    [wireDrawing, cancelWireDrawing, selectionHandler]
+    [wireDrawing, components, addWire, createJunctionOnWire, cancelWireDrawing, selectionHandler]
   );
 
   return {

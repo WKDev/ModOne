@@ -35,6 +35,10 @@ interface UseBlockDragOptions {
   junctions?: Map<string, { position: Position }>;
   /** Optional moveJunction function for junction drag support */
   moveJunction?: (id: string, position: Position, skipHistory?: boolean) => void;
+  /** Optional selection state override (document mode) */
+  selectedIds?: Set<string>;
+  /** Optional selection setter override (document mode) */
+  setSelection?: (ids: string[]) => void;
 }
 
 interface DragState {
@@ -85,24 +89,28 @@ export function useBlockDrag({
   moveComponent: customMoveComponent,
   junctions: customJunctions,
   moveJunction: customMoveJunction,
+  selectedIds: customSelectedIds,
+  setSelection: customSetSelection,
 }: UseBlockDragOptions): UseBlockDragReturn {
   // Store access
   const zoom = useCanvasStore((state) => state.zoom);
   const pan = useCanvasStore((state) => state.pan);
-  const selectedIds = useCanvasStore((state) => state.selectedIds);
+  const globalSelectedIds = useCanvasStore((state) => state.selectedIds);
   const globalComponents = useCanvasStore((state) => state.components);
   const globalMoveComponent = useCanvasStore((state) => state.moveComponent);
   const globalJunctions = useCanvasStore((state) => state.junctions);
   const globalMoveJunction = useCanvasStore((state) => state.moveJunction);
   const snapToGridEnabled = useCanvasStore((state) => state.snapToGrid);
   const gridSize = useCanvasStore((state) => state.gridSize);
-  const setSelection = useCanvasStore((state) => state.setSelection);
+  const globalSetSelection = useCanvasStore((state) => state.setSelection);
 
   // Use custom (document-aware) or fall back to global store
   const components = customComponents ?? globalComponents;
   const moveComponent = customMoveComponent ?? globalMoveComponent;
   const junctions = customJunctions ?? globalJunctions;
   const moveJunction = customMoveJunction ?? globalMoveJunction;
+  const selectedIds = customSelectedIds ?? globalSelectedIds;
+  const setSelection = customSetSelection ?? globalSetSelection;
 
   // Drag state
   const [isDragging, setIsDragging] = useState(false);

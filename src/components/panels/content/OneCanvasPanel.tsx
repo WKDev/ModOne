@@ -19,7 +19,6 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
-import { useCanvasStore } from '../../../stores/canvasStore';
 import { useDocumentContext } from '../../../contexts/DocumentContext';
 import { PanelErrorBoundary } from '../../error/PanelErrorBoundary';
 import {
@@ -49,7 +48,7 @@ import { PropertiesPanel } from './PropertiesPanel';
 import { BlockDragPreview } from './canvas/BlockDragPreview';
 import { CanvasDropZone } from './canvas/CanvasDropZone';
 import { CanvasDialogs } from './canvas/CanvasDialogs';
-import { useCanvasState } from './canvas/useCanvasState';
+import { useCanvasFacade } from '../../../hooks/useCanvasFacade';
 import { useCanvasInteractions } from './canvas/CanvasInteractionHandlers';
 
 import '../../OneCanvas/styles/simulation.css';
@@ -75,6 +74,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     moveComponent,
     moveJunction,
     removeWire,
+    createJunctionOnWire,
     updateComponent,
     updateWireHandle,
     removeWireHandle,
@@ -86,11 +86,19 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     updateWireDrawing,
     cancelWireDrawing,
     selectedIds,
+    setSelection,
+    addToSelection,
+    toggleSelection,
+    clearSelection,
     setPan,
     alignSelected,
     distributeSelected,
     flipSelected,
-  } = useCanvasState(documentId);
+    getCircuitData,
+    loadCircuit,
+    undo,
+    redo,
+  } = useCanvasFacade(documentId);
 
   const schematicDoc = useSchematicDocument(documentId);
 
@@ -100,16 +108,16 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
       const currentPageId = schematicDoc.schematic.activePageId;
       if (targetPageId === currentPageId) return;
 
-      const currentCircuit = useCanvasStore.getState().getCircuitData();
+      const currentCircuit = getCircuitData();
       updatePageCircuitInDocument(documentId, currentPageId, currentCircuit);
       useDocumentRegistry.getState().pushHistory(documentId);
       schematicDoc.setActivePage(targetPageId);
 
       const targetPage = schematicDoc.schematic.pages.find((p) => p.id === targetPageId);
       if (!targetPage) return;
-      useCanvasStore.getState().loadCircuit(targetPage.circuit);
+      loadCircuit(targetPage.circuit);
     },
-    [schematicDoc, documentId]
+    [schematicDoc, documentId, getCircuitData, loadCircuit]
   );
 
   const [minimapCollapsed, setMinimapCollapsed] = useState(false);
@@ -168,6 +176,10 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     wires,
     junctions,
     zoom,
+    setSelection,
+    addToSelection,
+    toggleSelection,
+    clearSelection,
   });
 
   const {
@@ -185,6 +197,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
   } = useCanvasInteractions({
     canvasRef,
     components,
+    junctions,
     wires,
     pan,
     zoom,
@@ -195,6 +208,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     cancelWireDrawing,
     addWire,
     removeWire,
+    createJunctionOnWire,
     removeWireHandle,
     insertEndpointHandle,
     handleSegmentDragStart,
@@ -204,7 +218,16 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
   const junctionsArray = useMemo(() => Array.from(junctions.values()), [junctions]);
   const simulation = useSimulation(componentsArray, wires, junctionsArray);
 
-  useCanvasKeyboardShortcuts();
+  useCanvasKeyboardShortcuts({
+    components: components as Map<string, Block>,
+    wires,
+    selectedIds,
+    clearSelection,
+    addComponent,
+    addWire,
+    undo,
+    redo,
+  });
 
   const { handleBlockDragStart } = useBlockDrag({
     canvasRef,
@@ -213,6 +236,8 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     moveComponent,
     junctions: junctions as Map<string, { position: Position }>,
     moveJunction,
+    selectedIds,
+    setSelection,
   });
 
   useEffect(() => {

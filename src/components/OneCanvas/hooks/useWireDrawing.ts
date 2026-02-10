@@ -7,11 +7,11 @@
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import { useCanvasStore } from '../../../stores/canvasStore';
 import { isValidConnection, getValidTargets } from '../utils/connectionValidator';
 import { getPortAbsolutePosition } from '../utils/wirePathCalculator';
-import type { Position, WireEndpoint, PortEndpoint } from '../types';
+import type { Position, WireEndpoint, PortEndpoint, Block, Wire } from '../types';
 import { isPortEndpoint } from '../types';
+import type { WireDrawingState as StoreWireDrawingState } from '../../../types/canvasFacade';
 
 // ============================================================================
 // Types
@@ -45,22 +45,31 @@ interface UseWireDrawingReturn {
   isValidTarget: (blockId: string, portId: string) => boolean;
 }
 
+interface UseWireDrawingParams {
+  components: Map<string, Block>;
+  wires: Wire[];
+  wireDrawing: StoreWireDrawingState | null;
+  startWireDrawing: (from: WireEndpoint, options?: { skipValidation?: boolean; startPosition?: Position }) => void;
+  updateWireDrawing: (position: Position) => void;
+  completeWireDrawing: (to: WireEndpoint) => void;
+  cancelWireDrawing: () => void;
+}
+
 // ============================================================================
 // Hook
 // ============================================================================
 
-export function useWireDrawing(): UseWireDrawingReturn {
+export function useWireDrawing({
+  components,
+  wires,
+  wireDrawing: storeWireDrawing,
+  startWireDrawing,
+  updateWireDrawing: updateWireDrawingStore,
+  completeWireDrawing,
+  cancelWireDrawing,
+}: UseWireDrawingParams): UseWireDrawingReturn {
   // Valid targets are UI-only state computed when wire drawing starts
   const [validTargets, setValidTargets] = useState<Set<string>>(new Set());
-
-  // Store access - use store as single source of truth for wire drawing state
-  const components = useCanvasStore((state) => state.components);
-  const wires = useCanvasStore((state) => state.wires);
-  const storeWireDrawing = useCanvasStore((state) => state.wireDrawing);
-  const startWireDrawing = useCanvasStore((state) => state.startWireDrawing);
-  const updateWireDrawingStore = useCanvasStore((state) => state.updateWireDrawing);
-  const completeWireDrawing = useCanvasStore((state) => state.completeWireDrawing);
-  const cancelWireDrawing = useCanvasStore((state) => state.cancelWireDrawing);
 
   // Derive drawing state from store + local valid targets
   const drawing = useMemo((): WireDrawingState | null => {
