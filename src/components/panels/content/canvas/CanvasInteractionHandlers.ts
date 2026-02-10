@@ -56,6 +56,7 @@ interface UseCanvasInteractionsParams {
     handleBPosition: Position,
     isEndpointSegment?: boolean
   ) => void;
+  handlePanMouseDown?: (event: MouseEvent) => void;
 }
 
 const WIRE_INTERACTION_CONFIG = {
@@ -153,6 +154,7 @@ export function useCanvasInteractions({
   removeWireHandle,
   insertEndpointHandle,
   handleSegmentDragStart,
+  handlePanMouseDown,
 }: UseCanvasInteractionsParams) {
   const [wireContextMenu, setWireContextMenu] = useState<WireContextMenuState | null>(null);
   const wireInteractionRef = useRef<{ mode: WireInteractionMode; snapTarget: WireSnapTarget | null }>({
@@ -464,8 +466,22 @@ export function useCanvasInteractions({
 
   const handleCanvasMouseDown = useCallback(
     (event: ReactMouseEvent) => {
-      const modeType = useInteractionStore.getState().mode.type;
-      if (modeType !== 'IDLE') {
+      const initialModeType = useInteractionStore.getState().mode.type;
+
+      if (initialModeType === 'PANNING') {
+        return;
+      }
+
+      if (initialModeType === 'IDLE') {
+        handlePanMouseDown?.(event.nativeEvent);
+        const modeAfterPanAttempt = useInteractionStore.getState().mode.type;
+        if (modeAfterPanAttempt === 'PANNING') {
+          return;
+        }
+        if (modeAfterPanAttempt !== 'IDLE') {
+          return;
+        }
+      } else {
         return;
       }
 
@@ -481,7 +497,7 @@ export function useCanvasInteractions({
 
       selectionHandler.handleCanvasMouseDown(event, canvasPos);
     },
-    [canvasRef, pan, zoom, selectionHandler]
+    [canvasRef, pan, zoom, selectionHandler, handlePanMouseDown]
   );
 
   const handleCanvasMouseMove = useCallback(

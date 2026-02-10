@@ -100,6 +100,7 @@ export interface CanvasRef {
   getContainer: () => HTMLDivElement | null;
   getContent: () => HTMLDivElement | null;
   getOverlay: () => HTMLDivElement | null;
+  handlePanMouseDown: (event: MouseEvent) => void;
 }
 
 // ============================================================================
@@ -164,7 +165,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
   });
 
   // Canvas interaction (pan/zoom)
-  const { cursor } = useCanvasInteraction(containerRef);
+  const { cursor, handlePanMouseDown } = useCanvasInteraction(containerRef);
 
   // Combine all selected IDs (blocks + wires) for overlays
   const allSelectedIds = useMemo(() => {
@@ -180,6 +181,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
       getContainer: () => containerRef.current,
       getContent: () => contentRef.current,
       getOverlay: () => overlayRef.current,
+      handlePanMouseDown,
     };
     canvasRef.current = refObject;
     return refObject;

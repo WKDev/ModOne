@@ -48,13 +48,15 @@ interface UseCanvasInteractionOptions {
   maxZoom?: number;
 }
 
-interface CanvasInteractionState {
+interface CanvasInteractionReturn {
   /** Whether space key is held */
   isSpaceHeld: boolean;
   /** Whether currently panning with mouse */
   isPanning: boolean;
   /** Cursor style based on current state */
   cursor: string;
+  /** Pan-start handler wired from React mouse flow */
+  handlePanMouseDown: (event: MouseEvent) => void;
 }
 
 // ============================================================================
@@ -318,7 +320,6 @@ export function useCanvasInteraction(
     window.addEventListener('keyup', handleKeyUp);
 
     // Mouse events
-    container.addEventListener('mousedown', handleMouseDown);
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
 
@@ -335,7 +336,6 @@ export function useCanvasInteraction(
       container.removeEventListener('wheel', handleWheel);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
-      container.removeEventListener('mousedown', handleMouseDown);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
       container.removeEventListener('touchstart', handleTouchStart);
@@ -349,7 +349,6 @@ export function useCanvasInteraction(
     handleWheel,
     handleKeyDown,
     handleKeyUp,
-    handleMouseDown,
     handleMouseMove,
     handleMouseUp,
     handleTouchStart,
@@ -363,7 +362,8 @@ export function useCanvasInteraction(
     isSpaceHeld,
     isPanning,
     cursor,
-  } as CanvasInteractionState;
+    handlePanMouseDown: handleMouseDown,
+  } as CanvasInteractionReturn;
 }
 
 export default useCanvasInteraction;

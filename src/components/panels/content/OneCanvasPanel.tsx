@@ -50,6 +50,7 @@ import { CanvasDropZone } from './canvas/CanvasDropZone';
 import { CanvasDialogs } from './canvas/CanvasDialogs';
 import { useCanvasFacade } from '../../../hooks/useCanvasFacade';
 import { useCanvasInteractions } from './canvas/CanvasInteractionHandlers';
+import { useInteractionStore } from '../../../stores/interactionStore';
 
 import '../../OneCanvas/styles/simulation.css';
 
@@ -182,6 +183,10 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     clearSelection,
   });
 
+  const handlePanMouseDown = useCallback((event: MouseEvent) => {
+    canvasRef.current?.handlePanMouseDown(event);
+  }, []);
+
   const {
     wireContextMenu,
     handleStartWire,
@@ -212,6 +217,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
     removeWireHandle,
     insertEndpointHandle,
     handleSegmentDragStart,
+    handlePanMouseDown,
   });
 
   const componentsArray = useMemo(() => Array.from(components.values()), [components]);
@@ -242,8 +248,12 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && wireDrawing) {
-        cancelWireDrawing();
+      if (event.key === 'Escape') {
+        if (wireDrawing) {
+          cancelWireDrawing();
+        }
+        // Reset interaction store to IDLE on Escape (handles any stuck mode)
+        useInteractionStore.getState().resetToIdle();
       }
     };
 
