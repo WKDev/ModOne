@@ -10,8 +10,13 @@
  * Wire selection uses pre-computed geometry cache (no DOM queries).
  */
 
-import { useState, useCallback, useRef, useMemo } from 'react';
+import { useCallback, useRef, useMemo } from 'react';
 import { useCanvasStore } from '../../../stores/canvasStore';
+import {
+  useInteractionStore,
+  selectIsBoxSelecting,
+  selectBoxSelectingData,
+} from '../../../stores/interactionStore';
 import type { Position, Block, Wire, Junction } from '../types';
 import type { SelectionBoxState } from '../components/SelectionBox';
 import { getDragDirection } from '../components/SelectionBox';
@@ -108,13 +113,14 @@ export function useSelectionHandler(
   options: UseSelectionHandlerOptions = {}
 ): SelectionHandlerResult {
 
-  // Selection box state
-  const [selectionBox, setSelectionBox] = useState<SelectionBoxState | null>(null);
-  const [isDragSelecting, setIsDragSelecting] = useState(false);
+  const isDragSelecting = useInteractionStore(selectIsBoxSelecting);
+  const boxSelectingData = useInteractionStore(selectBoxSelectingData);
+  const enterBoxSelecting = useInteractionStore((s) => s.enterBoxSelecting);
+  const updateBoxSelecting = useInteractionStore((s) => s.updateBoxSelecting);
+  const exitBoxSelecting = useInteractionStore((s) => s.exitBoxSelecting);
 
-  // Track initial mouse down position to detect drag threshold
-  const mouseDownPos = useRef<Position | null>(null);
-  const hasPassedThreshold = useRef(false);
+  // Derive selectionBox from interactionStore data
+  const selectionBox = boxSelectingData?.selectionBox ?? null;
 
   // State version for geometry cache invalidation
   // Increment whenever components/wires/junctions change
@@ -155,41 +161,42 @@ export function useSelectionHandler(
       // Only handle left click
       if (_e.button !== 0) return;
 
-      // Always store initial position for drag detection
-      mouseDownPos.current = canvasPosition;
-      hasPassedThreshold.current = false;
+      // Check if we're in IDLE mode before starting box select
+      const modeType = useInteractionStore.getState().mode.type;
+      if (modeType !== 'IDLE') return;
+
+      enterBoxSelecting(canvasPosition);
     },
-    []
+    [enterBoxSelecting]
   );
 
   // Handle mouse move on canvas
   const handleCanvasMouseMove = useCallback(
     (_e: React.MouseEvent, canvasPosition: Position) => {
-      if (!mouseDownPos.current) return;
+      if (!boxSelectingData) return;
+      // Get latest data imperatively for threshold check
+      const data = useInteractionStore.getState().mode;
+      if (data.type !== 'BOX_SELECTING') return;
+      const bsData = data.data;
 
-      // Check if passed drag threshold
-      if (!hasPassedThreshold.current) {
-        const dx = Math.abs(canvasPosition.x - mouseDownPos.current.x);
-        const dy = Math.abs(canvasPosition.y - mouseDownPos.current.y);
-
-        // Threshold is in screen pixels, so adjust for zoom when comparing in canvas space
+      if (!bsData.hasPassedThreshold) {
+        const dx = Math.abs(canvasPosition.x - bsData.mouseDownPos.x);
+        const dy = Math.abs(canvasPosition.y - bsData.mouseDownPos.y);
         const canvasThreshold = DRAG_THRESHOLD / zoom;
-
         if (dx > canvasThreshold || dy > canvasThreshold) {
-          hasPassedThreshold.current = true;
-          setIsDragSelecting(true);
-        } else {
-          return;
+          updateBoxSelecting({
+            hasPassedThreshold: true,
+            selectionBox: { start: bsData.mouseDownPos, end: canvasPosition },
+          });
         }
+        return;
       }
 
-      // Update selection box
-      setSelectionBox({
-        start: mouseDownPos.current,
-        end: canvasPosition,
+      updateBoxSelecting({
+        selectionBox: { start: bsData.mouseDownPos, end: canvasPosition },
       });
     },
-    [zoom]
+    [boxSelectingData, zoom, updateBoxSelecting]
   );
 
   // Handle mouse up on canvas
@@ -261,10 +268,7 @@ export function useSelectionHandler(
       }
 
       // Reset drag state
-      mouseDownPos.current = null;
-      hasPassedThreshold.current = false;
-      setSelectionBox(null);
-      setIsDragSelecting(false);
+      exitBoxSelecting();
     },
     [
       selectionBox,
@@ -275,6 +279,7 @@ export function useSelectionHandler(
       setSelection,
       addToSelection,
       clearSelection,
+      exitBoxSelecting,
     ]
   );
 

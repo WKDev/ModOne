@@ -11,8 +11,14 @@
  * - Screen-to-canvas coordinate transformation
  */
 
-import { useCallback, useRef, useLayoutEffect, useState } from 'react';
+import { useCallback, useLayoutEffect } from 'react';
 import { useCanvasStore } from '../../../stores/canvasStore';
+import {
+  useInteractionStore,
+  selectIsDraggingItems,
+  selectDraggingData,
+} from '../../../stores/interactionStore';
+import type { DraggingItemsState } from '../../../stores/interactionStore';
 import { snapToGrid, screenToCanvas } from '../utils/canvasCoordinates';
 import { isToggleSelection } from '../selection/modifierKeys';
 import type { Position } from '../types';
@@ -40,27 +46,6 @@ interface UseBlockDragOptions {
   selectedIds?: Set<string>;
   /** Optional selection setter override (document mode) */
   setSelection?: (ids: string[]) => void;
-}
-
-interface DragState {
-  /** Whether a drag is in progress */
-  isDragging: boolean;
-  /** The block ID being dragged (primary drag target) */
-  draggedBlockId: string | null;
-  /** Starting mouse position in canvas coordinates */
-  startCanvasPos: Position | null;
-  /** Original positions of all blocks being dragged (for multi-select) */
-  originalPositions: Map<string, Position>;
-  /** IDs that are junctions (use moveJunction instead of moveComponent) */
-  junctionIds: Set<string>;
-  /** Whether this is the first move in the current drag (for history push) */
-  isFirstMove: boolean;
-  /** Cached container bounding rect (for performance) */
-  containerRect: DOMRect | null;
-  /** Whether the mouse has moved past the drag threshold */
-  hasPassedThreshold: boolean;
-  /** Mouse position at mousedown in screen coordinates (for threshold check) */
-  mouseDownScreenPos: Position | null;
 }
 
 interface UseBlockDragReturn {
@@ -114,23 +99,19 @@ export function useBlockDrag({
   const setSelection = customSetSelection ?? globalSetSelection;
 
   // Drag state
-  const [isDragging, setIsDragging] = useState(false);
-  const [draggedBlockId, setDraggedBlockId] = useState<string | null>(null);
-  const dragStateRef = useRef<DragState>({
-    isDragging: false,
-    draggedBlockId: null,
-    startCanvasPos: null,
-    originalPositions: new Map(),
-    junctionIds: new Set(),
-    isFirstMove: true,
-    containerRect: null,
-    hasPassedThreshold: false,
-    mouseDownScreenPos: null,
-  });
+  const isDragging = useInteractionStore(selectIsDraggingItems);
+  const draggingData = useInteractionStore(selectDraggingData);
+  const draggedBlockId = draggingData?.primaryBlockId ?? null;
+  const enterDraggingItems = useInteractionStore((s) => s.enterDraggingItems);
+  const updateDraggingItems = useInteractionStore((s) => s.updateDraggingItems);
+  const exitDraggingItems = useInteractionStore((s) => s.exitDraggingItems);
 
   // Handle drag start
   const handleBlockDragStart = useCallback(
     (blockId: string, event: React.MouseEvent) => {
+      const modeType = useInteractionStore.getState().mode.type;
+      if (modeType !== 'IDLE') return;
+
       // Check if drag should be prevented (e.g., during wire drawing)
       if (shouldPreventDrag?.()) {
         return;
@@ -208,9 +189,8 @@ export function useBlockDrag({
       const startCanvasPos = screenToCanvas(screenPos, pan, zoom);
 
       // Initialize drag state (cache rect for performance during drag)
-      dragStateRef.current = {
-        isDragging: true,
-        draggedBlockId: blockId,
+      const draggingState: DraggingItemsState = {
+        primaryBlockId: blockId,
         startCanvasPos,
         originalPositions,
         junctionIds: junctionIdSet,
@@ -220,17 +200,28 @@ export function useBlockDrag({
         mouseDownScreenPos: { x: event.clientX, y: event.clientY },
       };
 
-      setIsDragging(true);
-      setDraggedBlockId(blockId);
+      enterDraggingItems(draggingState);
     },
-    [shouldPreventDrag, selectedIds, components, junctions, setSelection, canvasRef, pan, zoom]
+    [
+      shouldPreventDrag,
+      selectedIds,
+      components,
+      junctions,
+      setSelection,
+      canvasRef,
+      pan,
+      zoom,
+      enterDraggingItems,
+    ]
   );
 
   // Handle mouse move during drag
   const handleMouseMove = useCallback(
     (event: MouseEvent) => {
-      const state = dragStateRef.current;
-      if (!state.isDragging || !state.startCanvasPos || !state.containerRect) return;
+      const mode = useInteractionStore.getState().mode;
+      if (mode.type !== 'DRAGGING_ITEMS') return;
+      const state = mode.data;
+      if (!state.startCanvasPos || !state.containerRect) return;
 
       // Check drag threshold: ignore small movements to prevent accidental drags
       if (!state.hasPassedThreshold) {
@@ -240,7 +231,7 @@ export function useBlockDrag({
         if (dx <= DRAG_THRESHOLD && dy <= DRAG_THRESHOLD) {
           return;
         }
-        state.hasPassedThreshold = true;
+        updateDraggingItems({ hasPassedThreshold: true });
       }
 
       // Convert current mouse position to canvas coordinates using cached rect
@@ -257,7 +248,7 @@ export function useBlockDrag({
       // On first move, let the store push history; on subsequent moves, skip
       const skipHistory = !state.isFirstMove;
       if (state.isFirstMove) {
-        state.isFirstMove = false;
+        updateDraggingItems({ isFirstMove: false });
       }
 
       // Move all dragged items (components and junctions)
@@ -279,39 +270,25 @@ export function useBlockDrag({
         }
       });
     },
-    [pan, zoom, snapToGridEnabled, gridSize, moveComponent, moveJunction]
+    [pan, zoom, snapToGridEnabled, gridSize, moveComponent, moveJunction, updateDraggingItems]
   );
 
   // Handle mouse up (end drag)
   const handleMouseUp = useCallback(() => {
-    if (!dragStateRef.current.isDragging) return;
-
-    // Reset drag state
-    dragStateRef.current = {
-      isDragging: false,
-      draggedBlockId: null,
-      startCanvasPos: null,
-      originalPositions: new Map(),
-      junctionIds: new Set(),
-      isFirstMove: true,
-      containerRect: null,
-      hasPassedThreshold: false,
-      mouseDownScreenPos: null,
-    };
-
-    setIsDragging(false);
-    setDraggedBlockId(null);
-  }, []);
+    const mode = useInteractionStore.getState().mode;
+    if (mode.type !== 'DRAGGING_ITEMS') return;
+    exitDraggingItems();
+  }, [exitDraggingItems]);
 
   // Attach global mouse event listeners during drag
   useLayoutEffect(() => {
     if (isDragging) {
       window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp, true);
+      window.addEventListener('mouseup', handleMouseUp);
 
       return () => {
         window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp, true);
+        window.removeEventListener('mouseup', handleMouseUp);
       };
     }
   }, [isDragging, handleMouseMove, handleMouseUp]);

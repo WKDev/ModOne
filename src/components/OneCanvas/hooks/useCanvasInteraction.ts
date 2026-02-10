@@ -8,8 +8,14 @@
  * - Trackpad pinch-to-zoom
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useCanvasStore } from '../../../stores/canvasStore';
+import {
+  useInteractionStore,
+  selectIsPanning,
+  selectCursor,
+  selectIsIdle,
+} from '../../../stores/interactionStore';
 import {
   clamp,
   calculateZoomPan,
@@ -74,8 +80,12 @@ export function useCanvasInteraction(
   const wireDrawing = useCanvasStore((state) => state.wireDrawing);
 
   // Interaction state
-  const [isSpaceHeld, setIsSpaceHeld] = useState(false);
-  const [isPanning, setIsPanning] = useState(false);
+  const isSpaceHeld = useInteractionStore((s) => s.isSpaceHeld);
+  const isPanning = useInteractionStore(selectIsPanning);
+  const isIdle = useInteractionStore(selectIsIdle);
+  const enterPanning = useInteractionStore((s) => s.enterPanning);
+  const exitPanning = useInteractionStore((s) => s.exitPanning);
+  const setSpaceHeld = useInteractionStore((s) => s.setSpaceHeld);
 
   // Refs for tracking drag state
   const dragStartRef = useRef<Position | null>(null);
@@ -86,7 +96,7 @@ export function useCanvasInteraction(
   const lastTouchCenterRef = useRef<Position | null>(null);
 
   // Cursor style based on state
-  const cursor = isPanning ? 'grabbing' : isSpaceHeld ? 'grab' : 'default';
+  const cursor = useInteractionStore(selectCursor);
 
   // ========================================================================
   // Wheel Handler (Zoom & Pan)
@@ -132,18 +142,18 @@ export function useCanvasInteraction(
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
     if (event.code === 'Space' && !event.repeat) {
       event.preventDefault();
-      setIsSpaceHeld(true);
+      setSpaceHeld(true);
     }
-  }, []);
+  }, [setSpaceHeld]);
 
   const handleKeyUp = useCallback((event: KeyboardEvent) => {
     if (event.code === 'Space') {
-      setIsSpaceHeld(false);
-      setIsPanning(false);
+      setSpaceHeld(false);
+      exitPanning();
       dragStartRef.current = null;
       panStartRef.current = null;
     }
-  }, []);
+  }, [exitPanning, setSpaceHeld]);
 
   const handleMouseDown = useCallback(
     (event: MouseEvent) => {
@@ -151,6 +161,10 @@ export function useCanvasInteraction(
 
       // Don't start panning during wire drawing
       if (wireDrawing) return;
+
+      const modeType = useInteractionStore.getState().mode.type;
+      if (!isIdle && modeType !== 'PANNING') return;
+      if (modeType !== 'IDLE' && modeType !== 'PANNING') return;
 
       // Don't start panning if clicking on a block or port
       const target = event.target as HTMLElement;
@@ -161,12 +175,12 @@ export function useCanvasInteraction(
       // Middle mouse button or Space+Left click for pan
       if (event.button === 1 || (isSpaceHeld && event.button === 0)) {
         event.preventDefault();
-        setIsPanning(true);
+        enterPanning({ x: event.clientX, y: event.clientY }, { ...pan });
         dragStartRef.current = { x: event.clientX, y: event.clientY };
         panStartRef.current = { ...pan };
       }
     },
-    [isSpaceHeld, pan, enablePan, wireDrawing]
+    [isSpaceHeld, pan, enablePan, wireDrawing, enterPanning, isIdle]
   );
 
   const handleMouseMove = useCallback(
@@ -186,11 +200,11 @@ export function useCanvasInteraction(
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
-      setIsPanning(false);
+      exitPanning();
       dragStartRef.current = null;
       panStartRef.current = null;
     }
-  }, [isPanning]);
+  }, [exitPanning, isPanning]);
 
   // ========================================================================
   // Touch / Trackpad Pinch-to-Zoom

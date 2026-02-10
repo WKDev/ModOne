@@ -4,6 +4,7 @@ import type { Block, HandleConstraint, PortPosition, PortEndpoint, Wire, WireEnd
 import { isPortEndpoint } from '../../../OneCanvas/types';
 import type { WireContextMenuAction } from '../../../OneCanvas/overlays/WireContextMenu';
 import type { WireDrawingState as StoreWireDrawingState } from '../../../../types/canvasFacade';
+import { useInteractionStore } from '../../../../stores/interactionStore';
 
 interface SelectionHandler {
   handleCanvasMouseDown: (event: ReactMouseEvent, canvasPos: Position) => void;
@@ -463,7 +464,8 @@ export function useCanvasInteractions({
 
   const handleCanvasMouseDown = useCallback(
     (event: ReactMouseEvent) => {
-      if (wireDrawing) {
+      const modeType = useInteractionStore.getState().mode.type;
+      if (modeType !== 'IDLE') {
         return;
       }
 
@@ -479,7 +481,7 @@ export function useCanvasInteractions({
 
       selectionHandler.handleCanvasMouseDown(event, canvasPos);
     },
-    [wireDrawing, canvasRef, pan, zoom, selectionHandler]
+    [canvasRef, pan, zoom, selectionHandler]
   );
 
   const handleCanvasMouseMove = useCallback(
@@ -494,11 +496,17 @@ export function useCanvasInteractions({
       };
       const canvasPos = screenToCanvas(screenPos, pan, zoom);
 
-      if (wireDrawing) {
+      const modeType = useInteractionStore.getState().mode.type;
+
+      if (modeType === 'WIRE_DRAWING' && wireDrawing) {
         const snapPolicy = getWireSnapPolicy(event);
         const snapTarget = findMagnetTarget(canvasPos, wireDrawing.from, snapPolicy);
         wireInteractionRef.current = { mode: 'drawing', snapTarget };
         updateWireDrawing(snapTarget?.position ?? canvasPos);
+        return;
+      }
+
+      if (modeType !== 'IDLE' && modeType !== 'BOX_SELECTING') {
         return;
       }
 
@@ -509,7 +517,8 @@ export function useCanvasInteractions({
 
   const handleCanvasMouseUp = useCallback(
     (event: ReactMouseEvent) => {
-      if (wireDrawing) {
+      const modeType = useInteractionStore.getState().mode.type;
+      if (modeType === 'WIRE_DRAWING' && wireDrawing) {
         const target = event.target as HTMLElement;
         if (!target.closest('[data-port-id]')) {
           const snapTarget = wireInteractionRef.current.snapTarget;
