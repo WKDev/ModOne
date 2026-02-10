@@ -54,12 +54,8 @@ export { WireContextMenu } from './overlays/WireContextMenu';
 export type { WireContextMenuAction } from './overlays/WireContextMenu';
 
 // Hooks
-export { useCanvasInteraction } from './hooks/useCanvasInteraction';
-export { useBlockDrag } from './hooks/useBlockDrag';
 export { useDragDrop } from './hooks/useDragDrop';
 export type { DragState } from './hooks/useDragDrop';
-export { useWireDrawing } from './hooks/useWireDrawing';
-export type { WireDrawingState } from './hooks/useWireDrawing';
 export {
   usePlcOutBlock,
   usePlcInBlock,
@@ -69,8 +65,6 @@ export {
 export { useSimulation } from './hooks/useSimulation';
 export type { UseSimulationReturn, UseSimulationOptions } from './hooks/useSimulation';
 export { useCanvasKeyboardShortcuts } from './hooks/useCanvasKeyboardShortcuts';
-export { useSelectionHandler } from './hooks/useSelectionHandler';
-export { useWireHandleDrag } from './hooks/useWireHandleDrag';
 
 // Selection
 export { SelectionBox, type SelectionBoxState, isPointInBox, doesRectIntersectBox } from './overlays/SelectionBox';

@@ -11,13 +11,13 @@
 import { useRef, forwardRef, useImperativeHandle, useMemo } from 'react';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { GridBackground } from './GridBackground';
-import { useCanvasInteraction } from './hooks/useCanvasInteraction';
 import { useCoordinateSystem } from './coordinate-system/useCoordinateSystem';
 import { CoordinateSystemProvider } from './coordinate-system/CoordinateSystemContext';
 import { TransformedLayer } from './layers/TransformedLayer';
 import { OverlayLayer } from './layers/OverlayLayer';
 import { CanvasContent } from './content/CanvasContent';
 import { CanvasOverlays } from './overlays/CanvasOverlays';
+import { useInteraction } from './contexts/InteractionContext';
 import type { Block, Wire, Junction, Position, HandleConstraint } from './types';
 import type { SelectionBoxState } from './overlays/SelectionBox';
 import type { WirePreviewState } from './overlays/WirePreview';
@@ -100,7 +100,6 @@ export interface CanvasRef {
   getContainer: () => HTMLDivElement | null;
   getContent: () => HTMLDivElement | null;
   getOverlay: () => HTMLDivElement | null;
-  handlePanMouseDown: (event: MouseEvent) => void;
 }
 
 // ============================================================================
@@ -147,6 +146,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
   const contentRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<CanvasRef | null>(null);
+  const { cursor, send } = useInteraction();
 
   // Store state
   const zoom = useCanvasStore((state) => state.zoom);
@@ -164,9 +164,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
     pan,
   });
 
-  // Canvas interaction (pan/zoom)
-  const { cursor, handlePanMouseDown } = useCanvasInteraction(containerRef);
-
   // Combine all selected IDs (blocks + wires) for overlays
   const allSelectedIds = useMemo(() => {
     const combined = new Set<string>();
@@ -181,7 +178,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
       getContainer: () => containerRef.current,
       getContent: () => contentRef.current,
       getOverlay: () => overlayRef.current,
-      handlePanMouseDown,
     };
     canvasRef.current = refObject;
     return refObject;
@@ -201,6 +197,28 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
     }
   };
 
+  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const rect = containerRef.current?.getBoundingClientRect();
+    const position = rect
+      ? {
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top,
+        }
+      : {
+          x: event.clientX,
+          y: event.clientY,
+        };
+
+    send({
+      type: 'WHEEL',
+      deltaX: event.deltaX,
+      deltaY: event.deltaY,
+      ctrlKey: event.ctrlKey || event.metaKey,
+      position,
+    });
+  };
+
   return (
     <CoordinateSystemProvider value={coordinateSystem}>
       <div
@@ -209,6 +227,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
         style={{ cursor }}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
+        onWheel={handleWheel}
       >
         {/* Grid background */}
         <GridBackground gridSize={gridSize} showGrid={showGrid} zoom={zoom} />
