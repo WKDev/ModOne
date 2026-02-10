@@ -17,6 +17,7 @@ import { snapToGrid, screenToCanvas } from '../utils/canvasCoordinates';
 import { isToggleSelection } from '../selection/modifierKeys';
 import type { Position } from '../types';
 import type { CanvasRef } from '../Canvas';
+import { DRAG_THRESHOLD_PX } from '../constants/interaction';
 
 // ============================================================================
 // Types
@@ -75,8 +76,8 @@ interface UseBlockDragReturn {
 // Constants
 // ============================================================================
 
-/** Minimum mouse movement (px) before a drag starts (matches useSelectionHandler) */
-const DRAG_THRESHOLD = 5;
+/** Minimum mouse movement (px) before a drag starts — imported from shared constants */
+const DRAG_THRESHOLD = DRAG_THRESHOLD_PX;
 
 // ============================================================================
 // Hook

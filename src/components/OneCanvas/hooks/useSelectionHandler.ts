@@ -27,6 +27,7 @@ import {
   isAddToSelection,
   hasModifier,
 } from '../selection/modifierKeys';
+import { DRAG_THRESHOLD_PX } from '../constants/interaction';
 
 // ============================================================================
 // Types
@@ -81,7 +82,7 @@ interface SelectionHandlerResult {
 // Constants
 // ============================================================================
 
-const DRAG_THRESHOLD = 5; // Pixels to move before starting drag-select
+const DRAG_THRESHOLD = DRAG_THRESHOLD_PX; // Pixels to move before starting drag-select
 
 // ============================================================================
 // Helper Functions
@@ -194,11 +195,7 @@ export function useSelectionHandler(
   // Handle mouse up on canvas
   const handleCanvasMouseUp = useCallback(
     (e: React.MouseEvent) => {
-      console.log('[useSelectionHandler] MouseUp - isDragSelecting:', isDragSelecting, 'selectionBox:', !!selectionBox);
-
       if (selectionBox && isDragSelecting) {
-        console.log('[useSelectionHandler] Drag select completed, finding items...');
-
         // Find all components, wires, and junctions that match the selection box
         const selectedIds: string[] = [];
 
@@ -206,26 +203,21 @@ export function useSelectionHandler(
         const dragDirection = getDragDirection(selectionBox);
         const isContainmentMode = dragDirection === 'ltr';
         const collisionMode = isContainmentMode ? 'contain' : 'intersect';
-        console.log('[useSelectionHandler] Drag direction:', dragDirection, 'mode:', collisionMode);
 
         // Convert to collision box format
         const collisionBox = toCollisionBox(selectionBox);
 
         // Select blocks based on drag direction
         components.forEach((component) => {
-          const isSelected = isBlockInBox(component, collisionBox, collisionMode);
-          if (isSelected) {
+          if (isBlockInBox(component, collisionBox, collisionMode)) {
             selectedIds.push(component.id);
-            console.log('[useSelectionHandler] Selected component:', component.id);
           }
         });
 
         // Select junctions based on drag direction
         junctions.forEach((junction) => {
-          const isSelected = isJunctionInBox(junction, collisionBox);
-          if (isSelected) {
+          if (isJunctionInBox(junction, collisionBox)) {
             selectedIds.push(junction.id);
-            console.log('[useSelectionHandler] Selected junction:', junction.id);
           }
         });
 
@@ -240,19 +232,12 @@ export function useSelectionHandler(
           collisionMode
         );
         selectedIds.push(...selectedWireIds);
-        if (selectedWireIds.length > 0) {
-          console.log('[useSelectionHandler] Selected wires:', selectedWireIds);
-        }
-
-        console.log('[useSelectionHandler] Total selected:', selectedIds.length, selectedIds);
 
         // Apply selection based on modifier keys
         if (hasModifier(e)) {
-          console.log('[useSelectionHandler] Adding to existing selection');
           // Add to existing selection
           selectedIds.forEach((id) => addToSelection(id));
         } else {
-          console.log('[useSelectionHandler] Replacing selection');
           // Replace selection
           setSelection(selectedIds);
         }
@@ -270,15 +255,12 @@ export function useSelectionHandler(
         const isClickingJunction = target.closest('[data-junction-id]');
 
         const isClickingInteractive = isClickingBlock || isClickingWire || isClickingPort || isClickingJunction;
-        console.log('[useSelectionHandler] Not dragging - isClickingInteractive:', !!isClickingInteractive, 'hasModifier:', hasModifier(e));
         if (!isClickingInteractive && !hasModifier(e)) {
-          console.log('[useSelectionHandler] Clearing selection');
           clearSelection();
         }
       }
 
       // Reset drag state
-      console.log('[useSelectionHandler] Resetting drag state');
       mouseDownPos.current = null;
       hasPassedThreshold.current = false;
       setSelectionBox(null);

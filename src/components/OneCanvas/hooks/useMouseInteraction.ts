@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import type { Position } from '../types';
+import { DRAG_THRESHOLD_PX } from '../constants/interaction';
 
 export type MouseState = 'idle' | 'pressed' | 'dragging' | 'clicking';
 
@@ -18,7 +19,7 @@ export interface MouseInteraction {
 }
 
 interface UseMouseInteractionOptions {
-  /** Minimum distance in pixels to consider a drag (default: 3) */
+  /** Minimum distance in pixels to consider a drag (default: DRAG_THRESHOLD_PX) */
   dragThreshold?: number;
 }
 
@@ -26,7 +27,7 @@ interface UseMouseInteractionOptions {
  * Hook for tracking mouse interaction state
  */
 export function useMouseInteraction(options: UseMouseInteractionOptions = {}) {
-  const { dragThreshold = 3 } = options;
+  const { dragThreshold = DRAG_THRESHOLD_PX } = options;
 
   const [state, setState] = useState<MouseState>('idle');
   const startPosRef = useRef<Position | null>(null);
