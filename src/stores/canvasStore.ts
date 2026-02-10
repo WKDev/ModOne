@@ -98,8 +98,10 @@ interface CanvasState {
   metadata: CircuitMetadata;
 
   // Selection
-  /** Typed selection state (new) */
+  /** Typed selection state (source of truth) */
   selection: SelectionState;
+  /** Cached derived Set of all selected IDs (kept in sync with selection) */
+  _selectedIdsCache: Set<string>;
 
   // Viewport
   /** Current zoom level (0.1 to 4.0) */
@@ -133,8 +135,6 @@ interface CanvasState {
 }
 
 interface CanvasActions {
-  /** Derived selected IDs for backward compatibility (read-only) */
-  readonly selectedIds: Set<string>;
 
   // Component operations
   /** Add a new component to the canvas */
@@ -277,6 +277,7 @@ const initialState: CanvasState = {
     tags: [],
   },
   selection: createSelectionState([]),
+  _selectedIdsCache: new Set<string>(),
   zoom: 1.0,
   pan: { x: 0, y: 0 },
   gridSize: DEFAULT_GRID_SIZE,
@@ -411,6 +412,11 @@ function getDefaultPorts(type: BlockType): Block['ports'] {
   return getDefaultPortsFromDefs(type);
 }
 
+/** Sync the _selectedIdsCache from the selection state (call after any selection mutation) */
+function syncSelectedIdsCache(state: CanvasState): void {
+  state._selectedIdsCache = new Set(getAllSelectedIds(state.selection));
+}
+
 // ============================================================================
 // Store
 // ============================================================================
@@ -420,9 +426,6 @@ export const useCanvasStore = create<CanvasStore>()(
     immer((set, get) => ({
       // Initial state
       ...initialState,
-      get selectedIds(): Set<string> {
-        return new Set(getAllSelectedIds(get().selection));
-      },
 
       // ========================================================================
       // Component Operations
@@ -487,6 +490,7 @@ export const useCanvasStore = create<CanvasStore>()(
 
             // Remove from selection
             state.selection = removeFromSelectionState(state.selection, id);
+            syncSelectedIdsCache(state);
             state.isDirty = true;
           },
           false,
@@ -747,6 +751,7 @@ export const useCanvasStore = create<CanvasStore>()(
 
             state.wires.splice(wireIndex, 1);
             state.selection = removeFromSelectionState(state.selection, id);
+            syncSelectedIdsCache(state);
             state.isDirty = true;
           },
           false,
@@ -810,6 +815,7 @@ export const useCanvasStore = create<CanvasStore>()(
 
             // Select the new junction
             state.selection = createSelectionState([{ id: junctionId, type: 'junction' }]);
+            syncSelectedIdsCache(state);
             state.isDirty = true;
           },
           false,
@@ -1080,6 +1086,7 @@ export const useCanvasStore = create<CanvasStore>()(
               .filter((s): s is Selection => s !== null);
 
             state.selection = createSelectionState(selections);
+            syncSelectedIdsCache(state);
           },
           false,
           'setSelection'
@@ -1092,6 +1099,7 @@ export const useCanvasStore = create<CanvasStore>()(
             const type = getItemType(id, state);
             if (type) {
               state.selection = addToSelectionState(state.selection, { id, type });
+              syncSelectedIdsCache(state);
             }
           },
           false,
@@ -1103,6 +1111,7 @@ export const useCanvasStore = create<CanvasStore>()(
         set(
           (state) => {
             state.selection = removeFromSelectionState(state.selection, id);
+            syncSelectedIdsCache(state);
           },
           false,
           `removeFromSelection/${id}`
@@ -1115,6 +1124,7 @@ export const useCanvasStore = create<CanvasStore>()(
             const type = getItemType(id, state);
             if (type) {
               state.selection = toggleInSelectionState(state.selection, { id, type });
+              syncSelectedIdsCache(state);
             }
           },
           false,
@@ -1126,6 +1136,7 @@ export const useCanvasStore = create<CanvasStore>()(
         set(
           (state) => {
             state.selection = clearSelectionState();
+            syncSelectedIdsCache(state);
           },
           false,
           'clearSelection'
@@ -1145,6 +1156,7 @@ export const useCanvasStore = create<CanvasStore>()(
               ...junctionIds.map(id => ({ id, type: 'junction' as const })),
             ];
             state.selection = createSelectionState(selections);
+            syncSelectedIdsCache(state);
           },
           false,
           'selectAll'
@@ -1310,6 +1322,7 @@ export const useCanvasStore = create<CanvasStore>()(
             state.junctions = restored.junctions;
             state.wires = restored.wires;
             state.selection = restored.selection;
+            syncSelectedIdsCache(state);
             state.historyIndex--;
             state.isDirty = true;
           },
@@ -1330,6 +1343,7 @@ export const useCanvasStore = create<CanvasStore>()(
             state.junctions = restored.junctions;
             state.wires = restored.wires;
             state.selection = restored.selection;
+            syncSelectedIdsCache(state);
             state.isDirty = true;
           },
           false,
@@ -1440,6 +1454,7 @@ export const useCanvasStore = create<CanvasStore>()(
 
             state.metadata = { ...data.metadata };
             state.selection = createSelectionState([]);
+            syncSelectedIdsCache(state);
             state.history = [];
             state.historyIndex = -1;
             state.isDirty = false;
@@ -1477,6 +1492,7 @@ export const useCanvasStore = create<CanvasStore>()(
             state.junctions = new Map();
             state.wires = [];
             state.selection = createSelectionState([]);
+            syncSelectedIdsCache(state);
             state.metadata = {
               name: 'Untitled Circuit',
               description: '',
@@ -1550,7 +1566,7 @@ export const selectWires = (state: CanvasStore) => state.wires;
 export const selectMetadata = (state: CanvasStore) => state.metadata;
 
 /** Select selected IDs */
-export const selectSelectedIds = (state: CanvasStore) => new Set(getAllSelectedIds(state.selection));
+export const selectSelectedIds = (state: CanvasStore) => state._selectedIdsCache;
 
 /** Select zoom level */
 export const selectZoom = (state: CanvasStore) => state.zoom;

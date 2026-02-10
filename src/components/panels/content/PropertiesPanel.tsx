@@ -52,7 +52,7 @@ export const PropertiesPanel = memo(function PropertiesPanel({
   const storeSelectedComponents = useCanvasStore(
     useShallow((state) => {
       const selected: Block[] = [];
-      state.selectedIds.forEach((id) => {
+      state._selectedIdsCache.forEach((id: string) => {
         const component = state.components.get(id);
         if (component) selected.push(component);
       });

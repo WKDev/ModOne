@@ -81,7 +81,7 @@ export function useBlockDrag({
   // Store access
   const zoom = useCanvasStore((state) => state.zoom);
   const pan = useCanvasStore((state) => state.pan);
-  const globalSelectedIds = useCanvasStore((state) => state.selectedIds);
+  const globalSelectedIds = useCanvasStore((state) => state._selectedIdsCache);
   const globalComponents = useCanvasStore((state) => state.components);
   const globalMoveComponent = useCanvasStore((state) => state.moveComponent);
   const globalJunctions = useCanvasStore((state) => state.junctions);
