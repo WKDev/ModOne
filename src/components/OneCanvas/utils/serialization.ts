@@ -19,6 +19,7 @@ import type {
   YamlWireDefinition,
 } from '../types';
 import { isValidBlockType, isLegacyBlockType, isPortEndpoint, migrateLegacyBlockType } from '../types';
+import { createSelectionState } from '../types';
 import { getBlockSize, getPowerSourcePorts } from '../blockDefinitions';
 
 // ============================================================================
@@ -380,7 +381,7 @@ export function yamlToCircuit(yamlString: string): CircuitState {
     junctions: new Map(),
     wires,
     metadata,
-    selectedIds: new Set(),
+    selection: createSelectionState([]),
   };
 }
 
@@ -402,7 +403,7 @@ export function createDefaultCircuit(name: string): CircuitState {
       tags: [],
       createdAt: new Date().toISOString(),
     },
-    selectedIds: new Set(),
+    selection: createSelectionState([]),
   };
 }
 

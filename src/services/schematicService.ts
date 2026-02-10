@@ -8,6 +8,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { MultiPageSchematic, SchematicPage } from '../components/OneCanvas/utils/multiPageSchematic';
 import type { SerializableCircuitState } from '../components/OneCanvas/types';
+import { createSelectionState } from '../components/OneCanvas/types';
 import { circuitToYaml, yamlToCircuit } from '../components/OneCanvas/utils/serialization';
 
 // ============================================================================
@@ -59,7 +60,7 @@ function serializePageCircuit(circuit: SerializableCircuitState): string {
     junctions: circuit.junctions ? new Map(Object.entries(circuit.junctions)) : new Map(),
     wires: circuit.wires,
     metadata: circuit.metadata,
-    selectedIds: new Set<string>(),
+    selection: createSelectionState([]),
   };
 
   return circuitToYaml(circuitState);

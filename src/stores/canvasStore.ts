@@ -45,7 +45,6 @@ import {
   snapToGridPosition,
   endpointKey,
   isValidEndpoint,
-  wireExists,
   findHandleInsertIndex,
   computeWireBendPoints,
   getWiresConnectedToComponent,
@@ -54,6 +53,7 @@ import {
   cleanupRedundantHandles,
 } from '../components/OneCanvas/utils/canvasHelpers';
 import { alignComponents, distributeComponents, flipComponents } from '../components/OneCanvas/utils/canvas-commands';
+import { isValidConnection } from '../components/OneCanvas/utils/connectionValidator';
 
 // ============================================================================
 // Types
@@ -98,8 +98,6 @@ interface CanvasState {
   metadata: CircuitMetadata;
 
   // Selection
-  /** Currently selected component/wire IDs (legacy - will be removed) */
-  selectedIds: Set<string>;
   /** Typed selection state (new) */
   selection: SelectionState;
 
@@ -135,6 +133,9 @@ interface CanvasState {
 }
 
 interface CanvasActions {
+  /** Derived selected IDs for backward compatibility (read-only) */
+  readonly selectedIds: Set<string>;
+
   // Component operations
   /** Add a new component to the canvas */
   addComponent: (type: BlockType, position: Position, props?: Partial<Block>) => string;
@@ -275,7 +276,6 @@ const initialState: CanvasState = {
     description: '',
     tags: [],
   },
-  selectedIds: new Set(),
   selection: createSelectionState([]),
   zoom: 1.0,
   pan: { x: 0, y: 0 },
@@ -358,7 +358,6 @@ function restoreSnapshot(snapshot: HistorySnapshot): {
   junctions: Map<string, Junction>;
   wires: Wire[];
   selection: SelectionState;
-  selectedIds: Set<string>;
 } {
   const selection = snapshot.selection
     ? createSelectionState(snapshot.selection)
@@ -378,7 +377,6 @@ function restoreSnapshot(snapshot: HistorySnapshot): {
       handles: wire.handles ? wire.handles.map((h) => ({ ...h, position: { ...h.position } })) : undefined,
     })),
     selection,
-    selectedIds: new Set(getAllSelectedIds(selection)),
   };
 }
 
@@ -422,6 +420,9 @@ export const useCanvasStore = create<CanvasStore>()(
     immer((set, get) => ({
       // Initial state
       ...initialState,
+      get selectedIds(): Set<string> {
+        return new Set(getAllSelectedIds(get().selection));
+      },
 
       // ========================================================================
       // Component Operations
@@ -485,7 +486,7 @@ export const useCanvasStore = create<CanvasStore>()(
             );
 
             // Remove from selection
-            state.selectedIds.delete(id);
+            state.selection = removeFromSelectionState(state.selection, id);
             state.isDirty = true;
           },
           false,
@@ -572,7 +573,7 @@ export const useCanvasStore = create<CanvasStore>()(
       rotateSelectedComponents: (degrees) => {
         set(
           (state) => {
-            const selectedComponents = Array.from(state.selectedIds)
+            const selectedComponents = getAllSelectedIds(state.selection)
               .filter((id) => state.components.has(id));
 
             if (selectedComponents.length === 0) return;
@@ -605,7 +606,11 @@ export const useCanvasStore = create<CanvasStore>()(
          set(
            (state) => {
              pushHistorySnapshot(state);
-             const result = alignComponents(state.components, state.selectedIds, direction);
+             const result = alignComponents(
+               state.components,
+               new Set(getAllSelectedIds(state.selection)),
+               direction
+             );
              state.components = result;
              state.isDirty = true;
            },
@@ -618,7 +623,11 @@ export const useCanvasStore = create<CanvasStore>()(
          set(
            (state) => {
              pushHistorySnapshot(state);
-             const result = distributeComponents(state.components, state.selectedIds, direction);
+             const result = distributeComponents(
+               state.components,
+               new Set(getAllSelectedIds(state.selection)),
+               direction
+             );
              state.components = result;
              state.isDirty = true;
            },
@@ -631,7 +640,11 @@ export const useCanvasStore = create<CanvasStore>()(
          set(
            (state) => {
              pushHistorySnapshot(state);
-             const result = flipComponents(state.components, state.selectedIds, axis);
+             const result = flipComponents(
+               state.components,
+               new Set(getAllSelectedIds(state.selection)),
+               axis
+             );
              state.components = result;
              state.isDirty = true;
            },
@@ -681,31 +694,12 @@ export const useCanvasStore = create<CanvasStore>()(
       addWire: (from, to, options) => {
         const state = get();
 
-        // Validate endpoints
-        if (!isValidEndpoint(from, state.components, state.junctions)) {
-          console.warn('Invalid wire source endpoint:', from);
-          return null;
-        }
-        if (!isValidEndpoint(to, state.components, state.junctions)) {
-          console.warn('Invalid wire target endpoint:', to);
-          return null;
-        }
-
-        // Prevent self-connection (only for port endpoints on the same component)
-        if (isPortEndpoint(from) && isPortEndpoint(to) && from.componentId === to.componentId) {
-          console.warn('Cannot connect component to itself');
-          return null;
-        }
-
-        // Prevent connecting same endpoint to itself
-        if (endpointKey(from) === endpointKey(to)) {
-          console.warn('Cannot connect endpoint to itself');
-          return null;
-        }
-
-        // Prevent duplicate wires
-        if (wireExists(state.wires, from, to)) {
-          console.warn('Wire already exists');
+        // Use centralized validator for comprehensive checks:
+        // endpoint existence, self-connection, same component, port type
+        // compatibility, port capacity limits, duplicate wire, and cycle detection
+        const validation = isValidConnection(from, to, state.components, state.wires, state.junctions);
+        if (!validation.valid) {
+          console.warn('Invalid wire connection:', validation.reason);
           return null;
         }
 
@@ -752,7 +746,7 @@ export const useCanvasStore = create<CanvasStore>()(
             pushHistorySnapshot(state);
 
             state.wires.splice(wireIndex, 1);
-            state.selectedIds.delete(id);
+            state.selection = removeFromSelectionState(state.selection, id);
             state.isDirty = true;
           },
           false,
@@ -815,7 +809,7 @@ export const useCanvasStore = create<CanvasStore>()(
             state.wires.push(wire2);
 
             // Select the new junction
-            state.selectedIds = new Set([junctionId]);
+            state.selection = createSelectionState([{ id: junctionId, type: 'junction' }]);
             state.isDirty = true;
           },
           false,
@@ -1078,10 +1072,6 @@ export const useCanvasStore = create<CanvasStore>()(
       setSelection: (ids) => {
         set(
           (state) => {
-            // Update legacy Set
-            state.selectedIds = new Set(ids);
-
-            // Update new SelectionState (dual-write)
             const selections: Selection[] = ids
               .map(id => {
                 const type = getItemType(id, state);
@@ -1099,10 +1089,6 @@ export const useCanvasStore = create<CanvasStore>()(
       addToSelection: (id) => {
         set(
           (state) => {
-            // Update legacy Set
-            state.selectedIds.add(id);
-
-            // Update new SelectionState (dual-write)
             const type = getItemType(id, state);
             if (type) {
               state.selection = addToSelectionState(state.selection, { id, type });
@@ -1116,10 +1102,6 @@ export const useCanvasStore = create<CanvasStore>()(
       removeFromSelection: (id) => {
         set(
           (state) => {
-            // Update legacy Set
-            state.selectedIds.delete(id);
-
-            // Update new SelectionState (dual-write)
             state.selection = removeFromSelectionState(state.selection, id);
           },
           false,
@@ -1130,14 +1112,6 @@ export const useCanvasStore = create<CanvasStore>()(
       toggleSelection: (id) => {
         set(
           (state) => {
-            // Update legacy Set
-            if (state.selectedIds.has(id)) {
-              state.selectedIds.delete(id);
-            } else {
-              state.selectedIds.add(id);
-            }
-
-            // Update new SelectionState (dual-write)
             const type = getItemType(id, state);
             if (type) {
               state.selection = toggleInSelectionState(state.selection, { id, type });
@@ -1151,10 +1125,6 @@ export const useCanvasStore = create<CanvasStore>()(
       clearSelection: () => {
         set(
           (state) => {
-            // Update legacy Set
-            state.selectedIds = new Set();
-
-            // Update new SelectionState (dual-write)
             state.selection = clearSelectionState();
           },
           false,
@@ -1165,19 +1135,10 @@ export const useCanvasStore = create<CanvasStore>()(
       selectAll: () => {
         set(
           (state) => {
-            // Collect all IDs
             const blockIds = Array.from(state.components.keys());
             const wireIds = state.wires.map((w) => w.id);
             const junctionIds = Array.from(state.junctions.keys());
 
-            // Update legacy Set
-            state.selectedIds = new Set([
-              ...blockIds,
-              ...wireIds,
-              ...junctionIds,
-            ]);
-
-            // Update new SelectionState (dual-write)
             const selections: Selection[] = [
               ...blockIds.map(id => ({ id, type: 'block' as const })),
               ...wireIds.map(id => ({ id, type: 'wire' as const })),
@@ -1349,7 +1310,6 @@ export const useCanvasStore = create<CanvasStore>()(
             state.junctions = restored.junctions;
             state.wires = restored.wires;
             state.selection = restored.selection;
-            state.selectedIds = restored.selectedIds;
             state.historyIndex--;
             state.isDirty = true;
           },
@@ -1370,7 +1330,6 @@ export const useCanvasStore = create<CanvasStore>()(
             state.junctions = restored.junctions;
             state.wires = restored.wires;
             state.selection = restored.selection;
-            state.selectedIds = restored.selectedIds;
             state.isDirty = true;
           },
           false,
@@ -1480,7 +1439,7 @@ export const useCanvasStore = create<CanvasStore>()(
             }
 
             state.metadata = { ...data.metadata };
-            state.selectedIds = new Set();
+            state.selection = createSelectionState([]);
             state.history = [];
             state.historyIndex = -1;
             state.isDirty = false;
@@ -1517,7 +1476,7 @@ export const useCanvasStore = create<CanvasStore>()(
             state.components = new Map();
             state.junctions = new Map();
             state.wires = [];
-            state.selectedIds = new Set();
+            state.selection = createSelectionState([]);
             state.metadata = {
               name: 'Untitled Circuit',
               description: '',
@@ -1562,7 +1521,7 @@ export const useCanvasStore = create<CanvasStore>()(
             components: new Map(),
             junctions: new Map(),
             wires: [],
-            selectedIds: new Set(),
+            selection: createSelectionState([]),
             history: [],
           }),
           false,
@@ -1591,7 +1550,7 @@ export const selectWires = (state: CanvasStore) => state.wires;
 export const selectMetadata = (state: CanvasStore) => state.metadata;
 
 /** Select selected IDs */
-export const selectSelectedIds = (state: CanvasStore) => state.selectedIds;
+export const selectSelectedIds = (state: CanvasStore) => new Set(getAllSelectedIds(state.selection));
 
 /** Select zoom level */
 export const selectZoom = (state: CanvasStore) => state.zoom;
@@ -1628,8 +1587,9 @@ export const selectComponent = (id: string) => (state: CanvasStore) =>
 
 /** Select selected components */
 export const selectSelectedComponents = (state: CanvasStore) => {
+  const selectedIds = new Set(getAllSelectedIds(state.selection));
   const selected: Block[] = [];
-  state.selectedIds.forEach((id) => {
+  selectedIds.forEach((id) => {
     const component = state.components.get(id);
     if (component) selected.push(component);
   });
@@ -1638,7 +1598,7 @@ export const selectSelectedComponents = (state: CanvasStore) => {
 
 /** Select selected wires */
 export const selectSelectedWires = (state: CanvasStore) =>
-  state.wires.filter((wire) => state.selectedIds.has(wire.id));
+  state.wires.filter((wire) => state.selection.items.has(wire.id));
 
 /** Select bounding box of all components */
 export const selectBoundingBox = (state: CanvasStore) => {

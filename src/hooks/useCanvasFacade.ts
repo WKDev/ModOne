@@ -22,6 +22,7 @@ import type {
   PortPosition,
   SerializableCircuitState,
 } from '../components/OneCanvas/types';
+import { getAllSelectedIds } from '../components/OneCanvas/types';
 import {
   alignComponents,
   distributeComponents,
@@ -282,7 +283,8 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
   const startWireDrawing = useCanvasStore((state) => state.startWireDrawing);
   const updateWireDrawing = useCanvasStore((state) => state.updateWireDrawing);
   const cancelWireDrawing = useCanvasStore((state) => state.cancelWireDrawing);
-  const selectedIds = useCanvasStore((state) => state.selectedIds);
+  const globalSelection = useCanvasStore((state) => state.selection);
+  const selectedIds = useMemo(() => new Set(getAllSelectedIds(globalSelection)), [globalSelection]);
   const globalSetSelection = useCanvasStore((state) => state.setSelection);
   const globalAddToSelection = useCanvasStore((state) => state.addToSelection);
   const globalToggleSelection = useCanvasStore((state) => state.toggleSelection);

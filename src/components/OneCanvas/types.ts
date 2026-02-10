@@ -225,6 +225,8 @@ export interface Port {
   position: PortPosition;
   /** Offset along the edge (0-1, default 0.5 = center) */
   offset?: number;
+  /** Maximum number of wire connections allowed. Undefined = unlimited. */
+  maxConnections?: number;
 }
 
 // ============================================================================
@@ -756,6 +758,8 @@ export interface CircuitState {
   metadata: CircuitMetadata;
   /** Currently selected component/wire IDs */
   selectedIds?: Set<string>;
+  /** Typed selection state */
+  selection?: SelectionState;
   /** Viewport state */
   viewport?: ViewportState;
 }
