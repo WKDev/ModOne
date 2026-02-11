@@ -48,7 +48,8 @@ export { DraggableBlock } from './components/DraggableBlock';
 // Wire Components
 export { Wire, WirePreview } from './Wire';
 export type { WireType } from './Wire';
-export { AnimatedWire, wireAnimationStyles } from './components/AnimatedWire';
+
+
 export { WireHandle } from './components/WireHandle';
 export { WireContextMenu } from './overlays/WireContextMenu';
 export type { WireContextMenuAction } from './overlays/WireContextMenu';

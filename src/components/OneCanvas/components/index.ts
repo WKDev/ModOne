@@ -9,7 +9,7 @@ export { BlockRenderer } from './BlockRenderer';
 export { DraggableBlock } from './DraggableBlock';
 export * from './blocks';
 export { SelectionBox, type SelectionBoxState, isPointInBox, doesRectIntersectBox } from './SelectionBox';
-export { AnimatedWire } from './AnimatedWire';
+
 export { CanvasMinimap } from './CanvasMinimap';
 export { CircuitLibraryPanel } from './CircuitLibraryPanel';
 export { WireNumberingDialog } from './WireNumberingDialog';
