@@ -54,8 +54,4 @@ export interface CanvasInteractionAdapter {
   // Spatial queries
   queryPoint(pos: Position, margin: number): SpatialItem[];
   queryBox(bounds: BoundingBox): SpatialItem[];
-
-  // Transient drag (direct DOM manipulation)
-  setTransientPosition(id: string, x: number, y: number): void;
-  clearTransientPositions(): void;
 }

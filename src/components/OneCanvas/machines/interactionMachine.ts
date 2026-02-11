@@ -597,38 +597,10 @@ export const interactionMachine = setup({
         y: event.canvasPosition.y - context.dragStartCanvasPos.y,
       };
 
-      for (const [id, original] of context.dragOriginalPositions) {
-        let next = {
-          x: original.x + delta.x,
-          y: original.y + delta.y,
-        };
+      // First move pushes history snapshot; subsequent moves skip history.
+      // Store update on every frame so connected wires recalculate in real-time.
+      const skipHistory = !context.dragIsFirstMove;
 
-        if (adapter.getSnapToGrid()) {
-          next = snapToGrid(next, adapter.getGridSize());
-        }
-
-        // Transient drag: update DOM directly for 60fps, skip React state
-        if (!context.dragJunctionIds.has(id)) {
-          adapter.setTransientPosition(id, next.x, next.y);
-        } else {
-          // Junctions are SVG — fall back to store update (small set, low cost)
-          adapter.moveJunction(id, next, true);
-        }
-      }
-    },
-
-    commitItemDragging: ({ context, event }) => {
-      if (!isPointerUp(event) || !context.dragStartCanvasPos || !context.dragHasPassedThreshold) {
-        return;
-      }
-
-      const adapter = getAdapter(context);
-      const delta = {
-        x: event.canvasPosition.x - context.dragStartCanvasPos.x,
-        y: event.canvasPosition.y - context.dragStartCanvasPos.y,
-      };
-
-      // Commit final positions to store (triggers React re-render + history push)
       for (const [id, original] of context.dragOriginalPositions) {
         let next = {
           x: original.x + delta.x,
@@ -640,14 +612,11 @@ export const interactionMachine = setup({
         }
 
         if (context.dragJunctionIds.has(id)) {
-          // Junctions were already updated during drag — final commit with history
-          adapter.moveJunction(id, next, false);
+          adapter.moveJunction(id, next, skipHistory);
         } else {
-          adapter.moveComponent(id, next, false);
+          adapter.moveComponent(id, next, skipHistory);
         }
       }
-
-      adapter.clearTransientPositions();
     },
 
     consumeDragFirstMove: assign(({ context }) => ({
@@ -1058,7 +1027,6 @@ export const interactionMachine = setup({
             },
             POINTER_UP: {
               target: '#oneCanvasInteraction.idle',
-              actions: ['commitItemDragging'],
             },
           },
         },
