@@ -724,8 +724,20 @@ export const interactionMachine = setup({
         }
       }
 
+      // Version must change when wire geometry changes (handle moves, not just item count).
+      // Combine item counts with a lightweight wire-handle hash.
+      let wireHandleHash = 0;
+      for (const w of adapter.getWires()) {
+        if (w.handles) {
+          for (const h of w.handles) {
+            // Simple bit-mixing hash: fast, not cryptographic, just needs to detect changes
+            wireHandleHash = (wireHandleHash * 31 + ((h.position.x * 1000) | 0)) | 0;
+            wireHandleHash = (wireHandleHash * 31 + ((h.position.y * 1000) | 0)) | 0;
+          }
+        }
+      }
       const geometryVersion =
-        adapter.getComponents().size + adapter.getJunctions().size + adapter.getWires().length;
+        adapter.getComponents().size + adapter.getJunctions().size + adapter.getWires().length + wireHandleHash;
       const wireIds = selectWiresInBox(
         adapter.getWires(),
         selectionBox,

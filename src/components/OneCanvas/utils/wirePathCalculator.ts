@@ -148,17 +148,42 @@ function calculateOrthogonalRoute(
   const dx = toExit.x - fromExit.x;
   const dy = toExit.y - fromExit.y;
 
-  // If already aligned, no intermediate points needed
-  if (Math.abs(dx) < 1 && Math.abs(dy) < 1) {
-    return [];
-  }
-  if (Math.abs(dx) < 1 || Math.abs(dy) < 1) {
-    return [];
-  }
-
   // Determine routing strategy based on port directions
   const fromIsHorizontal = fromDirection === 'left' || fromDirection === 'right';
   const toIsHorizontal = toDirection === 'left' || toDirection === 'right';
+
+  // If perfectly aligned (same point), create a minimal pair so segments are draggable
+  if (Math.abs(dx) < 1 && Math.abs(dy) < 1) {
+    // Degenerate case — exits overlap. Insert midpoint pair offset from exit.
+    if (fromIsHorizontal) {
+      return [
+        { x: fromExit.x, y: fromExit.y },
+        { x: toExit.x, y: toExit.y },
+      ];
+    }
+    return [
+      { x: fromExit.x, y: fromExit.y },
+      { x: toExit.x, y: toExit.y },
+    ];
+  }
+
+  // Exits on same axis — insert a midpoint pair so segment is draggable
+  if (Math.abs(dx) < 1) {
+    // Vertically aligned — add two horizontal-axis midpoints
+    const midY = fromExit.y + dy / 2;
+    return [
+      { x: fromExit.x, y: midY },
+      { x: toExit.x, y: midY },
+    ];
+  }
+  if (Math.abs(dy) < 1) {
+    // Horizontally aligned — add two vertical-axis midpoints
+    const midX = fromExit.x + dx / 2;
+    return [
+      { x: midX, y: fromExit.y },
+      { x: midX, y: toExit.y },
+    ];
+  }
 
   if (fromIsHorizontal && toIsHorizontal) {
     // Both horizontal: route vertically in the middle
@@ -175,11 +200,17 @@ function calculateOrthogonalRoute(
       { x: toExit.x, y: midY },
     ];
   } else if (fromIsHorizontal && !toIsHorizontal) {
-    // From horizontal, to vertical: single corner
-    return [{ x: toExit.x, y: fromExit.y }];
+    // From horizontal, to vertical: L-shaped. Split corner into 2 handles.
+    return [
+      { x: toExit.x, y: fromExit.y },
+      { x: toExit.x, y: toExit.y },
+    ];
   } else {
-    // From vertical, to horizontal: single corner
-    return [{ x: fromExit.x, y: toExit.y }];
+    // From vertical, to horizontal: L-shaped. Split corner into 2 handles.
+    return [
+      { x: fromExit.x, y: toExit.y },
+      { x: toExit.x, y: toExit.y },
+    ];
   }
 }
 
