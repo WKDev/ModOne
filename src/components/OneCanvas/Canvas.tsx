@@ -17,7 +17,7 @@ import { OverlayLayer } from './layers/OverlayLayer';
 import { CanvasContent } from './content/CanvasContent';
 import { CanvasOverlays } from './overlays/CanvasOverlays';
 import { useInteraction } from './contexts/InteractionContext';
-import type { Block, Wire, Junction, Position, HandleConstraint } from './types';
+import type { Block, Wire, Junction, Position } from './types';
 import type { SelectionBoxState } from './overlays/SelectionBox';
 import type { WirePreviewState } from './overlays/WirePreview';
 
@@ -62,32 +62,15 @@ interface CanvasProps {
   onEndWire?: (blockId: string, portId: string) => void;
   onBlockDragStart?: (blockId: string, event: React.MouseEvent) => void;
 
-  // Wire interaction callbacks
-  onWireContextMenu?: (wireId: string, position: Position, screenPos: { x: number; y: number }) => void;
-  onWireHandleDragStart?: (
-    wireId: string,
-    handleIndex: number,
-    constraint: HandleConstraint,
-    e: React.MouseEvent,
-    handlePosition: Position
-  ) => void;
-  onWireHandleContextMenu?: (wireId: string, handleIndex: number, e: React.MouseEvent) => void;
-  onWireSegmentDragStart?: (
-    wireId: string,
-    handleIndexA: number,
-    handleIndexB: number,
-    orientation: 'horizontal' | 'vertical',
-    e: React.MouseEvent,
-    handlePosA: Position,
-    handlePosB: Position,
-    skipEndpointCheck?: boolean
-  ) => void;
-  onWireEndpointSegmentDragStart?: (
-    wireId: string,
-    end: 'from' | 'to',
-    orientation: 'horizontal' | 'vertical',
-    e: React.MouseEvent
-  ) => void;
+   // Wire interaction callbacks
+   onWireContextMenu?: (wireId: string, position: Position, screenPos: { x: number; y: number }) => void;
+   onWireHandleContextMenu?: (wireId: string, handleIndex: number, e: React.MouseEvent) => void;
+   onWireEndpointSegmentDragStart?: (
+     wireId: string,
+     end: 'from' | 'to',
+     orientation: 'horizontal' | 'vertical',
+     e: React.MouseEvent
+   ) => void;
 
   // Component update
   onUpdateComponent?: (id: string, updates: Partial<Block>) => void;
@@ -134,9 +117,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
     onEndWire,
     onBlockDragStart,
     onWireContextMenu,
-    onWireHandleDragStart,
     onWireHandleContextMenu,
-    onWireSegmentDragStart,
     onWireEndpointSegmentDragStart,
     onUpdateComponent,
     className = '',
@@ -250,12 +231,10 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
               plcOutputStates={plcOutputStates}
               onStartWire={onStartWire}
               onEndWire={onEndWire}
-              onBlockDragStart={onBlockDragStart}
-              onWireContextMenu={onWireContextMenu}
-              onWireHandleDragStart={onWireHandleDragStart}
-              onWireHandleContextMenu={onWireHandleContextMenu}
-              onWireSegmentDragStart={onWireSegmentDragStart}
-              onWireEndpointSegmentDragStart={onWireEndpointSegmentDragStart}
+               onBlockDragStart={onBlockDragStart}
+               onWireContextMenu={onWireContextMenu}
+               onWireHandleContextMenu={onWireHandleContextMenu}
+               onWireEndpointSegmentDragStart={onWireEndpointSegmentDragStart}
               onUpdateComponent={onUpdateComponent}
             />
           </div>

@@ -1,4 +1,4 @@
-import type { Block, Wire, Junction, Position, HandleConstraint } from '../types';
+import type { Block, Wire, Junction, Position } from '../types';
 import { BlockRenderer } from './BlockRenderer';
 import { Wire as WireComponent } from './WireRenderer';
 
@@ -22,31 +22,14 @@ interface CanvasContentProps {
   onUpdateComponent?: (id: string, updates: Partial<Block>) => void;
 
   // Wire interaction handlers
-  onWireContextMenu?: (wireId: string, position: Position, screenPos: { x: number; y: number }) => void;
-  onWireHandleDragStart?: (
-    wireId: string,
-    handleIndex: number,
-    constraint: HandleConstraint,
-    e: React.MouseEvent,
-    handlePosition: Position
-  ) => void;
-  onWireHandleContextMenu?: (wireId: string, handleIndex: number, e: React.MouseEvent) => void;
-  onWireSegmentDragStart?: (
-    wireId: string,
-    handleIndexA: number,
-    handleIndexB: number,
-    orientation: 'horizontal' | 'vertical',
-    e: React.MouseEvent,
-    handlePosA: Position,
-    handlePosB: Position,
-    skipEndpointCheck?: boolean
-  ) => void;
-  onWireEndpointSegmentDragStart?: (
-    wireId: string,
-    end: 'from' | 'to',
-    orientation: 'horizontal' | 'vertical',
-    e: React.MouseEvent
-  ) => void;
+   onWireContextMenu?: (wireId: string, position: Position, screenPos: { x: number; y: number }) => void;
+   onWireHandleContextMenu?: (wireId: string, handleIndex: number, e: React.MouseEvent) => void;
+   onWireEndpointSegmentDragStart?: (
+     wireId: string,
+     end: 'from' | 'to',
+     orientation: 'horizontal' | 'vertical',
+     e: React.MouseEvent
+   ) => void;
 }
 
 /**
@@ -71,12 +54,10 @@ export function CanvasContent({
   plcOutputStates,
   onStartWire,
   onEndWire,
-  onBlockDragStart,
-  onWireContextMenu,
-  onWireHandleDragStart,
-  onWireHandleContextMenu,
-  onWireSegmentDragStart,
-  onWireEndpointSegmentDragStart,
+   onBlockDragStart,
+   onWireContextMenu,
+   onWireHandleContextMenu,
+   onWireEndpointSegmentDragStart,
   onUpdateComponent,
 }: CanvasContentProps) {
   // Calculate port positions for wire rendering
@@ -143,11 +124,9 @@ export function CanvasContent({
               handles={wire.handles}
               fromExitDirection={wire.fromExitDirection}
               toExitDirection={wire.toExitDirection}
-              onContextMenu={onWireContextMenu}
-              onHandleDragStart={onWireHandleDragStart}
-              onHandleContextMenu={onWireHandleContextMenu}
-              onSegmentDragStart={onWireSegmentDragStart}
-              onEndpointSegmentDragStart={onWireEndpointSegmentDragStart}
+               onContextMenu={onWireContextMenu}
+               onHandleContextMenu={onWireHandleContextMenu}
+               onEndpointSegmentDragStart={onWireEndpointSegmentDragStart}
               label={wire.label}
               wireNumber={wire.wireNumber}
             />

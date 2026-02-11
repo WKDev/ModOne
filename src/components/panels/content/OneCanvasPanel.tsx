@@ -426,47 +426,7 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
     [sendPointerDown]
   );
 
-  const handleWireHandleDragStart = useCallback(
-    (
-      wireId: string,
-      handleIndex: number,
-      constraint: HandleConstraint,
-      event: React.MouseEvent,
-      handlePosition: Position
-    ) => {
-      sendPointerDown(event, {
-        kind: 'wire_handle',
-        wireId,
-        handleIndex,
-        constraint,
-        handlePosition,
-      });
-    },
-    [sendPointerDown]
-  );
 
-  const handleSegmentDragStart = useCallback(
-    (
-      wireId: string,
-      handleIndexA: number,
-      handleIndexB: number,
-      orientation: 'horizontal' | 'vertical',
-      event: React.MouseEvent,
-      handlePosA: Position,
-      handlePosB: Position
-    ) => {
-      sendPointerDown(event, {
-        kind: 'wire_segment',
-        wireId,
-        handleA: handleIndexA,
-        handleB: handleIndexB,
-        orientation,
-        positionA: handlePosA,
-        positionB: handlePosB,
-      });
-    },
-    [sendPointerDown]
-  );
 
   const handleEndpointSegmentDragStart = useCallback(
     (wireId: string, end: 'from' | 'to', orientation: 'horizontal' | 'vertical', event: React.MouseEvent) => {
@@ -862,12 +822,10 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
                   onButtonRelease={handleButtonRelease}
                   onStartWire={handleStartWire}
                   onEndWire={handleEndWire}
-                  onBlockDragStart={handleBlockDragStart}
-                  onWireContextMenu={handleWireContextMenu}
-                  onWireHandleDragStart={handleWireHandleDragStart}
-                  onWireHandleContextMenu={handleWireHandleContextMenu}
-                  onWireSegmentDragStart={handleSegmentDragStart}
-                  onWireEndpointSegmentDragStart={handleEndpointSegmentDragStart}
+                   onBlockDragStart={handleBlockDragStart}
+                   onWireContextMenu={handleWireContextMenu}
+                   onWireHandleContextMenu={handleWireHandleContextMenu}
+                   onWireEndpointSegmentDragStart={handleEndpointSegmentDragStart}
                   onUpdateComponent={handleUpdateComponent}
                   debugMode={debugMode}
                 />

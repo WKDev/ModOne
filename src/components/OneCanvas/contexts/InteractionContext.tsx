@@ -141,11 +141,31 @@ export function resolvePointerTarget(
     }
   }
 
-  const wireNode = target.closest('[data-wire-id]') as HTMLElement | null;
-  if (wireNode) {
-    const wireId = wireNode.getAttribute('data-wire-id');
-    if (wireId) {
-      return { kind: 'wire', wireId };
+  // Wire handles and segments must be checked BEFORE the generic wire check,
+  // because they live inside <g data-wire-id> and closest('[data-wire-id]')
+  // would match the parent first, swallowing the more specific target.
+
+  const handleNode = target.closest('[data-wire-handle]') as HTMLElement | null;
+  if (handleNode) {
+    const wireId = handleNode.getAttribute('data-wire-id');
+    const handleIndex = parseIntAttr(handleNode.getAttribute('data-handle-index'));
+    const constraint = handleNode.getAttribute('data-constraint');
+    const x = parseFloatAttr(handleNode.getAttribute('data-handle-x'));
+    const y = parseFloatAttr(handleNode.getAttribute('data-handle-y'));
+    if (
+      wireId &&
+      handleIndex !== null &&
+      (constraint === 'free' || constraint === 'horizontal' || constraint === 'vertical') &&
+      x !== null &&
+      y !== null
+    ) {
+      return {
+        kind: 'wire_handle',
+        wireId,
+        handleIndex,
+        constraint,
+        handlePosition: { x, y },
+      };
     }
   }
 
@@ -181,27 +201,11 @@ export function resolvePointerTarget(
     }
   }
 
-  const handleNode = target.closest('[data-wire-handle]') as HTMLElement | null;
-  if (handleNode) {
-    const wireId = handleNode.getAttribute('data-wire-id');
-    const handleIndex = parseIntAttr(handleNode.getAttribute('data-handle-index'));
-    const constraint = handleNode.getAttribute('data-constraint');
-    const x = parseFloatAttr(handleNode.getAttribute('data-handle-x'));
-    const y = parseFloatAttr(handleNode.getAttribute('data-handle-y'));
-    if (
-      wireId &&
-      handleIndex !== null &&
-      (constraint === 'free' || constraint === 'horizontal' || constraint === 'vertical') &&
-      x !== null &&
-      y !== null
-    ) {
-      return {
-        kind: 'wire_handle',
-        wireId,
-        handleIndex,
-        constraint,
-        handlePosition: { x, y },
-      };
+  const wireNode = target.closest('[data-wire-id]') as HTMLElement | null;
+  if (wireNode) {
+    const wireId = wireNode.getAttribute('data-wire-id');
+    if (wireId) {
+      return { kind: 'wire', wireId };
     }
   }
 

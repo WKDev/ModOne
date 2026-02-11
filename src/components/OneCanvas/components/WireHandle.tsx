@@ -21,14 +21,6 @@ interface WireHandleProps {
   handleIndex: number;
   /** Movement constraint direction */
   constraint: HandleConstraint;
-  /** Called when user starts dragging the handle */
-  onDragStart: (
-    wireId: string,
-    handleIndex: number,
-    constraint: HandleConstraint,
-    e: React.MouseEvent,
-    handlePosition: Position
-  ) => void;
   /** Called when handle is right-clicked (for removal) */
   onContextMenu?: (
     wireId: string,
@@ -62,15 +54,8 @@ export const WireHandle = memo(function WireHandle({
   wireId,
   handleIndex,
   constraint,
-  onDragStart,
   onContextMenu,
 }: WireHandleProps) {
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    onDragStart(wireId, handleIndex, constraint, e, position);
-  };
-
   const handleRightClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -79,15 +64,20 @@ export const WireHandle = memo(function WireHandle({
 
   return (
     <g className="wire-handle" style={{ pointerEvents: 'auto' }}>
-      {/* Larger invisible hit area */}
+      {/* Larger invisible hit area — centralized handler reads data-* attrs */}
       <circle
         cx={position.x}
         cy={position.y}
         r={HIT_AREA_RADIUS}
         fill="transparent"
         className="cursor-grab active:cursor-grabbing"
-        onMouseDown={handleMouseDown}
         onContextMenu={handleRightClick}
+        data-wire-handle=""
+        data-wire-id={wireId}
+        data-handle-index={handleIndex}
+        data-constraint={constraint}
+        data-handle-x={position.x}
+        data-handle-y={position.y}
       />
 
       {/* Constraint indicator line */}
@@ -102,7 +92,7 @@ export const WireHandle = memo(function WireHandle({
           opacity={0.6}
           className="pointer-events-none"
         />
-      ) : (
+      ) : constraint === 'vertical' ? (
         <line
           x1={position.x}
           y1={position.y - INDICATOR_LENGTH}
@@ -113,7 +103,7 @@ export const WireHandle = memo(function WireHandle({
           opacity={0.6}
           className="pointer-events-none"
         />
-      )}
+      ) : null}
 
       {/* Visible handle circle */}
       <circle

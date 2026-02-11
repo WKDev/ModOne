@@ -6,7 +6,7 @@
  */
 
 import { memo, useCallback } from 'react';
-import type { Position, HandleConstraint, PortPosition, WireHandle as WireHandleData } from './types';
+import type { Position, PortPosition, WireHandle as WireHandleData } from './types';
 import { calculateWirePath, calculatePathWithHandles, calculatePathWithExitDirections } from './utils/wirePathCalculator';
 import { getClosestPointOnPath } from './utils/wireHitTest';
 import { WireHandle } from './components/WireHandle';
@@ -41,26 +41,8 @@ interface WireProps {
   onContextMenu?: (wireId: string, position: Position, screenPos: { x: number; y: number }) => void;
   /** Wire handles (control points with constraints) */
   handles?: WireHandleData[];
-  /** Handler for starting handle drag */
-  onHandleDragStart?: (
-    wireId: string,
-    handleIndex: number,
-    constraint: HandleConstraint,
-    e: React.MouseEvent,
-    handlePosition: Position
-  ) => void;
-  /** Handler for handle right-click (removal) */
-  onHandleContextMenu?: (wireId: string, handleIndex: number, e: React.MouseEvent) => void;
-  /** Handler for starting segment drag (two adjacent handles) */
-  onSegmentDragStart?: (
-    wireId: string,
-    handleIndexA: number,
-    handleIndexB: number,
-    orientation: 'horizontal' | 'vertical',
-    e: React.MouseEvent,
-    startPositionA: Position,
-    startPositionB: Position
-  ) => void;
+   /** Handler for handle right-click (removal) */
+   onHandleContextMenu?: (wireId: string, handleIndex: number, e: React.MouseEvent) => void;
   /** Handler for starting endpoint segment drag (port ↔ first/last handle) */
   onEndpointSegmentDragStart?: (
     wireId: string,
@@ -111,20 +93,18 @@ export const Wire = memo(function Wire({
   type = 'inactive',
   isActive = false,
   isSelected = false,
-  isHovered = false,
-  pathMode = 'straight',
-  onClick,
-  onContextMenu,
-  handles,
-  onHandleDragStart,
-  onHandleContextMenu,
-  onSegmentDragStart,
-  onEndpointSegmentDragStart,
-  fromExitDirection,
-  toExitDirection,
-  defaultFromDirection,
-  defaultToDirection,
-}: WireProps) {
+   isHovered = false,
+   pathMode = 'straight',
+   onClick,
+   onContextMenu,
+   handles,
+   onHandleContextMenu,
+   onEndpointSegmentDragStart,
+   fromExitDirection,
+   toExitDirection,
+   defaultFromDirection,
+   defaultToDirection,
+ }: WireProps) {
   // Extract positions from handles
   const handlePositions = handles?.map((h) => h.position);
 
@@ -278,34 +258,6 @@ export const Wire = memo(function Wire({
         </>
       )}
 
-      {/* Segment drag hit areas (between adjacent handles) */}
-      {isSelected && handles && handles.length >= 2 && onSegmentDragStart &&
-        handles.slice(0, -1).map((handle, i) => {
-          const next = handles[i + 1];
-          const dx = Math.abs(handle.position.x - next.position.x);
-          const dy = Math.abs(handle.position.y - next.position.y);
-          // Skip diagonal segments (threshold tolerates minor floating-point drift)
-          if (dx > 10 && dy > 10) return null;
-          const orientation = dx <= 10 ? 'vertical' : 'horizontal';
-          const cursor = orientation === 'vertical' ? 'ew-resize' : 'ns-resize';
-          return (
-            <line
-              key={`seg-${i}`}
-              x1={handle.position.x} y1={handle.position.y}
-              x2={next.position.x} y2={next.position.y}
-              stroke="transparent" strokeWidth={12}
-              style={{ pointerEvents: 'auto', cursor }}
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                onSegmentDragStart(id, i, i + 1, orientation, e,
-                  handle.position, next.position);
-              }}
-            />
-          );
-        })
-      }
-
       {/* Endpoint segment drag hit areas (port exit ↔ first/last handle) */}
       {isSelected && handles && handles.length >= 1 && onEndpointSegmentDragStart && (() => {
         const getExitPt = (pos: Position, dir: PortPosition, dist = 20): Position => {
@@ -377,7 +329,7 @@ export const Wire = memo(function Wire({
       })()}
 
       {/* Render handles when wire is selected */}
-      {isSelected && handles && handles.length > 0 && onHandleDragStart && (
+      {isSelected && handles && handles.length > 0 && (
         <>
           {handles.map((handle, index) => (
             <WireHandle
@@ -386,7 +338,6 @@ export const Wire = memo(function Wire({
               wireId={id}
               handleIndex={index}
               constraint={handle.constraint}
-              onDragStart={onHandleDragStart}
               onContextMenu={onHandleContextMenu}
             />
           ))}

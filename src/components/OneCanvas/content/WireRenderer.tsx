@@ -6,7 +6,7 @@
  */
 
 import { memo, useCallback } from 'react';
-import type { Position, HandleConstraint, PortPosition, WireHandle as WireHandleData } from '../types';
+import type { Position, PortPosition, WireHandle as WireHandleData } from '../types';
 import { calculateWirePath, calculatePathWithHandles, calculatePathWithExitDirections } from '../utils/wirePathCalculator';
 import { getClosestPointOnPath } from '../utils/wireHitTest';
 import { WireHandle } from '../components/WireHandle';
@@ -41,26 +41,8 @@ interface WireProps {
   onContextMenu?: (wireId: string, position: Position, screenPos: { x: number; y: number }) => void;
   /** Wire handles (control points with constraints) */
   handles?: WireHandleData[];
-  /** Handler for starting handle drag */
-  onHandleDragStart?: (
-    wireId: string,
-    handleIndex: number,
-    constraint: HandleConstraint,
-    e: React.MouseEvent,
-    handlePosition: Position
-  ) => void;
   /** Handler for handle right-click (removal) */
   onHandleContextMenu?: (wireId: string, handleIndex: number, e: React.MouseEvent) => void;
-  /** Handler for starting segment drag (two adjacent handles) */
-  onSegmentDragStart?: (
-    wireId: string,
-    handleIndexA: number,
-    handleIndexB: number,
-    orientation: 'horizontal' | 'vertical',
-    e: React.MouseEvent,
-    startPositionA: Position,
-    startPositionB: Position
-  ) => void;
   /** Handler for starting endpoint segment drag (port ↔ first/last handle) */
   onEndpointSegmentDragStart?: (
     wireId: string,
@@ -120,9 +102,7 @@ export const Wire = memo(function Wire({
   onClick,
   onContextMenu,
   handles,
-  onHandleDragStart,
   onHandleContextMenu,
-  onSegmentDragStart,
   onEndpointSegmentDragStart,
   fromExitDirection,
   toExitDirection,
@@ -291,8 +271,8 @@ export const Wire = memo(function Wire({
         </>
       )}
 
-      {/* Segment drag hit areas (between adjacent handles) */}
-      {isSelected && handles && handles.length >= 2 && onSegmentDragStart &&
+      {/* Segment drag hit areas (between adjacent handles) — centralized handler reads data-* attrs */}
+      {isSelected && handles && handles.length >= 2 &&
         handles.slice(0, -1).map((handle, i) => {
           const next = handles[i + 1];
           const dx = Math.abs(handle.position.x - next.position.x);
@@ -308,12 +288,15 @@ export const Wire = memo(function Wire({
               x2={next.position.x} y2={next.position.y}
               stroke="transparent" strokeWidth={12}
               style={{ pointerEvents: 'auto', cursor }}
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                onSegmentDragStart(id, i, i + 1, orientation, e,
-                  handle.position, next.position);
-              }}
+              data-wire-segment=""
+              data-wire-id={id}
+              data-handle-a={i}
+              data-handle-b={i + 1}
+              data-orientation={orientation}
+              data-pos-a-x={handle.position.x}
+              data-pos-a-y={handle.position.y}
+              data-pos-b-x={next.position.x}
+              data-pos-b-y={next.position.y}
             />
           );
         })
@@ -390,7 +373,7 @@ export const Wire = memo(function Wire({
       })()}
 
       {/* Render handles when wire is selected */}
-      {isSelected && handles && handles.length > 0 && onHandleDragStart && (
+      {isSelected && handles && handles.length > 0 && (
         <>
           {handles.map((handle, index) => (
             <WireHandle
@@ -399,7 +382,6 @@ export const Wire = memo(function Wire({
               wireId={id}
               handleIndex={index}
               constraint={handle.constraint}
-              onDragStart={onHandleDragStart}
               onContextMenu={onHandleContextMenu}
             />
           ))}
