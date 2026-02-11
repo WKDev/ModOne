@@ -1,12 +1,12 @@
 /**
  * Draggable Block Component
  *
- * Wrapper that makes canvas blocks draggable for repositioning.
+ * Positioned wrapper for canvas blocks.
+ * Mouse events are forwarded up for the XState interaction machine to handle.
+ * Toolbox-to-canvas drag uses a separate @dnd-kit path (DraggableBlockItem).
  */
 
-import { memo } from 'react';
-import { useDraggable } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
+import { memo, forwardRef } from 'react';
 import type { Block } from '../types';
 
 // ============================================================================
@@ -18,6 +18,8 @@ interface DraggableBlockProps {
   block: Block;
   /** Content to render */
   children: React.ReactNode;
+  /** Mouse down handler — forwarded to interaction machine */
+  onMouseDown?: (event: React.MouseEvent) => void;
 }
 
 // ============================================================================
@@ -25,42 +27,34 @@ interface DraggableBlockProps {
 // ============================================================================
 
 /**
- * Wrapper that makes a block draggable on the canvas.
+ * Positioned wrapper for a block on the canvas.
+ * Exposes ref for transient drag DOM manipulation.
  */
-export const DraggableBlock = memo(function DraggableBlock({
-  block,
-  children,
-}: DraggableBlockProps) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `canvas-block-${block.id}`,
-    data: {
-      type: 'canvas-component',
-      componentId: block.id,
-      originalPosition: block.position,
-    },
-  });
+export const DraggableBlock = memo(
+  forwardRef<HTMLDivElement, DraggableBlockProps>(function DraggableBlock(
+    { block, children, onMouseDown },
+    ref
+  ) {
+    const style: React.CSSProperties = {
+      position: 'absolute',
+      left: block.position.x,
+      top: block.position.y,
+      transform: `rotate(${block.rotation || 0}deg)`,
+      transformOrigin: 'center center',
+      zIndex: 1,
+    };
 
-  const style = {
-    position: 'absolute' as const,
-    left: block.position.x,
-    top: block.position.y,
-    transform: `${CSS.Translate.toString(transform)} rotate(${block.rotation || 0}deg)`,
-    transformOrigin: 'center center',
-    opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 1000 : 1,
-  };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...listeners}
-      {...attributes}
-      data-block-id={block.id}
-    >
-      {children}
-    </div>
-  );
-});
+    return (
+      <div
+        ref={ref}
+        style={style}
+        data-block-id={block.id}
+        onMouseDown={onMouseDown}
+      >
+        {children}
+      </div>
+    );
+  })
+);
 
 export default DraggableBlock;

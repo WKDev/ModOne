@@ -9,7 +9,6 @@
  */
 
 import { useRef, forwardRef, useImperativeHandle, useMemo } from 'react';
-import { useCanvasStore } from '../../stores/canvasStore';
 import { GridBackground } from './GridBackground';
 import { useCoordinateSystem } from './coordinate-system/useCoordinateSystem';
 import { CoordinateSystemProvider } from './coordinate-system/CoordinateSystemContext';
@@ -31,6 +30,10 @@ interface CanvasProps {
   blocks: Map<string, Block>;
   wires: Wire[];
   junctions: Map<string, Junction>;
+
+  // Viewport (from facade — do NOT read from global store)
+  zoom: number;
+  pan: Position;
 
   // Overlays (Screen/Container Space)
   selectionBox: SelectionBoxState | null;
@@ -111,6 +114,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
     blocks,
     wires,
     junctions,
+    zoom,
+    pan,
     selectionBox,
     wirePreview,
     onBlockClick,
@@ -148,14 +153,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
   const canvasRef = useRef<CanvasRef | null>(null);
   const { cursor, send } = useInteraction();
 
-  // Store state
-  const zoom = useCanvasStore((state) => state.zoom);
-  const pan = useCanvasStore((state) => state.pan);
-  const storeGridSize = useCanvasStore((state) => state.gridSize);
-  const storeShowGrid = useCanvasStore((state) => state.showGrid);
-
-  const gridSize = propGridSize ?? storeGridSize;
-  const showGrid = propShowGrid ?? storeShowGrid;
+  const gridSize = propGridSize ?? 20;
+  const showGrid = propShowGrid ?? true;
 
   // Coordinate system
   const coordinateSystem = useCoordinateSystem({

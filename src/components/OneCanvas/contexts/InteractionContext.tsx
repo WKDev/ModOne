@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useMachine, useSelector } from '@xstate/react';
-import { useCanvasStore } from '../../../stores/canvasStore';
+import type { CanvasFacadeReturn } from '../../../types/canvasFacade';
 import {
   interactionMachine,
   type CanvasEvent,
@@ -15,10 +15,13 @@ import {
   type Modifiers,
   type PointerTarget,
 } from '../machines/interactionMachine';
+import { useCanvasAdapter } from '../interaction/useCanvasAdapter';
 import type { Block, Position } from '../types';
 
 interface InteractionProviderProps {
   children: ReactNode;
+  facade: CanvasFacadeReturn;
+  containerRef: React.RefObject<HTMLDivElement | null>;
 }
 
 interface InteractionApi {
@@ -214,11 +217,10 @@ export function extractModifiers(event: ReactMouseEvent): Modifiers {
   };
 }
 
-export function InteractionProvider({ children }: InteractionProviderProps) {
-  const components = useCanvasStore((state) => state.components);
-  const junctions = useCanvasStore((state) => state.junctions);
+export function InteractionProvider({ children, facade, containerRef }: InteractionProviderProps) {
+  const adapterRef = useCanvasAdapter(facade, containerRef);
 
-  const [snapshot, send, actorRef] = useMachine(interactionMachine);
+  const [snapshot, send, actorRef] = useMachine(interactionMachine, { input: { adapterRef } });
 
   const cursor = useSelector(actorRef, (s) => {
     if (s.matches('panning')) {
@@ -236,7 +238,7 @@ export function InteractionProvider({ children }: InteractionProviderProps) {
     return 'default';
   });
 
-  const selectionBox = useSelector(actorRef, (s) => {
+  const selectionBoxCanvas = useSelector(actorRef, (s) => {
     if (!s.context.boxSelectStartPos || !s.context.boxSelectCurrentPos || !s.matches('box_selecting')) {
       return null;
     }
@@ -246,13 +248,29 @@ export function InteractionProvider({ children }: InteractionProviderProps) {
     };
   });
 
+  const selectionBox = useMemo(() => {
+    if (!selectionBoxCanvas) {
+      return null;
+    }
+    return {
+      start: {
+        x: selectionBoxCanvas.start.x * facade.zoom + facade.pan.x,
+        y: selectionBoxCanvas.start.y * facade.zoom + facade.pan.y,
+      },
+      end: {
+        x: selectionBoxCanvas.end.x * facade.zoom + facade.pan.x,
+        y: selectionBoxCanvas.end.y * facade.zoom + facade.pan.y,
+      },
+    };
+  }, [facade.pan.x, facade.pan.y, facade.zoom, selectionBoxCanvas]);
+
   const wirePreview = useSelector(actorRef, (s) => {
     if (!s.matches('wire_drawing') || !s.context.wireFrom || !s.context.wireTempPosition) {
       return null;
     }
 
     if ('componentId' in s.context.wireFrom) {
-      const fromPos = getPortPosition(components, s.context.wireFrom.componentId, s.context.wireFrom.portId);
+      const fromPos = getPortPosition(facade.components, s.context.wireFrom.componentId, s.context.wireFrom.portId);
       if (!fromPos) {
         return null;
       }
@@ -262,7 +280,7 @@ export function InteractionProvider({ children }: InteractionProviderProps) {
       };
     }
 
-    const junction = junctions.get(s.context.wireFrom.junctionId);
+    const junction = facade.junctions.get(s.context.wireFrom.junctionId);
     if (!junction) {
       return null;
     }

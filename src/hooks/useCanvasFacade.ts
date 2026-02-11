@@ -290,6 +290,9 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
   const globalToggleSelection = useCanvasStore((state) => state.toggleSelection);
   const globalClearSelection = useCanvasStore((state) => state.clearSelection);
   const setPan = useCanvasStore((state) => state.setPan);
+  const globalSetZoom = useCanvasStore((state) => state.setZoom);
+  const globalGridSize = useCanvasStore((state) => state.gridSize);
+  const globalSnapToGrid = useCanvasStore((state) => state.snapToGrid);
   const alignSelected = useCanvasStore((state) => state.alignSelected);
   const distributeSelected = useCanvasStore((state) => state.distributeSelected);
   const flipSelected = useCanvasStore((state) => state.flipSelected);
@@ -356,6 +359,9 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
         clearSelection: clearDocumentSelection,
         // Viewport
         setPan: documentState.setPan,
+        setZoom: documentState.setZoom,
+        gridSize: documentState.gridSize,
+        snapToGrid: documentState.snapToGrid,
         // History
         undo: documentUndo,
         redo: documentRedo,
@@ -409,6 +415,9 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
       clearSelection: globalClearSelection,
       // Viewport
       setPan,
+      setZoom: globalSetZoom,
+      gridSize: globalGridSize,
+      snapToGrid: globalSnapToGrid,
       // History
       undo: globalUndo,
       redo: globalRedo,
@@ -469,6 +478,9 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
     globalToggleSelection,
     globalClearSelection,
     setPan,
+    globalSetZoom,
+    globalGridSize,
+    globalSnapToGrid,
     alignSelected,
     distributeSelected,
     flipSelected,

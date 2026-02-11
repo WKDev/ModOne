@@ -1,9 +1,11 @@
 import { assign, setup, type SnapshotFrom } from 'xstate';
+import type { RefObject } from 'react';
 import { DRAG_THRESHOLD_PX } from '../constants/interaction';
 import { WireGeometryCache } from '../geometry/geometryCache';
 import { getDragDirection } from '../components/SelectionBox';
 import { isBlockInBox, isJunctionInBox, selectWiresInBox } from '../geometry/collision';
 import { getPortAbsolutePosition } from '../utils/wirePathCalculator';
+import type { CanvasInteractionAdapter } from '../interaction/types';
 import type {
   HandleConstraint,
   Junction,
@@ -11,11 +13,9 @@ import type {
   PortEndpoint,
   PortPosition,
   Position,
-  Wire,
   WireEndpoint,
   Block,
 } from '../types';
-import { useCanvasStore } from '../../../stores/canvasStore';
 
 export type Modifiers = { ctrl: boolean; shift: boolean; alt: boolean; meta: boolean };
 
@@ -75,6 +75,7 @@ export type WireSnapTarget =
   | { kind: 'wire'; wireId: string; position: Position };
 
 export interface InteractionContext {
+  adapterRef: RefObject<CanvasInteractionAdapter> | null;
   panStartScreenPos: Position | null;
   panStartValue: Position | null;
 
@@ -119,51 +120,10 @@ export interface InteractionContext {
   containerRect: DOMRect | null;
 }
 
-interface CanvasStoreInterop {
-  pan: Position;
-  zoom: number;
-  gridSize: number;
-  snapToGrid: boolean;
-  components: Map<string, Block>;
-  junctions: Map<string, Junction>;
-  wires: Wire[];
-  _selectedIdsCache: Set<string>;
-  setPan: (pan: Position) => void;
-  setZoom: (zoom: number) => void;
-  setSelection: (ids: string[]) => void;
-  addToSelection: (id: string) => void;
-  clearSelection: () => void;
-  moveComponent: (id: string, position: Position, skipHistory?: boolean) => void;
-  moveJunction: (id: string, position: Position, skipHistory?: boolean) => void;
-  addWire: (
-    from: WireEndpoint,
-    to: WireEndpoint,
-    options?: { fromExitDirection?: PortPosition; toExitDirection?: PortPosition }
-  ) => string | null;
-  createJunctionOnWire: (wireId: string, position: Position) => string | null;
-  moveWireSegment: (
-    wireId: string,
-    handleIndexA: number,
-    handleIndexB: number,
-    delta: Position,
-    isFirstMove?: boolean
-  ) => void;
-  updateWireHandle: (
-    wireId: string,
-    handleIndex: number,
-    position: Position,
-    isFirstMove?: boolean
-  ) => void;
-  cleanupOverlappingHandles: (wireId: string) => void;
-  startWireDrawing: (from: WireEndpoint, options?: { skipValidation?: boolean; startPosition?: Position }) => void;
-  updateWireDrawing: (position: Position) => void;
-  cancelWireDrawing: () => void;
-  rebuildInteractionQuadtree?: () => void;
-}
-
 const wireGeometryCache = new WireGeometryCache();
 
 const initialContext: InteractionContext = {
+  adapterRef: null,
   panStartScreenPos: null,
   panStartValue: null,
 
@@ -220,8 +180,12 @@ function isPointerUp(event: CanvasEvent): event is Extract<CanvasEvent, { type: 
   return event.type === 'POINTER_UP';
 }
 
-function getStore(): CanvasStoreInterop {
-  return useCanvasStore.getState() as unknown as CanvasStoreInterop;
+function getAdapter(context: InteractionContext): CanvasInteractionAdapter {
+  const adapter = context.adapterRef?.current;
+  if (!adapter) {
+    throw new Error('InteractionMachine: adapter not available');
+  }
+  return adapter;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -282,13 +246,16 @@ function closestPointOnSegment(point: Position, a: Position, b: Position): { poi
   };
 }
 
-function findWireSnapTarget(cursor: Position, source: WireEndpoint | null): WireSnapTarget | null {
+function findWireSnapTarget(
+  cursor: Position,
+  source: WireEndpoint | null,
+  adapter: CanvasInteractionAdapter
+): WireSnapTarget | null {
   if (!source) {
     return null;
   }
 
-  const store = getStore();
-  const zoom = Math.max(store.zoom, 0.01);
+  const zoom = Math.max(adapter.getZoom(), 0.01);
 
   const portThreshold = 16 / zoom;
   const junctionThreshold = 14 / zoom;
@@ -297,7 +264,7 @@ function findWireSnapTarget(cursor: Position, source: WireEndpoint | null): Wire
   let bestPort: WireSnapTarget | null = null;
   let bestPortDistance = Infinity;
 
-  for (const block of store.components.values()) {
+  for (const block of adapter.getComponents().values()) {
     for (const port of block.ports) {
       const endpoint: PortEndpoint = { componentId: block.id, portId: port.id };
       if ('componentId' in source && source.componentId === endpoint.componentId && source.portId === endpoint.portId) {
@@ -325,7 +292,7 @@ function findWireSnapTarget(cursor: Position, source: WireEndpoint | null): Wire
 
   let bestJunction: WireSnapTarget | null = null;
   let bestJunctionDistance = Infinity;
-  for (const junction of store.junctions.values()) {
+  for (const junction of adapter.getJunctions().values()) {
     if ('junctionId' in source && source.junctionId === junction.id) {
       continue;
     }
@@ -347,9 +314,9 @@ function findWireSnapTarget(cursor: Position, source: WireEndpoint | null): Wire
   let bestWire: WireSnapTarget | null = null;
   let bestWireDistance = Infinity;
 
-  for (const wire of store.wires) {
-    const fromPos = resolveEndpointPosition(wire.from, store.components, store.junctions);
-    const toPos = resolveEndpointPosition(wire.to, store.components, store.junctions);
+  for (const wire of adapter.getWires()) {
+    const fromPos = resolveEndpointPosition(wire.from, adapter.getComponents(), adapter.getJunctions());
+    const toPos = resolveEndpointPosition(wire.to, adapter.getComponents(), adapter.getJunctions());
     if (!fromPos || !toPos) {
       continue;
     }
@@ -375,6 +342,7 @@ export const interactionMachine = setup({
   types: {
     context: {} as InteractionContext,
     events: {} as CanvasEvent,
+    input: {} as { adapterRef: RefObject<CanvasInteractionAdapter> },
   },
   guards: {
     canStartPanning: ({ context, event }) => {
@@ -419,7 +387,7 @@ export const interactionMachine = setup({
       if (!isPointerMove(event) || !context.boxSelectStartPos) {
         return false;
       }
-      const zoom = Math.max(getStore().zoom, 0.01);
+      const zoom = Math.max(getAdapter(context).getZoom(), 0.01);
       const threshold = DRAG_THRESHOLD_PX / zoom;
       return distance(event.canvasPosition, context.boxSelectStartPos) > threshold;
     },
@@ -429,8 +397,7 @@ export const interactionMachine = setup({
   },
   actions: {
     rebuildInteractionSpatialIndex: () => {
-      const store = getStore();
-      store.rebuildInteractionQuadtree?.();
+      /* spatial index auto-rebuilds via useEffect in adapter */
     },
 
     clearTransientInteraction: assign(({ context }) => ({
@@ -477,7 +444,7 @@ export const interactionMachine = setup({
     })),
 
     cancelCurrentStoreInteraction: () => {
-      getStore().cancelWireDrawing();
+      /* XState manages wire drawing state */
     },
 
     setSpaceHeldOnKeyDown: assign(({ context, event }) => {
@@ -499,11 +466,13 @@ export const interactionMachine = setup({
         return;
       }
 
-      const store = getStore();
+      const adapter = getAdapter(context);
       if (event.ctrlKey) {
         const zoomFactor = 1 + (-event.deltaY * 0.1) * 0.1;
-        const newZoom = clamp(store.zoom * zoomFactor, 0.1, 4);
-        if (newZoom !== store.zoom) {
+        const zoom = adapter.getZoom();
+        const newZoom = clamp(zoom * zoomFactor, 0.1, 4);
+        if (newZoom !== zoom) {
+          const pan = adapter.getPan();
           const mousePos = context.containerRect
             ? {
                 x: event.position.x - context.containerRect.left,
@@ -511,19 +480,20 @@ export const interactionMachine = setup({
               }
             : event.position;
 
-          const scaleRatio = newZoom / store.zoom;
-          store.setPan({
-            x: mousePos.x - (mousePos.x - store.pan.x) * scaleRatio,
-            y: mousePos.y - (mousePos.y - store.pan.y) * scaleRatio,
+          const scaleRatio = newZoom / zoom;
+          adapter.setPan({
+            x: mousePos.x - (mousePos.x - pan.x) * scaleRatio,
+            y: mousePos.y - (mousePos.y - pan.y) * scaleRatio,
           });
-          store.setZoom(newZoom);
+          adapter.setZoom(newZoom);
         }
         return;
       }
 
-      store.setPan({
-        x: store.pan.x - event.deltaX,
-        y: store.pan.y - event.deltaY,
+      const pan = adapter.getPan();
+      adapter.setPan({
+        x: pan.x - event.deltaX,
+        y: pan.y - event.deltaY,
       });
     },
 
@@ -531,7 +501,7 @@ export const interactionMachine = setup({
       if (!isPointerDown(event)) {
         return context;
       }
-      const pan = getStore().pan;
+      const pan = getAdapter(context).getPan();
       return {
         ...context,
         panStartScreenPos: { ...event.position },
@@ -545,7 +515,7 @@ export const interactionMachine = setup({
       }
       const dx = event.position.x - context.panStartScreenPos.x;
       const dy = event.position.y - context.panStartScreenPos.y;
-      getStore().setPan({
+      getAdapter(context).setPan({
         x: context.panStartValue.x + dx,
         y: context.panStartValue.y + dy,
       });
@@ -556,8 +526,8 @@ export const interactionMachine = setup({
         return context;
       }
 
-      const store = getStore();
-      const selectedIds = store._selectedIdsCache;
+      const adapter = getAdapter(context);
+      const selectedIds = adapter.getSelectedIds();
 
       let primaryId: string | null = null;
       if (event.target.kind === 'block') {
@@ -581,18 +551,18 @@ export const interactionMachine = setup({
         }
       }
 
-      store.setSelection(Array.from(dragIds));
+      adapter.setSelection(Array.from(dragIds));
 
       const originalPositions = new Map<string, Position>();
       const junctionIds = new Set<string>();
       for (const id of dragIds) {
-        const block = store.components.get(id);
+        const block = adapter.getComponents().get(id);
         if (block) {
           originalPositions.set(id, { ...block.position });
           continue;
         }
 
-        const junction = store.junctions.get(id);
+        const junction = adapter.getJunctions().get(id);
         if (junction) {
           originalPositions.set(id, { ...junction.position });
           junctionIds.add(id);
@@ -621,7 +591,7 @@ export const interactionMachine = setup({
         return;
       }
 
-      const store = getStore();
+      const adapter = getAdapter(context);
       const delta = {
         x: event.canvasPosition.x - context.dragStartCanvasPos.x,
         y: event.canvasPosition.y - context.dragStartCanvasPos.y,
@@ -634,14 +604,14 @@ export const interactionMachine = setup({
           y: original.y + delta.y,
         };
 
-        if (store.snapToGrid) {
-          next = snapToGrid(next, store.gridSize);
+        if (adapter.getSnapToGrid()) {
+          next = snapToGrid(next, adapter.getGridSize());
         }
 
         if (context.dragJunctionIds.has(id)) {
-          store.moveJunction(id, next, skipHistory);
+          adapter.moveJunction(id, next, skipHistory);
         } else {
-          store.moveComponent(id, next, skipHistory);
+          adapter.moveComponent(id, next, skipHistory);
         }
       }
     },
@@ -685,12 +655,12 @@ export const interactionMachine = setup({
         return;
       }
 
-      const store = getStore();
+      const adapter = getAdapter(context);
       if (!context.boxSelectHasPassedThreshold) {
         const hasModifier =
           event.modifiers.alt || event.modifiers.ctrl || event.modifiers.meta || event.modifiers.shift;
         if (!hasModifier) {
-          store.clearSelection();
+          adapter.clearSelection();
         }
         return;
       }
@@ -709,24 +679,25 @@ export const interactionMachine = setup({
       };
 
       const nextSelection: string[] = [];
-      for (const block of store.components.values()) {
+      for (const block of adapter.getComponents().values()) {
         if (isBlockInBox(block, selectionBox, mode)) {
           nextSelection.push(block.id);
         }
       }
-      for (const junction of store.junctions.values()) {
+      for (const junction of adapter.getJunctions().values()) {
         if (isJunctionInBox(junction, selectionBox)) {
           nextSelection.push(junction.id);
         }
       }
 
-      const geometryVersion = store.components.size + store.junctions.size + store.wires.length;
+      const geometryVersion =
+        adapter.getComponents().size + adapter.getJunctions().size + adapter.getWires().length;
       const wireIds = selectWiresInBox(
-        store.wires,
+        adapter.getWires(),
         selectionBox,
         wireGeometryCache,
-        store.components,
-        store.junctions,
+        adapter.getComponents(),
+        adapter.getJunctions(),
         geometryVersion,
         mode
       );
@@ -734,12 +705,12 @@ export const interactionMachine = setup({
 
       if (event.modifiers.ctrl || event.modifiers.meta || event.modifiers.shift || event.modifiers.alt) {
         for (const id of nextSelection) {
-          store.addToSelection(id);
+          adapter.addToSelection(id);
         }
         return;
       }
 
-      store.setSelection(nextSelection);
+      adapter.setSelection(nextSelection);
     },
 
     prepareWireDrawing: assign(({ context, event }) => {
@@ -751,13 +722,6 @@ export const interactionMachine = setup({
         componentId: event.target.blockId,
         portId: event.target.portId,
       };
-
-      const store = getStore();
-      store.startWireDrawing(from, {
-        skipValidation: true,
-        startPosition: event.canvasPosition,
-      });
-      store.updateWireDrawing(event.canvasPosition);
 
       return {
         ...context,
@@ -773,9 +737,8 @@ export const interactionMachine = setup({
         return context;
       }
 
-      const snapTarget = findWireSnapTarget(event.canvasPosition, context.wireFrom);
+      const snapTarget = findWireSnapTarget(event.canvasPosition, context.wireFrom, getAdapter(context));
       const previewPosition = snapTarget ? snapTarget.position : event.canvasPosition;
-      getStore().updateWireDrawing(previewPosition);
 
       return {
         ...context,
@@ -789,28 +752,26 @@ export const interactionMachine = setup({
         return;
       }
 
-      const store = getStore();
+      const adapter = getAdapter(context);
 
       if (context.wireSnapTarget.kind === 'wire') {
-        const junctionId = store.createJunctionOnWire(context.wireSnapTarget.wireId, context.wireSnapTarget.position);
+        const junctionId = adapter.createJunctionOnWire(context.wireSnapTarget.wireId, context.wireSnapTarget.position);
         if (junctionId) {
-          store.addWire(
+          adapter.addWire(
             context.wireFrom,
             { junctionId },
             { fromExitDirection: context.wireFromExitDirection ?? undefined }
           );
         }
       } else {
-        store.addWire(context.wireFrom, context.wireSnapTarget.endpoint, {
+        adapter.addWire(context.wireFrom, context.wireSnapTarget.endpoint, {
           fromExitDirection: context.wireFromExitDirection ?? undefined,
         });
       }
-
-      store.cancelWireDrawing();
     },
 
     cancelWireDrawing: () => {
-      getStore().cancelWireDrawing();
+      /* XState handles wire drawing state */
     },
 
     prepareWireSegmentDragging: assign(({ context, event }) => {
@@ -842,21 +803,21 @@ export const interactionMachine = setup({
         return context;
       }
 
-      const store = getStore();
+      const adapter = getAdapter(context);
       const absDx = event.canvasPosition.x - context.segmentStartCanvasPos.x;
       const absDy = event.canvasPosition.y - context.segmentStartCanvasPos.y;
 
       let targetDelta: Position;
       if (context.segmentOrientation === 'horizontal') {
         let targetY = context.segmentStartPositionA.y + absDy;
-        if (store.snapToGrid) {
-          targetY = Math.round(targetY / store.gridSize) * store.gridSize;
+        if (adapter.getSnapToGrid()) {
+          targetY = Math.round(targetY / adapter.getGridSize()) * adapter.getGridSize();
         }
         targetDelta = { x: 0, y: targetY - context.segmentStartPositionA.y };
       } else {
         let targetX = context.segmentStartPositionA.x + absDx;
-        if (store.snapToGrid) {
-          targetX = Math.round(targetX / store.gridSize) * store.gridSize;
+        if (adapter.getSnapToGrid()) {
+          targetX = Math.round(targetX / adapter.getGridSize()) * adapter.getGridSize();
         }
         targetDelta = { x: targetX - context.segmentStartPositionA.x, y: 0 };
       }
@@ -866,7 +827,7 @@ export const interactionMachine = setup({
         y: targetDelta.y - context.segmentAppliedDelta.y,
       };
 
-      store.moveWireSegment(
+      adapter.moveWireSegment(
         context.segmentWireId,
         context.segmentHandleA,
         context.segmentHandleB,
@@ -885,7 +846,7 @@ export const interactionMachine = setup({
       if (!context.segmentWireId) {
         return;
       }
-      getStore().cleanupOverlappingHandles(context.segmentWireId);
+      getAdapter(context).cleanupOverlappingHandles(context.segmentWireId);
     },
 
     prepareWireHandleDragging: assign(({ context, event }) => {
@@ -914,7 +875,7 @@ export const interactionMachine = setup({
         return context;
       }
 
-      const store = getStore();
+      const adapter = getAdapter(context);
       const delta = {
         x: event.canvasPosition.x - context.handleStartCanvasPos.x,
         y: event.canvasPosition.y - context.handleStartCanvasPos.y,
@@ -938,11 +899,11 @@ export const interactionMachine = setup({
         };
       }
 
-      if (store.snapToGrid) {
-        nextPosition = snapToGrid(nextPosition, store.gridSize);
+      if (adapter.getSnapToGrid()) {
+        nextPosition = snapToGrid(nextPosition, adapter.getGridSize());
       }
 
-      store.updateWireHandle(context.handleWireId, context.handleIndex, nextPosition, context.handleIsFirstMove);
+      adapter.updateWireHandle(context.handleWireId, context.handleIndex, nextPosition, context.handleIsFirstMove);
 
       return {
         ...context,
@@ -954,12 +915,15 @@ export const interactionMachine = setup({
       if (!context.handleWireId) {
         return;
       }
-      getStore().cleanupOverlappingHandles(context.handleWireId);
+      getAdapter(context).cleanupOverlappingHandles(context.handleWireId);
     },
   },
 }).createMachine({
   id: 'oneCanvasInteraction',
-  context: initialContext,
+  context: ({ input }) => ({
+    ...initialContext,
+    adapterRef: input.adapterRef,
+  }),
   initial: 'idle',
   on: {
     ESCAPE: {

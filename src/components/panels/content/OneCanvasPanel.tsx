@@ -43,6 +43,7 @@ import { isPortEndpoint } from '../../OneCanvas/types';
 import { useCanvasKeyboardShortcuts, useSimulation } from '../../OneCanvas';
 import { useDocumentRegistry } from '../../../stores/documentRegistry';
 import { useSchematicDocument } from '../../../stores/hooks/useSchematicDocument';
+import type { CanvasFacadeReturn } from '../../../types/canvasFacade';
 import { PropertiesPanel } from './PropertiesPanel';
 import { BlockDragPreview } from './canvas/BlockDragPreview';
 import { CanvasDropZone } from './canvas/CanvasDropZone';
@@ -65,6 +66,11 @@ interface WireContextMenuState {
   wireId: string;
   position: Position;
   screenPosition: { x: number; y: number };
+}
+
+interface OneCanvasPanelContentProps {
+  facade: CanvasFacadeReturn;
+  interactionRootRef: React.RefObject<HTMLDivElement | null>;
 }
 
 function getPortPosition(components: Map<string, Block>, blockId: string, portId: string): Position | null {
@@ -102,10 +108,13 @@ function getPortPosition(components: Map<string, Block>, blockId: string, portId
   }
 }
 
-const OneCanvasPanelContent = memo(function OneCanvasPanelContent() {
+const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
+  facade,
+  interactionRootRef,
+}: OneCanvasPanelContentProps) {
   const canvasRef = useRef<CanvasRef>(null);
-  const interactionRootRef = useRef<HTMLDivElement>(null);
   const containerRectRef = useRef<DOMRect | null>(null);
+  const activePointerIdRef = useRef<number | null>(null);
   const interaction = useInteraction();
 
   const { documentId } = useDocumentContext();
@@ -135,7 +144,7 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent() {
     loadCircuit,
     undo,
     redo,
-  } = useCanvasFacade(documentId);
+  } = facade;
 
   const schematicDoc = useSchematicDocument(documentId);
 
@@ -221,8 +230,10 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent() {
   );
 
   const getScreenPosition = useCallback((clientX: number, clientY: number): Position | null => {
-    const container = canvasRef.current?.getContainer();
+    // Try canvas container first, fall back to interaction root div
+    const container = canvasRef.current?.getContainer() ?? interactionRootRef.current;
     if (!container) {
+      console.warn('[OneCanvas] getScreenPosition: no container available');
       return null;
     }
     const rect = container.getBoundingClientRect();
@@ -251,8 +262,18 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent() {
     [components, getScreenPosition, interaction, toCanvasPosition]
   );
 
-  const sendPointerMove = useCallback(
-    (event: React.MouseEvent) => {
+  const isGestureActive = !interaction.snapshot.matches('idle');
+
+  useEffect(() => {
+    if (!isGestureActive) {
+      return;
+    }
+
+    const handleWindowPointerMove = (event: PointerEvent) => {
+      if (activePointerIdRef.current !== null && event.pointerId !== activePointerIdRef.current) {
+        return;
+      }
+
       const screenPos = getScreenPosition(event.clientX, event.clientY);
       if (!screenPos) {
         return;
@@ -261,31 +282,22 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent() {
         type: 'POINTER_MOVE',
         position: screenPos,
         canvasPosition: toCanvasPosition(screenPos),
-        modifiers: extractModifiers(event),
+        modifiers: {
+          ctrl: event.ctrlKey,
+          shift: event.shiftKey,
+          alt: event.altKey,
+          meta: event.metaKey,
+        },
       });
-    },
-    [getScreenPosition, interaction, toCanvasPosition]
-  );
+    };
 
-  const sendPointerUp = useCallback(
-    (event: React.MouseEvent) => {
-      const screenPos = getScreenPosition(event.clientX, event.clientY);
-      if (!screenPos) {
+    const handleWindowPointerUp = (event: PointerEvent) => {
+      if (activePointerIdRef.current !== null && event.pointerId !== activePointerIdRef.current) {
         return;
       }
-      interaction.send({
-        type: 'POINTER_UP',
-        position: screenPos,
-        canvasPosition: toCanvasPosition(screenPos),
-        button: event.button,
-        modifiers: extractModifiers(event),
-      });
-    },
-    [getScreenPosition, interaction, toCanvasPosition]
-  );
 
-  useEffect(() => {
-    const handleWindowMouseUp = (event: MouseEvent) => {
+      activePointerIdRef.current = null;
+
       const screenPos = getScreenPosition(event.clientX, event.clientY);
       if (!screenPos) {
         return;
@@ -304,9 +316,41 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent() {
       });
     };
 
-    window.addEventListener('mouseup', handleWindowMouseUp);
-    return () => window.removeEventListener('mouseup', handleWindowMouseUp);
-  }, [getScreenPosition, interaction, toCanvasPosition]);
+    const handleWindowPointerCancel = (event: PointerEvent) => {
+      if (activePointerIdRef.current !== null && event.pointerId !== activePointerIdRef.current) {
+        return;
+      }
+
+      activePointerIdRef.current = null;
+
+      const screenPos = getScreenPosition(event.clientX, event.clientY);
+      if (!screenPos) {
+        return;
+      }
+      interaction.send({
+        type: 'POINTER_UP',
+        position: screenPos,
+        canvasPosition: toCanvasPosition(screenPos),
+        button: event.button,
+        modifiers: {
+          ctrl: event.ctrlKey,
+          shift: event.shiftKey,
+          alt: event.altKey,
+          meta: event.metaKey,
+        },
+      });
+    };
+
+    window.addEventListener('pointermove', handleWindowPointerMove);
+    window.addEventListener('pointerup', handleWindowPointerUp);
+    window.addEventListener('pointercancel', handleWindowPointerCancel);
+
+    return () => {
+      window.removeEventListener('pointermove', handleWindowPointerMove);
+      window.removeEventListener('pointerup', handleWindowPointerUp);
+      window.removeEventListener('pointercancel', handleWindowPointerCancel);
+    };
+  }, [getScreenPosition, interaction, isGestureActive, toCanvasPosition]);
 
   const handleMouseDown = useCallback(
     (event: React.MouseEvent) => {
@@ -315,19 +359,30 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent() {
     [sendPointerDown]
   );
 
-  const handleMouseMove = useCallback(
-    (event: React.MouseEvent) => {
-      sendPointerMove(event);
-    },
-    [sendPointerMove]
-  );
+  const handlePointerDownCapture = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (!event.isPrimary) {
+      return;
+    }
+    activePointerIdRef.current = event.pointerId;
+  }, []);
 
-  const handleMouseUp = useCallback(
-    (event: React.MouseEvent) => {
-      sendPointerUp(event);
-    },
-    [sendPointerUp]
-  );
+  const handlePointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (activePointerIdRef.current === event.pointerId) {
+      activePointerIdRef.current = null;
+    }
+  }, []);
+
+  const handlePointerCancel = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (activePointerIdRef.current === event.pointerId) {
+      activePointerIdRef.current = null;
+    }
+  }, []);
+
+  const handleLostPointerCapture = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (activePointerIdRef.current === event.pointerId) {
+      activePointerIdRef.current = null;
+    }
+  }, []);
 
   const handleStartWire = useCallback(
     (blockId: string, portId: string) => {
@@ -776,8 +831,10 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent() {
                 ref={interactionRootRef}
                 className="w-full h-full"
                 onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
+                onPointerDownCapture={handlePointerDownCapture}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerCancel}
+                onLostPointerCapture={handleLostPointerCapture}
               >
                 <Canvas
                   ref={canvasRef}
@@ -785,6 +842,8 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent() {
                   blocks={components}
                   wires={wires}
                   junctions={junctions}
+                  zoom={zoom}
+                  pan={pan}
                   selectionBox={interaction.selectionBox}
                   wirePreview={machineWirePreview}
                   onBlockClick={handleBlockClick}
@@ -884,9 +943,13 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent() {
 });
 
 export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPanelProps) {
+  const { documentId } = useDocumentContext();
+  const facade = useCanvasFacade(documentId);
+  const interactionRootRef = useRef<HTMLDivElement>(null);
+
   return (
-    <InteractionProvider>
-      <OneCanvasPanelContent />
+    <InteractionProvider key={documentId ?? '__global__'} facade={facade} containerRef={interactionRootRef}>
+      <OneCanvasPanelContent facade={facade} interactionRootRef={interactionRootRef} />
     </InteractionProvider>
   );
 });

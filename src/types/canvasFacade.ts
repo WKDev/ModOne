@@ -175,6 +175,12 @@ export interface CanvasFacadeReturn {
 
   /** Set pan offset */
   setPan: (pan: Position) => void;
+  /** Set zoom level */
+  setZoom: (zoom: number) => void;
+  /** Current grid size in canvas units */
+  gridSize: number;
+  /** Whether snap-to-grid is enabled */
+  snapToGrid: boolean;
 
   // --------------------------------------------------------------------------
   // History (Undo / Redo)
