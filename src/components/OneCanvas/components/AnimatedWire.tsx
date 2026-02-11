@@ -61,6 +61,11 @@ const SHORT_CIRCUIT_PULSE_DURATION = '0.3s';
 const WIRE_STROKE_WIDTH = 2;
 const WIRE_STROKE_WIDTH_SELECTED = 3;
 const WIRE_HIT_AREA_WIDTH = 10;
+const SEGMENT_HIT_AREA_WIDTH = 12;
+
+// Handle interaction
+const HANDLE_RADIUS = 5;
+const HANDLE_HIT_RADIUS = 10;
 
 // Colors by voltage level
 const VOLTAGE_COLORS: Record<number, string> = {
@@ -123,24 +128,56 @@ export const AnimatedWire = memo(function AnimatedWire({
   isShortCircuit = false,
   onClick,
 }: AnimatedWireProps) {
-  // Calculate wire path as points for arrow positioning
-  const pathPoints = useMemo(() => {
-    // Use provided handle positions or calculate orthogonal path
+  // Build full point sequence: [startPos, ...handles, endPos]
+  const allPoints = useMemo(() => {
     if (wire.handles && wire.handles.length > 0) {
-      return wire.handles.map((h) => h.position);
+      return [startPos, ...wire.handles.map((h) => h.position), endPos];
     }
     return calculateOrthogonalPoints(startPos, endPos);
   }, [wire.handles, startPos, endPos]);
 
-  // Generate SVG path string
-  const pathString = useMemo(() => {
-    // If we have points, convert to path string
-    if (pathPoints.length > 0) {
-      return generatePathString(pathPoints);
+  // For arrow positioning, use handle positions only (or fallback)
+  const pathPoints = useMemo(() => {
+    if (wire.handles && wire.handles.length > 0) {
+      return [startPos, ...wire.handles.map((h) => h.position), endPos];
     }
-    // Fallback to bezier path
+    return calculateOrthogonalPoints(startPos, endPos);
+  }, [wire.handles, startPos, endPos]);
+
+  // Generate SVG path string from full point sequence
+  const pathString = useMemo(() => {
+    if (allPoints.length >= 2) {
+      return generatePathString(allPoints);
+    }
     return calculateWirePath(startPos, endPos);
-  }, [pathPoints, startPos, endPos]);
+  }, [allPoints, startPos, endPos]);
+
+  // Build segment descriptors for hit areas between consecutive handles
+  // Only segments between two handles (not endpoint-to-handle) are draggable
+  const segments = useMemo(() => {
+    const handles = wire.handles;
+    if (!handles || handles.length < 2) return [];
+
+    const result: Array<{
+      handleA: number;
+      handleB: number;
+      posA: Position;
+      posB: Position;
+      orientation: 'horizontal' | 'vertical';
+    }> = [];
+
+    for (let i = 0; i < handles.length - 1; i++) {
+      const posA = handles[i].position;
+      const posB = handles[i + 1].position;
+      const dx = Math.abs(posB.x - posA.x);
+      const dy = Math.abs(posB.y - posA.y);
+      // Classify orientation: if mostly horizontal (flat), it's horizontal
+      const orientation: 'horizontal' | 'vertical' = dy <= dx ? 'horizontal' : 'vertical';
+      result.push({ handleA: i, handleB: i + 1, posA, posB, orientation });
+    }
+
+    return result;
+  }, [wire.handles]);
 
   // Determine stroke color
   const strokeColor = useMemo(() => {
@@ -182,7 +219,7 @@ export const AnimatedWire = memo(function AnimatedWire({
 
   return (
     <g className="animated-wire" data-wire-id={wire.id}>
-      {/* Hit area for easier selection */}
+      {/* Hit area for easier selection (whole wire) */}
       <path
         d={pathString}
         stroke="transparent"
@@ -191,6 +228,29 @@ export const AnimatedWire = memo(function AnimatedWire({
         onClick={handleClick}
         style={{ cursor: 'pointer' }}
       />
+
+      {/* Per-segment hit areas for segment dragging */}
+      {segments.map((seg) => (
+        <line
+          key={`seg-${seg.handleA}-${seg.handleB}`}
+          x1={seg.posA.x}
+          y1={seg.posA.y}
+          x2={seg.posB.x}
+          y2={seg.posB.y}
+          stroke="transparent"
+          strokeWidth={SEGMENT_HIT_AREA_WIDTH}
+          style={{ cursor: seg.orientation === 'horizontal' ? 'ns-resize' : 'ew-resize' }}
+          data-wire-segment=""
+          data-wire-id={wire.id}
+          data-handle-a={seg.handleA}
+          data-handle-b={seg.handleB}
+          data-orientation={seg.orientation}
+          data-pos-a-x={seg.posA.x}
+          data-pos-a-y={seg.posA.y}
+          data-pos-b-x={seg.posB.x}
+          data-pos-b-y={seg.posB.y}
+        />
+      ))}
 
       {/* Main wire path */}
       <path
@@ -204,9 +264,64 @@ export const AnimatedWire = memo(function AnimatedWire({
           ...animationStyle,
           ...shortCircuitStyle,
           transition: 'stroke 0.2s ease',
+          pointerEvents: 'none',
         }}
         onClick={handleClick}
       />
+
+      {/* Per-handle interactive circles (only when selected or always visible) */}
+      {isSelected && wire.handles && wire.handles.map((handle, idx) => (
+        <g key={`handle-${idx}`}>
+          {/* Invisible hit area for handle */}
+          <circle
+            cx={handle.position.x}
+            cy={handle.position.y}
+            r={HANDLE_HIT_RADIUS}
+            fill="transparent"
+            style={{ cursor: 'grab' }}
+            data-wire-handle=""
+            data-wire-id={wire.id}
+            data-handle-index={idx}
+            data-constraint={handle.constraint}
+            data-handle-x={handle.position.x}
+            data-handle-y={handle.position.y}
+          />
+          {/* Visible handle dot */}
+          <circle
+            cx={handle.position.x}
+            cy={handle.position.y}
+            r={HANDLE_RADIUS}
+            fill="#3b82f6"
+            stroke="#1d4ed8"
+            strokeWidth={1.5}
+            style={{ pointerEvents: 'none' }}
+          />
+          {/* Constraint indicator */}
+          {handle.constraint === 'horizontal' ? (
+            <line
+              x1={handle.position.x - 8}
+              y1={handle.position.y}
+              x2={handle.position.x + 8}
+              y2={handle.position.y}
+              stroke="#1d4ed8"
+              strokeWidth={1.5}
+              opacity={0.6}
+              style={{ pointerEvents: 'none' }}
+            />
+          ) : handle.constraint === 'vertical' ? (
+            <line
+              x1={handle.position.x}
+              y1={handle.position.y - 8}
+              x2={handle.position.x}
+              y2={handle.position.y + 8}
+              stroke="#1d4ed8"
+              strokeWidth={1.5}
+              opacity={0.6}
+              style={{ pointerEvents: 'none' }}
+            />
+          ) : null}
+        </g>
+      ))}
 
       {/* Direction indicator arrow for powered wires */}
       {isPowered && currentDirection && (

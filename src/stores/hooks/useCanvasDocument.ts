@@ -448,8 +448,13 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
   );
 
   const updateWireHandle = useCallback(
-    (wireId: string, handleIndex: number, position: Position) => {
+    (wireId: string, handleIndex: number, position: Position, isFirstMove?: boolean) => {
       if (!documentId) return;
+
+      // Push history on first move of a drag so Undo reverts the whole drag
+      if (isFirstMove) {
+        pushHistory(documentId);
+      }
 
       updateCanvasData(documentId, (docData) => {
         const wire = docData.wires.find((w) => w.id === wireId);
@@ -471,7 +476,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         handle.source = 'user';
       });
     },
-    [documentId, updateCanvasData]
+    [documentId, pushHistory, updateCanvasData]
   );
 
   const removeWireHandle = useCallback(

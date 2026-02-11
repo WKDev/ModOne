@@ -45,15 +45,18 @@ export function useCanvasAdapter(
     queryBox: (bounds) => spatialIndexRef.current.queryBox(bounds),
 
     setTransientPosition: (id, x, y) => {
+      // Block elements use data-block-id attribute
       const el = document.querySelector(`[data-block-id="${id}"]`) as HTMLElement | null;
       if (el) {
         el.style.left = `${x}px`;
         el.style.top = `${y}px`;
+        return;
       }
+      // Junction elements are SVG circles with data-junction-id (not currently draggable via transient)
     },
     clearTransientPositions: () => {
-      // No-op for now — positions are already set via style.left/top
-      // React re-render will reset them to store values
+      // After store commit + React re-render, DOM positions reset to store values.
+      // No explicit cleanup needed — React reconciliation handles it.
     },
   };
 

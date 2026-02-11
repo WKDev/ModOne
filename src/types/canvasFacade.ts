@@ -97,8 +97,8 @@ export interface CanvasFacadeReturn {
   removeWire: (id: string) => void;
   /** Create a junction on an existing wire, splitting it */
   createJunctionOnWire: (wireId: string, position: Position) => string | null;
-  /** Update handle position (constrained) */
-  updateWireHandle: (wireId: string, handleIndex: number, position: Position) => void;
+  /** Update handle position (constrained). isFirstMove pushes history for undo. */
+  updateWireHandle: (wireId: string, handleIndex: number, position: Position, isFirstMove?: boolean) => void;
   /** Remove handle from wire */
   removeWireHandle: (wireId: string, handleIndex: number) => void;
   /** Move a wire segment by delta */
