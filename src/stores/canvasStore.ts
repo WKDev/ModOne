@@ -51,7 +51,7 @@ import {
   getWiresConnectedToJunction,
   recalculateAutoHandles,
 } from '../components/OneCanvas/utils/canvasHelpers';
-import { simplifyWireHandles } from '../components/OneCanvas/utils/wireSimplifier';
+import { polylineToHandles, simplifyWireHandles } from '../components/OneCanvas/utils/wireSimplifier';
 import { alignComponents, distributeComponents, flipComponents } from '../components/OneCanvas/utils/canvas-commands';
 import { isValidConnection } from '../components/OneCanvas/utils/connectionValidator';
 
@@ -183,6 +183,8 @@ interface CanvasActions {
   insertEndpointHandle: (wireId: string, end: 'from' | 'to', newHandles: Array<{position: Position, constraint: HandleConstraint}>) => void;
   /** Remove adjacent handles that overlap (same position). No history push — call after drag ends. */
   cleanupOverlappingHandles: (wireId: string) => void;
+  /** Commit a full wire polyline as handles and routing mode. */
+  commitWirePolyline: (wireId: string, poly: readonly Position[], routingMode: 'auto' | 'manual', skipHistory?: boolean) => void;
 
   // Selection operations
   /** Set selection to specific IDs (replaces current) */
@@ -1079,6 +1081,24 @@ export const useCanvasStore = create<CanvasStore>()(
           },
           false,
           `cleanupOverlappingHandles/${wireId}`
+        );
+      },
+
+      commitWirePolyline: (wireId, poly, routingMode, skipHistory) => {
+        set(
+          (state) => {
+            if (!skipHistory) {
+              pushHistorySnapshot(state);
+            }
+            const wire = state.wires.find((w) => w.id === wireId);
+            if (!wire) return;
+            const handles = polylineToHandles([...poly], wire.handles, 'user');
+            wire.handles = handles.length > 0 ? handles : undefined;
+            wire.routingMode = routingMode;
+            state.isDirty = true;
+          },
+          false,
+          'commitWirePolyline'
         );
       },
 

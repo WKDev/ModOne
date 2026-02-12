@@ -277,6 +277,7 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
   const globalMoveWireSegment = useCanvasStore((state) => state.moveWireSegment);
   const globalInsertEndpointHandle = useCanvasStore((state) => state.insertEndpointHandle);
   const globalCleanupOverlappingHandles = useCanvasStore((state) => state.cleanupOverlappingHandles);
+  const globalCommitWirePolyline = useCanvasStore((state) => state.commitWirePolyline);
   const globalUpdateComponent = useCanvasStore((state) => state.updateComponent);
 
   const wireDrawing = useCanvasStore((state) => state.wireDrawing);
@@ -339,6 +340,7 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
         moveWireSegment: documentState.moveWireSegment,
         insertEndpointHandle: documentState.insertEndpointHandle,
         cleanupOverlappingHandles: documentState.cleanupOverlappingHandles,
+        commitWirePolyline: documentState.commitWirePolyline,
         // Alignment
         alignSelected: alignDocumentSelected,
         distributeSelected: distributeDocumentSelected,
@@ -395,6 +397,7 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
       moveWireSegment: globalMoveWireSegment,
       insertEndpointHandle: globalInsertEndpointHandle,
       cleanupOverlappingHandles: globalCleanupOverlappingHandles,
+      commitWirePolyline: globalCommitWirePolyline,
       // Alignment
       alignSelected,
       distributeSelected,
@@ -468,6 +471,7 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
     globalMoveWireSegment,
     globalInsertEndpointHandle,
     globalCleanupOverlappingHandles,
+    globalCommitWirePolyline,
     wireDrawing,
     startWireDrawing,
     updateWireDrawing,

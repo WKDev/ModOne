@@ -40,7 +40,7 @@ import {
   getWiresConnectedToJunction,
   recalculateAutoHandles,
 } from '../../components/OneCanvas/utils/canvasHelpers';
-import { simplifyWireHandles } from '../../components/OneCanvas/utils/wireSimplifier';
+import { polylineToHandles, simplifyWireHandles } from '../../components/OneCanvas/utils/wireSimplifier';
 
 // ============================================================================
 // Types
@@ -88,6 +88,7 @@ export interface UseCanvasDocumentReturn {
   moveWireSegment: (wireId: string, handleIndexA: number, handleIndexB: number, delta: Position, isFirstMove?: boolean) => void;
   insertEndpointHandle: (wireId: string, end: 'from' | 'to', newHandles: Array<{position: Position, constraint: HandleConstraint}>) => void;
   cleanupOverlappingHandles: (wireId: string) => void;
+  commitWirePolyline: (wireId: string, poly: readonly Position[], routingMode: 'auto' | 'manual', skipHistory?: boolean) => void;
 
   // Viewport operations
   setZoom: (zoom: number) => void;
@@ -578,6 +579,24 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
     [documentId, updateCanvasData]
   );
 
+  const commitWirePolyline = useCallback(
+    (wireId: string, poly: readonly Position[], routingMode: 'auto' | 'manual', skipHistory?: boolean) => {
+      if (!documentId) return;
+
+      if (!skipHistory) {
+        pushHistory(documentId);
+      }
+      updateCanvasData(documentId, (docData) => {
+        const wire = docData.wires.find((w) => w.id === wireId);
+        if (!wire) return;
+        const handles = polylineToHandles([...poly], wire.handles, 'user');
+        wire.handles = handles.length > 0 ? handles : undefined;
+        wire.routingMode = routingMode;
+      });
+    },
+    [documentId, pushHistory, updateCanvasData]
+  );
+
   // Viewport operations
   const setZoom = useCallback(
     (zoom: number) => {
@@ -720,6 +739,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       moveWireSegment,
       insertEndpointHandle,
       cleanupOverlappingHandles,
+      commitWirePolyline,
 
       // Viewport operations
       setZoom,
@@ -759,6 +779,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
     moveWireSegment,
     insertEndpointHandle,
     cleanupOverlappingHandles,
+    commitWirePolyline,
     setZoom,
     setPan,
     resetViewport,

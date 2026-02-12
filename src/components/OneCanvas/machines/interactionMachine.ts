@@ -5,8 +5,16 @@ import { WireGeometryCache } from '../geometry/geometryCache';
 import { getDragDirection } from '../components/SelectionBox';
 import { isBlockInBox, isJunctionInBox, selectWiresInBox } from '../geometry/collision';
 import { getPortAbsolutePosition } from '../utils/wirePathCalculator';
+import {
+  buildWirePolyline,
+  simplifyOrthogonal,
+  getSegmentOrientation,
+  ensureMovableSegment,
+  dragSegment,
+} from '../utils/wireSimplifier';
 import type { CanvasInteractionAdapter } from '../interaction/types';
 import type {
+  GeomApi,
   HandleConstraint,
   Junction,
   JunctionEndpoint,
@@ -107,6 +115,8 @@ export interface InteractionContext {
   segmentAppliedDelta: Position;
   segmentIsFirstMove: boolean;
   segmentContainerRect: DOMRect | null;
+  segmentPoly: Position[] | null;
+  segmentPolySegIndex: number;
 
   handleWireId: string | null;
   handleIndex: number;
@@ -155,6 +165,8 @@ const initialContext: InteractionContext = {
   segmentAppliedDelta: { x: 0, y: 0 },
   segmentIsFirstMove: true,
   segmentContainerRect: null,
+  segmentPoly: null,
+  segmentPolySegIndex: -1,
 
   handleWireId: null,
   handleIndex: -1,
@@ -433,6 +445,8 @@ export const interactionMachine = setup({
       segmentAppliedDelta: { x: 0, y: 0 },
       segmentIsFirstMove: true,
       segmentContainerRect: null,
+      segmentPoly: null,
+      segmentPolySegIndex: -1,
 
       handleWireId: null,
       handleIndex: -1,
@@ -794,17 +808,41 @@ export const interactionMachine = setup({
         return context;
       }
 
+      const { wireId } = event.target;
+      const adapter = getAdapter(context);
+      const wire = adapter.getWires().find((w) => w.id === wireId);
+      if (!wire) {
+        return context;
+      }
+
+      const geom: GeomApi = {
+        components: adapter.getComponents(),
+        junctions: adapter.getJunctions(),
+      };
+      const rawPoly = buildWirePolyline(wire, geom);
+      if (!rawPoly || rawPoly.length < 2) {
+        return context;
+      }
+
+      // handleA is an index into wire.handles[]; polyline index = handleA + 1
+      const rawSegIndex = event.target.handleA + 1;
+      const { poly, segIndex } = ensureMovableSegment(rawPoly, rawSegIndex);
+      const orientation = getSegmentOrientation(poly, segIndex);
+
       return {
         ...context,
-        segmentWireId: event.target.wireId,
+        segmentWireId: wireId,
+        segmentPoly: poly,
+        segmentPolySegIndex: segIndex,
+        segmentOrientation: orientation,
+        segmentStartCanvasPos: { ...event.canvasPosition },
+        segmentIsFirstMove: true,
+        // Keep legacy fields at defaults (unused in new flow)
         segmentHandleA: event.target.handleA,
         segmentHandleB: event.target.handleB,
-        segmentOrientation: event.target.orientation,
-        segmentStartCanvasPos: { ...event.canvasPosition },
         segmentStartPositionA: { ...event.target.positionA },
         segmentStartPositionB: { ...event.target.positionB },
         segmentAppliedDelta: { x: 0, y: 0 },
-        segmentIsFirstMove: true,
       };
     }),
 
@@ -812,8 +850,8 @@ export const interactionMachine = setup({
       if (
         !isPointerMove(event) ||
         !context.segmentWireId ||
-        !context.segmentStartCanvasPos ||
-        !context.segmentStartPositionA
+        !context.segmentPoly ||
+        !context.segmentStartCanvasPos
       ) {
         return context;
       }
@@ -822,37 +860,29 @@ export const interactionMachine = setup({
       const absDx = event.canvasPosition.x - context.segmentStartCanvasPos.x;
       const absDy = event.canvasPosition.y - context.segmentStartCanvasPos.y;
 
-      let targetDelta: Position;
+      let perpDelta: number;
       if (context.segmentOrientation === 'horizontal') {
-        let targetY = context.segmentStartPositionA.y + absDy;
+        const origY = context.segmentPoly[context.segmentPolySegIndex].y;
+        let targetY = origY + absDy;
         if (adapter.getSnapToGrid()) {
           targetY = Math.round(targetY / adapter.getGridSize()) * adapter.getGridSize();
         }
-        targetDelta = { x: 0, y: targetY - context.segmentStartPositionA.y };
+        perpDelta = targetY - origY;
       } else {
-        let targetX = context.segmentStartPositionA.x + absDx;
+        const origX = context.segmentPoly[context.segmentPolySegIndex].x;
+        let targetX = origX + absDx;
         if (adapter.getSnapToGrid()) {
           targetX = Math.round(targetX / adapter.getGridSize()) * adapter.getGridSize();
         }
-        targetDelta = { x: targetX - context.segmentStartPositionA.x, y: 0 };
+        perpDelta = targetX - origX;
       }
 
-      const delta = {
-        x: targetDelta.x - context.segmentAppliedDelta.x,
-        y: targetDelta.y - context.segmentAppliedDelta.y,
-      };
-
-      adapter.moveWireSegment(
-        context.segmentWireId,
-        context.segmentHandleA,
-        context.segmentHandleB,
-        delta,
-        context.segmentIsFirstMove
-      );
+      const newPoly = dragSegment(context.segmentPoly, context.segmentPolySegIndex, perpDelta);
+      const skipHistory = !context.segmentIsFirstMove;
+      adapter.commitWirePolyline(context.segmentWireId, newPoly, 'manual', skipHistory);
 
       return {
         ...context,
-        segmentAppliedDelta: targetDelta,
         segmentIsFirstMove: false,
       };
     }),
@@ -861,7 +891,24 @@ export const interactionMachine = setup({
       if (!context.segmentWireId) {
         return;
       }
-      getAdapter(context).cleanupOverlappingHandles(context.segmentWireId);
+
+      const adapter = getAdapter(context);
+      const wire = adapter.getWires().find((w) => w.id === context.segmentWireId);
+      if (!wire) {
+        return;
+      }
+
+      const geom: GeomApi = {
+        components: adapter.getComponents(),
+        junctions: adapter.getJunctions(),
+      };
+      const poly = buildWirePolyline(wire, geom);
+      if (!poly || poly.length < 2) {
+        return;
+      }
+
+      const simplified = simplifyOrthogonal(poly);
+      adapter.commitWirePolyline(context.segmentWireId, simplified, 'manual', true);
     },
 
     prepareWireHandleDragging: assign(({ context, event }) => {

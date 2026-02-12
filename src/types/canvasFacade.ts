@@ -117,6 +117,12 @@ export interface CanvasFacadeReturn {
   ) => void;
   /** Remove adjacent overlapping handles */
   cleanupOverlappingHandles: (wireId: string) => void;
+  commitWirePolyline: (
+    wireId: string,
+    poly: readonly Position[],
+    routingMode: 'auto' | 'manual',
+    skipHistory?: boolean
+  ) => void;
 
   // --------------------------------------------------------------------------
   // Alignment / Distribution Commands

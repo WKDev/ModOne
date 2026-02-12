@@ -40,6 +40,7 @@ export function useCanvasAdapter(
     moveWireSegment: facade.moveWireSegment,
     updateWireHandle: facade.updateWireHandle,
     cleanupOverlappingHandles: facade.cleanupOverlappingHandles,
+    commitWirePolyline: facade.commitWirePolyline,
 
     queryPoint: (pos, margin) => spatialIndexRef.current.queryPoint(pos, margin),
     queryBox: (bounds) => spatialIndexRef.current.queryBox(bounds),

@@ -50,6 +50,12 @@ export interface CanvasInteractionAdapter {
   ): void;
   updateWireHandle(wireId: string, handleIndex: number, position: Position, isFirstMove?: boolean): void;
   cleanupOverlappingHandles(wireId: string): void;
+  commitWirePolyline(
+    wireId: string,
+    poly: readonly Position[],
+    routingMode: 'auto' | 'manual',
+    skipHistory?: boolean
+  ): void;
 
   // Spatial queries
   queryPoint(pos: Position, margin: number): SpatialItem[];
