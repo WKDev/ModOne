@@ -13,6 +13,8 @@ import { useCallback } from 'react';
 import { useEditorAreaStore } from '../stores/editorAreaStore';
 import { useToolPanelStore } from '../stores/toolPanelStore';
 import { useDocumentRegistry } from '../stores/documentRegistry';
+import { canvasService } from '../services/canvasService';
+import type { CircuitState, SerializableCircuitState } from '../components/OneCanvas/types';
 import type { PanelType } from '../types/panel';
 import { getPanelZone } from '../types/panel';
 import type { ProjectFileNode } from '../types/fileTypes';
@@ -30,11 +32,21 @@ import {
 
 interface UseFileOpenResult {
   /** Open a file by its path */
-  openFile: (absolutePath: string, relativePath?: string) => void;
+  openFile: (absolutePath: string, relativePath?: string) => Promise<void>;
   /** Open a file node from the explorer */
   openFileNode: (node: ProjectFileNode) => void;
   /** Check if a file can be opened in an editor */
   canOpen: (path: string) => boolean;
+}
+
+function circuitStateToSerializable(state: CircuitState): SerializableCircuitState {
+  return {
+    components: Object.fromEntries(state.components),
+    junctions: state.junctions.size > 0 ? Object.fromEntries(state.junctions) : undefined,
+    wires: state.wires,
+    metadata: state.metadata,
+    viewport: state.viewport,
+  };
 }
 
 /**
@@ -52,14 +64,17 @@ export function useFileOpen(): UseFileOpenResult {
 
   // Document registry for multi-document editing
   const createDocument = useDocumentRegistry((state) => state.createDocument);
+  const loadCanvasCircuit = useDocumentRegistry((state) => state.loadCanvasCircuit);
   const getDocumentByFilePath = useDocumentRegistry((state) => state.getDocumentByFilePath);
+  const setDocumentFilePath = useDocumentRegistry((state) => state.setDocumentFilePath);
+  const setDocumentStatus = useDocumentRegistry((state) => state.setDocumentStatus);
   const setDocumentTab = useDocumentRegistry((state) => state.setDocumentTab);
 
   /**
    * Open a file in the appropriate editor.
    */
   const openFile = useCallback(
-    (absolutePath: string, relativePath?: string) => {
+    async (absolutePath: string, relativePath?: string) => {
       const fileInfo = resolveFileType(relativePath || absolutePath);
 
       // Handle project files specially (open project instead of tab)
@@ -109,11 +124,21 @@ export function useFileOpen(): UseFileOpenResult {
         if (existingDoc) {
           documentId = existingDoc.id;
         } else {
-          // Create a new document in the registry
           const docName = getFileNameWithoutExtension(absolutePath);
           documentId = createDocument(documentType, docName);
-          // TODO: Load actual file content into document
-          // This will be handled when we implement file loading service
+          setDocumentFilePath(documentId, absolutePath);
+
+          if (documentType === 'canvas') {
+            try {
+              setDocumentStatus(documentId, 'loading');
+              const circuitState = await canvasService.loadCircuit(absolutePath);
+              const serializableData = circuitStateToSerializable(circuitState);
+              loadCanvasCircuit(documentId, serializableData);
+            } catch (error) {
+              console.error('Failed to load canvas file:', error);
+              setDocumentStatus(documentId, 'error');
+            }
+          }
         }
       }
 
@@ -137,7 +162,10 @@ export function useFileOpen(): UseFileOpenResult {
       setActiveEditorTab,
       showAndActivateTool,
       createDocument,
+      loadCanvasCircuit,
       getDocumentByFilePath,
+      setDocumentFilePath,
+      setDocumentStatus,
       setDocumentTab,
     ]
   );
@@ -151,7 +179,7 @@ export function useFileOpen(): UseFileOpenResult {
         return; // Don't open folders
       }
 
-      openFile(node.absolutePath, node.path);
+      void openFile(node.absolutePath, node.path);
     },
     [openFile]
   );

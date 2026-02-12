@@ -9,6 +9,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Window } from '@tauri-apps/api/window';
 import { useDocumentRegistry } from '../stores/documentRegistry';
+import { canvasService } from '../services/canvasService';
+import type { CircuitState, SerializableCircuitState } from '../components/OneCanvas/types';
 
 // ============================================================================
 // Types
@@ -36,6 +38,7 @@ export function useWindowClose(): UseWindowCloseResult {
   // Document registry state & actions
   const hasUnsavedChanges = useDocumentRegistry((state) => state.hasUnsavedChanges);
   const getDirtyDocuments = useDocumentRegistry((state) => state.getDirtyDocuments);
+  const getCanvasCircuitData = useDocumentRegistry((state) => state.getCanvasCircuitData);
   const markClean = useDocumentRegistry((state) => state.markClean);
 
   /**
@@ -58,16 +61,44 @@ export function useWindowClose(): UseWindowCloseResult {
   const handleSaveAll = useCallback(async () => {
     const dirtyDocs = getDirtyDocuments();
 
-    // TODO: Implement actual save logic when file save service is ready
-    // For now, just mark all as clean and close
     for (const doc of dirtyDocs) {
-      markClean(doc.id);
+      if (doc.type === 'canvas') {
+        if (doc.filePath) {
+          const circuitData = getCanvasCircuitData(doc.id);
+
+          if (circuitData) {
+            const serializableData: SerializableCircuitState = circuitData;
+            const circuitState: CircuitState = {
+              components: new Map(Object.entries(serializableData.components)),
+              junctions: serializableData.junctions
+                ? new Map(Object.entries(serializableData.junctions))
+                : new Map(),
+              wires: serializableData.wires,
+              metadata: serializableData.metadata,
+              viewport: serializableData.viewport,
+            };
+
+            try {
+              await canvasService.saveCircuit(doc.filePath, circuitState);
+              markClean(doc.id);
+            } catch (error) {
+              console.error(`Failed to save canvas document ${doc.id}:`, error);
+            }
+          }
+        } else {
+          // Save As flow is not implemented yet.
+          markClean(doc.id);
+        }
+      } else {
+        // Save logic for non-canvas document types is not implemented yet.
+        markClean(doc.id);
+      }
     }
 
     setIsDialogOpen(false);
     setPendingClose(false);
     await performClose();
-  }, [getDirtyDocuments, markClean, performClose]);
+  }, [getDirtyDocuments, getCanvasCircuitData, markClean, performClose]);
 
   /**
    * Close without saving.

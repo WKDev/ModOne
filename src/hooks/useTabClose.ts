@@ -11,6 +11,8 @@ import { usePanelStore } from '../stores/panelStore';
 import { useEditorAreaStore } from '../stores/editorAreaStore';
 import { useDocumentRegistry } from '../stores/documentRegistry';
 import type { TabState } from '../types/tab';
+import { canvasService } from '../services/canvasService';
+import type { CircuitState, SerializableCircuitState } from '../components/OneCanvas/types';
 
 // ============================================================================
 // Constants
@@ -68,6 +70,7 @@ export function useTabClose(): UseTabCloseResult {
 
   // Document registry state & actions
   const getDocument = useDocumentRegistry((state) => state.getDocument);
+  const getCanvasCircuitData = useDocumentRegistry((state) => state.getCanvasCircuitData);
   const closeDocument = useDocumentRegistry((state) => state.closeDocument);
   const markClean = useDocumentRegistry((state) => state.markClean);
 
@@ -169,15 +172,53 @@ export function useTabClose(): UseTabCloseResult {
     const { panelId, tab, documentId } = pendingClose;
 
     if (documentId) {
-      // TODO: Implement actual save logic when file save service is ready
-      // For now, just mark as clean and close
-      markClean(documentId);
+      const doc = getDocument(documentId);
+
+      if (doc?.type === 'canvas') {
+        if (doc.filePath) {
+          const circuitData = getCanvasCircuitData(documentId);
+
+          if (circuitData) {
+            const serializableData: SerializableCircuitState = circuitData;
+            const circuitState: CircuitState = {
+              components: new Map(Object.entries(serializableData.components)),
+              junctions: serializableData.junctions
+                ? new Map(Object.entries(serializableData.junctions))
+                : new Map(),
+              wires: serializableData.wires,
+              metadata: serializableData.metadata,
+              viewport: serializableData.viewport,
+            };
+
+            try {
+              await canvasService.saveCircuit(doc.filePath, circuitState);
+              markClean(documentId);
+            } catch (error) {
+              console.error(`Failed to save canvas document ${documentId}:`, error);
+            }
+          }
+        } else {
+          // Save As flow is not implemented yet.
+          markClean(documentId);
+        }
+      } else {
+        // Save logic for non-canvas document types is not implemented yet.
+        markClean(documentId);
+      }
+
       closeDocument(documentId);
     }
 
     removeTab(panelId, tab.id);
     setPendingClose(null);
-  }, [pendingClose, removeTab, closeDocument, markClean]);
+  }, [
+    pendingClose,
+    getDocument,
+    getCanvasCircuitData,
+    removeTab,
+    closeDocument,
+    markClean,
+  ]);
 
   /**
    * Close without saving.
