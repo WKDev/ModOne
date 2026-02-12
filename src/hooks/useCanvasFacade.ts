@@ -2,8 +2,8 @@
  * Canvas Facade Hook
  *
  * Single entry point for all canvas state access from UI components.
- * Routes to document-based state (useCanvasDocument) or global canvasStore
- * based on whether a documentId is present.
+ * Routes to document-based state (useCanvasDocument) or the legacy
+ * GlobalCanvasAdapter based on whether a documentId is present.
  *
  * UI components must use this hook instead of importing canvasStore directly.
  *
@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useCanvasStore } from '../stores/canvasStore';
+import { useGlobalCanvasAdapter } from '../stores/adapters/globalCanvasAdapter';
 import { useDocumentRegistry } from '../stores/documentRegistry';
 import { useCanvasDocument } from '../stores/hooks/useCanvasDocument';
 import type {
@@ -22,7 +22,6 @@ import type {
   PortPosition,
   SerializableCircuitState,
 } from '../components/OneCanvas/types';
-import { getAllSelectedIds } from '../components/OneCanvas/types';
 import {
   alignComponents,
   distributeComponents,
@@ -65,10 +64,13 @@ function detectExitDirection(start: Position, current: Position): PortPosition |
  * Unified canvas state facade.
  *
  * @param documentId - If provided, routes to document-based state.
- *                     If null, falls back to global canvasStore.
+ *                     If null, falls back to GlobalCanvasAdapter (deprecated).
  */
 export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
   const documentState = useCanvasDocument(documentId);
+
+  // Global fallback via adapter (all hook calls are unconditional)
+  const globalFacade = useGlobalCanvasAdapter();
 
   // --------------------------------------------------------------------------
   // Document-mode local interaction state
@@ -258,63 +260,7 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
   const documentCanRedo = documentId ? canRedoDoc(documentId) : false;
 
   // --------------------------------------------------------------------------
-  // Global store selectors (fallback mode)
-  // --------------------------------------------------------------------------
-
-  const globalComponents = useCanvasStore((state) => state.components);
-  const globalJunctions = useCanvasStore((state) => state.junctions);
-  const globalWires = useCanvasStore((state) => state.wires);
-  const globalZoom = useCanvasStore((state) => state.zoom);
-  const globalPan = useCanvasStore((state) => state.pan);
-  const globalAddComponent = useCanvasStore((state) => state.addComponent);
-  const globalAddWire = useCanvasStore((state) => state.addWire);
-  const globalMoveComponent = useCanvasStore((state) => state.moveComponent);
-  const globalRemoveWire = useCanvasStore((state) => state.removeWire);
-  const globalCreateJunctionOnWire = useCanvasStore((state) => state.createJunctionOnWire);
-  const globalMoveJunction = useCanvasStore((state) => state.moveJunction);
-  const globalRecalculateWireHandles = useCanvasStore((state) => state.recalculateWireHandles);
-  const globalUpdateWireHandle = useCanvasStore((state) => state.updateWireHandle);
-  const globalRemoveWireHandle = useCanvasStore((state) => state.removeWireHandle);
-  const globalMoveWireSegment = useCanvasStore((state) => state.moveWireSegment);
-  const globalInsertEndpointHandle = useCanvasStore((state) => state.insertEndpointHandle);
-  const globalCleanupOverlappingHandles = useCanvasStore((state) => state.cleanupOverlappingHandles);
-  const globalCommitWirePolyline = useCanvasStore((state) => state.commitWirePolyline);
-  const globalUpdateComponent = useCanvasStore((state) => state.updateComponent);
-
-  const wireDrawing = useCanvasStore((state) => state.wireDrawing);
-  const startWireDrawing = useCanvasStore((state) => state.startWireDrawing);
-  const updateWireDrawing = useCanvasStore((state) => state.updateWireDrawing);
-  const cancelWireDrawing = useCanvasStore((state) => state.cancelWireDrawing);
-  const globalSelection = useCanvasStore((state) => state.selection);
-  const selectedIds = useMemo(() => new Set(getAllSelectedIds(globalSelection)), [globalSelection]);
-  const globalSetSelection = useCanvasStore((state) => state.setSelection);
-  const globalAddToSelection = useCanvasStore((state) => state.addToSelection);
-  const globalToggleSelection = useCanvasStore((state) => state.toggleSelection);
-  const globalClearSelection = useCanvasStore((state) => state.clearSelection);
-  const setPan = useCanvasStore((state) => state.setPan);
-  const globalSetZoom = useCanvasStore((state) => state.setZoom);
-  const globalGridSize = useCanvasStore((state) => state.gridSize);
-  const globalSnapToGrid = useCanvasStore((state) => state.snapToGrid);
-  const alignSelected = useCanvasStore((state) => state.alignSelected);
-  const distributeSelected = useCanvasStore((state) => state.distributeSelected);
-  const flipSelected = useCanvasStore((state) => state.flipSelected);
-  const globalUndo = useCanvasStore((state) => state.undo);
-  const globalRedo = useCanvasStore((state) => state.redo);
-
-  // Global circuitIO
-  const getGlobalCircuitData = useCallback((): SerializableCircuitState => {
-    return useCanvasStore.getState().getCircuitData();
-  }, []);
-
-  const loadGlobalCircuit = useCallback((data: SerializableCircuitState) => {
-    useCanvasStore.getState().loadCircuit(data);
-  }, []);
-
-  const globalCanUndo = useCanvasStore((state) => state.history.length > 0 && state.historyIndex >= 0);
-  const globalCanRedo = useCanvasStore((state) => state.historyIndex < state.history.length - 1);
-
-  // --------------------------------------------------------------------------
-  // Build return value
+  // Build return value: document path vs global adapter
   // --------------------------------------------------------------------------
 
   return useMemo((): CanvasFacadeReturn => {
@@ -379,64 +325,8 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
       };
     }
 
-    return {
-      // Selectors
-      components: globalComponents,
-      junctions: globalJunctions,
-      wires: globalWires,
-      zoom: globalZoom,
-      pan: globalPan,
-      // Component Commands
-      addComponent: globalAddComponent,
-      moveComponent: (id, position, skipHistory, skipWireRecalc) =>
-        globalMoveComponent(id, position, skipHistory, skipWireRecalc),
-      updateComponent: globalUpdateComponent,
-      // Junction Commands
-      moveJunction: (id, position, skipHistory, skipWireRecalc) =>
-        globalMoveJunction(id, position, skipHistory, skipWireRecalc),
-      // Wire Commands
-      addWire: globalAddWire,
-      removeWire: globalRemoveWire,
-      createJunctionOnWire: globalCreateJunctionOnWire,
-      recalculateWireHandles: globalRecalculateWireHandles,
-      updateWireHandle: globalUpdateWireHandle,
-      removeWireHandle: globalRemoveWireHandle,
-      moveWireSegment: globalMoveWireSegment,
-      insertEndpointHandle: globalInsertEndpointHandle,
-      cleanupOverlappingHandles: globalCleanupOverlappingHandles,
-      commitWirePolyline: globalCommitWirePolyline,
-      // Alignment
-      alignSelected,
-      distributeSelected,
-      flipSelected,
-      // CircuitIO
-      getCircuitData: getGlobalCircuitData,
-      loadCircuit: loadGlobalCircuit,
-      // Wire Drawing
-      wireDrawing,
-      startWireDrawing,
-      updateWireDrawing,
-      cancelWireDrawing,
-      // Selection
-      selectedIds,
-      setSelection: globalSetSelection,
-      addToSelection: globalAddToSelection,
-      toggleSelection: globalToggleSelection,
-      clearSelection: globalClearSelection,
-      // Viewport
-      setPan,
-      setZoom: globalSetZoom,
-      gridSize: globalGridSize,
-      snapToGrid: globalSnapToGrid,
-      // History
-      undo: globalUndo,
-      redo: globalRedo,
-      canUndo: globalCanUndo,
-      canRedo: globalCanRedo,
-      // Metadata
-      isDocumentMode: false,
-      documentId: null,
-    };
+    // Global fallback — all values come from GlobalCanvasAdapter
+    return globalFacade;
   }, [
     // Document state
     documentState,
@@ -460,47 +350,7 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
     documentRedo,
     documentCanUndo,
     documentCanRedo,
-    // Global state
-    globalComponents,
-    globalJunctions,
-    globalWires,
-    globalZoom,
-    globalPan,
-    globalAddComponent,
-    globalAddWire,
-    globalMoveComponent,
-    globalMoveJunction,
-    globalRecalculateWireHandles,
-    globalRemoveWire,
-    globalCreateJunctionOnWire,
-    globalUpdateComponent,
-    globalUpdateWireHandle,
-    globalRemoveWireHandle,
-    globalMoveWireSegment,
-    globalInsertEndpointHandle,
-    globalCleanupOverlappingHandles,
-    globalCommitWirePolyline,
-    wireDrawing,
-    startWireDrawing,
-    updateWireDrawing,
-    cancelWireDrawing,
-    selectedIds,
-    globalSetSelection,
-    globalAddToSelection,
-    globalToggleSelection,
-    globalClearSelection,
-    setPan,
-    globalSetZoom,
-    globalGridSize,
-    globalSnapToGrid,
-    alignSelected,
-    distributeSelected,
-    flipSelected,
-    getGlobalCircuitData,
-    loadGlobalCircuit,
-    globalUndo,
-    globalRedo,
-    globalCanUndo,
-    globalCanRedo,
+    // Global adapter
+    globalFacade,
   ]);
 }

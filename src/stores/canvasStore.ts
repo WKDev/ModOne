@@ -1,8 +1,12 @@
 /**
  * Canvas Store - Zustand State Management for OneCanvas
  *
- * Manages circuit canvas state including components, wires, selection,
- * viewport (zoom/pan), grid settings, and undo/redo history.
+ * @deprecated DO NOT import this module from UI components or hooks.
+ * Use `useCanvasFacade(documentId)` from `src/hooks/useCanvasFacade.ts` instead.
+ * The ONLY allowed consumer of this module is `src/stores/adapters/globalCanvasAdapter.ts`.
+ *
+ * This store will be removed entirely in Phase 3.5 of the OneCanvas Stabilization.
+ * @see PRD_OneCanvas_Stabilization.md — Task 3.5
  */
 
 import { create } from 'zustand';

@@ -313,4 +313,106 @@ describe.each(adapters)('CanvasFacade (%s)', (_adapterName, setupFn) => {
 
     expect(result.current.components.get('a')?.position).toEqual({ x: 100, y: 40 });
   });
+
+  describe('page/document switching contract', () => {
+    it('switching documents preserves each document state independently', () => {
+      if (_adapterName === 'GlobalAdapter') return;
+
+      const registry = useDocumentRegistry.getState();
+      const docId1 = registry.createDocument('canvas');
+      const docId2 = registry.createDocument('canvas');
+
+      const { result: facade1 } = renderHook(() => useCanvasFacade(docId1));
+      act(() => {
+        facade1.current.loadCircuit(emptyCircuit({ a: makeBlock('a', 10, 10, 10, 10) }));
+      });
+
+      const { result: facade2 } = renderHook(() => useCanvasFacade(docId2));
+      act(() => {
+        facade2.current.loadCircuit(emptyCircuit({ x: makeBlock('x', 50, 50, 20, 20) }));
+      });
+
+      expect(facade1.current.components.has('a')).toBe(true);
+      expect(facade1.current.components.has('x')).toBe(false);
+
+      expect(facade2.current.components.has('x')).toBe(true);
+      expect(facade2.current.components.has('a')).toBe(false);
+    });
+
+    it('modifying one document does not affect another', () => {
+      if (_adapterName === 'GlobalAdapter') return;
+
+      const registry = useDocumentRegistry.getState();
+      const docId1 = registry.createDocument('canvas');
+      const docId2 = registry.createDocument('canvas');
+
+      const { result: facade1 } = renderHook(() => useCanvasFacade(docId1));
+      const { result: facade2 } = renderHook(() => useCanvasFacade(docId2));
+
+      act(() => {
+        facade1.current.loadCircuit(emptyCircuit({ a: makeBlock('a', 10, 10, 10, 10) }));
+        facade2.current.loadCircuit(emptyCircuit({ b: makeBlock('b', 20, 20, 10, 10) }));
+      });
+
+      act(() => {
+        facade1.current.moveComponent('a', { x: 200, y: 200 });
+      });
+
+      expect(facade2.current.components.get('b')?.position).toEqual({ x: 20, y: 20 });
+      expect(facade1.current.components.get('a')?.position).toEqual({ x: 200, y: 200 });
+    });
+
+    it('undo/redo are scoped to individual documents', () => {
+      if (_adapterName === 'GlobalAdapter') return;
+
+      const registry = useDocumentRegistry.getState();
+      const docId1 = registry.createDocument('canvas');
+      const docId2 = registry.createDocument('canvas');
+
+      const { result: facade1 } = renderHook(() => useCanvasFacade(docId1));
+      const { result: facade2 } = renderHook(() => useCanvasFacade(docId2));
+
+      act(() => {
+        facade1.current.loadCircuit(emptyCircuit({ a: makeBlock('a', 10, 10, 10, 10) }));
+        facade2.current.loadCircuit(emptyCircuit({ b: makeBlock('b', 20, 20, 10, 10) }));
+      });
+
+      act(() => {
+        facade1.current.moveComponent('a', { x: 100, y: 100 });
+      });
+      act(() => {
+        facade2.current.moveComponent('b', { x: 200, y: 200 });
+      });
+
+      act(() => {
+        facade1.current.undo();
+      });
+
+      expect(facade1.current.components.get('a')?.position).toEqual({ x: 10, y: 10 });
+      expect(facade2.current.components.get('b')?.position).toEqual({ x: 200, y: 200 });
+    });
+
+    it('closing a document does not affect other open documents', () => {
+      if (_adapterName === 'GlobalAdapter') return;
+
+      const registry = useDocumentRegistry.getState();
+      const docId1 = registry.createDocument('canvas');
+      const docId2 = registry.createDocument('canvas');
+
+      const { result: facade1 } = renderHook(() => useCanvasFacade(docId1));
+      const { result: facade2 } = renderHook(() => useCanvasFacade(docId2));
+
+      act(() => {
+        facade1.current.loadCircuit(emptyCircuit({ a: makeBlock('a', 10, 10, 10, 10) }));
+        facade2.current.loadCircuit(emptyCircuit({ b: makeBlock('b', 20, 20, 10, 10) }));
+      });
+
+      act(() => {
+        registry.closeDocument(docId1);
+      });
+
+      expect(facade2.current.components.has('b')).toBe(true);
+      expect(facade2.current.components.get('b')?.position).toEqual({ x: 20, y: 20 });
+    });
+  });
 });

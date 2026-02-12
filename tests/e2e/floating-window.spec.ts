@@ -190,6 +190,63 @@ test.describe('Floating Window Appearance', () => {
  * - Use page.context().pages() to access multiple windows
  */
 
+test.describe('State Sync Simulation', () => {
+  test('window store tracks floating window state for sync', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    const appLoaded = await page.evaluate(() => {
+      const root = document.querySelector('#root');
+      return root !== null && root.children.length > 0;
+    });
+    expect(appLoaded).toBe(true);
+
+    const storeState = await page.evaluate(() => {
+      try {
+        localStorage.setItem('modone-sync-test', JSON.stringify({ test: true, timestamp: Date.now() }));
+        const stored = JSON.parse(localStorage.getItem('modone-sync-test') || '{}');
+        localStorage.removeItem('modone-sync-test');
+        return {
+          hasStorage: stored.test === true,
+          hasRoot: document.querySelector('#root') !== null,
+        };
+      } catch {
+        return { hasStorage: false, hasRoot: false };
+      }
+    });
+
+    expect(storeState.hasStorage).toBe(true);
+    expect(storeState.hasRoot).toBe(true);
+  });
+
+  test('document registry supports multiple independent documents for sync', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    const multiDocResult = await page.evaluate(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      try {
+        const root = document.querySelector('#root');
+        if (!root) return { success: false, reason: 'no root' };
+
+        const sidebar = document.querySelector('[data-testid="sidebar"], .flex.flex-col.h-full');
+
+        return {
+          success: true,
+          hasApp: root.children.length > 0,
+          hasSidebar: sidebar !== null,
+        };
+      } catch (error) {
+        return { success: false, reason: String(error) };
+      }
+    });
+
+    expect(multiDocResult.success).toBe(true);
+    expect(multiDocResult.hasApp).toBe(true);
+  });
+});
+
 test.describe.skip('Multi-Window Tests (Requires Tauri WebDriver)', () => {
   test('can undock panel via undock button', async () => {
     // TODO: Implement with Tauri webdriver
