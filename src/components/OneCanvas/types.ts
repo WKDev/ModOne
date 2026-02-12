@@ -668,6 +668,8 @@ export type HandleConstraint = 'horizontal' | 'vertical' | 'free';
 
 /** Wire control point with constraint and source info */
 export interface WireHandle {
+  /** Stable identifier for history-friendly handle tracking */
+  id?: string;
   /** Handle position */
   position: Position;
   /** Movement constraint */
@@ -698,6 +700,21 @@ export interface Wire {
   label?: string;
   /** IEC 60204-1 wire number for documentation */
   wireNumber?: string;
+  /** Routing mode: 'auto' = fully recalculated on block move, 'manual' = user-controlled handles */
+  routingMode?: 'auto' | 'manual';
+}
+
+// ============================================================================
+// Polyline & Geometry API (used by wire simplifier + rubber-band)
+// ============================================================================
+
+/** Ordered positions forming an orthogonal polyline (exit point → handles → exit point) */
+export type Poly = readonly Position[];
+
+/** Geometry API for resolving wire endpoint positions */
+export interface GeomApi {
+  components: Map<string, Block>;
+  junctions: Map<string, Junction>;
 }
 
 // ============================================================================

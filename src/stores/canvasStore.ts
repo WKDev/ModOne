@@ -50,8 +50,8 @@ import {
   getWiresConnectedToComponent,
   getWiresConnectedToJunction,
   recalculateAutoHandles,
-  cleanupRedundantHandles,
 } from '../components/OneCanvas/utils/canvasHelpers';
+import { simplifyWireHandles } from '../components/OneCanvas/utils/wireSimplifier';
 import { alignComponents, distributeComponents, flipComponents } from '../components/OneCanvas/utils/canvas-commands';
 import { isValidConnection } from '../components/OneCanvas/utils/connectionValidator';
 
@@ -531,13 +531,17 @@ export const useCanvasStore = create<CanvasStore>()(
 
             state.components.set(id, { ...component, position: finalPosition } as Block);
 
-            // Recalculate auto handles on connected wires and cleanup redundant handles
+            // Recalculate auto handles on connected wires and simplify handles
             const connectedWires = getWiresConnectedToComponent(state.wires, id);
             for (const wire of connectedWires) {
               const target = state.wires.find((w) => w.id === wire.id);
               if (target) {
                 target.handles = recalculateAutoHandles(target, state.components, state.junctions);
-                cleanupRedundantHandles(target);
+                const geom = { components: state.components, junctions: state.junctions };
+                const simplified = simplifyWireHandles(target, geom);
+                if (simplified !== undefined) {
+                  target.handles = simplified;
+                }
               }
             }
 
@@ -674,13 +678,17 @@ export const useCanvasStore = create<CanvasStore>()(
 
             state.junctions.set(id, { ...junction, position: finalPosition });
 
-            // Recalculate auto handles on connected wires and cleanup redundant handles
+            // Recalculate auto handles on connected wires and simplify handles
             const connectedWires = getWiresConnectedToJunction(state.wires, id);
             for (const wire of connectedWires) {
               const target = state.wires.find((w) => w.id === wire.id);
               if (target) {
                 target.handles = recalculateAutoHandles(target, state.components, state.junctions);
-                cleanupRedundantHandles(target);
+                const geom = { components: state.components, junctions: state.junctions };
+                const simplified = simplifyWireHandles(target, geom);
+                if (simplified !== undefined) {
+                  target.handles = simplified;
+                }
               }
             }
 
@@ -1062,7 +1070,10 @@ export const useCanvasStore = create<CanvasStore>()(
             const wire = state.wires.find((w) => w.id === wireId);
             if (!wire) return;
 
-            if (cleanupRedundantHandles(wire)) {
+            const geom = { components: state.components, junctions: state.junctions };
+            const simplified = simplifyWireHandles(wire, geom);
+            if (simplified !== undefined) {
+              wire.handles = simplified;
               state.isDirty = true;
             }
           },
