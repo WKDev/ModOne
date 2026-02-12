@@ -9,6 +9,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Window } from '@tauri-apps/api/window';
 import { useDocumentRegistry } from '../stores/documentRegistry';
+import { useLayoutPersistenceStore } from '../stores/layoutPersistenceStore';
 import { canvasService } from '../services/canvasService';
 import type { CircuitState, SerializableCircuitState } from '../components/OneCanvas/types';
 
@@ -41,11 +42,28 @@ export function useWindowClose(): UseWindowCloseResult {
   const getCanvasCircuitData = useDocumentRegistry((state) => state.getCanvasCircuitData);
   const markClean = useDocumentRegistry((state) => state.markClean);
 
+  // Layout persistence for saving session before close
+  const saveLastSession = useLayoutPersistenceStore((state) => state.saveLastSession);
+
   /**
    * Perform the actual window close.
+   * Saves layout session first, then adds a grace period for pending IPC
+   * responses to complete before destroying the WebView2 window.
+   * This prevents HRESULT 0x8007139F (ERROR_INVALID_STATE) on Windows.
    */
   const performClose = useCallback(async () => {
     try {
+      // Save layout session while WebView2 is still fully alive
+      await saveLastSession();
+    } catch (error) {
+      console.error('Failed to save last session:', error);
+    }
+
+    try {
+      // Grace period for any in-flight IPC responses to complete
+      // Prevents WebView2 ERROR_INVALID_STATE (0x8007139F)
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
       const currentWindow = Window.getCurrent();
       await currentWindow.destroy();
     } catch (error) {
@@ -53,7 +71,7 @@ export function useWindowClose(): UseWindowCloseResult {
       // Fallback for non-Tauri environment
       window.close();
     }
-  }, []);
+  }, [saveLastSession]);
 
   /**
    * Save all dirty documents and close.
@@ -117,19 +135,6 @@ export function useWindowClose(): UseWindowCloseResult {
     setPendingClose(false);
   }, []);
 
-  /**
-   * Handle the close request - check for dirty documents first.
-   */
-  const handleCloseRequest = useCallback(() => {
-    if (hasUnsavedChanges()) {
-      // Show dialog
-      setIsDialogOpen(true);
-      setPendingClose(true);
-      return false; // Prevent close
-    }
-    return true; // Allow close
-  }, [hasUnsavedChanges]);
-
   // Set up Tauri window close event listener
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -140,19 +145,24 @@ export function useWindowClose(): UseWindowCloseResult {
 
         // Listen for close request
         unlisten = await currentWindow.onCloseRequested(async (event) => {
+          // Always prevent default close to control the lifecycle ourselves.
+          // This ensures saveLastSession() completes via IPC before WebView2
+          // is destroyed, preventing HRESULT 0x8007139F on Windows.
+          event.preventDefault();
+
           if (pendingClose) {
-            // Already showing dialog, prevent close
-            event.preventDefault();
+            // Already showing dialog, do nothing
             return;
           }
 
           if (hasUnsavedChanges()) {
-            // Prevent close and show dialog
-            event.preventDefault();
+            // Show unsaved changes dialog
             setIsDialogOpen(true);
             setPendingClose(true);
+          } else {
+            // No unsaved changes — save session and close gracefully
+            await performClose();
           }
-          // Otherwise, allow normal close
         });
       } catch (error) {
         // Not in Tauri environment, use browser's beforeunload
@@ -177,7 +187,7 @@ export function useWindowClose(): UseWindowCloseResult {
         unlisten();
       }
     };
-  }, [hasUnsavedChanges, pendingClose, handleCloseRequest]);
+  }, [hasUnsavedChanges, pendingClose, performClose]);
 
   return {
     isDialogOpen,

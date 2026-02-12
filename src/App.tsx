@@ -37,7 +37,7 @@ function useFloatingWindowParams() {
  * Main window content - full application with VSCode-style layout
  */
 function MainWindowContent() {
-  const { initialize, saveLastSession } = useLayoutPersistenceStore();
+  const { initialize } = useLayoutPersistenceStore();
   const initializeToolPanel = useToolPanelStore((state) => state.initializeDefaultTabs);
   const toolPanelTabs = useToolPanelStore((state) => state.tabs);
   const openSettingsTab = useEditorAreaStore((state) => state.openSettingsTab);
@@ -95,17 +95,10 @@ function MainWindowContent() {
     }
   }, [isInitialized, toolPanelTabs.length, initializeToolPanel]);
 
-  // Save session before window close
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      // Note: This is synchronous, so we can't await the save
-      // The store handles this appropriately
-      saveLastSession();
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [saveLastSession]);
+  // Note: Layout session saving is handled by useWindowClose hook's performClose()
+  // which saves the session via IPC while WebView2 is still alive, then destroys
+  // the window. The previous beforeunload approach caused WebView2 HRESULT 0x8007139F
+  // because the IPC call was still in-flight when the window was destroyed.
 
   // Show loading state while initializing
   if (!isInitialized) {
