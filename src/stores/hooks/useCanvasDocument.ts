@@ -270,7 +270,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
                 target.handles = recalculateAutoHandles(target, docData.components, docData.junctions);
                 const geom = { components: docData.components, junctions: docData.junctions };
                 const simplified = simplifyWireHandles(target, geom);
-                if (simplified !== undefined) {
+                if (simplified !== target.handles) {
                   target.handles = simplified;
                 }
               }
@@ -307,7 +307,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
                 target.handles = recalculateAutoHandles(target, docData.components, docData.junctions);
                 const geom = { components: docData.components, junctions: docData.junctions };
                 const simplified = simplifyWireHandles(target, geom);
-                if (simplified !== undefined) {
+                if (simplified !== target.handles) {
                   target.handles = simplified;
                 }
               }
@@ -504,7 +504,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         wire.handles = recalculateAutoHandles(wire, docData.components, docData.junctions);
         const geom = { components: docData.components, junctions: docData.junctions };
         const simplified = simplifyWireHandles(wire, geom, 'auto');
-        if (simplified !== undefined) {
+        if (simplified !== wire.handles) {
           wire.handles = simplified;
         }
       });
@@ -595,7 +595,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
 
         const geom = { components: docData.components, junctions: docData.junctions };
         const simplified = simplifyWireHandles(wire, geom);
-        if (simplified !== undefined) {
+        if (simplified !== wire.handles) {
           wire.handles = simplified;
         }
       });

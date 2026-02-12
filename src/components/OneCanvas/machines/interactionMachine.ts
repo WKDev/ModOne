@@ -721,10 +721,13 @@ export const interactionMachine = setup({
           // Auto wires: recalculate from scratch (the block has already moved)
           adapter.recalculateWireHandles(session.wireId);
         } else {
-          // Manual wires: commit the draft polyline
+          // Manual wires: simplify the draft polyline to remove bridge artifacts,
+          // then commit. Without this, bridgeOrthogonal() points accumulate as
+          // permanent handles on every block drag.
           const draft = context.wireDraftPolys.get(session.wireId);
           if (draft && draft.length >= 2) {
-            adapter.commitWirePolyline(session.wireId, draft, 'manual', true);
+            const simplified = simplifyOrthogonal(draft);
+            adapter.commitWirePolyline(session.wireId, simplified, 'manual', true);
           }
         }
       }
@@ -981,6 +984,13 @@ export const interactionMachine = setup({
 
     finalizeWireSegmentDragging: ({ context }) => {
       if (!context.segmentWireId) {
+        return;
+      }
+
+      // If no actual drag movement occurred (mouse down + up without move),
+      // skip finalization to avoid creating stubs from ensureMovableSegment
+      // and avoid flipping routingMode to 'manual' unnecessarily.
+      if (context.segmentIsFirstMove) {
         return;
       }
 

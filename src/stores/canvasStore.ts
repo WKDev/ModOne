@@ -544,7 +544,10 @@ export const useCanvasStore = create<CanvasStore>()(
                   target.handles = recalculateAutoHandles(target, state.components, state.junctions);
                   const geom = { components: state.components, junctions: state.junctions };
                   const simplified = simplifyWireHandles(target, geom);
-                  if (simplified !== undefined) {
+                  // Use reference identity: simplifyWireHandles returns wire.handles
+                  // unchanged when polyline can't be built (skip), or a new value
+                  // (including undefined = straight line, remove all handles).
+                  if (simplified !== target.handles) {
                     target.handles = simplified;
                   }
                 }
@@ -693,7 +696,7 @@ export const useCanvasStore = create<CanvasStore>()(
                   target.handles = recalculateAutoHandles(target, state.components, state.junctions);
                   const geom = { components: state.components, junctions: state.junctions };
                   const simplified = simplifyWireHandles(target, geom);
-                  if (simplified !== undefined) {
+                  if (simplified !== target.handles) {
                     target.handles = simplified;
                   }
                 }
@@ -1002,7 +1005,7 @@ export const useCanvasStore = create<CanvasStore>()(
             wire.handles = recalculateAutoHandles(wire, state.components, state.junctions);
             const geom = { components: state.components, junctions: state.junctions };
             const simplified = simplifyWireHandles(wire, geom, 'auto');
-            if (simplified !== undefined) {
+            if (simplified !== wire.handles) {
               wire.handles = simplified;
             }
             state.isDirty = true;
@@ -1099,7 +1102,7 @@ export const useCanvasStore = create<CanvasStore>()(
 
             const geom = { components: state.components, junctions: state.junctions };
             const simplified = simplifyWireHandles(wire, geom);
-            if (simplified !== undefined) {
+            if (simplified !== wire.handles) {
               wire.handles = simplified;
               state.isDirty = true;
             }
