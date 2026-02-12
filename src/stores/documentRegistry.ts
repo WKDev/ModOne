@@ -42,6 +42,14 @@ import type { SerializableCircuitState } from '../components/OneCanvas/types';
 import type { MultiPageSchematic } from '../components/OneCanvas/utils/multiPageSchematic';
 import type { LadderElement, LadderWire } from '../types/ladder';
 import type { Scenario, ScenarioExecutionState } from '../types/scenario';
+import {
+  broadcastDocumentSync,
+  getSyncWindowId,
+  listenDocumentSync,
+  mergeCanvasDocumentData,
+  shouldAcceptRemoteUpdate,
+  type DocumentSyncPayload,
+} from '../utils/documentSync';
 
 // ============================================================================
 // Types
@@ -105,6 +113,8 @@ interface DocumentRegistryActions {
   loadCanvasCircuit: (documentId: string, circuit: SerializableCircuitState) => void;
   /** Get canvas circuit data for saving */
   getCanvasCircuitData: (documentId: string) => SerializableCircuitState | null;
+  /** Apply remote canvas sync payload without rebroadcasting */
+  applyRemoteCanvasUpdate: (payload: DocumentSyncPayload) => void;
 
   // Ladder-specific data updates
   /** Update ladder document data */
@@ -201,6 +211,48 @@ function restoreCanvasFromHistory(snapshot: CanvasHistoryData): Pick<CanvasDocum
       handles: wire.handles ? wire.handles.map((h) => ({ ...h, position: { ...h.position } })) : undefined,
     })),
   };
+}
+
+function canvasDataToSerializable(data: CanvasDocumentData): SerializableCircuitState {
+  return {
+    components: Object.fromEntries(data.components),
+    junctions: data.junctions.size > 0 ? Object.fromEntries(data.junctions) : undefined,
+    wires: data.wires.map((wire) => ({
+      ...wire,
+      from: { ...wire.from },
+      to: { ...wire.to },
+      handles: wire.handles
+        ? wire.handles.map((handle) => ({ ...handle, position: { ...handle.position } }))
+        : undefined,
+    })),
+    metadata: { ...data.metadata },
+    viewport: {
+      zoom: data.zoom,
+      panX: data.pan.x,
+      panY: data.pan.y,
+    },
+  };
+}
+
+function applySerializableToCanvasData(doc: CanvasDocumentState, circuit: SerializableCircuitState): void {
+  doc.data.components = new Map(Object.entries(circuit.components));
+  doc.data.junctions = circuit.junctions ? new Map(Object.entries(circuit.junctions)) : new Map();
+  doc.data.wires = circuit.wires.map((wire) => ({
+    ...wire,
+    from: { ...wire.from },
+    to: { ...wire.to },
+    handles: wire.handles
+      ? wire.handles.map((handle) => ({ ...handle, position: { ...handle.position } }))
+      : undefined,
+  }));
+  doc.data.metadata = { ...circuit.metadata };
+  if (circuit.viewport) {
+    doc.data.zoom = circuit.viewport.zoom;
+    doc.data.pan = {
+      x: circuit.viewport.panX,
+      y: circuit.viewport.panY,
+    };
+  }
 }
 
 /** Create ladder history snapshot */
@@ -312,23 +364,7 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
             doc = createEmptyCanvasDocument(name, filePath);
             const canvasDoc = doc as CanvasDocumentState;
             const circuitData = data as SerializableCircuitState;
-            canvasDoc.data.components = new Map(Object.entries(circuitData.components));
-            canvasDoc.data.junctions = circuitData.junctions
-              ? new Map(Object.entries(circuitData.junctions))
-              : new Map();
-            canvasDoc.data.wires = circuitData.wires.map((wire) => ({
-              ...wire,
-              from: { ...wire.from },
-              to: { ...wire.to },
-            }));
-            canvasDoc.data.metadata = { ...circuitData.metadata };
-            if (circuitData.viewport) {
-              canvasDoc.data.zoom = circuitData.viewport.zoom;
-              canvasDoc.data.pan = {
-                x: circuitData.viewport.panX,
-                y: circuitData.viewport.panY,
-              };
-            }
+            applySerializableToCanvasData(canvasDoc, circuitData);
             break;
           }
           case 'ladder':
@@ -483,18 +519,35 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
       // ========================================================================
 
       updateCanvasData: (documentId, updater) => {
+        let payloadToBroadcast: DocumentSyncPayload | null = null;
+
         set(
           (state) => {
             const doc = state.documents.get(documentId);
             if (doc && isCanvasDocument(doc)) {
               updater(doc.data);
+              doc.revision += 1;
               doc.isDirty = true;
               doc.lastModified = Date.now();
+
+              payloadToBroadcast = {
+                documentId,
+                revision: doc.revision,
+                data: canvasDataToSerializable(doc.data),
+                sourceWindowId: getSyncWindowId(),
+                timestamp: doc.lastModified,
+              };
             }
           },
           false,
           `updateCanvasData/${documentId}`
         );
+
+        if (payloadToBroadcast) {
+          void broadcastDocumentSync(payloadToBroadcast).catch((error) => {
+            console.warn('Failed to broadcast canvas document sync update:', error);
+          });
+        }
       },
 
       loadCanvasCircuit: (documentId, circuit) => {
@@ -502,27 +555,13 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
           (state) => {
             const doc = state.documents.get(documentId);
             if (doc && isCanvasDocument(doc)) {
-              doc.data.components = new Map(Object.entries(circuit.components));
-              doc.data.junctions = circuit.junctions
-                ? new Map(Object.entries(circuit.junctions))
-                : new Map();
-              doc.data.wires = circuit.wires.map((wire) => ({
-                ...wire,
-                from: { ...wire.from },
-                to: { ...wire.to },
-              }));
-              doc.data.metadata = { ...circuit.metadata };
-              if (circuit.viewport) {
-                doc.data.zoom = circuit.viewport.zoom;
-                doc.data.pan = {
-                  x: circuit.viewport.panX,
-                  y: circuit.viewport.panY,
-                };
-              }
+              applySerializableToCanvasData(doc, circuit);
               doc.history = [];
               doc.historyIndex = -1;
               doc.isDirty = false;
               doc.status = 'loaded';
+              doc.revision = 0;
+              doc.lastModified = Date.now();
             }
           },
           false,
@@ -533,21 +572,41 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
       getCanvasCircuitData: (documentId) => {
         const doc = get().documents.get(documentId);
         if (doc && isCanvasDocument(doc)) {
-          return {
-            components: Object.fromEntries(doc.data.components),
-            junctions: doc.data.junctions.size > 0
-              ? Object.fromEntries(doc.data.junctions)
-              : undefined,
-            wires: doc.data.wires,
-            metadata: doc.data.metadata,
-            viewport: {
-              zoom: doc.data.zoom,
-              panX: doc.data.pan.x,
-              panY: doc.data.pan.y,
-            },
-          };
+          return canvasDataToSerializable(doc.data);
         }
         return null;
+      },
+
+      applyRemoteCanvasUpdate: (payload) => {
+        set(
+          (state) => {
+            const doc = state.documents.get(payload.documentId);
+            if (!doc || !isCanvasDocument(doc)) {
+              return;
+            }
+
+            if (
+              !shouldAcceptRemoteUpdate(
+                doc.revision,
+                doc.lastModified,
+                payload.revision,
+                payload.timestamp,
+              )
+            ) {
+              return;
+            }
+
+            const local = canvasDataToSerializable(doc.data);
+            const merged = mergeCanvasDocumentData(local, payload.data);
+
+            applySerializableToCanvasData(doc, merged);
+            doc.revision = payload.revision;
+            doc.lastModified = payload.timestamp;
+            doc.status = 'loaded';
+          },
+          false,
+          `applyRemoteCanvasUpdate/${payload.documentId}`,
+        );
       },
 
       // ========================================================================
@@ -864,6 +923,31 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
     { name: 'document-registry' }
   )
 );
+
+let hasInitializedDocumentSyncListener = false;
+
+function initializeDocumentSyncListener(): void {
+  if (hasInitializedDocumentSyncListener) {
+    return;
+  }
+
+  hasInitializedDocumentSyncListener = true;
+
+  void listenDocumentSync((payload) => {
+    if (payload.sourceWindowId === getSyncWindowId()) {
+      return;
+    }
+
+    useDocumentRegistry.getState().applyRemoteCanvasUpdate(payload);
+  }).catch((error) => {
+    hasInitializedDocumentSyncListener = false;
+    console.warn('Failed to initialize document sync listener:', error);
+  });
+}
+
+if (typeof window !== 'undefined') {
+  initializeDocumentSyncListener();
+}
 
 // ============================================================================
 // Selectors

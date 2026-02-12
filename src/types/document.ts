@@ -53,6 +53,8 @@ export interface DocumentMeta {
   errorMessage?: string;
   /** Last modified timestamp */
   lastModified: number;
+  /** Monotonically increasing revision number for sync conflict resolution */
+  revision: number;
   /** Associated tab ID */
   tabId: string | null;
 }
@@ -301,6 +303,7 @@ export function createDocumentMeta(
     isDirty: false,
     status: 'empty',
     lastModified: Date.now(),
+    revision: 0,
     tabId: null,
   };
 }
