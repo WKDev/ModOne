@@ -9,6 +9,7 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { PanelType, PANEL_TYPE_LABELS } from '../types/panel';
 import { TabState, TabData } from '../types/tab';
+import { useDocumentRegistry } from './documentRegistry';
 
 interface EditorAreaState {
   /** Array of tabs in the editor area */
@@ -266,3 +267,24 @@ export const useEditorAreaStore = create<EditorAreaStore>()(
     { name: 'editor-area-store' }
   )
 );
+
+// ============================================================================
+// Cross-store Subscriptions
+// ============================================================================
+
+/**
+ * Sync document dirty state → tab modified indicator.
+ * When a document's isDirty changes in the registry, update the
+ * corresponding editor tab's isModified flag so the UI shows `*`.
+ */
+useDocumentRegistry.subscribe((state, prevState) => {
+  const editorStore = useEditorAreaStore.getState();
+
+  state.documents.forEach((doc, docId) => {
+    const prevDoc = prevState.documents.get(docId);
+    // Only sync when dirty state actually changed and tab is linked
+    if (doc.tabId && (!prevDoc || doc.isDirty !== prevDoc.isDirty)) {
+      editorStore.updateTabModified(doc.tabId, doc.isDirty);
+    }
+  });
+});

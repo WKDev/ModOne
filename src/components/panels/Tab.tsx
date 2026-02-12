@@ -82,16 +82,11 @@ export function Tab({
         </span>
       )}
 
-      {/* Modified indicator */}
-      {isModified && (
-        <span
-          className="flex-shrink-0 w-2 h-2 rounded-full bg-blue-400"
-          title="Unsaved changes"
-        />
-      )}
-
-      {/* Title */}
-      <span className="flex-1 truncate text-xs font-medium">{title}</span>
+      {/* Title (with * prefix when modified) */}
+      <span className="flex-1 truncate text-xs font-medium">
+        {isModified && <span className="text-gray-400">*</span>}
+        {title}
+      </span>
 
       {/* Close button */}
       <button
