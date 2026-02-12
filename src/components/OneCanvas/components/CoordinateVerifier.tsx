@@ -6,13 +6,14 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { useCanvasStore } from '../../../stores/canvasStore';
 import { screenToCanvas, canvasToScreen } from '../utils/canvasCoordinates';
 import type { Position } from '../types';
 import type { CanvasRef } from '../Canvas';
 
 interface CoordinateVerifierProps {
   canvasRef: React.RefObject<CanvasRef | null>;
+  zoom: number;
+  pan: Position;
 }
 
 interface ClickMarker {
@@ -24,12 +25,9 @@ interface ClickMarker {
   pan: Position;
 }
 
-export function CoordinateVerifier({ canvasRef }: CoordinateVerifierProps) {
+export function CoordinateVerifier({ canvasRef, zoom, pan }: CoordinateVerifierProps) {
   const [markers, setMarkers] = useState<ClickMarker[]>([]);
   const nextId = useRef(0);
-
-  const zoom = useCanvasStore((state) => state.zoom);
-  const pan = useCanvasStore((state) => state.pan);
 
   useEffect(() => {
     const container = canvasRef.current?.getContainer();

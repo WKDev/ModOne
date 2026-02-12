@@ -4,12 +4,14 @@ import { SelectionBoundingBox } from './SelectionBoundingBox';
 import { WirePreview, type WirePreviewState } from './WirePreview';
 import { CoordinateDebugger } from './CoordinateDebugger';
 import type { CanvasRef } from '../Canvas';
-import type { Block, Wire, Junction } from '../types';
+import type { Block, Wire, Junction, Position } from '../types';
 
 interface CanvasOverlaysProps {
   selectionBox: SelectionBoxState | null;
   debugMode?: boolean;
   canvasRef?: React.RefObject<CanvasRef | null>;
+  zoom: number;
+  pan: Position;
 
   // SelectionBoundingBox props
   selectedIds?: Set<string>;
@@ -31,6 +33,8 @@ export function CanvasOverlays({
   selectionBox,
   debugMode = false,
   canvasRef,
+  zoom,
+  pan,
   selectedIds,
   components,
   wires,
@@ -56,7 +60,13 @@ export function CanvasOverlays({
       {wirePreview && <WirePreview preview={wirePreview} />}
 
       {/* Debug Tools */}
-      {debugMode && canvasRef && <CoordinateDebugger canvasRef={canvasRef} />}
+      {debugMode && canvasRef && (
+        <CoordinateDebugger
+          canvasRef={canvasRef}
+          zoom={zoom}
+          pan={pan}
+        />
+      )}
     </>
   );
 }

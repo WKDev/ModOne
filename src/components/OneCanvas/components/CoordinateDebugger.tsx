@@ -6,23 +6,21 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { useCanvasStore } from '../../../stores/canvasStore';
 import { screenToCanvas } from '../utils/canvasCoordinates';
 import type { Position } from '../types';
 import type { CanvasRef } from '../Canvas';
 
 interface CoordinateDebuggerProps {
   canvasRef: React.RefObject<CanvasRef | null>;
+  zoom: number;
+  pan: Position;
 }
 
-export function CoordinateDebugger({ canvasRef }: CoordinateDebuggerProps) {
+export function CoordinateDebugger({ canvasRef, zoom, pan }: CoordinateDebuggerProps) {
   const [mouseScreen, setMouseScreen] = useState<Position | null>(null);
   const [mouseCanvas, setMouseCanvas] = useState<Position | null>(null);
   const [clickScreen, setClickScreen] = useState<Position | null>(null);
   const [clickCanvas, setClickCanvas] = useState<Position | null>(null);
-
-  const zoom = useCanvasStore((state) => state.zoom);
-  const pan = useCanvasStore((state) => state.pan);
 
   const handleMouseMove = useCallback(
     (event: MouseEvent) => {

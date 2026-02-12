@@ -5,14 +5,14 @@
  * Routes to appropriate type-specific editor based on component type.
  *
  * Supports two modes:
- * 1. Standalone: uses global canvasStore for selection/update
+ * 1. Standalone: uses active canvas facade for selection/update
  * 2. Injected: receives selectedComponents/onUpdateComponent as props (e.g., OneCanvasPanel sidebar)
  */
 
 import { memo, useCallback, useMemo } from 'react';
-import { useShallow } from 'zustand/react/shallow';
 import { Settings2 } from 'lucide-react';
-import { useCanvasStore } from '../../../stores/canvasStore';
+import { useCanvasFacade } from '../../../hooks/useCanvasFacade';
+import { useEditorAreaStore } from '../../../stores/editorAreaStore';
 import type { Block } from '../../OneCanvas/types';
 import {
   PlcOutProperties,
@@ -46,20 +46,23 @@ export const PropertiesPanel = memo(function PropertiesPanel({
   selectedComponents: externalSelectedComponents,
   onUpdateComponent: externalUpdateComponent,
 }: PropertiesPanelProps) {
-  // Use external props if provided, otherwise fall back to global store.
-  // useShallow ensures the derived array is compared shallowly, avoiding
-  // infinite re-renders from a new array reference on every selector call.
-  const storeSelectedComponents = useCanvasStore(
-    useShallow((state) => {
-      const selected: Block[] = [];
-      state._selectedIdsCache.forEach((id: string) => {
-        const component = state.components.get(id);
-        if (component) selected.push(component);
-      });
-      return selected;
-    })
-  );
-  const storeUpdateComponent = useCanvasStore((state) => state.updateComponent);
+  // Use external props if provided, otherwise fall back to active document state.
+  const activeTabData = useEditorAreaStore((state) => {
+    const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
+    return activeTab?.data as { documentId?: string } | undefined;
+  });
+  const documentId = activeTabData?.documentId ?? null;
+  const facade = useCanvasFacade(documentId);
+
+  const storeSelectedComponents = useMemo(() => {
+    const selected: Block[] = [];
+    facade.selectedIds.forEach((id) => {
+      const component = facade.components.get(id);
+      if (component) selected.push(component);
+    });
+    return selected;
+  }, [facade.selectedIds, facade.components]);
+  const storeUpdateComponent = facade.updateComponent;
 
   const selectedComponents = externalSelectedComponents ?? storeSelectedComponents;
   const updateComponent = externalUpdateComponent ?? storeUpdateComponent;
