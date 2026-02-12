@@ -30,6 +30,8 @@ interface CanvasContentProps {
      orientation: 'horizontal' | 'vertical',
      e: React.MouseEvent
    ) => void;
+   /** Draft polylines for rubber-band preview (wireId → polyline) */
+   wireDraftPolys?: ReadonlyMap<string, readonly Position[]>;
 }
 
 /**
@@ -54,11 +56,12 @@ export function CanvasContent({
   plcOutputStates,
   onStartWire,
   onEndWire,
-   onBlockDragStart,
-   onWireContextMenu,
-   onWireHandleContextMenu,
-   onWireEndpointSegmentDragStart,
-  onUpdateComponent,
+    onBlockDragStart,
+    onWireContextMenu,
+    onWireHandleContextMenu,
+    onWireEndpointSegmentDragStart,
+   onUpdateComponent,
+   wireDraftPolys,
 }: CanvasContentProps) {
   // Calculate port positions for wire rendering
   const getPortPosition = (blockId: string, portId: string) => {
@@ -129,6 +132,7 @@ export function CanvasContent({
                onEndpointSegmentDragStart={onWireEndpointSegmentDragStart}
               label={wire.label}
               wireNumber={wire.wireNumber}
+              draftPoly={wireDraftPolys?.get(wire.id)}
             />
           );
         })}

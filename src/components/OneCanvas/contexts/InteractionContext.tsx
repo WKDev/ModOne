@@ -34,6 +34,7 @@ interface InteractionApi {
   isDragging: boolean;
   isBoxSelecting: boolean;
   isWireDrawing: boolean;
+  wireDraftPolys: ReadonlyMap<string, readonly Position[]>;
 }
 
 const InteractionContext = createContext<InteractionApi | null>(null);
@@ -300,6 +301,8 @@ export function InteractionProvider({ children, facade, containerRef }: Interact
   const isBoxSelecting = useSelector(actorRef, (s) => s.matches('box_selecting'));
   const isWireDrawing = useSelector(actorRef, (s) => s.matches('wire_drawing'));
 
+  const wireDraftPolys = useSelector(actorRef, (s) => s.context.wireDraftPolys) as ReadonlyMap<string, readonly Position[]>;
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isEditableElement(event.target)) {
@@ -352,8 +355,9 @@ export function InteractionProvider({ children, facade, containerRef }: Interact
       isDragging,
       isBoxSelecting,
       isWireDrawing,
+      wireDraftPolys,
     }),
-    [send, snapshot, cursor, selectionBox, wirePreview, isSpaceHeld, isDragging, isBoxSelecting, isWireDrawing]
+    [send, snapshot, cursor, selectionBox, wirePreview, isSpaceHeld, isDragging, isBoxSelecting, isWireDrawing, wireDraftPolys]
   );
 
   return <InteractionContext.Provider value={value}>{children}</InteractionContext.Provider>;

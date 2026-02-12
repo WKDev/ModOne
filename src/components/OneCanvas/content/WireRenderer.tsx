@@ -7,7 +7,7 @@
 
 import { memo, useCallback } from 'react';
 import type { Position, PortPosition, WireHandle as WireHandleData } from '../types';
-import { calculateWirePath, calculatePathWithHandles, calculatePathWithExitDirections } from '../utils/wirePathCalculator';
+import { calculateWirePath, calculatePathWithHandles, calculatePathWithExitDirections, segmentsToPath } from '../utils/wirePathCalculator';
 import { getClosestPointOnPath } from '../utils/wireHitTest';
 import { WireHandle } from '../components/WireHandle';
 
@@ -62,6 +62,8 @@ interface WireProps {
   label?: string;
   /** Wire number (IEC 60204-1) */
   wireNumber?: string;
+  /** Draft polyline override for rubber-band preview (suppresses interactive elements) */
+  draftPoly?: readonly Position[];
 }
 
 // ============================================================================
@@ -110,12 +112,18 @@ export const Wire = memo(function Wire({
   defaultToDirection,
   label,
   wireNumber,
+  draftPoly,
 }: WireProps) {
   // Extract positions from handles
   const handlePositions = handles?.map((h) => h.position);
 
   // Calculate path based on mode and handles
   const pathD = (() => {
+    // Draft polyline override for rubber-band preview
+    if (draftPoly && draftPoly.length >= 2) {
+      return segmentsToPath([...draftPoly], 8);
+    }
+
     // If we have handles, use path with handles
     if (handlePositions && handlePositions.length > 0) {
       return calculatePathWithHandles(
@@ -272,7 +280,7 @@ export const Wire = memo(function Wire({
       )}
 
       {/* Segment drag hit areas (between adjacent handles) — centralized handler reads data-* attrs */}
-      {isSelected && handles && handles.length >= 2 &&
+      {!draftPoly && isSelected && handles && handles.length >= 2 &&
         handles.slice(0, -1).map((handle, i) => {
           const next = handles[i + 1];
           const dx = Math.abs(handle.position.x - next.position.x);
@@ -303,7 +311,7 @@ export const Wire = memo(function Wire({
       }
 
       {/* Endpoint segment drag hit areas (port exit ↔ first/last handle) */}
-      {isSelected && handles && handles.length >= 1 && onEndpointSegmentDragStart && (() => {
+      {!draftPoly && isSelected && handles && handles.length >= 1 && onEndpointSegmentDragStart && (() => {
         const getExitPt = (pos: Position, dir: PortPosition, dist = 20): Position => {
           switch (dir) {
             case 'top': return { x: pos.x, y: pos.y - dist };
@@ -373,7 +381,7 @@ export const Wire = memo(function Wire({
       })()}
 
       {/* Render handles when wire is selected */}
-      {isSelected && handles && handles.length > 0 && (
+      {!draftPoly && isSelected && handles && handles.length > 0 && (
         <>
           {handles.map((handle, index) => (
             <WireHandle

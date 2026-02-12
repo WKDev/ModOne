@@ -272,6 +272,7 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
   const globalRemoveWire = useCanvasStore((state) => state.removeWire);
   const globalCreateJunctionOnWire = useCanvasStore((state) => state.createJunctionOnWire);
   const globalMoveJunction = useCanvasStore((state) => state.moveJunction);
+  const globalRecalculateWireHandles = useCanvasStore((state) => state.recalculateWireHandles);
   const globalUpdateWireHandle = useCanvasStore((state) => state.updateWireHandle);
   const globalRemoveWireHandle = useCanvasStore((state) => state.removeWireHandle);
   const globalMoveWireSegment = useCanvasStore((state) => state.moveWireSegment);
@@ -327,14 +328,17 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
         pan: documentState.pan,
         // Component Commands
         addComponent: documentState.addComponent,
-        moveComponent: documentState.moveComponent,
+        moveComponent: (id, position, skipHistory, skipWireRecalc) =>
+          documentState.moveComponent(id, position, skipHistory, skipWireRecalc),
         updateComponent: documentState.updateComponent,
         // Junction Commands
-        moveJunction: documentState.moveJunction,
+        moveJunction: (id, position, skipHistory, skipWireRecalc) =>
+          documentState.moveJunction(id, position, skipHistory, skipWireRecalc),
         // Wire Commands
         addWire: documentState.addWire,
         removeWire: documentState.removeWire,
         createJunctionOnWire: documentState.createJunctionOnWire,
+        recalculateWireHandles: documentState.recalculateWireHandles,
         updateWireHandle: documentState.updateWireHandle,
         removeWireHandle: documentState.removeWireHandle,
         moveWireSegment: documentState.moveWireSegment,
@@ -384,14 +388,17 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
       pan: globalPan,
       // Component Commands
       addComponent: globalAddComponent,
-      moveComponent: globalMoveComponent,
+      moveComponent: (id, position, skipHistory, skipWireRecalc) =>
+        globalMoveComponent(id, position, skipHistory, skipWireRecalc),
       updateComponent: globalUpdateComponent,
       // Junction Commands
-      moveJunction: globalMoveJunction,
+      moveJunction: (id, position, skipHistory, skipWireRecalc) =>
+        globalMoveJunction(id, position, skipHistory, skipWireRecalc),
       // Wire Commands
       addWire: globalAddWire,
       removeWire: globalRemoveWire,
       createJunctionOnWire: globalCreateJunctionOnWire,
+      recalculateWireHandles: globalRecalculateWireHandles,
       updateWireHandle: globalUpdateWireHandle,
       removeWireHandle: globalRemoveWireHandle,
       moveWireSegment: globalMoveWireSegment,
@@ -463,6 +470,7 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
     globalAddWire,
     globalMoveComponent,
     globalMoveJunction,
+    globalRecalculateWireHandles,
     globalRemoveWire,
     globalCreateJunctionOnWire,
     globalUpdateComponent,

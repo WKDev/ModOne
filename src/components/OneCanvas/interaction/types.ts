@@ -31,8 +31,8 @@ export interface CanvasInteractionAdapter {
   setZoom(zoom: number): void;
 
   // Component writes
-  moveComponent(id: string, position: Position, skipHistory?: boolean): void;
-  moveJunction(id: string, position: Position, skipHistory?: boolean): void;
+  moveComponent(id: string, position: Position, skipHistory?: boolean, skipWireRecalc?: boolean): void;
+  moveJunction(id: string, position: Position, skipHistory?: boolean, skipWireRecalc?: boolean): void;
 
   // Wire writes
   addWire(
@@ -49,6 +49,7 @@ export interface CanvasInteractionAdapter {
     isFirstMove?: boolean
   ): void;
   updateWireHandle(wireId: string, handleIndex: number, position: Position, isFirstMove?: boolean): void;
+  recalculateWireHandles(wireId: string): void;
   cleanupOverlappingHandles(wireId: string): void;
   commitWirePolyline(
     wireId: string,

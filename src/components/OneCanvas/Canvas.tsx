@@ -132,7 +132,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
   const contentRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<CanvasRef | null>(null);
-  const { cursor, send } = useInteraction();
+  const { cursor, send, wireDraftPolys } = useInteraction();
 
   const gridSize = propGridSize ?? 20;
   const showGrid = propShowGrid ?? true;
@@ -235,7 +235,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
                onWireContextMenu={onWireContextMenu}
                onWireHandleContextMenu={onWireHandleContextMenu}
                onWireEndpointSegmentDragStart={onWireEndpointSegmentDragStart}
-              onUpdateComponent={onUpdateComponent}
+               onUpdateComponent={onUpdateComponent}
+               wireDraftPolys={wireDraftPolys}
             />
           </div>
         </TransformedLayer>

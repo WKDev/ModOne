@@ -12,6 +12,7 @@ import {
   ensureMovableSegment,
   dragSegment,
 } from '../utils/wireSimplifier';
+import { createRubberBandSession, computeDraftPoly, type RubberBandWireSession } from '../utils/rubberBand';
 import type { CanvasInteractionAdapter } from '../interaction/types';
 import type {
   GeomApi,
@@ -21,6 +22,7 @@ import type {
   PortEndpoint,
   PortPosition,
   Position,
+  Wire,
   WireEndpoint,
   Block,
 } from '../types';
@@ -95,6 +97,8 @@ export interface InteractionContext {
   dragMouseDownScreenPos: Position | null;
   dragIsFirstMove: boolean;
   dragContainerRect: DOMRect | null;
+  rubberBandSessions: RubberBandWireSession[];
+  wireDraftPolys: Map<string, readonly Position[]>;
 
   boxSelectStartPos: Position | null;
   boxSelectCurrentPos: Position | null;
@@ -145,6 +149,8 @@ const initialContext: InteractionContext = {
   dragMouseDownScreenPos: null,
   dragIsFirstMove: true,
   dragContainerRect: null,
+  rubberBandSessions: [],
+  wireDraftPolys: new Map(),
 
   boxSelectStartPos: null,
   boxSelectCurrentPos: null,
@@ -198,6 +204,14 @@ function getAdapter(context: InteractionContext): CanvasInteractionAdapter {
     throw new Error('InteractionMachine: adapter not available');
   }
   return adapter;
+}
+
+function getWiresConnectedToIds(adapter: CanvasInteractionAdapter, ids: Set<string>): Wire[] {
+  return adapter.getWires().filter((wire) => {
+    const fromId = 'componentId' in wire.from ? wire.from.componentId : wire.from.junctionId;
+    const toId = 'componentId' in wire.to ? wire.to.componentId : wire.to.junctionId;
+    return ids.has(fromId) || ids.has(toId);
+  });
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -425,6 +439,8 @@ export const interactionMachine = setup({
       dragMouseDownScreenPos: null,
       dragIsFirstMove: true,
       dragContainerRect: null,
+      rubberBandSessions: [],
+      wireDraftPolys: new Map(),
 
       boxSelectStartPos: null,
       boxSelectCurrentPos: null,
@@ -614,6 +630,7 @@ export const interactionMachine = setup({
       // First move pushes history snapshot; subsequent moves skip history.
       // Store update on every frame so connected wires recalculate in real-time.
       const skipHistory = !context.dragIsFirstMove;
+      const hasRubberBand = context.rubberBandSessions.length > 0;
 
       for (const [id, original] of context.dragOriginalPositions) {
         let next = {
@@ -626,9 +643,9 @@ export const interactionMachine = setup({
         }
 
         if (context.dragJunctionIds.has(id)) {
-          adapter.moveJunction(id, next, skipHistory);
+          adapter.moveJunction(id, next, skipHistory, hasRubberBand);
         } else {
-          adapter.moveComponent(id, next, skipHistory);
+          adapter.moveComponent(id, next, skipHistory, hasRubberBand);
         }
       }
     },
@@ -637,6 +654,81 @@ export const interactionMachine = setup({
       ...context,
       dragIsFirstMove: false,
     })),
+
+    initRubberBandSessions: assign(({ context }) => {
+      const adapter = getAdapter(context);
+      const dragIds = new Set(context.dragOriginalPositions.keys());
+      const connectedWires = getWiresConnectedToIds(adapter, dragIds);
+
+      const geom: GeomApi = {
+        components: adapter.getComponents(),
+        junctions: adapter.getJunctions(),
+      };
+
+      const sessions: RubberBandWireSession[] = [];
+      for (const wire of connectedWires) {
+        const session = createRubberBandSession(wire, dragIds, geom);
+        if (session) {
+          sessions.push(session);
+        }
+      }
+
+      return {
+        ...context,
+        rubberBandSessions: sessions,
+        wireDraftPolys: new Map(),
+      };
+    }),
+
+    updateRubberBandDrafts: assign(({ context, event }) => {
+      if (!isPointerMove(event) || !context.dragStartCanvasPos || context.rubberBandSessions.length === 0) {
+        return context;
+      }
+
+      const delta = {
+        x: event.canvasPosition.x - context.dragStartCanvasPos.x,
+        y: event.canvasPosition.y - context.dragStartCanvasPos.y,
+      };
+
+      const adapter = getAdapter(context);
+      if (adapter.getSnapToGrid()) {
+        const gridSize = adapter.getGridSize();
+        delta.x = Math.round(delta.x / gridSize) * gridSize;
+        delta.y = Math.round(delta.y / gridSize) * gridSize;
+      }
+
+      const drafts = new Map<string, readonly Position[]>();
+      for (const session of context.rubberBandSessions) {
+        const poly = computeDraftPoly(session, delta);
+        drafts.set(session.wireId, poly);
+      }
+
+      return {
+        ...context,
+        wireDraftPolys: drafts,
+      };
+    }),
+
+    commitRubberBandDrafts: ({ context }) => {
+      if (context.rubberBandSessions.length === 0) {
+        return;
+      }
+
+      const adapter = getAdapter(context);
+
+      for (const session of context.rubberBandSessions) {
+        if (session.isAutoWire) {
+          // Auto wires: recalculate from scratch (the block has already moved)
+          adapter.recalculateWireHandles(session.wireId);
+        } else {
+          // Manual wires: commit the draft polyline
+          const draft = context.wireDraftPolys.get(session.wireId);
+          if (draft && draft.length >= 2) {
+            adapter.commitWirePolyline(session.wireId, draft, 'manual', true);
+          }
+        }
+      }
+    },
 
     prepareBoxSelecting: assign(({ context, event }) => {
       if (!isPointerDown(event)) {
@@ -1060,7 +1152,12 @@ export const interactionMachine = setup({
             POINTER_MOVE: {
               guard: 'draggingThresholdPassed',
               target: 'active',
-              actions: ['markDraggingThresholdPassed', 'applyItemDragging', 'consumeDragFirstMove'],
+              actions: [
+                'markDraggingThresholdPassed',
+                'initRubberBandSessions',
+                'applyItemDragging',
+                'consumeDragFirstMove',
+              ],
             },
             POINTER_UP: {
               target: '#oneCanvasInteraction.idle',
@@ -1070,10 +1167,11 @@ export const interactionMachine = setup({
         active: {
           on: {
             POINTER_MOVE: {
-              actions: ['applyItemDragging', 'consumeDragFirstMove'],
+              actions: ['applyItemDragging', 'consumeDragFirstMove', 'updateRubberBandDrafts'],
             },
             POINTER_UP: {
               target: '#oneCanvasInteraction.idle',
+              actions: ['commitRubberBandDrafts'],
             },
           },
         },

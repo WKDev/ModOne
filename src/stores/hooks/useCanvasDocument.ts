@@ -73,10 +73,10 @@ export interface UseCanvasDocumentReturn {
   addComponent: (type: BlockType, position: Position, props?: Partial<Block>) => string;
   removeComponent: (id: string) => void;
   updateComponent: (id: string, updates: Partial<Block>) => void;
-  moveComponent: (id: string, position: Position, skipHistory?: boolean) => void;
+  moveComponent: (id: string, position: Position, skipHistory?: boolean, skipWireRecalc?: boolean) => void;
 
   // Junction operations
-  moveJunction: (id: string, position: Position, skipHistory?: boolean) => void;
+  moveJunction: (id: string, position: Position, skipHistory?: boolean, skipWireRecalc?: boolean) => void;
 
   // Wire operations
   addWire: (from: WireEndpoint, to: WireEndpoint, options?: { fromExitDirection?: PortPosition; toExitDirection?: PortPosition }) => string | null;
@@ -84,6 +84,7 @@ export interface UseCanvasDocumentReturn {
   createJunctionOnWire: (wireId: string, position: Position) => string | null;
   addWireHandle: (wireId: string, position: Position) => void;
   updateWireHandle: (wireId: string, handleIndex: number, position: Position) => void;
+  recalculateWireHandles: (wireId: string) => void;
   removeWireHandle: (wireId: string, handleIndex: number) => void;
   moveWireSegment: (wireId: string, handleIndexA: number, handleIndexB: number, delta: Position, isFirstMove?: boolean) => void;
   insertEndpointHandle: (wireId: string, end: 'from' | 'to', newHandles: Array<{position: Position, constraint: HandleConstraint}>) => void;
@@ -245,7 +246,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
   );
 
   const moveComponent = useCallback(
-    (id: string, position: Position, skipHistory?: boolean) => {
+    (id: string, position: Position, skipHistory?: boolean, skipWireRecalc?: boolean) => {
       if (!documentId || !data) return;
 
       const finalPosition = data.snapToGrid
@@ -260,16 +261,18 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         if (component) {
           docData.components.set(id, { ...component, position: finalPosition } as Block);
 
-          // Recalculate auto handles on connected wires and simplify handles
-          const connectedWires = getWiresConnectedToComponent(docData.wires, id);
-          for (const wire of connectedWires) {
-            const target = docData.wires.find((w) => w.id === wire.id);
-            if (target) {
-              target.handles = recalculateAutoHandles(target, docData.components, docData.junctions);
-              const geom = { components: docData.components, junctions: docData.junctions };
-              const simplified = simplifyWireHandles(target, geom);
-              if (simplified !== undefined) {
-                target.handles = simplified;
+          if (!skipWireRecalc) {
+            // Recalculate auto handles on connected wires and simplify handles
+            const connectedWires = getWiresConnectedToComponent(docData.wires, id);
+            for (const wire of connectedWires) {
+              const target = docData.wires.find((w) => w.id === wire.id);
+              if (target) {
+                target.handles = recalculateAutoHandles(target, docData.components, docData.junctions);
+                const geom = { components: docData.components, junctions: docData.junctions };
+                const simplified = simplifyWireHandles(target, geom);
+                if (simplified !== undefined) {
+                  target.handles = simplified;
+                }
               }
             }
           }
@@ -280,7 +283,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
   );
 
   const moveJunction = useCallback(
-    (id: string, position: Position, skipHistory?: boolean) => {
+    (id: string, position: Position, skipHistory?: boolean, skipWireRecalc?: boolean) => {
       if (!documentId || !data) return;
 
       const finalPosition = data.snapToGrid
@@ -295,16 +298,18 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         if (junction) {
           docData.junctions.set(id, { ...junction, position: finalPosition });
 
-          // Recalculate auto handles on connected wires and simplify handles
-          const connectedWires = getWiresConnectedToJunction(docData.wires, id);
-          for (const wire of connectedWires) {
-            const target = docData.wires.find((w) => w.id === wire.id);
-            if (target) {
-              target.handles = recalculateAutoHandles(target, docData.components, docData.junctions);
-              const geom = { components: docData.components, junctions: docData.junctions };
-              const simplified = simplifyWireHandles(target, geom);
-              if (simplified !== undefined) {
-                target.handles = simplified;
+          if (!skipWireRecalc) {
+            // Recalculate auto handles on connected wires and simplify handles
+            const connectedWires = getWiresConnectedToJunction(docData.wires, id);
+            for (const wire of connectedWires) {
+              const target = docData.wires.find((w) => w.id === wire.id);
+              if (target) {
+                target.handles = recalculateAutoHandles(target, docData.components, docData.junctions);
+                const geom = { components: docData.components, junctions: docData.junctions };
+                const simplified = simplifyWireHandles(target, geom);
+                if (simplified !== undefined) {
+                  target.handles = simplified;
+                }
               }
             }
           }
@@ -486,6 +491,25 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       });
     },
     [documentId, pushHistory, updateCanvasData]
+  );
+
+  const recalculateWireHandles = useCallback(
+    (wireId: string) => {
+      if (!documentId) return;
+
+      updateCanvasData(documentId, (docData) => {
+        const wire = docData.wires.find((w) => w.id === wireId);
+        if (!wire) return;
+
+        wire.handles = recalculateAutoHandles(wire, docData.components, docData.junctions);
+        const geom = { components: docData.components, junctions: docData.junctions };
+        const simplified = simplifyWireHandles(wire, geom, 'auto');
+        if (simplified !== undefined) {
+          wire.handles = simplified;
+        }
+      });
+    },
+    [documentId, updateCanvasData]
   );
 
   const removeWireHandle = useCallback(
@@ -735,6 +759,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       createJunctionOnWire,
       addWireHandle,
       updateWireHandle,
+      recalculateWireHandles,
       removeWireHandle,
       moveWireSegment,
       insertEndpointHandle,
@@ -775,6 +800,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
     createJunctionOnWire,
     addWireHandle,
     updateWireHandle,
+    recalculateWireHandles,
     removeWireHandle,
     moveWireSegment,
     insertEndpointHandle,

@@ -33,12 +33,15 @@ export function useCanvasAdapter(
     setPan: facade.setPan,
     setZoom: facade.setZoom,
 
-    moveComponent: facade.moveComponent,
-    moveJunction: facade.moveJunction,
+    moveComponent: (id, position, skipHistory, skipWireRecalc) =>
+      facade.moveComponent(id, position, skipHistory, skipWireRecalc),
+    moveJunction: (id, position, skipHistory, skipWireRecalc) =>
+      facade.moveJunction(id, position, skipHistory, skipWireRecalc),
     addWire: facade.addWire,
     createJunctionOnWire: facade.createJunctionOnWire,
     moveWireSegment: facade.moveWireSegment,
     updateWireHandle: facade.updateWireHandle,
+    recalculateWireHandles: facade.recalculateWireHandles,
     cleanupOverlappingHandles: facade.cleanupOverlappingHandles,
     commitWirePolyline: facade.commitWirePolyline,
 

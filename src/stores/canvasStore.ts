@@ -144,7 +144,7 @@ interface CanvasActions {
   /** Update a component's properties */
   updateComponent: (id: string, updates: Partial<Block>) => void;
   /** Move a component to a new position. Set skipHistory=true during continuous drag. */
-  moveComponent: (id: string, position: Position, skipHistory?: boolean) => void;
+  moveComponent: (id: string, position: Position, skipHistory?: boolean, skipWireRecalc?: boolean) => void;
   /** Rotate a component by specified degrees */
   rotateComponent: (id: string, degrees: number) => void;
   /** Rotate all selected components by specified degrees */
@@ -152,7 +152,7 @@ interface CanvasActions {
 
   // Junction operations
   /** Move a junction to a new position. Set skipHistory=true during continuous drag. */
-  moveJunction: (id: string, position: Position, skipHistory?: boolean) => void;
+  moveJunction: (id: string, position: Position, skipHistory?: boolean, skipWireRecalc?: boolean) => void;
 
   // Wire operations
   /** Add a wire connection between two ports */
@@ -175,6 +175,8 @@ interface CanvasActions {
   addWireHandle: (wireId: string, position: Position) => void;
   /** Update handle position (constrained). Set isFirstMove=true on drag start to record history. */
   updateWireHandle: (wireId: string, handleIndex: number, position: Position, isFirstMove?: boolean) => void;
+  /** Recalculate and simplify auto-routed handles for a single wire. */
+  recalculateWireHandles: (wireId: string) => void;
   /** Remove handle from wire */
   removeWireHandle: (wireId: string, handleIndex: number) => void;
   /** Move a wire segment (two adjacent handles) by delta. Set isFirstMove=true on drag start to record history. */
@@ -516,7 +518,7 @@ export const useCanvasStore = create<CanvasStore>()(
         );
       },
 
-      moveComponent: (id, position, skipHistory) => {
+      moveComponent: (id, position, skipHistory, skipWireRecalc) => {
         const state = get();
         const finalPosition = state.snapToGrid
           ? snapToGridPosition(position, state.gridSize)
@@ -533,16 +535,18 @@ export const useCanvasStore = create<CanvasStore>()(
 
             state.components.set(id, { ...component, position: finalPosition } as Block);
 
-            // Recalculate auto handles on connected wires and simplify handles
-            const connectedWires = getWiresConnectedToComponent(state.wires, id);
-            for (const wire of connectedWires) {
-              const target = state.wires.find((w) => w.id === wire.id);
-              if (target) {
-                target.handles = recalculateAutoHandles(target, state.components, state.junctions);
-                const geom = { components: state.components, junctions: state.junctions };
-                const simplified = simplifyWireHandles(target, geom);
-                if (simplified !== undefined) {
-                  target.handles = simplified;
+            if (!skipWireRecalc) {
+              // Recalculate auto handles on connected wires and simplify handles
+              const connectedWires = getWiresConnectedToComponent(state.wires, id);
+              for (const wire of connectedWires) {
+                const target = state.wires.find((w) => w.id === wire.id);
+                if (target) {
+                  target.handles = recalculateAutoHandles(target, state.components, state.junctions);
+                  const geom = { components: state.components, junctions: state.junctions };
+                  const simplified = simplifyWireHandles(target, geom);
+                  if (simplified !== undefined) {
+                    target.handles = simplified;
+                  }
                 }
               }
             }
@@ -663,7 +667,7 @@ export const useCanvasStore = create<CanvasStore>()(
          );
        },
 
-      moveJunction: (id, position, skipHistory) => {
+      moveJunction: (id, position, skipHistory, skipWireRecalc) => {
         const state = get();
         const finalPosition = state.snapToGrid
           ? snapToGridPosition(position, state.gridSize)
@@ -680,16 +684,18 @@ export const useCanvasStore = create<CanvasStore>()(
 
             state.junctions.set(id, { ...junction, position: finalPosition });
 
-            // Recalculate auto handles on connected wires and simplify handles
-            const connectedWires = getWiresConnectedToJunction(state.wires, id);
-            for (const wire of connectedWires) {
-              const target = state.wires.find((w) => w.id === wire.id);
-              if (target) {
-                target.handles = recalculateAutoHandles(target, state.components, state.junctions);
-                const geom = { components: state.components, junctions: state.junctions };
-                const simplified = simplifyWireHandles(target, geom);
-                if (simplified !== undefined) {
-                  target.handles = simplified;
+            if (!skipWireRecalc) {
+              // Recalculate auto handles on connected wires and simplify handles
+              const connectedWires = getWiresConnectedToJunction(state.wires, id);
+              for (const wire of connectedWires) {
+                const target = state.wires.find((w) => w.id === wire.id);
+                if (target) {
+                  target.handles = recalculateAutoHandles(target, state.components, state.junctions);
+                  const geom = { components: state.components, junctions: state.junctions };
+                  const simplified = simplifyWireHandles(target, geom);
+                  if (simplified !== undefined) {
+                    target.handles = simplified;
+                  }
                 }
               }
             }
@@ -984,6 +990,25 @@ export const useCanvasStore = create<CanvasStore>()(
           },
           false,
           `updateWireHandle/${wireId}/${handleIndex}`
+        );
+      },
+
+      recalculateWireHandles: (wireId) => {
+        set(
+          (state) => {
+            const wire = state.wires.find((w) => w.id === wireId);
+            if (!wire) return;
+
+            wire.handles = recalculateAutoHandles(wire, state.components, state.junctions);
+            const geom = { components: state.components, junctions: state.junctions };
+            const simplified = simplifyWireHandles(wire, geom, 'auto');
+            if (simplified !== undefined) {
+              wire.handles = simplified;
+            }
+            state.isDirty = true;
+          },
+          false,
+          `recalculateWireHandles/${wireId}`
         );
       },
 

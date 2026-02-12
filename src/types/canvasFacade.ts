@@ -72,7 +72,7 @@ export interface CanvasFacadeReturn {
   /** Add a new component to the canvas */
   addComponent: (type: BlockType, position: Position, props?: Partial<Block>) => string;
   /** Move a component. skipHistory=true during continuous drag. */
-  moveComponent: (id: string, position: Position, skipHistory?: boolean) => void;
+  moveComponent: (id: string, position: Position, skipHistory?: boolean, skipWireRecalc?: boolean) => void;
   /** Update a component's properties */
   updateComponent: (id: string, updates: Partial<Block>) => void;
 
@@ -81,7 +81,7 @@ export interface CanvasFacadeReturn {
   // --------------------------------------------------------------------------
 
   /** Move a junction. skipHistory=true during continuous drag. */
-  moveJunction: (id: string, position: Position, skipHistory?: boolean) => void;
+  moveJunction: (id: string, position: Position, skipHistory?: boolean, skipWireRecalc?: boolean) => void;
 
   // --------------------------------------------------------------------------
   // Wire Commands
@@ -99,6 +99,8 @@ export interface CanvasFacadeReturn {
   createJunctionOnWire: (wireId: string, position: Position) => string | null;
   /** Update handle position (constrained). isFirstMove pushes history for undo. */
   updateWireHandle: (wireId: string, handleIndex: number, position: Position, isFirstMove?: boolean) => void;
+  /** Recalculate and simplify auto-routed handles for a single wire. */
+  recalculateWireHandles: (wireId: string) => void;
   /** Remove handle from wire */
   removeWireHandle: (wireId: string, handleIndex: number) => void;
   /** Move a wire segment by delta */
