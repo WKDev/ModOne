@@ -27,7 +27,11 @@ class CommandRegistry {
   /** Cached snapshot of all commands (for useSyncExternalStore) */
   private cachedAllCommands: Command[] | null = null;
 
-  /** @deprecated Recent command caches removed — when() filters are dynamic */
+  /** Cached snapshot of recent commands (invalidated on notifySubscribers) */
+  private cachedRecentCommands: Command[] | null = null;
+
+  /** Cached sliced recent commands by limit (for useSyncExternalStore) */
+  private cachedRecentByLimit: Map<number, Command[]> = new Map();
 
   /**
    * Register a command with the registry.
@@ -244,14 +248,32 @@ class CommandRegistry {
    * @returns Array of recent commands (most recent first)
    */
   getRecent(limit = 5): Command[] {
-    // Always re-evaluate when() filters since they are dynamic functions
-    // whose results can change without any registry mutation.
-    const resolved = this.recentCommands
-      .slice(0, this.MAX_RECENT)
-      .map((id) => this.commands.get(id))
-      .filter((cmd): cmd is Command => cmd !== undefined && (!cmd.when || cmd.when()));
+    // Return cached slice if available (referential stability for useSyncExternalStore)
+    const cachedSlice = this.cachedRecentByLimit.get(limit);
+    if (cachedSlice !== undefined) {
+      return cachedSlice;
+    }
 
-    return resolved.slice(0, limit);
+    // Build base cache if needed (invalidated by notifySubscribers)
+    if (this.cachedRecentCommands === null) {
+      this.cachedRecentCommands = this.recentCommands
+        .slice(0, this.MAX_RECENT)
+        .map((id) => this.commands.get(id))
+        .filter((cmd): cmd is Command => cmd !== undefined && (!cmd.when || cmd.when()));
+    }
+
+    // Cache and return the sliced version
+    const sliced = this.cachedRecentCommands.slice(0, limit);
+    this.cachedRecentByLimit.set(limit, sliced);
+    return sliced;
+  }
+
+  /**
+   * Invalidate recent command caches and notify subscribers.
+   * Call when external conditions (e.g. when() results) may have changed.
+   */
+  invalidateRecent(): void {
+    this.notifySubscribers();
   }
 
   /**
@@ -281,6 +303,8 @@ class CommandRegistry {
   private notifySubscribers(): void {
     // Invalidate caches when data changes
     this.cachedAllCommands = null;
+    this.cachedRecentCommands = null;
+    this.cachedRecentByLimit.clear();
     this.subscribers.forEach((callback) => callback());
   }
 
@@ -307,6 +331,8 @@ class CommandRegistry {
     this.commands.clear();
     this.recentCommands = [];
     this.cachedAllCommands = null;
+    this.cachedRecentCommands = null;
+    this.cachedRecentByLimit.clear();
     this.notifySubscribers();
   }
 }

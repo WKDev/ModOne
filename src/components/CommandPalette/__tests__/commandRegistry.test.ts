@@ -253,6 +253,7 @@ describe('CommandRegistry', () => {
       expect(commandRegistry.getRecent()).toHaveLength(1);
 
       enabled = false;
+      commandRegistry.invalidateRecent();
       expect(commandRegistry.getRecent()).toHaveLength(0);
     });
 
