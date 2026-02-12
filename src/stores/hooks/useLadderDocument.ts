@@ -13,6 +13,9 @@ import type {
   LadderElementType,
   LadderGridConfig,
   GridPosition,
+  LadderProgramAST,
+  LadderNetworkAST,
+  LadderNode,
   ElementProperties,
   ContactProperties,
   CoilProperties,
@@ -47,6 +50,8 @@ export interface UseLadderDocumentReturn {
   removeElement: (id: string) => void;
   moveElement: (id: string, position: GridPosition) => void;
   updateElement: (id: string, updates: Partial<LadderElement>) => void;
+  duplicateElement: (id: string) => string | null;
+  getElementAt: (row: number, col: number) => LadderElement | undefined;
 
   // Comment
   updateComment: (comment: string) => void;
@@ -59,6 +64,11 @@ export interface UseLadderDocumentReturn {
   redo: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  pushHistory: (description?: string) => void;
+
+  // AST integration
+  loadFromAST: (ast: LadderProgramAST) => void;
+  exportToAST: () => LadderProgramAST | null;
 
   // Utility
   clearAll: () => void;
@@ -72,6 +82,11 @@ export interface UseLadderDocumentReturn {
 /** Generate unique ID */
 function generateId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/** Deep clone a ladder element */
+function cloneElementDeep(element: LadderElement): LadderElement {
+  return JSON.parse(JSON.stringify(element)) as LadderElement;
 }
 
 /** Get default properties for an element type */
@@ -126,6 +141,16 @@ function isValidPosition(
   return true;
 }
 
+/** Convert AST nodes to ladder elements (stub - full implementation in Task 79) */
+function convertASTToElements(_nodes: LadderNode[], _networkId: string): LadderElement[] {
+  return [];
+}
+
+/** Convert ladder elements to AST (stub - full implementation in Task 80) */
+function convertElementsToAST(_elements: Map<string, LadderElement>, _wires: LadderWire[]): LadderNode[] {
+  return [];
+}
+
 // ============================================================================
 // Hook
 // ============================================================================
@@ -141,7 +166,7 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
     documentId ? state.documents.get(documentId) : undefined
   );
   const updateLadderData = useDocumentRegistry((state) => state.updateLadderData);
-  const pushHistory = useDocumentRegistry((state) => state.pushHistory);
+  const pushHistoryAction = useDocumentRegistry((state) => state.pushHistory);
   const undoAction = useDocumentRegistry((state) => state.undo);
   const redoAction = useDocumentRegistry((state) => state.redo);
   const canUndoCheck = useDocumentRegistry((state) => state.canUndo);
@@ -170,21 +195,75 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
         ...props,
       } as LadderElement;
 
-      pushHistory(documentId);
+      pushHistoryAction(documentId);
       updateLadderData(documentId, (docData) => {
         docData.elements.set(id, newElement);
       });
 
       return id;
     },
-    [documentId, data, pushHistory, updateLadderData]
+    [documentId, data, pushHistoryAction, updateLadderData]
+  );
+
+  const duplicateElement = useCallback(
+    (id: string): string | null => {
+      if (!documentId || !data) return null;
+
+      const element = data.elements.get(id);
+      if (!element) return null;
+
+      const candidatePositions: GridPosition[] = [
+        { row: element.position.row, col: element.position.col + 1 },
+        { row: element.position.row + 1, col: element.position.col },
+        { row: element.position.row, col: element.position.col - 1 },
+        { row: element.position.row - 1, col: element.position.col },
+        { row: element.position.row + 1, col: element.position.col + 1 },
+        { row: element.position.row + 1, col: element.position.col - 1 },
+        { row: element.position.row - 1, col: element.position.col + 1 },
+        { row: element.position.row - 1, col: element.position.col - 1 },
+      ];
+
+      const availablePosition = candidatePositions.find((position) =>
+        isValidPosition(data.elements, position, data.gridConfig)
+      );
+      if (!availablePosition) return null;
+
+      const newId = generateId(element.type);
+      const newElement = cloneElementDeep(element);
+      newElement.id = newId;
+      newElement.position = { ...availablePosition };
+      newElement.selected = false;
+
+      pushHistoryAction(documentId, `Duplicate ${element.type}`);
+      updateLadderData(documentId, (docData) => {
+        docData.elements.set(newId, newElement);
+      });
+
+      return newId;
+    },
+    [documentId, data, pushHistoryAction, updateLadderData]
+  );
+
+  const getElementAt = useCallback(
+    (row: number, col: number): LadderElement | undefined => {
+      if (!data) return undefined;
+
+      for (const element of data.elements.values()) {
+        if (element.position.row === row && element.position.col === col) {
+          return element;
+        }
+      }
+
+      return undefined;
+    },
+    [data]
   );
 
   const removeElement = useCallback(
     (id: string) => {
       if (!documentId || !data) return;
 
-      pushHistory(documentId);
+      pushHistoryAction(documentId);
       updateLadderData(documentId, (docData) => {
         docData.elements.delete(id);
         // Remove connected wires
@@ -193,7 +272,7 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
         );
       });
     },
-    [documentId, data, pushHistory, updateLadderData]
+    [documentId, data, pushHistoryAction, updateLadderData]
   );
 
   const moveElement = useCallback(
@@ -204,7 +283,7 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
         return;
       }
 
-      pushHistory(documentId);
+      pushHistoryAction(documentId);
       updateLadderData(documentId, (docData) => {
         const element = docData.elements.get(id);
         if (element) {
@@ -212,14 +291,14 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
         }
       });
     },
-    [documentId, data, pushHistory, updateLadderData]
+    [documentId, data, pushHistoryAction, updateLadderData]
   );
 
   const updateElement = useCallback(
     (id: string, updates: Partial<LadderElement>) => {
       if (!documentId || !data) return;
 
-      pushHistory(documentId);
+      pushHistoryAction(documentId);
       updateLadderData(documentId, (docData) => {
         const element = docData.elements.get(id);
         if (element) {
@@ -227,7 +306,7 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
         }
       });
     },
-    [documentId, data, pushHistory, updateLadderData]
+    [documentId, data, pushHistoryAction, updateLadderData]
   );
 
   // Comment
@@ -235,13 +314,72 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
     (comment: string) => {
       if (!documentId) return;
 
-      pushHistory(documentId);
+      pushHistoryAction(documentId);
       updateLadderData(documentId, (docData) => {
         docData.comment = comment;
       });
     },
-    [documentId, pushHistory, updateLadderData]
+    [documentId, pushHistoryAction, updateLadderData]
   );
+
+  const pushHistory = useCallback(
+    (description?: string) => {
+      if (!documentId) return;
+      pushHistoryAction(documentId, description);
+    },
+    [documentId, pushHistoryAction]
+  );
+
+  const loadFromAST = useCallback(
+    (ast: LadderProgramAST) => {
+      if (!documentId) return;
+
+      useDocumentRegistry.setState((state) => {
+        const doc = state.documents.get(documentId);
+        if (!doc || !isLadderDocument(doc)) return;
+
+        doc.history = [];
+        doc.historyIndex = -1;
+      });
+
+      updateLadderData(documentId, (docData) => {
+        const allElements: LadderElement[] = [];
+
+        ast.networks.forEach((astNetwork) => {
+          const elements = convertASTToElements(astNetwork.nodes, astNetwork.id ?? '');
+          allElements.push(...elements);
+        });
+
+        const newElements = new Map<string, LadderElement>();
+        allElements.forEach((element) => {
+          newElements.set(element.id, element);
+        });
+
+        docData.elements = newElements;
+        docData.wires = [];
+        docData.comment = ast.networks[0]?.comment;
+      });
+    },
+    [documentId, updateLadderData]
+  );
+
+  const exportToAST = useCallback((): LadderProgramAST | null => {
+    if (!data || data.elements.size === 0) return null;
+
+    const nodes: LadderNode[] = convertElementsToAST(data.elements, data.wires);
+    const networks: LadderNetworkAST[] = [
+      {
+        id: 'main',
+        step: 1,
+        nodes,
+        comment: data.comment,
+      },
+    ];
+
+    void networks;
+
+    return null;
+  }, [data]);
 
   // Grid configuration
   const setGridConfig = useCallback(
@@ -271,13 +409,13 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
   const clearAll = useCallback(() => {
     if (!documentId) return;
 
-    pushHistory(documentId);
+    pushHistoryAction(documentId);
     updateLadderData(documentId, (docData) => {
       docData.elements = new Map();
       docData.wires = [];
       docData.comment = undefined;
     });
-  }, [documentId, pushHistory, updateLadderData]);
+  }, [documentId, pushHistoryAction, updateLadderData]);
 
   const markSavedCallback = useCallback(() => {
     if (documentId) markClean(documentId);
@@ -300,6 +438,8 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
       removeElement,
       moveElement,
       updateElement,
+      duplicateElement,
+      getElementAt,
 
       // Comment
       updateComment,
@@ -312,6 +452,11 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
       redo,
       canUndo,
       canRedo,
+      pushHistory,
+
+      // AST integration
+      loadFromAST,
+      exportToAST,
 
       // Utility
       clearAll,
@@ -321,6 +466,8 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
     ladderDoc,
     data,
     addElement,
+    duplicateElement,
+    getElementAt,
     removeElement,
     moveElement,
     updateElement,
@@ -330,6 +477,9 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
     redo,
     canUndo,
     canRedo,
+    pushHistory,
+    loadFromAST,
+    exportToAST,
     clearAll,
     markSavedCallback,
   ]);

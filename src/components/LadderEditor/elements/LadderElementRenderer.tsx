@@ -80,9 +80,48 @@ const COUNTER_TYPE_MAP: Record<string, CounterType> = {
 const WIRE_TYPE_MAP: Record<string, WireComponentType> = {
   wire_h: 'horizontal',
   wire_v: 'vertical',
-  wire_corner: 'corner_tl', // Default corner, should be specified more precisely
-  wire_junction: 'junction_t', // Default junction, should be specified more precisely
 };
+
+/** Valid corner wire subtypes */
+const VALID_CORNER_TYPES = new Set<WireComponentType>([
+  'corner_tl', 'corner_tr', 'corner_bl', 'corner_br',
+]);
+
+/** Valid junction wire subtypes */
+const VALID_JUNCTION_TYPES = new Set<WireComponentType>([
+  'junction_t', 'junction_b', 'junction_l', 'junction_r',
+]);
+
+/**
+ * Resolve the concrete wire component type from element type and properties.
+ * For corner/junction wires, reads the `direction` property to determine
+ * the specific variant. Falls back to reasonable defaults.
+ */
+function resolveWireType(elementType: string, properties: Record<string, unknown>): WireComponentType | undefined {
+  // Direct mapping for horizontal/vertical
+  const directType = WIRE_TYPE_MAP[elementType];
+  if (directType) return directType;
+
+  // Corner wires: read direction from properties
+  if (elementType === 'wire_corner') {
+    const direction = properties?.direction as WireComponentType | undefined;
+    if (direction && VALID_CORNER_TYPES.has(direction)) {
+      return direction;
+    }
+    return 'corner_tl'; // Default fallback
+  }
+
+  // Junction wires: read direction from properties
+  if (elementType === 'wire_junction') {
+    const direction = properties?.direction as WireComponentType | undefined;
+    if (direction && VALID_JUNCTION_TYPES.has(direction)) {
+      return direction;
+    }
+    return 'junction_t'; // Default fallback
+  }
+
+  return undefined;
+}
 
 /** Map from element type to comparison type */
 const COMPARISON_TYPE_MAP: Record<string, ComparisonType> = {
@@ -179,7 +218,7 @@ export function LadderElementRenderer({
 
   // Wire elements
   if (type.startsWith('wire_')) {
-    const wireType = WIRE_TYPE_MAP[type];
+    const wireType = resolveWireType(type, (element.properties ?? {}) as Record<string, unknown>);
     if (!wireType) {
       // Unknown wire type - render as horizontal
       return (

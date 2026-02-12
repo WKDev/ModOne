@@ -6,20 +6,38 @@
 
 import { Undo2, Redo2, Scissors, Copy, Clipboard, CheckSquare } from 'lucide-react';
 import { commandRegistry } from '../commandRegistry';
-import {
-  useLadderStore,
-  selectCanUndo,
-  selectCanRedo,
-  selectUndoDescription,
-  selectRedoDescription,
-} from '../../../stores/ladderStore';
+import { useDocumentRegistry } from '../../../stores/documentRegistry';
+import { useEditorAreaStore } from '../../../stores/editorAreaStore';
+import { isLadderDocument } from '../../../types/document';
 import type { Command } from '../types';
+
+function getActiveLadderDocumentId(): string | null {
+  const { tabs, activeTabId } = useEditorAreaStore.getState();
+  const activeTab = tabs.find((tab) => tab.id === activeTabId);
+  const documentId = activeTab?.data?.documentId;
+  if (typeof documentId !== 'string') {
+    return null;
+  }
+
+  const document = useDocumentRegistry.getState().getDocument(documentId);
+  return document && isLadderDocument(document) ? documentId : null;
+}
 
 /**
  * Get the current undo description for display.
  */
 function getUndoLabel(): string {
-  const desc = selectUndoDescription(useLadderStore.getState());
+  const documentId = getActiveLadderDocumentId();
+  if (!documentId) {
+    return 'Undo';
+  }
+
+  const document = useDocumentRegistry.getState().getDocument(documentId);
+  if (!document || !isLadderDocument(document)) {
+    return 'Undo';
+  }
+
+  const desc = document.history[document.historyIndex]?.description;
   return desc ? `Undo '${desc}'` : 'Undo';
 }
 
@@ -27,7 +45,21 @@ function getUndoLabel(): string {
  * Get the current redo description for display.
  */
 function getRedoLabel(): string {
-  const desc = selectRedoDescription(useLadderStore.getState());
+  const documentId = getActiveLadderDocumentId();
+  if (!documentId) {
+    return 'Redo';
+  }
+
+  const document = useDocumentRegistry.getState().getDocument(documentId);
+  if (!document || !isLadderDocument(document)) {
+    return 'Redo';
+  }
+
+  const nextHistoryIndex = document.historyIndex + 2;
+  const desc =
+    nextHistoryIndex < document.history.length
+      ? document.history[nextHistoryIndex]?.description
+      : undefined;
   return desc ? `Redo '${desc}'` : 'Redo';
 }
 
@@ -45,9 +77,15 @@ export function registerEditCommands(): void {
       icon: <Undo2 size={16} />,
       shortcut: 'Ctrl+Z',
       keywords: ['undo', 'revert', 'back'],
-      when: () => selectCanUndo(useLadderStore.getState()),
+      when: () => {
+        const documentId = getActiveLadderDocumentId();
+        return documentId ? useDocumentRegistry.getState().canUndo(documentId) : false;
+      },
       execute: () => {
-        useLadderStore.getState().undo();
+        const documentId = getActiveLadderDocumentId();
+        if (documentId) {
+          useDocumentRegistry.getState().undo(documentId);
+        }
       },
     },
     {
@@ -59,9 +97,15 @@ export function registerEditCommands(): void {
       icon: <Redo2 size={16} />,
       shortcut: 'Ctrl+Y',
       keywords: ['redo', 'forward'],
-      when: () => selectCanRedo(useLadderStore.getState()),
+      when: () => {
+        const documentId = getActiveLadderDocumentId();
+        return documentId ? useDocumentRegistry.getState().canRedo(documentId) : false;
+      },
       execute: () => {
-        useLadderStore.getState().redo();
+        const documentId = getActiveLadderDocumentId();
+        if (documentId) {
+          useDocumentRegistry.getState().redo(documentId);
+        }
       },
     },
     {

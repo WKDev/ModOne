@@ -5,8 +5,39 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { LadderPropertiesPanel } from '../LadderPropertiesPanel';
-import { useLadderStore } from '../../../../stores/ladderStore';
+import { useLadderDocument } from '../../../../stores/hooks/useLadderDocument';
+import { useLadderUIStore } from '../../../../stores/ladderUIStore';
 import type { ContactElement, CoilElement, TimerElement, CounterElement, LadderElement } from '../../../../types/ladder';
+
+const { mockUIState, mockLadderDoc } = vi.hoisted(() => ({
+  mockUIState: {
+    selectedElementIds: new Set<string>(),
+    mode: 'edit' as 'edit' | 'monitor',
+  },
+  mockLadderDoc: {
+    elements: new Map<string, LadderElement>(),
+    updateElement: vi.fn(),
+  },
+}));
+
+vi.mock('../../../../contexts/DocumentContext', () => ({
+  useDocumentContext: vi.fn(() => ({
+    documentId: 'test-doc',
+    documentType: 'ladder',
+    tabId: 'test-tab',
+  })),
+}));
+
+vi.mock('../../../../stores/hooks/useLadderDocument', () => ({
+  useLadderDocument: vi.fn(() => mockLadderDoc),
+}));
+
+vi.mock('../../../../stores/ladderUIStore', () => ({
+  useLadderUIStore: vi.fn(
+    (selector: (state: { selectedElementIds: Set<string>; mode: 'edit' | 'monitor' }) => unknown) =>
+      selector(mockUIState)
+  ),
+}));
 
 // Sample elements for testing
 const mockContactElement: ContactElement = {
@@ -58,11 +89,20 @@ function createMockElements(): Map<string, LadderElement> {
 }
 
 describe('LadderPropertiesPanel', () => {
+  function setSelection(ids: string[], mode: 'edit' | 'monitor' = 'edit') {
+    mockUIState.selectedElementIds = new Set(ids);
+    mockUIState.mode = mode;
+  }
+
   beforeEach(() => {
-    // Reset store to initial state
-    act(() => {
-      useLadderStore.getState().reset();
-    });
+    mockLadderDoc.elements = createMockElements();
+    mockLadderDoc.updateElement = vi.fn();
+    setSelection([], 'edit');
+    vi.mocked(useLadderDocument).mockReturnValue(mockLadderDoc);
+    vi.mocked(useLadderUIStore).mockImplementation(
+      (selector: (state: { selectedElementIds: Set<string>; mode: 'edit' | 'monitor' }) => unknown) =>
+        selector(mockUIState)
+    );
   });
 
   afterEach(() => {
@@ -72,13 +112,7 @@ describe('LadderPropertiesPanel', () => {
 
   describe('Empty State', () => {
     it('should show empty state when no elements are selected', () => {
-      act(() => {
-        useLadderStore.setState({
-          elements: createMockElements(),
-          selectedElementIds: new Set(),
-          mode: 'edit',
-        });
-      });
+      setSelection([], 'edit');
 
       render(<LadderPropertiesPanel />);
 
@@ -88,13 +122,7 @@ describe('LadderPropertiesPanel', () => {
 
   describe('Single Element Selection', () => {
     it('should show contact properties for selected contact', () => {
-      act(() => {
-        useLadderStore.setState({
-          elements: createMockElements(),
-          selectedElementIds: new Set([mockContactElement.id]),
-          mode: 'edit',
-        });
-      });
+      setSelection([mockContactElement.id], 'edit');
 
       render(<LadderPropertiesPanel />);
 
@@ -104,13 +132,7 @@ describe('LadderPropertiesPanel', () => {
     });
 
     it('should show coil properties for selected coil', () => {
-      act(() => {
-        useLadderStore.setState({
-          elements: createMockElements(),
-          selectedElementIds: new Set([mockCoilElement.id]),
-          mode: 'edit',
-        });
-      });
+      setSelection([mockCoilElement.id], 'edit');
 
       render(<LadderPropertiesPanel />);
 
@@ -120,13 +142,7 @@ describe('LadderPropertiesPanel', () => {
     });
 
     it('should show timer properties for selected timer', () => {
-      act(() => {
-        useLadderStore.setState({
-          elements: createMockElements(),
-          selectedElementIds: new Set([mockTimerElement.id]),
-          mode: 'edit',
-        });
-      });
+      setSelection([mockTimerElement.id], 'edit');
 
       render(<LadderPropertiesPanel />);
 
@@ -136,13 +152,7 @@ describe('LadderPropertiesPanel', () => {
     });
 
     it('should show counter properties for selected counter', () => {
-      act(() => {
-        useLadderStore.setState({
-          elements: createMockElements(),
-          selectedElementIds: new Set([mockCounterElement.id]),
-          mode: 'edit',
-        });
-      });
+      setSelection([mockCounterElement.id], 'edit');
 
       render(<LadderPropertiesPanel />);
 
@@ -152,13 +162,7 @@ describe('LadderPropertiesPanel', () => {
     });
 
     it('should show element address in header', () => {
-      act(() => {
-        useLadderStore.setState({
-          elements: createMockElements(),
-          selectedElementIds: new Set([mockContactElement.id]),
-          mode: 'edit',
-        });
-      });
+      setSelection([mockContactElement.id], 'edit');
 
       render(<LadderPropertiesPanel />);
 
@@ -169,13 +173,7 @@ describe('LadderPropertiesPanel', () => {
 
   describe('Multi-Select', () => {
     it('should show multi-select view when multiple elements selected', () => {
-      act(() => {
-        useLadderStore.setState({
-          elements: createMockElements(),
-          selectedElementIds: new Set([mockContactElement.id, mockCoilElement.id]),
-          mode: 'edit',
-        });
-      });
+      setSelection([mockContactElement.id, mockCoilElement.id], 'edit');
 
       render(<LadderPropertiesPanel />);
 
@@ -184,13 +182,7 @@ describe('LadderPropertiesPanel', () => {
     });
 
     it('should show type counts in multi-select view', () => {
-      act(() => {
-        useLadderStore.setState({
-          elements: createMockElements(),
-          selectedElementIds: new Set([mockContactElement.id, mockTimerElement.id]),
-          mode: 'edit',
-        });
-      });
+      setSelection([mockContactElement.id, mockTimerElement.id], 'edit');
 
       render(<LadderPropertiesPanel />);
 
@@ -201,13 +193,7 @@ describe('LadderPropertiesPanel', () => {
 
   describe('Monitor Mode', () => {
     it('should show read-only message in monitor mode', () => {
-      act(() => {
-        useLadderStore.setState({
-          elements: createMockElements(),
-          selectedElementIds: new Set([mockContactElement.id]),
-          mode: 'monitor',
-        });
-      });
+      setSelection([mockContactElement.id], 'monitor');
 
       render(<LadderPropertiesPanel />);
 
@@ -215,13 +201,7 @@ describe('LadderPropertiesPanel', () => {
     });
 
     it('should disable inputs in monitor mode', () => {
-      act(() => {
-        useLadderStore.setState({
-          elements: createMockElements(),
-          selectedElementIds: new Set([mockContactElement.id]),
-          mode: 'monitor',
-        });
-      });
+      setSelection([mockContactElement.id], 'monitor');
 
       render(<LadderPropertiesPanel />);
 
@@ -241,15 +221,8 @@ describe('LadderPropertiesPanel', () => {
 
     it('should update element when address changes', async () => {
       const updateElementSpy = vi.fn();
-
-      act(() => {
-        useLadderStore.setState({
-          elements: createMockElements(),
-          selectedElementIds: new Set([mockContactElement.id]),
-          mode: 'edit',
-        });
-        vi.spyOn(useLadderStore.getState(), 'updateElement').mockImplementation(updateElementSpy);
-      });
+      mockLadderDoc.updateElement = updateElementSpy;
+      setSelection([mockContactElement.id], 'edit');
 
       render(<LadderPropertiesPanel />);
 
@@ -267,15 +240,8 @@ describe('LadderPropertiesPanel', () => {
 
     it('should update element when type changes', () => {
       const updateElementSpy = vi.fn();
-
-      act(() => {
-        useLadderStore.setState({
-          elements: createMockElements(),
-          selectedElementIds: new Set([mockContactElement.id]),
-          mode: 'edit',
-        });
-        vi.spyOn(useLadderStore.getState(), 'updateElement').mockImplementation(updateElementSpy);
-      });
+      mockLadderDoc.updateElement = updateElementSpy;
+      setSelection([mockContactElement.id], 'edit');
 
       render(<LadderPropertiesPanel />);
 
@@ -289,15 +255,8 @@ describe('LadderPropertiesPanel', () => {
 
     it('should update element when label changes', async () => {
       const updateElementSpy = vi.fn();
-
-      act(() => {
-        useLadderStore.setState({
-          elements: createMockElements(),
-          selectedElementIds: new Set([mockContactElement.id]),
-          mode: 'edit',
-        });
-        vi.spyOn(useLadderStore.getState(), 'updateElement').mockImplementation(updateElementSpy);
-      });
+      mockLadderDoc.updateElement = updateElementSpy;
+      setSelection([mockContactElement.id], 'edit');
 
       render(<LadderPropertiesPanel />);
 

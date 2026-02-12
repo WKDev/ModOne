@@ -6,9 +6,10 @@
  */
 
 import { useCallback, useMemo, useState } from 'react';
-import { useShallow } from 'zustand/react/shallow';
 import { cn } from '../../../lib/utils';
-import { useLadderStore, selectElements } from '../../../stores/ladderStore';
+import { useDocumentContext } from '../../../contexts/DocumentContext';
+import { useLadderDocument } from '../../../stores/hooks/useLadderDocument';
+import { useLadderUIStore } from '../../../stores/ladderUIStore';
 import {
   isContactElement,
   isCoilElement,
@@ -193,21 +194,20 @@ function SingleElementProperties({
  * LadderPropertiesPanel - Main properties panel component
  */
 export function LadderPropertiesPanel({ className }: LadderPropertiesPanelProps) {
-  // Use shallow comparison for stable selection
-  const { selectedElementIds, elements, mode, updateElement } = useLadderStore(
-    useShallow((state) => ({
-      selectedElementIds: state.selectedElementIds,
-      elements: selectElements(state),
-      mode: state.mode,
-      updateElement: state.updateElement,
-    }))
-  );
+  const { documentId } = useDocumentContext();
+  const ladderDoc = useLadderDocument(documentId);
+  const selectedElementIds = useLadderUIStore((state) => state.selectedElementIds);
+  const mode = useLadderUIStore((state) => state.mode);
+  const elements = ladderDoc?.elements;
+  const updateElement = ladderDoc?.updateElement;
 
   // Device select dialog state
   const [isDeviceDialogOpen, setIsDeviceDialogOpen] = useState(false);
 
   // Compute selected elements from IDs
   const selectedElements = useMemo(() => {
+    if (!elements) return [];
+
     const result: LadderElement[] = [];
     selectedElementIds.forEach((id) => {
       const element = elements.get(id);
@@ -220,7 +220,7 @@ export function LadderPropertiesPanel({ className }: LadderPropertiesPanelProps)
 
   const handleUpdate = useCallback(
     (updates: Partial<LadderElement>) => {
-      if (selectedElements.length === 1) {
+      if (selectedElements.length === 1 && updateElement) {
         updateElement(selectedElements[0].id, updates);
       }
     },
@@ -235,7 +235,7 @@ export function LadderPropertiesPanel({ className }: LadderPropertiesPanelProps)
   // Handle device selection from dialog
   const handleDeviceSelect = useCallback(
     (address: string) => {
-      if (selectedElements.length === 1) {
+      if (selectedElements.length === 1 && updateElement) {
         updateElement(selectedElements[0].id, { address });
       }
     },
@@ -244,6 +244,10 @@ export function LadderPropertiesPanel({ className }: LadderPropertiesPanelProps)
 
   // Determine what to render based on selection state
   const content = useMemo(() => {
+    if (!ladderDoc) {
+      return <EmptyState message="No active ladder document" />;
+    }
+
     if (selectedElements.length === 0) {
       return <EmptyState message="Select an element to view properties" />;
     }
@@ -286,7 +290,7 @@ export function LadderPropertiesPanel({ className }: LadderPropertiesPanelProps)
         )}
       </div>
     );
-  }, [selectedElements, handleUpdate, isMonitorMode]);
+  }, [ladderDoc, selectedElements, handleUpdate, isMonitorMode]);
 
   return (
     <div

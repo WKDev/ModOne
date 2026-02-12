@@ -146,7 +146,7 @@ interface DocumentRegistryActions {
 
   // History operations
   /** Push current state to history */
-  pushHistory: (documentId: string) => void;
+  pushHistory: (documentId: string, description?: string) => void;
   /** Undo last action */
   undo: (documentId: string) => void;
   /** Redo last undone action */
@@ -694,7 +694,7 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
       // History Operations
       // ========================================================================
 
-      pushHistory: (documentId) => {
+      pushHistory: (documentId, description) => {
         set(
           (state) => {
             const doc = state.documents.get(documentId);
@@ -706,6 +706,7 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
               snapshot = {
                 timestamp: Date.now(),
                 data: createCanvasHistorySnapshot(doc.data),
+                description,
               };
               // Clear redo history
               doc.history = doc.history.slice(0, doc.historyIndex + 1);
@@ -720,6 +721,7 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
               snapshot = {
                 timestamp: Date.now(),
                 data: createLadderHistorySnapshot(doc.data),
+                description,
               };
               doc.history = doc.history.slice(0, doc.historyIndex + 1);
               doc.history.push(snapshot as HistorySnapshot<LadderHistoryData>);
@@ -732,6 +734,7 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
               snapshot = {
                 timestamp: Date.now(),
                 data: createScenarioHistorySnapshot(doc.data.scenario),
+                description,
               };
               doc.history = doc.history.slice(0, doc.historyIndex + 1);
               doc.history.push(snapshot as HistorySnapshot<ScenarioHistoryData>);
@@ -746,6 +749,7 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
                 data: {
                   snapshot: JSON.stringify(doc.data.schematic),
                 } as SchematicHistoryData,
+                description,
               };
               doc.history = doc.history.slice(0, doc.historyIndex + 1);
               doc.history.push(snapshot as HistorySnapshot<SchematicHistoryData>);
@@ -842,7 +846,7 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
             if (!doc) return;
 
             if (isCanvasDocument(doc)) {
-              if (doc.historyIndex >= doc.history.length - 1) return;
+              if (doc.historyIndex + 2 >= doc.history.length) return;
 
               doc.historyIndex++;
               const snapshot = doc.history[doc.historyIndex + 1];
@@ -854,7 +858,7 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
                 doc.isDirty = true;
               }
             } else if (isLadderDocument(doc)) {
-              if (doc.historyIndex >= doc.history.length - 1) return;
+              if (doc.historyIndex + 2 >= doc.history.length) return;
 
               doc.historyIndex++;
               const snapshot = doc.history[doc.historyIndex + 1];
@@ -866,7 +870,7 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
                 doc.isDirty = true;
               }
             } else if (isScenarioDocument(doc)) {
-              if (doc.historyIndex >= doc.history.length - 1) return;
+              if (doc.historyIndex + 2 >= doc.history.length) return;
 
               doc.historyIndex++;
               const snapshot = doc.history[doc.historyIndex + 1];
@@ -875,7 +879,7 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
                 doc.isDirty = true;
               }
             } else if (isSchematicDocument(doc)) {
-              if (doc.historyIndex >= doc.history.length - 1) return;
+              if (doc.historyIndex + 2 >= doc.history.length) return;
 
               doc.historyIndex++;
               const snapshot = doc.history[doc.historyIndex + 1];
@@ -900,7 +904,7 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
         if (!doc) return false;
 
         if (isCanvasDocument(doc) || isLadderDocument(doc) || isScenarioDocument(doc) || isSchematicDocument(doc)) {
-          return doc.historyIndex < doc.history.length - 1;
+          return doc.historyIndex + 2 < doc.history.length;
         }
         return false;
       },

@@ -8,11 +8,14 @@
 
 import { useCallback, useMemo, useRef, useEffect } from 'react';
 import { cn } from '../../lib/utils';
-import { useLadderStore, selectElements, selectSelectedElementIds, selectGridConfig } from '../../stores/ladderStore';
+import { useDocumentContext } from '../../contexts/DocumentContext';
+import { useLadderDocument } from '../../stores/hooks/useLadderDocument';
+import { useLadderUIStore } from '../../stores/ladderUIStore';
 import { PowerRail } from './PowerRail';
 import { NeutralRail } from './NeutralRail';
 import { LadderCell } from './LadderCell';
 import { LadderElementRenderer } from './elements';
+import { DEFAULT_LADDER_GRID_CONFIG } from '../../types/ladder';
 import type { GridPosition, LadderElement } from '../../types/ladder';
 
 export interface LadderGridProps {
@@ -49,17 +52,22 @@ export function LadderGrid({
 }: LadderGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  const { documentId } = useDocumentContext();
+  const ladderDoc = useLadderDocument(documentId);
 
-  // Store state
-  const elements = useLadderStore(selectElements);
-  const selectedIds = useLadderStore(selectSelectedElementIds);
-  const gridConfig = useLadderStore(selectGridConfig);
+  // Document state
+  const elements = ladderDoc?.elements ?? new Map<string, LadderElement>();
+  const gridConfig = ladderDoc?.gridConfig ?? DEFAULT_LADDER_GRID_CONFIG;
 
-  // Store actions
-  const setSelection = useLadderStore((state) => state.setSelection);
-  const toggleSelection = useLadderStore((state) => state.toggleSelection);
-  const addToSelection = useLadderStore((state) => state.addToSelection);
-  const clearSelection = useLadderStore((state) => state.clearSelection);
+  // UI state/actions
+  const selectedIds = useLadderUIStore((state) => state.selectedElementIds);
+  const mode = useLadderUIStore((state) => state.mode);
+  const monitoringState = useLadderUIStore((state) => state.monitoringState);
+  const setSelection = useLadderUIStore((state) => state.setSelection);
+  const toggleSelection = useLadderUIStore((state) => state.toggleSelection);
+  const addToSelection = useLadderUIStore((state) => state.addToSelection);
+  const clearSelection = useLadderUIStore((state) => state.clearSelection);
+  const isReadonly = readonly || (mode === 'monitor' && monitoringState !== null);
 
   // Use props if provided, otherwise use store config
   const columnCount = columnCountProp ?? gridConfig.columns;
@@ -113,7 +121,7 @@ export function LadderGrid({
   // Handle cell click
   const handleCellClick = useCallback(
     (position: GridPosition, shiftKey: boolean, ctrlKey: boolean) => {
-      if (readonly) return;
+      if (isReadonly) return;
 
       const element = getElementAt(position.row, position.col);
 
@@ -131,40 +139,41 @@ export function LadderGrid({
         clearSelection();
       }
     },
-    [readonly, getElementAt, toggleSelection, addToSelection, setSelection, clearSelection]
+    [isReadonly, getElementAt, toggleSelection, addToSelection, setSelection, clearSelection]
   );
 
   // Handle cell double-click
   const handleCellDoubleClick = useCallback(
     (position: GridPosition) => {
-      if (readonly) return;
+      if (isReadonly) return;
 
       const element = getElementAt(position.row, position.col);
       if (element) {
-        // TODO: Open element properties editor
-        console.log('Double-click on element:', element);
+        // InlineEditPopover is triggered via context menu or keyboard shortcut
       }
     },
-    [readonly, getElementAt]
+    [isReadonly, getElementAt]
   );
 
   // Handle keyboard navigation
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || readonly) return;
+    if (!container || isReadonly) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // TODO: Implement keyboard navigation in Task 78
       // For now, just handle Delete key
       if (e.key === 'Delete' && selectedIds.size > 0) {
-        // Will be implemented in Task 78
-        console.log('Delete pressed, selected:', Array.from(selectedIds));
+        selectedIds.forEach((id) => {
+          ladderDoc?.removeElement(id);
+        });
+        useLadderUIStore.getState().clearSelection();
       }
     };
 
     container.addEventListener('keydown', handleKeyDown);
     return () => container.removeEventListener('keydown', handleKeyDown);
-  }, [readonly, selectedIds]);
+  }, [isReadonly, selectedIds, ladderDoc]);
 
   // Calculate total grid width
   const railWidth = 30;
@@ -192,7 +201,7 @@ export function LadderGrid({
             height={cellHeight}
             element={element}
             isSelected={isSelected}
-            readonly={readonly}
+            readonly={isReadonly}
             onClick={handleCellClick}
             onDoubleClick={handleCellDoubleClick}
           >
@@ -222,6 +231,7 @@ export function LadderGrid({
     cellWidth,
     cellHeight,
     readonly,
+    isReadonly,
     getElementAt,
     isElementSelected,
     handleCellClick,

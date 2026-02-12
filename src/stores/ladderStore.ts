@@ -1,11 +1,13 @@
 /**
- * Ladder Store - Zustand State Management for LadderEditor
+ * @deprecated This singleton ladder store has been replaced by:
+ * - `documentRegistry.ts` — Per-document data (elements, wires, history, etc.)
+ * - `ladderUIStore.ts` — UI state (selection, clipboard, monitoring mode)
+ * - `hooks/useLadderDocument.ts` — React hook for document operations
  *
- * Manages ladder editor state including elements, wires, selection,
- * monitoring state, clipboard, and undo/redo history.
+ * No component should import from this file. It is preserved temporarily
+ * for reference during migration verification and will be deleted.
  *
- * Networks concept has been removed - elements and wires are stored directly.
- * Individual ladder files (CSV) serve as the unit of organization.
+ * Original: Ladder Store - Zustand State Management for LadderEditor
  */
 
 import { create } from 'zustand';

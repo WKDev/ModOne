@@ -8,11 +8,7 @@
 import { useCallback, useMemo } from 'react';
 import { Zap, Unlock, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '../../../lib/utils';
-import {
-  useLadderStore,
-  selectMode,
-  selectMonitoringState,
-} from '../../../stores/ladderStore';
+import { useLadderUIStore } from '../../../stores/ladderUIStore';
 
 // ============================================================================
 // Types
@@ -91,9 +87,9 @@ export function ForcedDevicesPanel({
   onEditForce,
 }: ForcedDevicesPanelProps) {
   // Get store state
-  const mode = useLadderStore(selectMode);
-  const monitoringState = useLadderStore(selectMonitoringState);
-  const releaseForce = useLadderStore((state) => state.releaseForce);
+  const mode = useLadderUIStore((state) => state.mode);
+  const monitoringState = useLadderUIStore((state) => state.monitoringState);
+  const releaseForce = useLadderUIStore((state) => state.releaseForce);
 
   const isMonitoring = mode === 'monitor';
 

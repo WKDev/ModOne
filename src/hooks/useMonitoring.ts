@@ -10,10 +10,10 @@ import { useCallback, useEffect, useRef } from 'react';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import {
-  useLadderStore,
+  useLadderUIStore,
   selectMode,
   selectMonitoringState,
-} from '../stores/ladderStore';
+} from '../stores/ladderUIStore';
 import type {
   LadderMonitoringState,
   TimerState,
@@ -115,15 +115,15 @@ const MONITORING_ERROR_EVENT = 'ladder:monitoring-error';
  */
 export function useMonitoring(): UseMonitoringResult {
   // Get store state using selectors
-  const mode = useLadderStore(selectMode);
-  const monitoringState = useLadderStore(selectMonitoringState);
+  const mode = useLadderUIStore(selectMode);
+  const monitoringState = useLadderUIStore(selectMonitoringState);
 
   // Get store actions
-  const storeStartMonitoring = useLadderStore((state) => state.startMonitoring);
-  const storeStopMonitoring = useLadderStore((state) => state.stopMonitoring);
-  const updateMonitoringState = useLadderStore((state) => state.updateMonitoringState);
-  const storeForceDevice = useLadderStore((state) => state.forceDevice);
-  const storeReleaseForce = useLadderStore((state) => state.releaseForce);
+  const storeStartMonitoring = useLadderUIStore((state) => state.startMonitoring);
+  const storeStopMonitoring = useLadderUIStore((state) => state.stopMonitoring);
+  const updateMonitoringState = useLadderUIStore((state) => state.updateMonitoringState);
+  const storeForceDevice = useLadderUIStore((state) => state.forceDevice);
+  const storeReleaseForce = useLadderUIStore((state) => state.releaseForce);
 
   // Local state refs
   const mountedRef = useRef(true);

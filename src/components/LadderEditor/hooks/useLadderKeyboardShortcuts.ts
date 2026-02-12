@@ -16,7 +16,11 @@
  */
 
 import { useEffect, useCallback } from 'react';
-import { useLadderStore } from '../../../stores/ladderStore';
+import { useDocumentContext } from '../../../contexts/DocumentContext';
+import { useLadderUIStore } from '../../../stores/ladderUIStore';
+import { useDocumentRegistry } from '../../../stores/documentRegistry';
+import { isLadderDocument } from '../../../types/document';
+import type { LadderElement, LadderGridConfig, GridPosition } from '../../../types/ladder';
 
 export interface UseLadderKeyboardShortcutsOptions {
   /** Whether shortcuts are enabled */
@@ -48,6 +52,35 @@ function isInputTarget(target: EventTarget | null): boolean {
   return false;
 }
 
+function cloneElementDeep(element: LadderElement): LadderElement {
+  return JSON.parse(JSON.stringify(element)) as LadderElement;
+}
+
+function generateElementId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+function isValidPosition(
+  elements: Map<string, LadderElement>,
+  position: GridPosition,
+  gridConfig: LadderGridConfig
+): boolean {
+  if (position.col < 0 || position.col >= gridConfig.columns) {
+    return false;
+  }
+  if (position.row < 0) {
+    return false;
+  }
+
+  for (const element of elements.values()) {
+    if (element.position.row === position.row && element.position.col === position.col) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 /**
  * Hook for ladder editor keyboard shortcuts
  */
@@ -55,68 +88,177 @@ export function useLadderKeyboardShortcuts(
   options: UseLadderKeyboardShortcutsOptions = {}
 ) {
   const { enabled = true, onEditElement, onNavigate } = options;
+  const { documentId } = useDocumentContext();
 
-  // Get store actions
-  const {
-    selectedElementIds,
-    mode,
-    removeElement,
-    copyToClipboard,
-    cutSelection,
-    pasteFromClipboard,
-    selectAll,
-    clearSelection,
-    undo,
-    redo,
-    duplicateElement,
-  } = useLadderStore();
+  const selectedElementIds = useLadderUIStore((state) => state.selectedElementIds);
+  const mode = useLadderUIStore((state) => state.mode);
 
   // Handle delete key
   const handleDelete = useCallback(() => {
-    if (mode !== 'edit') return;
+    if (mode !== 'edit' || !documentId) return;
 
     const idsToDelete = Array.from(selectedElementIds);
-    idsToDelete.forEach((id) => {
-      removeElement(id);
+    if (idsToDelete.length === 0) {
+      return;
+    }
+
+    const registry = useDocumentRegistry.getState();
+    const doc = registry.getDocument(documentId);
+    if (!doc || !isLadderDocument(doc)) {
+      return;
+    }
+
+    registry.pushHistory(documentId, `Delete ${idsToDelete.length} element(s)`);
+    registry.updateLadderData(documentId, (data) => {
+      idsToDelete.forEach((id) => {
+        data.elements.delete(id);
+      });
+      data.wires = data.wires.filter(
+        (wire) => !idsToDelete.includes(wire.from.elementId) && !idsToDelete.includes(wire.to.elementId)
+      );
     });
-  }, [selectedElementIds, mode, removeElement]);
+    useLadderUIStore.getState().clearSelection();
+  }, [documentId, selectedElementIds, mode]);
 
   // Handle copy
   const handleCopy = useCallback(() => {
-    copyToClipboard();
-  }, [copyToClipboard]);
+    if (!documentId) return;
+
+    const registry = useDocumentRegistry.getState();
+    const doc = registry.getDocument(documentId);
+    if (!doc || !isLadderDocument(doc)) {
+      return;
+    }
+
+    const selectedElements: LadderElement[] = [];
+    selectedElementIds.forEach((id) => {
+      const element = doc.data.elements.get(id);
+      if (element) {
+        const cloned = cloneElementDeep(element);
+        cloned.selected = false;
+        selectedElements.push(cloned);
+      }
+    });
+
+    useLadderUIStore.getState().setClipboard(selectedElements);
+  }, [documentId, selectedElementIds]);
 
   // Handle cut
   const handleCut = useCallback(() => {
     if (mode !== 'edit') return;
-    cutSelection();
-  }, [mode, cutSelection]);
+    handleCopy();
+    handleDelete();
+  }, [mode, handleCopy, handleDelete]);
 
   // Handle paste
   const handlePaste = useCallback(() => {
-    if (mode !== 'edit') return;
-    pasteFromClipboard();
-  }, [mode, pasteFromClipboard]);
+    if (mode !== 'edit' || !documentId) return;
+
+    const uiStore = useLadderUIStore.getState();
+    const clipboard = uiStore.clipboard;
+    if (clipboard.length === 0) {
+      return;
+    }
+
+    const firstElement = clipboard[0];
+    const baseRow = firstElement.position.row;
+    const baseCol = firstElement.position.col;
+    const targetPosition = { row: baseRow + 1, col: baseCol };
+    const offsetRow = targetPosition.row - baseRow;
+    const offsetCol = targetPosition.col - baseCol;
+
+    const newIds: string[] = [];
+    const registry = useDocumentRegistry.getState();
+    const doc = registry.getDocument(documentId);
+    if (!doc || !isLadderDocument(doc)) {
+      return;
+    }
+
+    registry.pushHistory(documentId, `Paste ${clipboard.length} element(s)`);
+    registry.updateLadderData(documentId, (data) => {
+      clipboard.forEach((element) => {
+        const newPosition = {
+          row: element.position.row + offsetRow,
+          col: element.position.col + offsetCol,
+        };
+        if (!isValidPosition(data.elements, newPosition, data.gridConfig)) {
+          return;
+        }
+
+        const newId = generateElementId(element.type);
+        const cloned = cloneElementDeep(element);
+        cloned.id = newId;
+        cloned.position = newPosition;
+        cloned.selected = false;
+        data.elements.set(newId, cloned);
+        newIds.push(newId);
+      });
+    });
+
+    uiStore.setSelection(newIds);
+  }, [documentId, mode]);
 
   // Handle duplicate
   const handleDuplicate = useCallback(() => {
-    if (mode !== 'edit') return;
+    if (mode !== 'edit' || !documentId) return;
 
     const ids = Array.from(selectedElementIds);
+    const registry = useDocumentRegistry.getState();
     ids.forEach((id) => {
-      duplicateElement(id);
+      const doc = registry.getDocument(documentId);
+      if (!doc || !isLadderDocument(doc)) {
+        return;
+      }
+
+      const element = doc.data.elements.get(id);
+      if (!element) {
+        return;
+      }
+
+      const candidatePositions: GridPosition[] = [
+        { row: element.position.row, col: element.position.col + 1 },
+        { row: element.position.row + 1, col: element.position.col },
+        { row: element.position.row, col: element.position.col - 1 },
+        { row: element.position.row - 1, col: element.position.col },
+      ];
+
+      const availablePosition = candidatePositions.find((position) =>
+        isValidPosition(doc.data.elements, position, doc.data.gridConfig)
+      );
+      if (!availablePosition) {
+        return;
+      }
+
+      const newId = generateElementId(element.type);
+      const cloned = cloneElementDeep(element);
+      cloned.id = newId;
+      cloned.position = availablePosition;
+      cloned.selected = false;
+
+      registry.pushHistory(documentId, `Duplicate ${element.type}`);
+      registry.updateLadderData(documentId, (data) => {
+        data.elements.set(newId, cloned);
+      });
     });
-  }, [selectedElementIds, mode, duplicateElement]);
+  }, [documentId, selectedElementIds, mode]);
 
   // Handle select all
   const handleSelectAll = useCallback(() => {
-    selectAll();
-  }, [selectAll]);
+    if (!documentId) return;
+
+    const registry = useDocumentRegistry.getState();
+    const doc = registry.getDocument(documentId);
+    if (!doc || !isLadderDocument(doc)) {
+      return;
+    }
+
+    useLadderUIStore.getState().selectAll(Array.from(doc.data.elements.keys()));
+  }, [documentId]);
 
   // Handle escape
   const handleEscape = useCallback(() => {
-    clearSelection();
-  }, [clearSelection]);
+    useLadderUIStore.getState().clearSelection();
+  }, []);
 
   // Handle enter (edit element)
   const handleEnter = useCallback(() => {
@@ -195,17 +337,32 @@ export function useLadderKeyboardShortcuts(
       if (isModifierPressed) {
         switch (key.toLowerCase()) {
           case 'z':
-            event.preventDefault();
             if (shiftKey) {
-              redo();
+              if (!documentId) break;
+              const registry = useDocumentRegistry.getState();
+              if (registry.canRedo(documentId)) {
+                event.preventDefault();
+                registry.redo(documentId);
+              }
             } else {
-              undo();
+              if (!documentId) break;
+              const registry = useDocumentRegistry.getState();
+              if (registry.canUndo(documentId)) {
+                event.preventDefault();
+                registry.undo(documentId);
+              }
             }
             break;
 
           case 'y':
-            event.preventDefault();
-            redo();
+            if (!documentId) break;
+            {
+              const registry = useDocumentRegistry.getState();
+              if (registry.canRedo(documentId)) {
+                event.preventDefault();
+                registry.redo(documentId);
+              }
+            }
             break;
 
           case 'c':
@@ -246,8 +403,7 @@ export function useLadderKeyboardShortcuts(
       handlePaste,
       handleDuplicate,
       handleSelectAll,
-      undo,
-      redo,
+      documentId,
     ]
   );
 

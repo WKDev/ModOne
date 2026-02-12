@@ -5,7 +5,6 @@
  */
 
 import { useCallback } from 'react';
-import { useShallow } from 'zustand/react/shallow';
 import {
   Undo2,
   Redo2,
@@ -16,7 +15,10 @@ import {
   Trash2,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { useLadderStore } from '../../stores/ladderStore';
+import { useDocumentContext } from '../../contexts/DocumentContext';
+import { useLadderDocument } from '../../stores/hooks/useLadderDocument';
+import { useLadderUIStore } from '../../stores/ladderUIStore';
+import type { GridPosition, LadderElement } from '../../types/ladder';
 
 export interface LadderToolbarProps {
   /** Optional class name */
@@ -69,48 +71,100 @@ function ToolbarSeparator() {
  * LadderToolbar - Main toolbar component
  */
 export function LadderToolbar({ className }: LadderToolbarProps) {
-  const {
-    mode,
-    historyIndex,
-    history,
-    selectedElementIds,
-    clipboard,
-    undo,
-    redo,
-    startMonitoring,
-    stopMonitoring,
-    copyToClipboard,
-    pasteFromClipboard,
-    removeElement,
-  } = useLadderStore(
-    useShallow((state) => ({
-      mode: state.mode,
-      historyIndex: state.historyIndex,
-      history: state.history,
-      selectedElementIds: state.selectedElementIds,
-      clipboard: state.clipboard,
-      undo: state.undo,
-      redo: state.redo,
-      startMonitoring: state.startMonitoring,
-      stopMonitoring: state.stopMonitoring,
-      copyToClipboard: state.copyToClipboard,
-      pasteFromClipboard: state.pasteFromClipboard,
-      removeElement: state.removeElement,
-    }))
-  );
+  const { documentId } = useDocumentContext();
+  const ladderDoc = useLadderDocument(documentId);
 
-  const canUndo = historyIndex >= 0;
-  const canRedo = historyIndex < history.length - 1;
+  const mode = useLadderUIStore((state) => state.mode);
+  const selectedElementIds = useLadderUIStore((state) => state.selectedElementIds);
+  const clipboard = useLadderUIStore((state) => state.clipboard);
+  const startMonitoring = useLadderUIStore((state) => state.startMonitoring);
+  const stopMonitoring = useLadderUIStore((state) => state.stopMonitoring);
+  const setClipboard = useLadderUIStore((state) => state.setClipboard);
+  const setSelection = useLadderUIStore((state) => state.setSelection);
+  const clearSelection = useLadderUIStore((state) => state.clearSelection);
+
+  const canUndo = ladderDoc?.canUndo ?? false;
+  const canRedo = ladderDoc?.canRedo ?? false;
+  const isDirty = ladderDoc?.isDirty ?? false;
   const hasSelection = selectedElementIds.size > 0;
   const hasClipboard = clipboard.length > 0;
   const isEditMode = mode === 'edit';
+
+  const undo = useCallback(() => {
+    ladderDoc?.undo();
+  }, [ladderDoc]);
+
+  const redo = useCallback(() => {
+    ladderDoc?.redo();
+  }, [ladderDoc]);
+
+  const copyToClipboard = useCallback(() => {
+    if (!ladderDoc || selectedElementIds.size === 0) return;
+
+    const selectedElements: LadderElement[] = [];
+    selectedElementIds.forEach((id) => {
+      const element = ladderDoc.elements.get(id);
+      if (element) {
+        selectedElements.push(JSON.parse(JSON.stringify(element)) as LadderElement);
+      }
+    });
+
+    setClipboard(selectedElements);
+  }, [ladderDoc, selectedElementIds, setClipboard]);
+
+  const pasteFromClipboard = useCallback(() => {
+    if (!ladderDoc || clipboard.length === 0 || !isEditMode) return;
+
+    const firstElement = clipboard[0];
+    const basePosition = firstElement.position;
+    const targetPosition: GridPosition = { row: basePosition.row + 1, col: basePosition.col };
+    const offsetRow = targetPosition.row - basePosition.row;
+    const offsetCol = targetPosition.col - basePosition.col;
+
+    const newIds: string[] = [];
+    clipboard.forEach((element) => {
+      const id = ladderDoc.addElement(
+        element.type,
+        {
+          row: element.position.row + offsetRow,
+          col: element.position.col + offsetCol,
+        },
+        {
+          address: element.address,
+          label: element.label,
+          properties: element.properties,
+        }
+      );
+
+      if (id) {
+        newIds.push(id);
+      }
+    });
+
+    if (newIds.length > 0) {
+      setSelection(newIds);
+    }
+  }, [ladderDoc, clipboard, isEditMode, setSelection]);
 
   // Handle delete selected elements
   const handleDelete = useCallback(() => {
     if (!isEditMode) return;
     const ids = Array.from(selectedElementIds);
-    ids.forEach((id) => removeElement(id));
-  }, [selectedElementIds, removeElement, isEditMode]);
+    ids.forEach((id) => ladderDoc?.removeElement(id));
+    clearSelection();
+  }, [selectedElementIds, ladderDoc, isEditMode, clearSelection]);
+
+  const clearAll = useCallback(() => {
+    ladderDoc?.clearAll();
+  }, [ladderDoc]);
+
+  const markSaved = useCallback(() => {
+    ladderDoc?.markSaved();
+  }, [ladderDoc]);
+
+  void clearAll;
+  void markSaved;
+  void isDirty;
 
   return (
     <div
@@ -139,7 +193,7 @@ export function LadderToolbar({ className }: LadderToolbarProps) {
         <Copy size={16} />
       </ToolbarButton>
       <ToolbarButton
-        onClick={() => pasteFromClipboard()}
+        onClick={pasteFromClipboard}
         disabled={!hasClipboard || !isEditMode}
         title="Paste (Ctrl+V)"
       >

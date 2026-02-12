@@ -72,6 +72,8 @@ export interface HistorySnapshot<T = unknown> {
   timestamp: number;
   /** Snapshot data (type-specific) */
   data: T;
+  /** Human-readable description of the action that created this snapshot */
+  description?: string;
 }
 
 // ============================================================================

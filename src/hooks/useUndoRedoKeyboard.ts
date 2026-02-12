@@ -9,7 +9,8 @@
  */
 
 import { useEffect, useCallback } from 'react';
-import { useLadderStore, selectCanUndo, selectCanRedo } from '../stores/ladderStore';
+import { useDocumentContext } from '../contexts/DocumentContext';
+import { useDocumentRegistry } from '../stores/documentRegistry';
 
 /**
  * Check if the event target is an input element where we should not intercept shortcuts
@@ -30,9 +31,15 @@ function isInputElement(target: EventTarget | null): boolean {
  * Hook for handling global undo/redo keyboard shortcuts
  */
 export function useUndoRedoKeyboard(): void {
+  const { documentId } = useDocumentContext();
+
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     // Skip if typing in an input field
     if (isInputElement(e.target)) {
+      return;
+    }
+
+    if (!documentId) {
       return;
     }
 
@@ -40,27 +47,26 @@ export function useUndoRedoKeyboard(): void {
     if (!isCtrlOrCmd) return;
 
     const key = e.key.toLowerCase();
+    const registry = useDocumentRegistry.getState();
 
     // Ctrl+Z: Undo (without Shift)
     if (key === 'z' && !e.shiftKey) {
-      const state = useLadderStore.getState();
-      if (selectCanUndo(state)) {
+      if (registry.canUndo(documentId)) {
         e.preventDefault();
-        state.undo();
+        registry.undo(documentId);
       }
       return;
     }
 
     // Ctrl+Shift+Z or Ctrl+Y: Redo
     if ((key === 'z' && e.shiftKey) || key === 'y') {
-      const state = useLadderStore.getState();
-      if (selectCanRedo(state)) {
+      if (registry.canRedo(documentId)) {
         e.preventDefault();
-        state.redo();
+        registry.redo(documentId);
       }
       return;
     }
-  }, []);
+  }, [documentId]);
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);

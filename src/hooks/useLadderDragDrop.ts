@@ -7,7 +7,9 @@
 
 import { useCallback } from 'react';
 import type { DragEndEvent, DragStartEvent, DragOverEvent } from '@dnd-kit/core';
-import { useLadderStore, selectElements, selectGridConfig } from '../stores/ladderStore';
+import { useDocumentContext } from '../contexts/DocumentContext';
+import { useLadderDocument } from '../stores/hooks/useLadderDocument';
+import { useLadderUIStore } from '../stores/ladderUIStore';
 import type { LadderElementType, GridPosition, LadderElement, LadderGridConfig } from '../types/ladder';
 import { isCoilType } from '../types/ladder';
 
@@ -155,20 +157,28 @@ export interface UseLadderDragDropResult {
  * useLadderDragDrop - Manages drag-and-drop for ladder elements
  */
 export function useLadderDragDrop(): UseLadderDragDropResult {
-  const elements = useLadderStore(selectElements);
-  const gridConfig = useLadderStore(selectGridConfig);
-  const addElement = useLadderStore((state) => state.addElement);
-  const moveElement = useLadderStore((state) => state.moveElement);
-  const setSelection = useLadderStore((state) => state.setSelection);
+  const { documentId } = useDocumentContext();
+  const ladderDoc = useLadderDocument(documentId);
+  const setSelection = useLadderUIStore((state) => state.setSelection);
 
   /**
    * Check if element can be placed at position
    */
   const canPlaceAt = useCallback(
     (elementType: LadderElementType, position: GridPosition, excludeId?: string) => {
-      return validatePlacement(elementType, position, elements, gridConfig, excludeId);
+      if (!ladderDoc) {
+        return { valid: false, reason: 'No active ladder document' };
+      }
+
+      return validatePlacement(
+        elementType,
+        position,
+        ladderDoc.elements,
+        ladderDoc.gridConfig,
+        excludeId
+      );
     },
-    [elements, gridConfig]
+    [ladderDoc]
   );
 
   /**
@@ -201,6 +211,8 @@ export function useLadderDragDrop(): UseLadderDragDropResult {
     (event: DragEndEvent) => {
       const { active, over } = event;
 
+      if (!ladderDoc) return;
+
       // No drop target
       if (!over) return;
 
@@ -222,7 +234,7 @@ export function useLadderDragDrop(): UseLadderDragDropResult {
         const validation = canPlaceAt(activeData.elementType, targetPosition);
 
         if (validation.valid) {
-          const newId = addElement(activeData.elementType, targetPosition);
+          const newId = ladderDoc.addElement(activeData.elementType, targetPosition);
           if (newId) {
             setSelection([newId]);
           }
@@ -242,14 +254,14 @@ export function useLadderDragDrop(): UseLadderDragDropResult {
         );
 
         if (validation.valid) {
-          moveElement(activeData.elementId, targetPosition);
+          ladderDoc.moveElement(activeData.elementId, targetPosition);
         } else {
           console.warn('Invalid move:', validation.reason);
         }
         return;
       }
     },
-    [addElement, moveElement, setSelection, canPlaceAt]
+    [ladderDoc, setSelection, canPlaceAt]
   );
 
   return {

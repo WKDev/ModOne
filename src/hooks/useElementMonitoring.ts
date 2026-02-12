@@ -7,10 +7,10 @@
 
 import { useMemo } from 'react';
 import {
-  useLadderStore,
+  useLadderUIStore,
   selectMode,
   selectMonitoringState,
-} from '../stores/ladderStore';
+} from '../stores/ladderUIStore';
 import type {
   LadderElement,
   TimerState,
@@ -121,8 +121,8 @@ function getComparisonResult(
  */
 export function useElementMonitoring(element: LadderElement): UseElementMonitoringResult {
   // Get store state
-  const mode = useLadderStore(selectMode);
-  const monitoringState = useLadderStore(selectMonitoringState);
+  const mode = useLadderUIStore(selectMode);
+  const monitoringState = useLadderUIStore(selectMonitoringState);
 
   const isMonitoring = mode === 'monitor';
 
@@ -189,8 +189,8 @@ export function useWireMonitoring(wireId: string): {
   isMonitoring: boolean;
   isEnergized: boolean;
 } {
-  const mode = useLadderStore(selectMode);
-  const monitoringState = useLadderStore(selectMonitoringState);
+  const mode = useLadderUIStore(selectMode);
+  const monitoringState = useLadderUIStore(selectMonitoringState);
 
   const isMonitoring = mode === 'monitor';
 

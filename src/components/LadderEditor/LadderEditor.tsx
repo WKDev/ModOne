@@ -5,7 +5,7 @@
  * Integrates toolbox, grid, properties panel, and toolbar.
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import {
   DndContext,
@@ -16,7 +16,9 @@ import {
   KeyboardSensor,
 } from '@dnd-kit/core';
 import { cn } from '../../lib/utils';
-import { useLadderStore } from '../../stores/ladderStore';
+import { useDocumentContext } from '../../contexts/DocumentContext';
+import { useLadderDocument } from '../../stores/hooks/useLadderDocument';
+import { useLadderUIStore } from '../../stores/ladderUIStore';
 import { LadderGrid } from './LadderGrid';
 import { LadderToolbox } from './LadderToolbox';
 import { LadderToolbar } from './LadderToolbar';
@@ -62,17 +64,18 @@ function DragOverlayContent({ activeId }: { activeId: string | null }) {
  * LadderStatusBar - Status bar at the bottom of the editor
  */
 function LadderStatusBar() {
-  const { mode, elements, selectedElementIds } = useLadderStore(
+  const { documentId } = useDocumentContext();
+  const ladderDoc = useLadderDocument(documentId);
+  const { mode, selectedElementIds } = useLadderUIStore(
     useShallow((state) => ({
       mode: state.mode,
-      elements: state.elements,
       selectedElementIds: state.selectedElementIds,
     }))
   );
 
   const isMonitorMode = mode === 'monitor';
   const selectedCount = selectedElementIds.size;
-  const elementCount = elements.size;
+  const elementCount = ladderDoc?.elements.size ?? 0;
 
   return (
     <div className="flex items-center justify-between px-3 py-1.5 bg-neutral-800 border-t border-neutral-700 text-xs text-neutral-400">
@@ -101,17 +104,14 @@ export function LadderEditor({
   showToolbox = true,
   showPropertiesPanel = true,
 }: LadderEditorProps) {
-  const {
-    comment,
-    mode,
-    updateComment,
-  } = useLadderStore(
-    useShallow((state) => ({
-      comment: state.comment,
-      mode: state.mode,
-      updateComment: state.updateComment,
-    }))
-  );
+  const { documentId } = useDocumentContext();
+  const ladderDoc = useLadderDocument(documentId);
+  const mode = useLadderUIStore((state) => state.mode);
+  const comment = ladderDoc?.comment;
+
+  useEffect(() => {
+    useLadderUIStore.getState().clearSelection();
+  }, [documentId]);
 
   // Drag and drop handlers
   const { handleDragStart, handleDragOver, handleDragEnd } = useLadderDragDrop();
@@ -155,12 +155,20 @@ export function LadderEditor({
   // Handle comment update
   const handleUpdateComment = useCallback(
     (newComment: string) => {
-      updateComment(newComment);
+      ladderDoc?.updateComment(newComment);
     },
-    [updateComment]
+    [ladderDoc]
   );
 
   const isMonitorMode = mode === 'monitor';
+
+  if (!ladderDoc) {
+    return (
+      <div className={cn('flex h-full items-center justify-center bg-neutral-900 text-neutral-400', className)}>
+        No ladder document selected.
+      </div>
+    );
+  }
 
   return (
     <DndContext

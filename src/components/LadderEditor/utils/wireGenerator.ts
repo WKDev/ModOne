@@ -361,7 +361,7 @@ export function calculateWirePath(
       const key = `${from.row}-${col}`;
       if (!occupiedCells.has(key)) {
         segments.push({
-          type: col === from.col || col === midCol - direction ? 'horizontal' : 'horizontal',
+          type: 'horizontal',
           position: { row: from.row, col },
         });
       }
