@@ -11,6 +11,7 @@ import { Timer, type TimerType } from './Timer';
 import { Counter, type CounterType } from './Counter';
 import { Wire, type WireType as WireComponentType } from './Wire';
 import { Comparison, type ComparisonType, type ComparisonOperand } from './Comparison';
+import { resolveWireTypeFromDirections } from '../utils/wireGenerator';
 import type {
   LadderElement,
   LadderElementType,
@@ -96,6 +97,11 @@ const VALID_JUNCTION_TYPES = new Set<WireComponentType>([
  * Resolve the concrete wire component type from element type and properties.
  * For corner/junction wires, reads the `direction` property to determine
  * the specific variant. Falls back to reasonable defaults.
+ * 
+ * Priority:
+ * A: Use properties.direction if it's a valid WireComponentType
+ * B: Use properties.connectedDirections bitmask via resolveWireTypeFromDirections()
+ * C: Fall back to existing defaults (wire_h→horizontal, wire_v→vertical)
  */
 function resolveWireType(elementType: string, properties: Record<string, unknown>): WireComponentType | undefined {
   // Direct mapping for horizontal/vertical
@@ -108,6 +114,16 @@ function resolveWireType(elementType: string, properties: Record<string, unknown
     if (direction && VALID_CORNER_TYPES.has(direction)) {
       return direction;
     }
+    
+    // Fallback to connectedDirections bitmask if available
+    const connectedDirections = properties?.connectedDirections as number | undefined;
+    if (typeof connectedDirections === 'number') {
+      const resolvedType = resolveWireTypeFromDirections(connectedDirections);
+      if (VALID_CORNER_TYPES.has(resolvedType as WireComponentType)) {
+        return resolvedType as WireComponentType;
+      }
+    }
+    
     return 'corner_tl'; // Default fallback
   }
 
@@ -117,6 +133,16 @@ function resolveWireType(elementType: string, properties: Record<string, unknown
     if (direction && VALID_JUNCTION_TYPES.has(direction)) {
       return direction;
     }
+    
+    // Fallback to connectedDirections bitmask if available
+    const connectedDirections = properties?.connectedDirections as number | undefined;
+    if (typeof connectedDirections === 'number') {
+      const resolvedType = resolveWireTypeFromDirections(connectedDirections);
+      if (VALID_JUNCTION_TYPES.has(resolvedType as WireComponentType)) {
+        return resolvedType as WireComponentType;
+      }
+    }
+    
     return 'junction_t'; // Default fallback
   }
 

@@ -40,7 +40,9 @@ import type {
   TimerProperties,
   CounterProperties,
   CompareProperties,
+  WireProperties,
 } from '../../../types/ladder';
+// Note: isWireType available from '../../../types/ladder' if needed for future enhancements
 
 // ============================================================================
 // Types
@@ -288,20 +290,27 @@ function createWire(
   fromId: string,
   toId: string,
   context: ConversionContext,
-  type: 'horizontal' | 'vertical' = 'horizontal'
+  type: 'horizontal' | 'vertical' | 'junction' | 'cross' = 'horizontal',
+  junctionDirection?: LadderWire['junctionDirection']
 ): LadderWire {
-  return {
+  const wire: LadderWire = {
     id: generateId(context, 'wire'),
     from: {
       elementId: fromId,
-      port: type === 'horizontal' ? 'right' : 'bottom',
+      port: type === 'horizontal' ? 'right' : type === 'vertical' ? 'bottom' : 'right',
     },
     to: {
       elementId: toId,
-      port: type === 'horizontal' ? 'left' : 'top',
+      port: type === 'horizontal' ? 'left' : type === 'vertical' ? 'top' : 'left',
     },
-    type,
+    type: type === 'junction' || type === 'cross' ? 'junction' : type,
   };
+
+  if (junctionDirection) {
+    wire.junctionDirection = junctionDirection;
+  }
+
+  return wire;
 }
 
 // ============================================================================
@@ -419,14 +428,60 @@ function processBlockNode(
   } else {
     // Parallel block: children placed vertically
     let currentRow = startRow;
+    const branchStartRows: number[] = [];
 
     for (const child of node.children) {
+      branchStartRows.push(currentRow);
       const result = processNode(child, currentRow, startCol, context);
       entryIds.push(...result.entryIds);
       exitIds.push(...result.exitIds);
 
       const dims = calculateNodeDimensions(child);
       currentRow += dims.rows;
+    }
+
+    // Phase 3.5: Generate vertical wire elements between parallel branches
+    if (branchStartRows.length >= 2) {
+      const firstRow = branchStartRows[0];
+      const lastRow = branchStartRows[branchStartRows.length - 1];
+
+      // Vertical wire at the entry column (startCol - 1 if possible, or startCol)
+      const entryCol = Math.max(0, startCol - 1);
+      for (let row = firstRow; row <= lastRow; row++) {
+        // Skip rows that have logic elements placed
+        const occupied = context.elements.some(
+          (el) => el.position.row === row && el.position.col === entryCol
+        );
+        if (!occupied && !branchStartRows.includes(row)) {
+          // Place a vertical wire in the gap
+          const wireId = generateId(context, 'wire_v');
+          const wireElement: LadderElement = {
+            id: wireId,
+            type: 'wire_v',
+            position: { row, col: entryCol },
+            properties: {} as WireProperties,
+          } as LadderElement;
+          context.elements.push(wireElement);
+          context.maxRow = Math.max(context.maxRow, row);
+          context.maxCol = Math.max(context.maxCol, entryCol);
+        }
+      }
+
+      // Add vertical wires connecting entries (junction points)
+      for (let i = 0; i < branchStartRows.length - 1; i++) {
+        const fromRow = branchStartRows[i];
+        const toRow = branchStartRows[i + 1];
+        // Create vertical wire connection between adjacent branches
+        if (entryIds[i] && entryIds[i + 1]) {
+          context.wires.push(createWire(entryIds[i], entryIds[i + 1], context, 'vertical'));
+        }
+        // Same for exit points
+        if (exitIds[i] && exitIds[i + 1]) {
+          context.wires.push(createWire(exitIds[i], exitIds[i + 1], context, 'vertical'));
+        }
+        void fromRow;
+        void toRow;
+      }
     }
   }
 
@@ -740,7 +795,28 @@ export function detectParallelGroups(
   // Find vertical wires that indicate parallel connections
   const verticalWires = wires.filter((w) => w.type === 'vertical');
 
-  if (verticalWires.length === 0 || rowGroups.size <= 1) {
+  // Phase 3.6: Also scan elements for wire_v and wire_junction types
+  // This handles cases where vertical connections exist as grid elements
+  // rather than LadderWire objects
+  const columnWiresFromElements = new Map<number, Set<number>>();
+  for (const elements of rowGroups.values()) {
+    for (const el of elements) {
+      if (el.type === 'wire_v' || el.type === 'wire_junction') {
+        const col = el.position.col;
+        const row = el.position.row;
+        if (!columnWiresFromElements.has(col)) {
+          columnWiresFromElements.set(col, new Set());
+        }
+        const s = columnWiresFromElements.get(col)!;
+        // A vertical wire at (row, col) implies connections to row-1 and row+1
+        s.add(row);
+        if (row > 0) s.add(row - 1);
+        s.add(row + 1);
+      }
+    }
+  }
+
+  if ((verticalWires.length === 0 && columnWiresFromElements.size === 0) || rowGroups.size <= 1) {
     return groups;
   }
 
@@ -770,6 +846,17 @@ export function detectParallelGroups(
       }
       columnWires.get(col)!.add(fromElement.position.row);
       columnWires.get(col)!.add(toElement.position.row);
+    }
+  }
+
+  // Phase 3.6: Merge element-based wire info into columnWires
+  for (const [col, rows] of columnWiresFromElements) {
+    if (!columnWires.has(col)) {
+      columnWires.set(col, new Set());
+    }
+    const target = columnWires.get(col)!;
+    for (const row of rows) {
+      target.add(row);
     }
   }
 

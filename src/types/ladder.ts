@@ -100,6 +100,26 @@ import type {
 } from '../components/OneParser/types';
 
 // ============================================================================
+// Wire Direction Bitmask
+// ============================================================================
+
+/**
+ * Bitmask enum representing connection directions for a grid cell.
+ * Combine with bitwise OR to represent multiple directions.
+ * Example: TOP | LEFT === 0b0101 (5)
+ */
+export const WireDirection = {
+  NONE:   0b0000,
+  TOP:    0b0001,
+  BOTTOM: 0b0010,
+  LEFT:   0b0100,
+  RIGHT:  0b1000,
+} as const;
+
+/** Type for WireDirection values */
+export type WireDirectionValue = typeof WireDirection[keyof typeof WireDirection];
+
+// ============================================================================
 // Ladder Element Types (Editor-specific)
 // ============================================================================
 
@@ -330,9 +350,19 @@ export interface CompareElement extends BaseLadderElement<CompareType> {
   properties: CompareProperties;
 }
 
+/** Wire-specific properties */
+export interface WireProperties extends ElementProperties {
+  /** Specific direction for corner/junction wires */
+  direction?: 'corner_tl' | 'corner_tr' | 'corner_bl' | 'corner_br'
+            | 'junction_t' | 'junction_b' | 'junction_l' | 'junction_r'
+            | 'cross';
+  /** Bit mask of connected directions (runtime computed via WireDirection) */
+  connectedDirections?: number;
+}
+
 /** Wire element */
 export interface WireElement extends BaseLadderElement<WireType> {
-  properties: ElementProperties;
+  properties: WireProperties;
 }
 
 /** Rail element */
@@ -374,7 +404,11 @@ export interface LadderWire {
   /** Destination endpoint */
   to: WireEndpoint;
   /** Wire routing type */
-  type: 'horizontal' | 'vertical' | 'corner';
+  type: 'horizontal' | 'vertical' | 'corner' | 'junction' | 'cross';
+  /** Junction sub-direction (only when type is 'junction' or 'cross') */
+  junctionDirection?: 'junction_t' | 'junction_b' | 'junction_l' | 'junction_r' | 'cross';
+  /** Intermediate waypoints for multi-segment paths */
+  waypoints?: GridPosition[];
   /** Whether wire is energized (runtime) */
   energized?: boolean;
 }

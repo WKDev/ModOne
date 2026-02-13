@@ -30,7 +30,13 @@ import {
   isTimerType,
   isCounterType,
   isCompareType,
+  isWireType,
 } from '../../types/ladder';
+import {
+  resolveWireElementType,
+  updateAdjacentWires,
+} from '../../components/LadderEditor/utils/wireGenerator';
+import type { WireProperties } from '../../types/ladder';
 
 // ============================================================================
 // Types
@@ -186,18 +192,48 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
         return null;
       }
 
-      const id = generateId(type);
+      // Phase 1.7: Auto-resolve wire type based on neighbors
+      let resolvedType = type;
+      let wireDirection: string | undefined;
+      if (type === 'wire_h' || type === 'wire_v') {
+        const resolved = resolveWireElementType(position, type, data.elements, data.gridConfig);
+        resolvedType = resolved.type;
+        wireDirection = resolved.direction;
+      }
+
+      const id = generateId(resolvedType);
+      const defaultProps = getDefaultProperties(resolvedType);
+      const finalProperties = wireDirection
+        ? { ...defaultProps, direction: wireDirection } as WireProperties
+        : defaultProps;
+
       const newElement: LadderElement = {
         id,
-        type,
+        type: resolvedType,
         position: { ...position },
-        properties: getDefaultProperties(type),
+        properties: finalProperties,
         ...props,
       } as LadderElement;
 
       pushHistoryAction(documentId);
       updateLadderData(documentId, (docData) => {
+        // Add the new element
         docData.elements.set(id, newElement);
+
+        // Phase 1.7: Auto-update adjacent wire elements
+        const adjacentUpdates = updateAdjacentWires(position, docData.elements, docData.gridConfig);
+        for (const update of adjacentUpdates) {
+          const adjElement = docData.elements.get(update.elementId);
+          if (adjElement && isWireType(adjElement.type)) {
+            // Update the wire type and direction in-place
+            (adjElement as { type: LadderElementType }).type = update.newType;
+            if (update.newDirection) {
+              (adjElement.properties as WireProperties).direction = update.newDirection as WireProperties['direction'];
+            } else {
+              delete (adjElement.properties as WireProperties).direction;
+            }
+          }
+        }
       });
 
       return id;
@@ -263,6 +299,10 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
     (id: string) => {
       if (!documentId || !data) return;
 
+      // Phase 1.8: Record position before deletion for adjacent wire updates
+      const elementToRemove = data.elements.get(id);
+      const removedPosition = elementToRemove ? { ...elementToRemove.position } : null;
+
       pushHistoryAction(documentId);
       updateLadderData(documentId, (docData) => {
         docData.elements.delete(id);
@@ -270,6 +310,22 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
         docData.wires = docData.wires.filter(
           (wire) => wire.from.elementId !== id && wire.to.elementId !== id
         );
+
+        // Phase 1.8: Auto-update adjacent wire elements after deletion
+        if (removedPosition) {
+          const adjacentUpdates = updateAdjacentWires(removedPosition, docData.elements, docData.gridConfig);
+          for (const update of adjacentUpdates) {
+            const adjElement = docData.elements.get(update.elementId);
+            if (adjElement && isWireType(adjElement.type)) {
+              (adjElement as { type: LadderElementType }).type = update.newType;
+              if (update.newDirection) {
+                (adjElement.properties as WireProperties).direction = update.newDirection as WireProperties['direction'];
+              } else {
+                delete (adjElement.properties as WireProperties).direction;
+              }
+            }
+          }
+        }
       });
     },
     [documentId, data, pushHistoryAction, updateLadderData]
