@@ -6,7 +6,8 @@
   ],
   "plan_name": "custom_titlebar",
   "agent": "atlas",
-  "status": "in_progress",
-  "tasks_completed": 0,
-  "tasks_total": 2
+  "status": "completed",
+  "tasks_completed": 2,
+  "tasks_total": 2,
+  "completed_at": "2026-02-13T00:10:00.000Z"
 }

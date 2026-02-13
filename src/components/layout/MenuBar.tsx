@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import { Check } from 'lucide-react';
+import { Check, Minus, Square, X } from 'lucide-react';
+import { Window } from '@tauri-apps/api/window';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useLayoutPersistenceStore } from '../../stores/layoutPersistenceStore';
 import { SaveLayoutDialog } from './SaveLayoutDialog';
@@ -240,6 +241,8 @@ export function MenuBar() {
   const { menuOpen, setMenuOpen } = useLayoutStore();
   const menuRef = useRef<HTMLDivElement>(null);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
+  const [isMac] = useState(() => navigator.userAgent.includes('Mac'));
 
   const {
     currentLayoutName,
@@ -247,6 +250,54 @@ export function MenuBar() {
     loadLayout,
     resetToDefault,
   } = useLayoutPersistenceStore();
+
+  // Window control handlers
+  const handleMinimize = useCallback(async () => {
+    try {
+      const currentWindow = Window.getCurrent();
+      await currentWindow.minimize();
+    } catch (error) {
+      console.error('Failed to minimize window:', error);
+    }
+  }, []);
+
+  const handleMaximize = useCallback(async () => {
+    try {
+      const currentWindow = Window.getCurrent();
+      const maximized = await currentWindow.isMaximized();
+      if (maximized) {
+        await currentWindow.unmaximize();
+      } else {
+        await currentWindow.maximize();
+      }
+      setIsMaximized(!maximized);
+    } catch (error) {
+      console.error('Failed to toggle maximize:', error);
+    }
+  }, []);
+
+  const handleClose = useCallback(async () => {
+    try {
+      const currentWindow = Window.getCurrent();
+      await currentWindow.close();
+    } catch (error) {
+      console.error('Failed to close window:', error);
+    }
+  }, []);
+
+  // Check maximized state on mount
+  useEffect(() => {
+    const checkMaximized = async () => {
+      try {
+        const currentWindow = Window.getCurrent();
+        const maximized = await currentWindow.isMaximized();
+        setIsMaximized(maximized);
+      } catch (error) {
+        console.error('Failed to check maximized state:', error);
+      }
+    };
+    checkMaximized();
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -330,6 +381,33 @@ export function MenuBar() {
     });
   }, [buildLayoutsSubmenu]);
 
+  // Window controls component
+  const WindowControls = () => (
+    <div className="flex items-center gap-1">
+      <button
+        onClick={handleMinimize}
+        className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+        title="Minimize"
+      >
+        <Minus size={14} />
+      </button>
+      <button
+        onClick={handleMaximize}
+        className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+        title="Maximize"
+      >
+        <Square size={12} />
+      </button>
+      <button
+        onClick={handleClose}
+        className="w-6 h-6 flex items-center justify-center rounded hover:bg-red-600 text-gray-400 hover:text-white transition-colors"
+        title="Close"
+      >
+        <X size={14} />
+      </button>
+    </div>
+  );
+
   return (
     <>
       <SaveLayoutDialog
@@ -339,8 +417,12 @@ export function MenuBar() {
     <div
       ref={menuRef}
       data-testid="menu-bar"
-      className="h-8 bg-gray-800 border-b border-gray-700 flex items-center px-2 text-sm"
+      className="h-8 bg-[var(--color-bg-secondary)] border-b border-gray-700 flex items-center px-2 text-sm"
     >
+      {/* Mac: Controls on left */}
+      {isMac && <WindowControls />}
+
+      {/* Menu items */}
       {menus.map((menu) => (
         <div key={menu.label} className="relative">
           <button
@@ -373,6 +455,12 @@ export function MenuBar() {
           )}
         </div>
       ))}
+
+      {/* Drag region */}
+      <div className="flex-1" data-tauri-drag-region />
+
+      {/* Windows/Linux: Controls on right */}
+      {!isMac && <WindowControls />}
       </div>
     </>
   );
