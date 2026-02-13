@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import { Check, Minus, Square, X } from 'lucide-react';
+import { Check, Minus, Square, Copy, X } from 'lucide-react';
 import { Window } from '@tauri-apps/api/window';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useLayoutPersistenceStore } from '../../stores/layoutPersistenceStore';
@@ -8,6 +8,67 @@ import { projectDialogService } from '../../services/projectDialogService';
 import { fileDialogService } from '../../services/fileDialogService';
 import { importService } from '../../services/importService';
 import { commandRegistry } from '../CommandPalette/commandRegistry';
+
+// ============================================================================
+// Platform detection (computed once)
+// ============================================================================
+
+const IS_MAC = navigator.userAgent.includes('Mac');
+
+// ============================================================================
+// Cached Tauri window reference
+// ============================================================================
+
+let _appWindow: Window | null = null;
+function getAppWindow(): Window {
+  if (!_appWindow) {
+    _appWindow = Window.getCurrent();
+  }
+  return _appWindow;
+}
+
+// ============================================================================
+// Window Controls Component (extracted to avoid re-creation on every render)
+// ============================================================================
+
+interface WindowControlsProps {
+  isMaximized: boolean;
+  onMinimize: () => void;
+  onMaximize: () => void;
+  onClose: () => void;
+}
+
+function WindowControls({ isMaximized, onMinimize, onMaximize, onClose }: WindowControlsProps) {
+  return (
+    <div className="flex items-center">
+      <button
+        onClick={onMinimize}
+        className="w-[46px] h-8 flex items-center justify-center text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)] transition-colors"
+        title="Minimize"
+      >
+        <Minus size={16} />
+      </button>
+      <button
+        onClick={onMaximize}
+        className="w-[46px] h-8 flex items-center justify-center text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)] transition-colors"
+        title={isMaximized ? 'Restore Down' : 'Maximize'}
+      >
+        {isMaximized ? <Copy size={13} /> : <Square size={13} />}
+      </button>
+      <button
+        onClick={onClose}
+        className="w-[46px] h-8 flex items-center justify-center text-[var(--color-text-secondary)] hover:bg-red-600 hover:text-white transition-colors"
+        title="Close"
+      >
+        <X size={16} />
+      </button>
+    </div>
+  );
+}
+
+// ============================================================================
+// Menu Types
+// ============================================================================
 
 interface MenuItem {
   label: string;
@@ -242,7 +303,6 @@ export function MenuBar() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
-  const [isMac] = useState(() => navigator.userAgent.includes('Mac'));
 
   const {
     currentLayoutName,
@@ -251,11 +311,11 @@ export function MenuBar() {
     resetToDefault,
   } = useLayoutPersistenceStore();
 
-  // Window control handlers
+  // ---- Window control handlers ----
+
   const handleMinimize = useCallback(async () => {
     try {
-      const currentWindow = Window.getCurrent();
-      await currentWindow.minimize();
+      await getAppWindow().minimize();
     } catch (error) {
       console.error('Failed to minimize window:', error);
     }
@@ -263,40 +323,66 @@ export function MenuBar() {
 
   const handleMaximize = useCallback(async () => {
     try {
-      const currentWindow = Window.getCurrent();
-      const maximized = await currentWindow.isMaximized();
+      const appWindow = getAppWindow();
+      const maximized = await appWindow.isMaximized();
       if (maximized) {
-        await currentWindow.unmaximize();
+        await appWindow.unmaximize();
       } else {
-        await currentWindow.maximize();
+        await appWindow.maximize();
       }
-      setIsMaximized(!maximized);
+      // State will be updated by the resize listener below
     } catch (error) {
       console.error('Failed to toggle maximize:', error);
     }
   }, []);
 
   const handleClose = useCallback(async () => {
+    // close() triggers onCloseRequested — the useWindowClose hook in App.tsx
+    // intercepts this to handle unsaved changes properly.
     try {
-      const currentWindow = Window.getCurrent();
-      await currentWindow.close();
+      await getAppWindow().close();
     } catch (error) {
       console.error('Failed to close window:', error);
     }
   }, []);
 
-  // Check maximized state on mount
+  // Double-click on drag region to maximize/restore (VS Code behavior)
+  const handleDragRegionDoubleClick = useCallback(() => {
+    handleMaximize();
+  }, [handleMaximize]);
+
+  // ---- Sync isMaximized state via resize events ----
+
   useEffect(() => {
-    const checkMaximized = async () => {
+    let unlisten: (() => void) | undefined;
+
+    const setup = async () => {
       try {
-        const currentWindow = Window.getCurrent();
-        const maximized = await currentWindow.isMaximized();
+        const appWindow = getAppWindow();
+
+        // Check initial state
+        const maximized = await appWindow.isMaximized();
         setIsMaximized(maximized);
+
+        // Listen for resize events to track maximize/restore
+        unlisten = await appWindow.onResized(async () => {
+          try {
+            const nowMaximized = await appWindow.isMaximized();
+            setIsMaximized(nowMaximized);
+          } catch {
+            // Ignore errors during teardown
+          }
+        });
       } catch (error) {
-        console.error('Failed to check maximized state:', error);
+        console.error('Failed to set up window resize listener:', error);
       }
     };
-    checkMaximized();
+
+    setup();
+
+    return () => {
+      if (unlisten) unlisten();
+    };
   }, []);
 
   useEffect(() => {
@@ -381,32 +467,7 @@ export function MenuBar() {
     });
   }, [buildLayoutsSubmenu]);
 
-  // Window controls component
-  const WindowControls = () => (
-    <div className="flex items-center gap-1">
-      <button
-        onClick={handleMinimize}
-        className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
-        title="Minimize"
-      >
-        <Minus size={14} />
-      </button>
-      <button
-        onClick={handleMaximize}
-        className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
-        title="Maximize"
-      >
-        <Square size={12} />
-      </button>
-      <button
-        onClick={handleClose}
-        className="w-6 h-6 flex items-center justify-center rounded hover:bg-red-600 text-gray-400 hover:text-white transition-colors"
-        title="Close"
-      >
-        <X size={14} />
-      </button>
-    </div>
-  );
+  // ---- Render ----
 
   return (
     <>
@@ -414,53 +475,73 @@ export function MenuBar() {
         isOpen={saveDialogOpen}
         onClose={() => setSaveDialogOpen(false)}
       />
-    <div
-      ref={menuRef}
-      data-testid="menu-bar"
-      className="h-8 bg-[var(--color-bg-secondary)] border-b border-gray-700 flex items-center px-2 text-sm"
-    >
-      {/* Mac: Controls on left */}
-      {isMac && <WindowControls />}
+      <div
+        ref={menuRef}
+        data-testid="menu-bar"
+        className="h-8 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)] flex items-center text-sm select-none"
+      >
+        {/* Mac: Controls on left */}
+        {IS_MAC && (
+          <WindowControls
+            isMaximized={isMaximized}
+            onMinimize={handleMinimize}
+            onMaximize={handleMaximize}
+            onClose={handleClose}
+          />
+        )}
 
-      {/* Menu items */}
-      {menus.map((menu) => (
-        <div key={menu.label} className="relative">
-          <button
-            data-testid={getMenuTestId(menu.label)}
-            className={`px-3 py-1 rounded hover:bg-gray-700 ${
-              menuOpen === menu.label ? 'bg-gray-700' : ''
-            }`}
-            onClick={() => handleMenuClick(menu.label)}
-          >
-            {menu.label}
-          </button>
+        {/* Menu items */}
+        <div className="flex items-center px-2">
+          {menus.map((menu) => (
+            <div key={menu.label} className="relative">
+              <button
+                data-testid={getMenuTestId(menu.label)}
+                className={`px-3 py-1 rounded text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] ${
+                  menuOpen === menu.label ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)]' : ''
+                }`}
+                onClick={() => handleMenuClick(menu.label)}
+              >
+                {menu.label}
+              </button>
 
-          {menuOpen === menu.label && (
-            <div className="absolute left-0 top-full mt-0.5 bg-gray-800 border border-gray-700 rounded shadow-lg min-w-48 py-1 z-50">
-              {menu.items.map((item, index) =>
-                item.separator ? (
-                  <div
-                    key={index}
-                    className="h-px bg-gray-700 my-1 mx-2"
-                  />
-                ) : (
-                  <MenuItemComponent
-                    key={item.label}
-                    item={item}
-                    onClose={() => setMenuOpen(null)}
-                  />
-                )
+              {menuOpen === menu.label && (
+                <div className="absolute left-0 top-full mt-0.5 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded shadow-lg min-w-48 py-1 z-50">
+                  {menu.items.map((item, index) =>
+                    item.separator ? (
+                      <div
+                        key={index}
+                        className="h-px bg-[var(--color-border)] my-1 mx-2"
+                      />
+                    ) : (
+                      <MenuItemComponent
+                        key={item.label}
+                        item={item}
+                        onClose={() => setMenuOpen(null)}
+                      />
+                    )
+                  )}
+                </div>
               )}
             </div>
-          )}
+          ))}
         </div>
-      ))}
 
-      {/* Drag region */}
-      <div className="flex-1" data-tauri-drag-region />
+        {/* Drag region — fills remaining space, double-click to maximize */}
+        <div
+          className="flex-1 h-full"
+          data-tauri-drag-region
+          onDoubleClick={handleDragRegionDoubleClick}
+        />
 
-      {/* Windows/Linux: Controls on right */}
-      {!isMac && <WindowControls />}
+        {/* Windows/Linux: Controls on right */}
+        {!IS_MAC && (
+          <WindowControls
+            isMaximized={isMaximized}
+            onMinimize={handleMinimize}
+            onMaximize={handleMaximize}
+            onClose={handleClose}
+          />
+        )}
       </div>
     </>
   );
@@ -489,8 +570,8 @@ function MenuItemComponent({ item, onClose }: MenuItemComponentProps) {
         data-testid={getItemTestId(item.label)}
         className={`w-full px-4 py-1.5 text-left flex items-center justify-between ${
           item.disabled
-            ? 'text-gray-500 cursor-not-allowed'
-            : 'hover:bg-gray-700'
+            ? 'text-[var(--color-text-muted)] cursor-not-allowed'
+            : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]'
         }`}
         onClick={handleClick}
         disabled={item.disabled}
@@ -498,29 +579,29 @@ function MenuItemComponent({ item, onClose }: MenuItemComponentProps) {
         <span className="flex items-center gap-2">
           {item.checked !== undefined && (
             <span className="w-4 h-4 flex items-center justify-center">
-              {item.checked && <Check size={14} className="text-blue-400" />}
+              {item.checked && <Check size={14} className="text-[var(--color-accent)]" />}
             </span>
           )}
           {item.label}
         </span>
-        <span className="text-gray-500 text-xs ml-8">
+        <span className="text-[var(--color-text-muted)] text-xs ml-8">
           {item.shortcut}
           {item.submenu && '\u25B6'}
         </span>
       </button>
 
       {item.submenu && (
-        <div className="absolute left-full top-0 ml-0.5 bg-gray-800 border border-gray-700 rounded shadow-lg min-w-40 py-1 hidden group-hover:block">
+        <div className="absolute left-full top-0 ml-0.5 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded shadow-lg min-w-40 py-1 hidden group-hover:block">
           {item.submenu.map((subItem, index) =>
             subItem.separator ? (
-              <div key={index} className="h-px bg-gray-700 my-1 mx-2" />
+              <div key={index} className="h-px bg-[var(--color-border)] my-1 mx-2" />
             ) : (
               <button
                 key={subItem.label}
                 className={`w-full px-4 py-1.5 text-left flex items-center ${
                   subItem.disabled
-                    ? 'text-gray-500 cursor-not-allowed'
-                    : 'hover:bg-gray-700'
+                    ? 'text-[var(--color-text-muted)] cursor-not-allowed'
+                    : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]'
                 }`}
                 disabled={subItem.disabled}
                 onClick={() => {
@@ -530,7 +611,7 @@ function MenuItemComponent({ item, onClose }: MenuItemComponentProps) {
               >
                 {subItem.checked !== undefined && (
                   <span className="w-4 h-4 mr-2 flex items-center justify-center">
-                    {subItem.checked && <Check size={14} className="text-blue-400" />}
+                    {subItem.checked && <Check size={14} className="text-[var(--color-accent)]" />}
                   </span>
                 )}
                 {subItem.label}
