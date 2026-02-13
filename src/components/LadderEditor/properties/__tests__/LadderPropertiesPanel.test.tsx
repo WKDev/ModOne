@@ -33,6 +33,10 @@ const { mockUIState, mockLadderDoc } = vi.hoisted(() => ({
     duplicateElement: vi.fn(() => null),
     getElementAt: vi.fn(() => undefined),
 
+    // Wire-specific operations
+    mergeWireElement: vi.fn(),
+    placeVerticalWireSpan: vi.fn(),
+
     // Comment
     updateComment: vi.fn(),
 

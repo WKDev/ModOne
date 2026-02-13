@@ -1043,6 +1043,64 @@ export function generateJunctionAtBranchPoint(
 }
 
 // ============================================================================
+// Wire Merge: mergeWireDirections()
+// ============================================================================
+
+/**
+ * Merge a new wire type onto an existing wire element.
+ * Used when placing wire_v on an existing wire_h (or vice versa)
+ * to create junctions/crosses.
+ *
+ * Combines the existing element's directions with the new wire's
+ * base directions, then resolves the merged type.
+ *
+ * @returns WireTypeUpdate if the element should change, null if no change
+ */
+export function mergeWireDirections(
+  existingElement: LadderElement,
+  newIntendedType: 'wire_h' | 'wire_v',
+  elements: Map<string, LadderElement>,
+  gridConfig: LadderGridConfig,
+  graph?: ConnectivityGraph
+): WireTypeUpdate | null {
+  if (!isWireType(existingElement.type)) return null;
+
+  // Get directions from existing element
+  const existingDirs = getElementDirections(existingElement);
+
+  // Get base directions for the new wire tool
+  const newBase = newIntendedType === 'wire_h'
+    ? (LEFT | RIGHT)
+    : (TOP | BOTTOM);
+
+  // Also consider neighbor directions at this position
+  const neighborDirs = analyzeNeighborDirections(
+    existingElement.position, elements, gridConfig, graph
+  );
+
+  // Combine all directions
+  const combined = existingDirs | newBase | neighborDirs;
+
+  // Resolve the merged type
+  const componentType = DIRECTION_TO_WIRE_TYPE[combined];
+  if (!componentType) return null;
+
+  const resolved = componentTypeToWireType(componentType);
+
+  // Check if actually changed
+  const currentDirection = (existingElement.properties as WireProperties)?.direction;
+  if (resolved.type === existingElement.type && resolved.direction === currentDirection) {
+    return null;
+  }
+
+  return {
+    elementId: existingElement.id,
+    newType: resolved.type,
+    newDirection: resolved.direction,
+  };
+}
+
+// ============================================================================
 // Phase 2 Helpers: recalculateWireType() + applyWireTypeUpdate()
 // ============================================================================
 
@@ -1127,6 +1185,8 @@ export default {
   analyzeNeighborDirections,
   resolveWireElementType,
   updateAdjacentWires,
+  // Wire merge
+  mergeWireDirections,
   // Phase 2 helpers
   recalculateWireType,
   applyWireTypeUpdate,

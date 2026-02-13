@@ -16,7 +16,7 @@ import { PowerRail } from './PowerRail';
 import { NeutralRail } from './NeutralRail';
 import { LadderCell } from './LadderCell';
 import { LadderElementRenderer } from './elements';
-import { DEFAULT_LADDER_GRID_CONFIG } from '../../types/ladder';
+import { DEFAULT_LADDER_GRID_CONFIG, isWireType } from '../../types/ladder';
 import { validatePlacement } from '../../hooks/useLadderDragDrop';
 import type { ToolboxDragData, GridElementDragData } from '../../hooks/useLadderDragDrop';
 import type { GridPosition, LadderElement, LadderElementType } from '../../types/ladder';
@@ -66,6 +66,7 @@ export function LadderGrid({
   const selectedIds = useLadderUIStore((state) => state.selectedElementIds);
   const mode = useLadderUIStore((state) => state.mode);
   const monitoringState = useLadderUIStore((state) => state.monitoringState);
+  const activeTool = useLadderUIStore((state) => state.activeTool);
   const setSelection = useLadderUIStore((state) => state.setSelection);
   const toggleSelection = useLadderUIStore((state) => state.toggleSelection);
   const addToSelection = useLadderUIStore((state) => state.addToSelection);
@@ -150,13 +151,59 @@ export function LadderGrid({
     [activeDragType, activeDragExcludeId, elements, gridConfig]
   );
 
-  // Handle cell click
+  // Wire-specific UI state
+  const lastWireVPlacement = useLadderUIStore((state) => state.lastWireVPlacement);
+  const setLastWireVPlacement = useLadderUIStore((state) => state.setLastWireVPlacement);
+
+  // Handle cell click — includes click-to-place for active tool
   const handleCellClick = useCallback(
     (position: GridPosition, shiftKey: boolean, ctrlKey: boolean) => {
       if (isReadonly) return;
 
       const element = getElementAt(position.row, position.col);
 
+      // === Wire-specific tool behavior ===
+      if (activeTool && ladderDoc) {
+        // Feature 2: Shift+Click vertical spanning (wire_v tool + Shift + same column)
+        if (activeTool === 'wire_v' && shiftKey && lastWireVPlacement && lastWireVPlacement.col === position.col) {
+          ladderDoc.placeVerticalWireSpan(position.col, lastWireVPlacement.row, position.row);
+          setLastWireVPlacement(position);
+          return;
+        }
+
+        // Feature 1: Wire-on-wire merge (wire tool on existing wire element)
+        if (element && isWireType(activeTool) && isWireType(element.type)) {
+          ladderDoc.mergeWireElement(element.id, activeTool as 'wire_h' | 'wire_v');
+          // Track placement for vertical spanning
+          if (activeTool === 'wire_v') {
+            setLastWireVPlacement(position);
+          }
+          return;
+        }
+
+        // Standard tool placement on empty cell
+        if (!element) {
+          const validation = validatePlacement(
+            activeTool,
+            position,
+            elements,
+            gridConfig,
+          );
+          if (validation.valid) {
+            const newId = ladderDoc.addElement(activeTool, position);
+            if (newId) {
+              setSelection([newId]);
+              // Track wire_v placement for Shift+Click spanning
+              if (activeTool === 'wire_v') {
+                setLastWireVPlacement(position);
+              }
+            }
+          }
+          return;
+        }
+      }
+
+      // === Standard selection behavior ===
       if (ctrlKey && element) {
         // Toggle selection
         toggleSelection(element.id);
@@ -171,7 +218,7 @@ export function LadderGrid({
         clearSelection();
       }
     },
-    [isReadonly, getElementAt, toggleSelection, addToSelection, setSelection, clearSelection]
+    [isReadonly, getElementAt, activeTool, elements, gridConfig, ladderDoc, lastWireVPlacement, toggleSelection, addToSelection, setSelection, clearSelection, setLastWireVPlacement]
   );
 
   // Handle cell double-click
@@ -218,6 +265,7 @@ export function LadderGrid({
             element={element}
             isSelected={isSelected}
             isValidDropTarget={isValidDropTarget(row, col)}
+            hasActiveTool={!!activeTool}
             readonly={isReadonly}
             onClick={handleCellClick}
             onDoubleClick={handleCellDoubleClick}

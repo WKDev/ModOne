@@ -38,6 +38,7 @@ import {
   recalculateWireType,
   applyWireTypeUpdate,
   recalculateAllWireTypes,
+  mergeWireDirections,
 } from '../../components/LadderEditor/utils/wireGenerator';
 import type { WireProperties } from '../../types/ladder';
 
@@ -61,6 +62,10 @@ export interface UseLadderDocumentReturn {
   updateElement: (id: string, updates: Partial<LadderElement>) => void;
   duplicateElement: (id: string) => string | null;
   getElementAt: (row: number, col: number) => LadderElement | undefined;
+
+  // Wire-specific operations
+  mergeWireElement: (existingId: string, newWireType: 'wire_h' | 'wire_v') => void;
+  placeVerticalWireSpan: (col: number, startRow: number, endRow: number) => void;
 
   // Comment
   updateComment: (comment: string) => void;
@@ -440,6 +445,134 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
     [documentId, data, pushHistoryAction, updateLadderData]
   );
 
+  // Wire-specific operations
+
+  /**
+   * Merge a new wire type onto an existing wire element.
+   * When placing wire_v on wire_h → creates junction/cross.
+   */
+  const mergeWireElement = useCallback(
+    (existingId: string, newWireType: 'wire_h' | 'wire_v') => {
+      if (!documentId || !data) return;
+
+      const existing = data.elements.get(existingId);
+      if (!existing || !isWireType(existing.type)) return;
+
+      pushHistoryAction(documentId, `Merge ${newWireType} onto ${existing.type}`);
+      updateLadderData(documentId, (docData) => {
+        const el = docData.elements.get(existingId);
+        if (!el) return;
+
+        // Merge directions: existing + new tool + neighbors
+        const mergeUpdate = mergeWireDirections(el, newWireType, docData.elements, docData.gridConfig);
+        if (mergeUpdate) {
+          applyWireTypeUpdate(el, mergeUpdate);
+        }
+
+        // Update adjacent wires after merge
+        const adjacentUpdates = updateAdjacentWires(el.position, docData.elements, docData.gridConfig);
+        for (const update of adjacentUpdates) {
+          const adjElement = docData.elements.get(update.elementId);
+          if (adjElement && isWireType(adjElement.type)) {
+            applyWireTypeUpdate(adjElement, update);
+          }
+        }
+      });
+    },
+    [documentId, data, pushHistoryAction, updateLadderData]
+  );
+
+  /**
+   * Place vertical wire spanning multiple rows.
+   * Auto-merges with existing wire elements at each cell.
+   * Creates junctions at endpoints where vertical meets horizontal.
+   */
+  const placeVerticalWireSpan = useCallback(
+    (col: number, startRow: number, endRow: number) => {
+      if (!documentId || !data) return;
+
+      const minRow = Math.min(startRow, endRow);
+      const maxRow = Math.max(startRow, endRow);
+      if (minRow === maxRow) return; // Need at least 2 rows
+
+      pushHistoryAction(documentId, `Place vertical wire span row ${minRow}-${maxRow} col ${col}`);
+      updateLadderData(documentId, (docData) => {
+        const placedPositions: GridPosition[] = [];
+
+        for (let row = minRow; row <= maxRow; row++) {
+          const position: GridPosition = { row, col };
+
+          // Check if cell is occupied
+          let existingElement: LadderElement | undefined;
+          for (const el of docData.elements.values()) {
+            if (el.position.row === row && el.position.col === col) {
+              existingElement = el;
+              break;
+            }
+          }
+
+          if (existingElement) {
+            if (isWireType(existingElement.type)) {
+              // Merge wire_v onto existing wire element (auto-junction)
+              const mergeUpdate = mergeWireDirections(
+                existingElement, 'wire_v', docData.elements, docData.gridConfig
+              );
+              if (mergeUpdate) {
+                applyWireTypeUpdate(existingElement, mergeUpdate);
+              }
+              placedPositions.push(position);
+            }
+            // Non-wire element: skip (can't overwrite contacts/coils)
+          } else {
+            // Empty cell: place wire_v
+            if (col >= 0 && col < docData.gridConfig.columns && row >= 0) {
+              const resolved = resolveWireElementType(
+                position, 'wire_v', docData.elements, docData.gridConfig
+              );
+              const id = generateId(resolved.type);
+              const props = resolved.direction
+                ? { direction: resolved.direction } as WireProperties
+                : {} as WireProperties;
+
+              const newElement: LadderElement = {
+                id,
+                type: resolved.type,
+                position: { ...position },
+                properties: props,
+              } as LadderElement;
+
+              docData.elements.set(id, newElement);
+              placedPositions.push(position);
+            }
+          }
+        }
+
+        // After all elements placed/merged, recalculate all affected wires
+        for (const pos of placedPositions) {
+          // Recalculate self
+          for (const el of docData.elements.values()) {
+            if (el.position.row === pos.row && el.position.col === pos.col && isWireType(el.type)) {
+              const selfUpdate = recalculateWireType(el, docData.elements, docData.gridConfig);
+              if (selfUpdate) {
+                applyWireTypeUpdate(el, selfUpdate);
+              }
+              break;
+            }
+          }
+          // Update adjacent wires
+          const adjacentUpdates = updateAdjacentWires(pos, docData.elements, docData.gridConfig);
+          for (const update of adjacentUpdates) {
+            const adjElement = docData.elements.get(update.elementId);
+            if (adjElement && isWireType(adjElement.type)) {
+              applyWireTypeUpdate(adjElement, update);
+            }
+          }
+        }
+      });
+    },
+    [documentId, data, pushHistoryAction, updateLadderData]
+  );
+
   // Comment
   const updateComment = useCallback(
     (comment: string) => {
@@ -594,6 +727,10 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
       duplicateElement,
       getElementAt,
 
+      // Wire-specific operations
+      mergeWireElement,
+      placeVerticalWireSpan,
+
       // Comment
       updateComment,
 
@@ -624,6 +761,8 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
     removeElement,
     moveElement,
     updateElement,
+    mergeWireElement,
+    placeVerticalWireSpan,
     updateComment,
     setGridConfig,
     undo,

@@ -2,7 +2,7 @@ import { enableMapSet } from 'immer';
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
-import type { LadderElement, LadderMonitoringState } from '../types/ladder';
+import type { LadderElement, LadderElementType, LadderMonitoringState, GridPosition } from '../types/ladder';
 import { createEmptyMonitoringState } from '../types/ladder';
 
 enableMapSet();
@@ -12,6 +12,10 @@ export interface LadderUIState {
   clipboard: LadderElement[];
   mode: 'edit' | 'monitor';
   monitoringState: LadderMonitoringState | null;
+  /** Currently selected tool type for click-to-place (GxWorks-style) */
+  activeTool: LadderElementType | null;
+  /** Last placed wire_v position for Shift+Click vertical spanning */
+  lastWireVPlacement: GridPosition | null;
 }
 
 export interface LadderUIActions {
@@ -24,6 +28,11 @@ export interface LadderUIActions {
 
   setClipboard: (elements: LadderElement[]) => void;
   clearClipboard: () => void;
+
+  setActiveTool: (type: LadderElementType) => void;
+  clearActiveTool: () => void;
+
+  setLastWireVPlacement: (position: GridPosition | null) => void;
 
   startMonitoring: () => void;
   stopMonitoring: () => void;
@@ -41,6 +50,8 @@ const createInitialState = (): LadderUIState => ({
   clipboard: [],
   mode: 'edit',
   monitoringState: null,
+  activeTool: null,
+  lastWireVPlacement: null,
 });
 
 export const useLadderUIStore = create<LadderUIStore>()(
@@ -132,6 +143,37 @@ export const useLadderUIStore = create<LadderUIStore>()(
         );
       },
 
+      setActiveTool: (type) => {
+        set(
+          (state) => {
+            state.activeTool = type;
+          },
+          false,
+          `setActiveTool/${type}`
+        );
+      },
+
+      clearActiveTool: () => {
+        set(
+          (state) => {
+            state.activeTool = null;
+            state.lastWireVPlacement = null;
+          },
+          false,
+          'clearActiveTool'
+        );
+      },
+
+      setLastWireVPlacement: (position) => {
+        set(
+          (state) => {
+            state.lastWireVPlacement = position;
+          },
+          false,
+          'setLastWireVPlacement'
+        );
+      },
+
       startMonitoring: () => {
         set(
           (state) => {
@@ -217,6 +259,8 @@ export const useLadderUIStore = create<LadderUIStore>()(
             ...createInitialState(),
             selectedElementIds: new Set(),
             clipboard: [],
+            activeTool: null,
+            lastWireVPlacement: null,
           }),
           false,
           'reset'
@@ -231,5 +275,6 @@ export const selectSelectedElementIds = (state: LadderUIStore) => state.selected
 export const selectClipboard = (state: LadderUIStore) => state.clipboard;
 export const selectMode = (state: LadderUIStore) => state.mode;
 export const selectMonitoringState = (state: LadderUIStore) => state.monitoringState;
+export const selectActiveTool = (state: LadderUIStore) => state.activeTool;
 
 export default useLadderUIStore;
