@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { Check, Minus, Square, Copy, X } from 'lucide-react';
-import { Window } from '@tauri-apps/api/window';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useLayoutPersistenceStore } from '../../stores/layoutPersistenceStore';
 import { SaveLayoutDialog } from './SaveLayoutDialog';
@@ -19,13 +19,7 @@ const IS_MAC = navigator.userAgent.includes('Mac');
 // Cached Tauri window reference
 // ============================================================================
 
-let _appWindow: Window | null = null;
-function getAppWindow(): Window {
-  if (!_appWindow) {
-    _appWindow = Window.getCurrent();
-  }
-  return _appWindow;
-}
+const appWindow = getCurrentWindow();
 
 // ============================================================================
 // Window Controls Component (extracted to avoid re-creation on every render)
@@ -315,7 +309,7 @@ export function MenuBar() {
 
   const handleMinimize = useCallback(async () => {
     try {
-      await getAppWindow().minimize();
+      await appWindow.minimize();
     } catch (error) {
       console.error('Failed to minimize window:', error);
     }
@@ -323,13 +317,7 @@ export function MenuBar() {
 
   const handleMaximize = useCallback(async () => {
     try {
-      const appWindow = getAppWindow();
-      const maximized = await appWindow.isMaximized();
-      if (maximized) {
-        await appWindow.unmaximize();
-      } else {
-        await appWindow.maximize();
-      }
+      await appWindow.toggleMaximize();
       // State will be updated by the resize listener below
     } catch (error) {
       console.error('Failed to toggle maximize:', error);
@@ -340,7 +328,7 @@ export function MenuBar() {
     // close() triggers onCloseRequested — the useWindowClose hook in App.tsx
     // intercepts this to handle unsaved changes properly.
     try {
-      await getAppWindow().close();
+      await appWindow.close();
     } catch (error) {
       console.error('Failed to close window:', error);
     }
@@ -358,8 +346,6 @@ export function MenuBar() {
 
     const setup = async () => {
       try {
-        const appWindow = getAppWindow();
-
         // Check initial state
         const maximized = await appWindow.isMaximized();
         setIsMaximized(maximized);
