@@ -160,19 +160,31 @@ export function useLadderKeyboardShortcuts(
       return;
     }
 
-    const firstElement = clipboard[0];
-    const baseRow = firstElement.position.row;
-    const baseCol = firstElement.position.col;
-    const targetPosition = { row: baseRow + 1, col: baseCol };
-    const offsetRow = targetPosition.row - baseRow;
-    const offsetCol = targetPosition.col - baseCol;
-
-    const newIds: string[] = [];
     const registry = useDocumentRegistry.getState();
     const doc = registry.getDocument(documentId);
     if (!doc || !isLadderDocument(doc)) {
       return;
     }
+
+    const firstElement = clipboard[0];
+    const baseRow = firstElement.position.row;
+    const baseCol = firstElement.position.col;
+
+    // Search downward for first available row (starting at row+1)
+    let offsetRow = 1;
+    const offsetCol = 0;
+    const maxAttempts = 20;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const testRow = baseRow + offsetRow;
+      const testCol = baseCol + offsetCol;
+      const occupied = [...doc.data.elements.values()].some(
+        (el) => el.position.row === testRow && el.position.col === testCol
+      );
+      if (!occupied) break;
+      offsetRow++;
+    }
+
+    const newIds: string[] = [];
 
     registry.pushHistory(documentId, `Paste ${clipboard.length} element(s)`);
     registry.updateLadderData(documentId, (data) => {

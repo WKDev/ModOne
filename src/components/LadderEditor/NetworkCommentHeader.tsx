@@ -144,7 +144,7 @@ export function NetworkCommentHeader({
   return (
     <div
       className={cn(
-        'bg-neutral-900/70 border-b border-neutral-700',
+        'group bg-neutral-900/70 border-b border-neutral-700',
         'cursor-pointer transition-colors',
         editable && 'hover:bg-neutral-800/70',
         className

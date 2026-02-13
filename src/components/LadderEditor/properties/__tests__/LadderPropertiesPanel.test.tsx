@@ -7,16 +7,52 @@ import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 import { LadderPropertiesPanel } from '../LadderPropertiesPanel';
 import { useLadderDocument } from '../../../../stores/hooks/useLadderDocument';
 import { useLadderUIStore } from '../../../../stores/ladderUIStore';
-import type { ContactElement, CoilElement, TimerElement, CounterElement, LadderElement } from '../../../../types/ladder';
+import type { ContactElement, CoilElement, TimerElement, CounterElement, LadderElement, LadderWire } from '../../../../types/ladder';
+import type { LadderUIStore } from '../../../../stores/ladderUIStore';
 
 const { mockUIState, mockLadderDoc } = vi.hoisted(() => ({
   mockUIState: {
     selectedElementIds: new Set<string>(),
+    clipboard: [] as LadderElement[],
     mode: 'edit' as 'edit' | 'monitor',
+    monitoringState: null,
   },
   mockLadderDoc: {
+    // Data
     elements: new Map<string, LadderElement>(),
+    wires: [] as LadderWire[],
+    comment: undefined as string | undefined,
+    gridConfig: { columns: 10, cellWidth: 80, cellHeight: 60 },
+    isDirty: false,
+
+    // Element operations
+    addElement: vi.fn(() => null),
+    removeElement: vi.fn(),
+    moveElement: vi.fn(),
     updateElement: vi.fn(),
+    duplicateElement: vi.fn(() => null),
+    getElementAt: vi.fn(() => undefined),
+
+    // Comment
+    updateComment: vi.fn(),
+
+    // Grid configuration
+    setGridConfig: vi.fn(),
+
+    // History operations
+    undo: vi.fn(),
+    redo: vi.fn(),
+    canUndo: false,
+    canRedo: false,
+    pushHistory: vi.fn(),
+
+    // AST integration
+    loadFromAST: vi.fn(),
+    exportToAST: vi.fn(() => null),
+
+    // Utility
+    clearAll: vi.fn(),
+    markSaved: vi.fn(),
   },
 }));
 
@@ -34,8 +70,8 @@ vi.mock('../../../../stores/hooks/useLadderDocument', () => ({
 
 vi.mock('../../../../stores/ladderUIStore', () => ({
   useLadderUIStore: vi.fn(
-    (selector: (state: { selectedElementIds: Set<string>; mode: 'edit' | 'monitor' }) => unknown) =>
-      selector(mockUIState)
+    (selector: (state: LadderUIStore) => unknown) =>
+      selector(mockUIState as unknown as LadderUIStore)
   ),
 }));
 
@@ -100,8 +136,8 @@ describe('LadderPropertiesPanel', () => {
     setSelection([], 'edit');
     vi.mocked(useLadderDocument).mockReturnValue(mockLadderDoc);
     vi.mocked(useLadderUIStore).mockImplementation(
-      (selector: (state: { selectedElementIds: Set<string>; mode: 'edit' | 'monitor' }) => unknown) =>
-        selector(mockUIState)
+      (selector: (state: LadderUIStore) => unknown) =>
+        selector(mockUIState as unknown as LadderUIStore)
     );
   });
 

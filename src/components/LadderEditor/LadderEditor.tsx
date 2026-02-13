@@ -203,8 +203,18 @@ export function LadderEditor({
                 editable={!isMonitorMode}
               />
 
-              {/* Grid container */}
-              <div className="flex-1 overflow-auto p-4">
+              {/* Grid container - onKeyDown stops arrow key propagation so
+                  the scroll container doesn't consume them before the grid */}
+              <div
+                className="flex-1 overflow-auto p-4"
+                onKeyDown={(e) => {
+                  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                    // Let the global keyboard shortcut handler manage navigation
+                    // Prevent the scroll container from scrolling on arrow keys
+                    e.preventDefault();
+                  }
+                }}
+              >
                 <LadderGrid
                   readonly={isMonitorMode}
                   showRowNumbers

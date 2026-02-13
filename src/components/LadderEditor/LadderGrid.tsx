@@ -6,7 +6,8 @@
  * Supports element placement, selection, and keyboard navigation.
  */
 
-import { useCallback, useMemo, useRef, useEffect } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
+import { useDndContext } from '@dnd-kit/core';
 import { cn } from '../../lib/utils';
 import { useDocumentContext } from '../../contexts/DocumentContext';
 import { useLadderDocument } from '../../stores/hooks/useLadderDocument';
@@ -16,7 +17,9 @@ import { NeutralRail } from './NeutralRail';
 import { LadderCell } from './LadderCell';
 import { LadderElementRenderer } from './elements';
 import { DEFAULT_LADDER_GRID_CONFIG } from '../../types/ladder';
-import type { GridPosition, LadderElement } from '../../types/ladder';
+import { validatePlacement } from '../../hooks/useLadderDragDrop';
+import type { ToolboxDragData, GridElementDragData } from '../../hooks/useLadderDragDrop';
+import type { GridPosition, LadderElement, LadderElementType } from '../../types/ladder';
 
 export interface LadderGridProps {
   /** Number of columns (default: from store config) */
@@ -118,6 +121,35 @@ export function LadderGrid({
     [selectedIds]
   );
 
+  // Get active drag element type for real-time drop validation
+  const { active: activeDrag } = useDndContext();
+  const activeDragType: LadderElementType | null = useMemo(() => {
+    if (!activeDrag?.data.current) return null;
+    const data = activeDrag.data.current as ToolboxDragData | GridElementDragData;
+    return data.elementType ?? null;
+  }, [activeDrag]);
+  const activeDragExcludeId: string | undefined = useMemo(() => {
+    if (!activeDrag?.data.current) return undefined;
+    const data = activeDrag.data.current as ToolboxDragData | GridElementDragData;
+    return data.type === 'grid-element' ? data.elementId : undefined;
+  }, [activeDrag]);
+
+  // Validate drop target for a specific cell during drag
+  const isValidDropTarget = useCallback(
+    (row: number, col: number): boolean => {
+      if (!activeDragType) return true; // No drag active, default valid
+      const result = validatePlacement(
+        activeDragType,
+        { row, col },
+        elements,
+        gridConfig,
+        activeDragExcludeId
+      );
+      return result.valid;
+    },
+    [activeDragType, activeDragExcludeId, elements, gridConfig]
+  );
+
   // Handle cell click
   const handleCellClick = useCallback(
     (position: GridPosition, shiftKey: boolean, ctrlKey: boolean) => {
@@ -155,25 +187,9 @@ export function LadderGrid({
     [isReadonly, getElementAt]
   );
 
-  // Handle keyboard navigation
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container || isReadonly) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // TODO: Implement keyboard navigation in Task 78
-      // For now, just handle Delete key
-      if (e.key === 'Delete' && selectedIds.size > 0) {
-        selectedIds.forEach((id) => {
-          ladderDoc?.removeElement(id);
-        });
-        useLadderUIStore.getState().clearSelection();
-      }
-    };
-
-    container.addEventListener('keydown', handleKeyDown);
-    return () => container.removeEventListener('keydown', handleKeyDown);
-  }, [isReadonly, selectedIds, ladderDoc]);
+  // NOTE: Keyboard shortcuts (Delete, Ctrl+Z, Ctrl+C, etc.) are handled
+  // globally by useLadderKeyboardShortcuts hook in LadderEditor.
+  // Do NOT add local keydown handlers here to avoid duplicate actions.
 
   // Calculate total grid width
   const railWidth = 30;
@@ -201,6 +217,7 @@ export function LadderGrid({
             height={cellHeight}
             element={element}
             isSelected={isSelected}
+            isValidDropTarget={isValidDropTarget(row, col)}
             readonly={isReadonly}
             onClick={handleCellClick}
             onDoubleClick={handleCellDoubleClick}
@@ -230,8 +247,8 @@ export function LadderGrid({
     columnCount,
     cellWidth,
     cellHeight,
-    readonly,
     isReadonly,
+    isValidDropTarget,
     getElementAt,
     isElementSelected,
     handleCellClick,

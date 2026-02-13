@@ -18,7 +18,7 @@ import { cn } from '../../lib/utils';
 import { useDocumentContext } from '../../contexts/DocumentContext';
 import { useLadderDocument } from '../../stores/hooks/useLadderDocument';
 import { useLadderUIStore } from '../../stores/ladderUIStore';
-import type { GridPosition, LadderElement } from '../../types/ladder';
+import type { LadderElement } from '../../types/ladder';
 
 export interface LadderToolbarProps {
   /** Optional class name */
@@ -117,9 +117,20 @@ export function LadderToolbar({ className }: LadderToolbarProps) {
 
     const firstElement = clipboard[0];
     const basePosition = firstElement.position;
-    const targetPosition: GridPosition = { row: basePosition.row + 1, col: basePosition.col };
-    const offsetRow = targetPosition.row - basePosition.row;
-    const offsetCol = targetPosition.col - basePosition.col;
+
+    // Try row+1 first, then search downward for first available row
+    let offsetRow = 1;
+    const offsetCol = 0;
+    const maxAttempts = 20;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const testRow = basePosition.row + offsetRow;
+      const testCol = basePosition.col + offsetCol;
+      const occupied = [...ladderDoc.elements.values()].some(
+        (el) => el.position.row === testRow && el.position.col === testCol
+      );
+      if (!occupied) break;
+      offsetRow++;
+    }
 
     const newIds: string[] = [];
     clipboard.forEach((element) => {
