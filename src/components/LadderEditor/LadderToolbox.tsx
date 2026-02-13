@@ -1,12 +1,12 @@
 /**
  * LadderToolbox Component
  *
- * Provides a draggable toolbox with all ladder element types organized
- * by category. Elements can be dragged onto the ladder grid.
+ * GxWorks-style compact horizontal toolbar with small icon buttons.
+ * Click a button to select the active tool, then click grid cells to place elements.
  */
 
-import { useDraggable } from '@dnd-kit/core';
 import { cn } from '../../lib/utils';
+import { useLadderUIStore } from '../../stores/ladderUIStore';
 import type { LadderElementType } from '../../types/ladder';
 
 // ============================================================================
@@ -22,7 +22,7 @@ export interface ToolboxItem {
   /** Visual icon/symbol */
   icon: string;
   /** Category for grouping */
-  category: 'contact' | 'coil' | 'timer' | 'counter' | 'compare';
+  category: 'contact' | 'coil' | 'wire' | 'timer' | 'counter' | 'compare';
   /** Description for tooltip */
   description?: string;
 }
@@ -32,8 +32,6 @@ export interface LadderToolboxProps {
   disabled?: boolean;
   /** Additional class names */
   className?: string;
-  /** Orientation: vertical (sidebar) or horizontal (toolbar) */
-  orientation?: 'vertical' | 'horizontal';
 }
 
 // ============================================================================
@@ -92,6 +90,22 @@ const TOOLBOX_ITEMS: ToolboxItem[] = [
     icon: '─(R)─',
     category: 'coil',
     description: 'Reset coil - unlatches when input is true',
+  },
+
+  // Wires
+  {
+    type: 'wire_h',
+    label: 'Horizontal Line',
+    icon: '───',
+    category: 'wire',
+    description: 'Horizontal connection line',
+  },
+  {
+    type: 'wire_v',
+    label: 'Vertical Line',
+    icon: '│',
+    category: 'wire',
+    description: 'Vertical connection line',
   },
 
   // Timers
@@ -163,11 +177,25 @@ const TOOLBOX_ITEMS: ToolboxItem[] = [
     description: 'Greater than comparison',
   },
   {
+    type: 'compare_ge',
+    label: 'Greater or Equal',
+    icon: '>=',
+    category: 'compare',
+    description: 'Greater than or equal comparison',
+  },
+  {
     type: 'compare_lt',
     label: 'Less Than',
     icon: '<',
     category: 'compare',
     description: 'Less than comparison',
+  },
+  {
+    type: 'compare_le',
+    label: 'Less or Equal',
+    icon: '<=',
+    category: 'compare',
+    description: 'Less than or equal comparison',
   },
 ];
 
@@ -175,56 +203,54 @@ const TOOLBOX_ITEMS: ToolboxItem[] = [
 const CATEGORIES: { id: ToolboxItem['category']; label: string }[] = [
   { id: 'contact', label: 'Contacts' },
   { id: 'coil', label: 'Coils' },
+  { id: 'wire', label: 'Lines' },
   { id: 'timer', label: 'Timers' },
   { id: 'counter', label: 'Counters' },
-  { id: 'compare', label: 'Comparison' },
+  { id: 'compare', label: 'Compare' },
 ];
 
 // ============================================================================
-// Draggable Toolbox Item
+// ToolboxButton — Compact icon button for a single element type
 // ============================================================================
 
-interface DraggableToolboxItemProps {
+interface ToolboxButtonProps {
   item: ToolboxItem;
-  disabled?: boolean;
+  isActive: boolean;
+  disabled: boolean;
+  onClick: () => void;
 }
 
-function DraggableToolboxItem({ item, disabled = false }: DraggableToolboxItemProps) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `toolbox-${item.type}`,
-    data: {
-      type: 'toolbox-item',
-      elementType: item.type,
-      item,
-    },
-    disabled,
-  });
-
+function ToolboxButton({ item, isActive, disabled, onClick }: ToolboxButtonProps) {
   return (
     <button
-      ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      className={cn(
-        'flex items-center gap-2 px-2 py-1.5 rounded',
-        'text-sm text-left w-full',
-        'border border-transparent',
-        'transition-all duration-150',
-        disabled
-          ? 'opacity-50 cursor-not-allowed bg-neutral-800'
-          : 'hover:bg-neutral-700 hover:border-neutral-600 cursor-grab active:cursor-grabbing',
-        isDragging && 'opacity-50 ring-2 ring-blue-500'
-      )}
-      title={item.description}
-      disabled={disabled}
       type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={`${item.label}${item.description ? ` — ${item.description}` : ''}`}
+      className={cn(
+        'flex items-center justify-center',
+        'min-w-[30px] h-[28px] px-1.5 rounded',
+        'font-mono text-[10px] leading-none',
+        'transition-colors duration-100',
+        'border border-transparent',
+        disabled
+          ? 'opacity-40 cursor-not-allowed text-neutral-500'
+          : isActive
+            ? 'bg-blue-600 text-white border-blue-500 hover:bg-blue-500'
+            : 'text-neutral-300 hover:bg-neutral-700 hover:text-neutral-100 hover:border-neutral-600'
+      )}
     >
-      <span className="font-mono text-xs text-neutral-400 w-12 text-center shrink-0">
-        {item.icon}
-      </span>
-      <span className="text-neutral-200 truncate">{item.label}</span>
+      {item.icon}
     </button>
   );
+}
+
+// ============================================================================
+// ToolboxSeparator — Thin vertical divider between category groups
+// ============================================================================
+
+function ToolboxSeparator() {
+  return <div className="w-px h-5 bg-neutral-600 mx-0.5 shrink-0" />;
 }
 
 // ============================================================================
@@ -232,78 +258,65 @@ function DraggableToolboxItem({ item, disabled = false }: DraggableToolboxItemPr
 // ============================================================================
 
 /**
- * LadderToolbox - Draggable element toolbox for the Ladder Editor
+ * LadderToolbox - GxWorks-style compact horizontal element toolbar
+ *
+ * Click a button to select it as the active placement tool.
+ * Click again (or press Escape) to deselect.
  */
 export function LadderToolbox({
   disabled = false,
   className,
-  orientation = 'vertical',
 }: LadderToolboxProps) {
+  const activeTool = useLadderUIStore((state) => state.activeTool);
+  const setActiveTool = useLadderUIStore((state) => state.setActiveTool);
+  const clearActiveTool = useLadderUIStore((state) => state.clearActiveTool);
+
+  const handleToolClick = (type: LadderElementType) => {
+    if (disabled) return;
+    if (activeTool === type) {
+      clearActiveTool();
+    } else {
+      setActiveTool(type);
+    }
+  };
+
   // Group items by category
-  const itemsByCategory = CATEGORIES.map((category) => ({
+  const groups = CATEGORIES.map((category) => ({
     ...category,
     items: TOOLBOX_ITEMS.filter((item) => item.category === category.id),
   }));
 
-  if (orientation === 'horizontal') {
-    return (
-      <div
-        className={cn(
-          'flex items-center gap-1 p-1',
-          'bg-neutral-800 border-b border-neutral-700',
-          className
-        )}
-      >
-        {TOOLBOX_ITEMS.map((item) => (
-          <DraggableToolboxItem key={item.type} item={item} disabled={disabled} />
-        ))}
-      </div>
-    );
-  }
-
   return (
     <div
       className={cn(
-        'flex flex-col w-48 h-full',
-        'bg-neutral-800 border-r border-neutral-700',
-        'overflow-y-auto',
+        'flex items-center gap-0.5 px-2 py-1',
+        'bg-neutral-800 border-b border-neutral-700',
+        'overflow-x-auto',
         className
       )}
     >
-      {/* Header */}
-      <div className="px-3 py-2 border-b border-neutral-700">
-        <h3 className="text-sm font-medium text-neutral-200">Elements</h3>
-        <p className="text-xs text-neutral-500 mt-0.5">
-          Drag to grid
-        </p>
-      </div>
+      {groups.map((group, groupIndex) => (
+        <div key={group.id} className="flex items-center gap-0.5 shrink-0">
+          {/* Separator before group (skip first) */}
+          {groupIndex > 0 && <ToolboxSeparator />}
 
-      {/* Categories */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-4">
-        {itemsByCategory.map((category) => (
-          <div key={category.id}>
-            <h4 className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1 px-1">
-              {category.label}
-            </h4>
-            <div className="space-y-0.5">
-              {category.items.map((item) => (
-                <DraggableToolboxItem
-                  key={item.type}
-                  item={item}
-                  disabled={disabled}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+          {/* Category label */}
+          <span className="text-[9px] text-neutral-500 uppercase tracking-wider mr-0.5 select-none whitespace-nowrap">
+            {group.label}
+          </span>
 
-      {/* Help text */}
-      <div className="px-3 py-2 border-t border-neutral-700">
-        <p className="text-xs text-neutral-500">
-          {disabled ? 'Disabled in monitor mode' : 'Double-click to configure'}
-        </p>
-      </div>
+          {/* Buttons */}
+          {group.items.map((item) => (
+            <ToolboxButton
+              key={item.type}
+              item={item}
+              isActive={activeTool === item.type}
+              disabled={disabled}
+              onClick={() => handleToolClick(item.type)}
+            />
+          ))}
+        </div>
+      ))}
     </div>
   );
 }

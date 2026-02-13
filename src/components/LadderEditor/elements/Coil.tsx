@@ -53,14 +53,14 @@ export function Coil({
   const colors = getElementColors(false, isEnergized, isForced);
   const { strokeWidth, labelFontSize, symbolFontSize } = ELEMENT_DIMENSIONS;
 
-  // SVG viewBox dimensions
-  const viewBoxWidth = 60;
-  const viewBoxHeight = 40;
+  // Use actual pixel dimensions as viewBox for 1:1 mapping (no scaling mismatch)
+  const viewBoxWidth = width;
+  const viewBoxHeight = height;
 
   // Coil symbol dimensions
   const radius = 9;
   const centerX = viewBoxWidth / 2;
-  const centerY = (viewBoxHeight - 10) / 2; // Offset up for label space
+  const centerY = viewBoxHeight / 2; // Matches Wire.tsx horizontal at height/2
 
   return (
     <div

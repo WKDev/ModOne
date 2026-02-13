@@ -608,7 +608,12 @@ export function analyzeNeighborDirections(
 ): number {
   // Phase 5: Use graph for O(1) lookups when available
   if (graph) {
-    return graph.getConnectedDirections(position);
+    let graphResult = graph.getConnectedDirections(position);
+    // Row 0 has no row above — suppress TOP direction to prevent upward branch connections
+    if (position.row === 0) {
+      graphResult &= ~TOP;
+    }
+    return graphResult;
   }
 
   let result = WireDirection.NONE;
@@ -652,6 +657,11 @@ export function analyzeNeighborDirections(
   }
   if (col === gridConfig.columns - 1) {
     result |= RIGHT; // NeutralRail
+  }
+
+  // Row 0 has no row above — suppress TOP direction to prevent upward branch connections
+  if (row === 0) {
+    result &= ~TOP;
   }
 
   return result;

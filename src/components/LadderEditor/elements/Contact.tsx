@@ -54,18 +54,18 @@ export function Contact({
   const colors = getElementColors(true, isEnergized, isForced);
   const { strokeWidth, labelFontSize } = ELEMENT_DIMENSIONS;
 
-  // SVG viewBox dimensions
-  const viewBoxWidth = 60;
-  const viewBoxHeight = 40;
+  // Use actual pixel dimensions as viewBox for 1:1 mapping (no scaling mismatch)
+  const viewBoxWidth = width;
+  const viewBoxHeight = height;
 
   // Contact symbol dimensions
   const symbolWidth = 20;
   const symbolHeight = 20;
   const symbolX = (viewBoxWidth - symbolWidth) / 2;
-  const symbolY = (viewBoxHeight - symbolHeight) / 2 - 4; // Offset up for label space
+  const symbolY = viewBoxHeight / 2 - symbolHeight / 2 - 4; // Offset up for label space
 
-  // Connection line positions
-  const lineY = symbolY + symbolHeight / 2;
+  // Connection line positions — matches Wire.tsx horizontal at height/2
+  const lineY = viewBoxHeight / 2;
 
   return (
     <div

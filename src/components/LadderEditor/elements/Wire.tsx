@@ -55,8 +55,9 @@ function getWirePath(
   width: number,
   height: number
 ): { d: string; type: 'path' } | { lines: Array<{ x1: number; y1: number; x2: number; y2: number }> } {
-  const centerX = width / 2;
   const centerY = height / 2;
+  // Vertical wires render on the LEFT side of the cell (1px offset for stroke visibility)
+  const leftX = 1;
 
   switch (type) {
     case 'horizontal':
@@ -66,81 +67,81 @@ function getWirePath(
       };
 
     case 'vertical':
-      // │
+      // │ (left-aligned)
       return {
-        lines: [{ x1: centerX, y1: 0, x2: centerX, y2: height }],
+        lines: [{ x1: leftX, y1: 0, x2: leftX, y2: height }],
       };
 
     case 'corner_tl':
-      // ┌──
+      // ┌── (vertical from bottom to center, then horizontal to right)
       return {
-        d: `M ${centerX} ${height} L ${centerX} ${centerY} L ${width} ${centerY}`,
+        d: `M ${leftX} ${height} L ${leftX} ${centerY} L ${width} ${centerY}`,
         type: 'path',
       };
 
     case 'corner_tr':
-      // ──┐
+      // ──┐ (horizontal from left to leftX, then vertical down)
       return {
-        d: `M 0 ${centerY} L ${centerX} ${centerY} L ${centerX} ${height}`,
+        d: `M 0 ${centerY} L ${leftX} ${centerY} L ${leftX} ${height}`,
         type: 'path',
       };
 
     case 'corner_bl':
-      // └──
+      // └── (vertical from top to center, then horizontal to right)
       return {
-        d: `M ${centerX} 0 L ${centerX} ${centerY} L ${width} ${centerY}`,
+        d: `M ${leftX} 0 L ${leftX} ${centerY} L ${width} ${centerY}`,
         type: 'path',
       };
 
     case 'corner_br':
-      // ──┘
+      // ──┘ (horizontal from left to leftX, then vertical up)
       return {
-        d: `M 0 ${centerY} L ${centerX} ${centerY} L ${centerX} 0`,
+        d: `M 0 ${centerY} L ${leftX} ${centerY} L ${leftX} 0`,
         type: 'path',
       };
 
     case 'junction_t':
-      // ──┬──
+      // ──┬── (full horizontal + vertical down from leftX)
       return {
         lines: [
           { x1: 0, y1: centerY, x2: width, y2: centerY },
-          { x1: centerX, y1: centerY, x2: centerX, y2: height },
+          { x1: leftX, y1: centerY, x2: leftX, y2: height },
         ],
       };
 
     case 'junction_b':
-      // ──┴──
+      // ──┴── (full horizontal + vertical up from leftX)
       return {
         lines: [
           { x1: 0, y1: centerY, x2: width, y2: centerY },
-          { x1: centerX, y1: 0, x2: centerX, y2: centerY },
+          { x1: leftX, y1: 0, x2: leftX, y2: centerY },
         ],
       };
 
     case 'junction_l':
-      // ├──
+      // ├── (full vertical at leftX + horizontal from leftX to right)
       return {
         lines: [
-          { x1: centerX, y1: 0, x2: centerX, y2: height },
-          { x1: centerX, y1: centerY, x2: width, y2: centerY },
+          { x1: leftX, y1: 0, x2: leftX, y2: height },
+          { x1: leftX, y1: centerY, x2: width, y2: centerY },
         ],
       };
 
     case 'junction_r':
-      // ──┤
+      // ──┤ (full vertical at leftX + horizontal from left to leftX)
       return {
         lines: [
-          { x1: centerX, y1: 0, x2: centerX, y2: height },
-          { x1: 0, y1: centerY, x2: centerX, y2: centerY },
+          { x1: leftX, y1: 0, x2: leftX, y2: height },
+          { x1: 0, y1: centerY, x2: leftX, y2: centerY },
         ],
       };
 
     case 'cross':
-      // ──┼──
+      // ──┼── (full horizontal + full vertical at leftX)
       return {
         lines: [
           { x1: 0, y1: centerY, x2: width, y2: centerY },
-          { x1: centerX, y1: 0, x2: centerX, y2: height },
+          { x1: leftX, y1: 0, x2: leftX, y2: height },
         ],
       };
 
@@ -232,10 +233,10 @@ export function Wire({
           ))
         )}
 
-        {/* Junction dot for junction and cross types */}
+        {/* Junction dot at intersection point (leftX for vertical, centerY for horizontal) */}
         {(type.startsWith('junction_') || type === 'cross') && (
           <circle
-            cx={width / 2}
+            cx={1}
             cy={height / 2}
             r={isEnergized ? 4 : 3}
             fill={style.stroke}
