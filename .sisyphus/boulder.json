@@ -1,13 +1,12 @@
 {
-  "active_plan": "C:\\Users\\chanh\\Projects\\ModOne\\.sisyphus\\plans\\onecanvas-stabilization-week1.md",
-  "started_at": "2026-02-09T23:05:38.868Z",
+  "active_plan": "C:\\Users\\chanh\\Projects\\ModOne\\.sisyphus\\plans\\custom_titlebar.md",
+  "started_at": "2026-02-13T00:02:46.491Z",
   "session_ids": [
-    "ses_3bd3d587fffepAAEBeWoEr8KOG"
+    "ses_3abc6c691ffewTKTKts0NrcD5X"
   ],
-  "plan_name": "onecanvas-stabilization-week1",
+  "plan_name": "custom_titlebar",
   "agent": "atlas",
-  "status": "completed",
-  "tasks_completed": 15,
-  "tasks_total": 15,
-  "completed_at": "2026-02-10T08:15:00.000Z"
+  "status": "in_progress",
+  "tasks_completed": 0,
+  "tasks_total": 2
 }
