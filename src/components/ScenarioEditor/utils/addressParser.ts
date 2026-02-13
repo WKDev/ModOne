@@ -67,23 +67,36 @@ const TYPE_TO_MEMORY_TYPE: Record<ParsedAddress['type'], MemoryType> = {
 };
 
 /**
- * PLC alias patterns.
- * M pattern: Coils (M0001 -> address 1)
- * D pattern: Holding registers (D12345 -> address 12345)
- * X pattern: Discrete inputs (X0001 -> address 1)
- * Y pattern: Coils/outputs (Y0001 -> address 1)
+ * PLC alias patterns for LS Electric PLCs.
+ * Address offsets match modserver_sync.rs for consistent mapping.
+ *
+ * Bit devices → Discrete Inputs:
+ *   P (Input Relay): DI offset 0
+ *   F (Special Relay): DI offset 2048
+ *
+ * Bit devices → Coils:
+ *   M (Auxiliary Relay): Coil offset 0
+ *   K (Keep Relay): Coil offset 8192
+ *   T (Timer Contact): Coil offset 10240
+ *   C (Counter Contact): Coil offset 12288
+ *
+ * Word devices → Holding Registers:
+ *   D (Data Register): HR offset 0
  */
 const PLC_ALIAS_PATTERNS: AliasPattern[] = [
-  // Mitsubishi M coil pattern (M0000-M9999)
-  { pattern: /^M(\d{4})$/i, type: 'coil', offset: 0 },
-  // Mitsubishi D data register pattern (D0-D99999)
+  // LS Electric PLC patterns (matching modserver_sync.rs offsets)
+  // Bit devices → Discrete Inputs
+  { pattern: /^P(\d{1,4})$/i, type: 'discrete', offset: 0 },
+  { pattern: /^F(\d{1,4})$/i, type: 'discrete', offset: 2048 },
+  // Bit devices → Coils
+  { pattern: /^M(\d{1,4})$/i, type: 'coil', offset: 0 },
+  { pattern: /^K(\d{1,4})$/i, type: 'coil', offset: 8192 },
+  { pattern: /^T(\d{1,4})$/i, type: 'coil', offset: 10240 },
+  // Note: 'C' without ':' prefix = PLC Counter (not Modbus Coil)
+  // Modbus Coil uses 'C:' prefix format (e.g., C:0x0001)
+  { pattern: /^C(\d{1,4})$/i, type: 'coil', offset: 12288 },
+  // Word devices → Holding Registers
   { pattern: /^D(\d{1,5})$/i, type: 'holding', offset: 0 },
-  // Siemens/Generic X input pattern (X0000-X9999)
-  { pattern: /^X(\d{4})$/i, type: 'discrete', offset: 0 },
-  // Siemens/Generic Y output pattern (Y0000-Y9999)
-  { pattern: /^Y(\d{4})$/i, type: 'coil', offset: 0 },
-  // Input register pattern (I0-I65535)
-  { pattern: /^I(\d{1,5})$/i, type: 'input', offset: 0 },
 ];
 
 // ============================================================================

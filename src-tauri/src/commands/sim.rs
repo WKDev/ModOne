@@ -5,14 +5,21 @@
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, State};
 
+use crate::commands::canvas_sync::CanvasSyncState;
+use crate::modbus::ModbusMemory;
 use crate::sim::{
     debugger::{SimDebugger, StepResult, StepType},
+    counter::CounterManager,
     engine::OneSimEngine,
     executor::LadderProgram,
     memory::DeviceMemory,
+    modserver_sync::ModServerSync,
+    timer::TimerManager,
     types::{
         Breakpoint, MemorySnapshot, ScanCycleInfo, SimBitDeviceType,
         SimWordDeviceType, SimulationConfig, SimulationStatus, WatchVariable,
@@ -23,12 +30,25 @@ use crate::sim::{
 // Simulation State
 // ============================================================================
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ForcedDeviceValue {
+    pub value: serde_json::Value,
+}
+
 /// Managed state for the simulation engine
 pub struct SimState {
     /// The simulation engine instance
-    engine: Arc<Mutex<Option<OneSimEngine>>>,
+    engine: Arc<Mutex<Option<Arc<OneSimEngine>>>>,
     /// The debugger instance
     debugger: Arc<SimDebugger>,
+    memory: Arc<DeviceMemory>,
+    /// Shared Modbus memory for ModServerSync
+    modbus_memory: Option<Arc<ModbusMemory>>,
+    program: Arc<Mutex<Option<LadderProgram>>>,
+    scan_task: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
+    monitoring_active: Arc<AtomicBool>,
+    forced_devices: Arc<parking_lot::RwLock<HashMap<String, serde_json::Value>>>,
 }
 
 impl Default for SimState {
@@ -38,17 +58,45 @@ impl Default for SimState {
 }
 
 impl SimState {
-    /// Create a new simulation state
-    pub fn new() -> Self {
+    pub fn with_memory(memory: Arc<DeviceMemory>) -> Self {
         Self {
             engine: Arc::new(Mutex::new(None)),
             debugger: Arc::new(SimDebugger::default()),
+            memory,
+            modbus_memory: None,
+            program: Arc::new(Mutex::new(None)),
+            scan_task: Arc::new(Mutex::new(None)),
+            monitoring_active: Arc::new(AtomicBool::new(false)),
+            forced_devices: Arc::new(parking_lot::RwLock::new(HashMap::new())),
         }
     }
 
+    /// Create with both DeviceMemory and ModbusMemory for ModServerSync
+    pub fn with_memory_and_modbus(memory: Arc<DeviceMemory>, modbus_memory: Arc<ModbusMemory>) -> Self {
+        Self {
+            engine: Arc::new(Mutex::new(None)),
+            debugger: Arc::new(SimDebugger::default()),
+            memory,
+            modbus_memory: Some(modbus_memory),
+            program: Arc::new(Mutex::new(None)),
+            scan_task: Arc::new(Mutex::new(None)),
+            monitoring_active: Arc::new(AtomicBool::new(false)),
+            forced_devices: Arc::new(parking_lot::RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// Create a new simulation state
+    pub fn new() -> Self {
+        Self::with_memory(Arc::new(DeviceMemory::new()))
+    }
+
     /// Get the engine (if running)
-    pub fn engine(&self) -> Arc<Mutex<Option<OneSimEngine>>> {
+    pub fn engine(&self) -> Arc<Mutex<Option<Arc<OneSimEngine>>>> {
         self.engine.clone()
+    }
+
+    pub fn memory(&self) -> &Arc<DeviceMemory> {
+        &self.memory
     }
 
     /// Get the debugger
@@ -101,6 +149,7 @@ const SIM_BREAKPOINT_HIT_EVENT: &str = "sim:breakpoint-hit";
 pub async fn sim_run(
     app: AppHandle,
     state: State<'_, SimState>,
+    canvas_sync_state: State<'_, CanvasSyncState>,
     params: Option<SimRunParams>,
 ) -> Result<(), String> {
     let mut engine_guard = state.engine.lock();
@@ -114,7 +163,11 @@ pub async fn sim_run(
 
     // Create new engine if needed
     if engine_guard.is_none() {
-        let engine = OneSimEngine::new();
+        let engine = Arc::new(OneSimEngine::with_components(
+            Arc::clone(state.memory()),
+            Arc::new(TimerManager::new()),
+            Arc::new(CounterManager::new()),
+        ));
         engine.set_app_handle(app.clone());
 
         // Apply config if provided
@@ -127,17 +180,57 @@ pub async fn sim_run(
         *engine_guard = Some(engine);
     }
 
-    // Get engine reference
-    let engine = engine_guard.as_ref().ok_or("Failed to create engine")?;
+    // Wire monitoring state into engine
+    if let Some(ref engine) = *engine_guard {
+        engine.set_monitoring_state(
+            Arc::clone(&state.monitoring_active),
+            Arc::clone(&state.forced_devices),
+        );
+    }
 
-    // Create an empty program for now (will be loaded from parser later)
-    let program = LadderProgram {
+    // Get engine reference
+    let engine = engine_guard
+        .as_ref()
+        .cloned()
+        .ok_or("Failed to create engine")?;
+
+    // Wire canvas sync into engine
+    if let Some(ref engine) = *engine_guard {
+        if let Some(sync) = canvas_sync_state.canvas_sync() {
+            engine.set_canvas_sync(sync);
+        }
+    }
+
+    // Wire ModServer sync into engine (DeviceMemory ↔ ModbusMemory)
+    if let Some(ref engine) = *engine_guard {
+        if let Some(ref modbus_mem) = state.modbus_memory {
+            let modserver_sync = Arc::new(ModServerSync::new(
+                Arc::clone(state.memory()),
+                Arc::clone(modbus_mem),
+            ));
+            engine.set_modserver_sync(modserver_sync);
+        }
+    }
+
+    let program = state.program.lock().clone().unwrap_or_else(|| LadderProgram {
         name: "Default Program".to_string(),
         networks: vec![],
-    };
+    });
 
     // Start the engine
     engine.start(program).map_err(|e| e.to_string())?;
+
+    drop(engine_guard);
+
+    if let Some(handle) = state.scan_task.lock().take() {
+        handle.abort();
+    }
+
+    let engine_clone = Arc::clone(&engine);
+    let scan_task = tokio::spawn(async move {
+        engine_clone.run_scan_loop().await;
+    });
+    *state.scan_task.lock() = Some(scan_task);
 
     // Emit status update
     let status = engine.get_status();
@@ -169,6 +262,11 @@ pub fn sim_stop(app: AppHandle, state: State<'_, SimState>) -> Result<(), String
 
     if let Some(ref engine) = *engine_guard {
         engine.stop();
+        drop(engine_guard);
+
+        if let Some(handle) = state.scan_task.lock().take() {
+            handle.abort();
+        }
 
         // Emit status update
         let _ = app.emit(
@@ -270,6 +368,14 @@ pub fn sim_reset(app: AppHandle, state: State<'_, SimState>) -> Result<(), Strin
 
     // Clear the engine
     *engine_guard = None;
+    drop(engine_guard);
+
+    if let Some(handle) = state.scan_task.lock().take() {
+        handle.abort();
+    }
+
+    state.forced_devices.write().clear();
+    state.monitoring_active.store(false, Ordering::SeqCst);
 
     // Reset debugger
     state.debugger.reset();
@@ -320,6 +426,16 @@ pub fn sim_get_scan_info(state: State<'_, SimState>) -> Result<ScanCycleInfo, St
             timestamp: 0,
         })
     }
+}
+
+/// Load a ladder program for simulation
+#[tauri::command]
+pub fn sim_load_program(
+    state: State<'_, SimState>,
+    program: LadderProgram,
+) -> Result<(), String> {
+    *state.program.lock() = Some(program);
+    Ok(())
 }
 
 // ============================================================================
@@ -786,4 +902,40 @@ pub fn sim_get_debugger_state(
         "breakpoints": state.debugger.get_breakpoints(),
         "watches": state.debugger.get_watches()
     }))
+}
+
+// ============================================================================
+// Ladder Monitoring Commands
+// ============================================================================
+
+/// Start ladder monitoring mode
+#[tauri::command]
+pub fn ladder_start_monitoring(state: State<'_, SimState>) -> Result<(), String> {
+    state.monitoring_active.store(true, Ordering::SeqCst);
+    Ok(())
+}
+
+/// Stop ladder monitoring mode
+#[tauri::command]
+pub fn ladder_stop_monitoring(state: State<'_, SimState>) -> Result<(), String> {
+    state.monitoring_active.store(false, Ordering::SeqCst);
+    Ok(())
+}
+
+/// Force a device to a specific value
+#[tauri::command]
+pub fn ladder_force_device(
+    state: State<'_, SimState>,
+    address: String,
+    value: serde_json::Value,
+) -> Result<(), String> {
+    state.forced_devices.write().insert(address, value);
+    Ok(())
+}
+
+/// Release force on a device
+#[tauri::command]
+pub fn ladder_release_force(state: State<'_, SimState>, address: String) -> Result<(), String> {
+    state.forced_devices.write().remove(&address);
+    Ok(())
 }

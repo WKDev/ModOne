@@ -12,7 +12,9 @@ use thiserror::Error;
 use super::counter::CounterManager;
 use super::memory::{DeviceMemory, SimMemoryError};
 use super::timer::TimerManager;
-use super::types::{SimBitDeviceType, SimCounterType, SimTimeBase, SimTimerType, SimWordDeviceType};
+use super::types::{
+    SimBitDeviceType, SimCounterType, SimTimeBase, SimTimerType, SimWordDeviceType,
+};
 
 // ============================================================================
 // Error Types
@@ -111,7 +113,10 @@ impl DeviceAddress {
         }
 
         let device = s.chars().next()?;
-        if !matches!(device, 'P' | 'M' | 'K' | 'F' | 'T' | 'C' | 'D' | 'R' | 'Z' | 'N') {
+        if !matches!(
+            device,
+            'P' | 'M' | 'K' | 'F' | 'T' | 'C' | 'D' | 'R' | 'Z' | 'N'
+        ) {
             return None;
         }
 
@@ -306,12 +311,7 @@ impl LadderNode {
     }
 
     /// Create a math operation node
-    pub fn math(
-        node_type: NodeType,
-        operand1: &str,
-        operand2: &str,
-        destination: &str,
-    ) -> Self {
+    pub fn math(node_type: NodeType, operand1: &str, operand2: &str, destination: &str) -> Self {
         Self {
             node_type,
             address: None,
@@ -343,6 +343,144 @@ pub struct LadderProgram {
     pub name: String,
     /// Networks (rungs)
     pub networks: Vec<LadderNetwork>,
+}
+
+impl<'de> Deserialize<'de> for LadderProgram {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        parse_ladder_program_value(value).map_err(serde::de::Error::custom)
+    }
+}
+
+fn parse_ladder_program_value(value: serde_json::Value) -> Result<LadderProgram, String> {
+    let obj = value
+        .as_object()
+        .ok_or_else(|| "Program payload must be an object".to_string())?;
+
+    let name = obj
+        .get("name")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "Program must include string field 'name'".to_string())?
+        .to_string();
+
+    let networks_value = obj
+        .get("networks")
+        .and_then(serde_json::Value::as_array)
+        .ok_or_else(|| "Program must include array field 'networks'".to_string())?;
+
+    let mut networks = Vec::with_capacity(networks_value.len());
+    for network in networks_value {
+        networks.push(parse_ladder_network_value(network)?);
+    }
+
+    Ok(LadderProgram { name, networks })
+}
+
+fn parse_ladder_network_value(value: &serde_json::Value) -> Result<LadderNetwork, String> {
+    let obj = value
+        .as_object()
+        .ok_or_else(|| "Network entry must be an object".to_string())?;
+
+    let id = if let Some(id) = obj.get("id").and_then(serde_json::Value::as_u64) {
+        id as u32
+    } else if let Some(id_str) = obj.get("id").and_then(serde_json::Value::as_str) {
+        id_str
+            .parse::<u32>()
+            .map_err(|_| "Network 'id' string must be a valid u32".to_string())?
+    } else {
+        return Err("Network must include numeric or numeric-string field 'id'".to_string());
+    };
+
+    let nodes_value = obj
+        .get("nodes")
+        .and_then(serde_json::Value::as_array)
+        .ok_or_else(|| "Network must include array field 'nodes'".to_string())?;
+
+    let mut nodes = Vec::with_capacity(nodes_value.len());
+    for node in nodes_value {
+        nodes.push(parse_ladder_node_value(node)?);
+    }
+
+    let comment = obj
+        .get("comment")
+        .and_then(serde_json::Value::as_str)
+        .map(ToString::to_string);
+
+    Ok(LadderNetwork { id, nodes, comment })
+}
+
+fn parse_ladder_node_value(value: &serde_json::Value) -> Result<LadderNode, String> {
+    let obj = value
+        .as_object()
+        .ok_or_else(|| "Node entry must be an object".to_string())?;
+
+    let node_type_value = obj
+        .get("nodeType")
+        .or_else(|| obj.get("node_type"))
+        .ok_or_else(|| "Node must include field 'nodeType' or 'node_type'".to_string())?
+        .clone();
+
+    let node_type: NodeType =
+        serde_json::from_value(node_type_value).map_err(|e| format!("Invalid node type: {}", e))?;
+
+    let address = obj
+        .get("address")
+        .and_then(serde_json::Value::as_str)
+        .map(ToString::to_string);
+
+    let children = if let Some(children) = obj.get("children") {
+        let arr = children
+            .as_array()
+            .ok_or_else(|| "Node 'children' must be an array".to_string())?;
+
+        let mut parsed = Vec::with_capacity(arr.len());
+        for child in arr {
+            parsed.push(parse_ladder_node_value(child)?);
+        }
+        parsed
+    } else {
+        Vec::new()
+    };
+
+    let preset = obj
+        .get("preset")
+        .and_then(serde_json::Value::as_u64)
+        .map(|v| v as u32);
+
+    let time_base = obj
+        .get("timeBase")
+        .or_else(|| obj.get("time_base"))
+        .map(|v| serde_json::from_value(v.clone()).map_err(|e| format!("Invalid time base: {}", e)))
+        .transpose()?;
+
+    let operand1 = obj
+        .get("operand1")
+        .and_then(serde_json::Value::as_str)
+        .map(ToString::to_string);
+
+    let operand2 = obj
+        .get("operand2")
+        .and_then(serde_json::Value::as_str)
+        .map(ToString::to_string);
+
+    let destination = obj
+        .get("destination")
+        .and_then(serde_json::Value::as_str)
+        .map(ToString::to_string);
+
+    Ok(LadderNode {
+        node_type,
+        address,
+        children,
+        preset,
+        time_base,
+        operand1,
+        operand2,
+        destination,
+    })
 }
 
 // ============================================================================
@@ -692,11 +830,15 @@ impl ProgramExecutor {
             Ok(self.memory.write_bit(device, addr.address, value)?)
         } else if let Some(bit_idx) = addr.bit_index {
             let device = addr.as_word_device().unwrap();
-            Ok(self.memory.write_word_bit(device, addr.address, bit_idx, value)?)
+            Ok(self
+                .memory
+                .write_word_bit(device, addr.address, bit_idx, value)?)
         } else {
             // Word device without bit index
             let device = addr.as_word_device().unwrap();
-            Ok(self.memory.write_word(device, addr.address, if value { 1 } else { 0 })?)
+            Ok(self
+                .memory
+                .write_word(device, addr.address, if value { 1 } else { 0 })?)
         }
     }
 
@@ -717,7 +859,11 @@ impl ProgramExecutor {
         } else {
             // Bit device - return 0 or 1
             let device = addr.as_bit_device().unwrap();
-            Ok(if self.memory.read_bit(device, addr.address)? { 1 } else { 0 })
+            Ok(if self.memory.read_bit(device, addr.address)? {
+                1
+            } else {
+                0
+            })
         }
     }
 
@@ -726,9 +872,13 @@ impl ProgramExecutor {
     where
         F: Fn(i32, i32) -> bool,
     {
-        let op1_str = node.operand1.as_ref()
+        let op1_str = node
+            .operand1
+            .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing operand1".to_string()))?;
-        let op2_str = node.operand2.as_ref()
+        let op2_str = node
+            .operand2
+            .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing operand2".to_string()))?;
 
         let op1 = self.read_operand(op1_str)?;
@@ -755,16 +905,14 @@ impl ProgramExecutor {
         let preset = node.preset.unwrap_or(1000);
         let time_base = node.time_base.unwrap_or(SimTimeBase::Ms);
 
-        let (done, _elapsed) = self.timer_mgr.update(
-            addr.address,
-            timer_type,
-            input,
-            preset,
-            time_base,
-        );
+        let (done, _elapsed) =
+            self.timer_mgr
+                .update(addr.address, timer_type, input, preset, time_base);
 
         // Update T contact
-        let _ = self.memory.write_bit_internal(SimBitDeviceType::T, addr.address, done);
+        let _ = self
+            .memory
+            .write_bit_internal(SimBitDeviceType::T, addr.address, done);
 
         Ok(())
     }
@@ -795,7 +943,9 @@ impl ProgramExecutor {
         );
 
         // Update C contact
-        let _ = self.memory.write_bit_internal(SimBitDeviceType::C, addr.address, done);
+        let _ = self
+            .memory
+            .write_bit_internal(SimBitDeviceType::C, addr.address, done);
 
         Ok(())
     }
@@ -805,11 +955,17 @@ impl ProgramExecutor {
     where
         F: Fn(i32, i32) -> i32,
     {
-        let op1_str = node.operand1.as_ref()
+        let op1_str = node
+            .operand1
+            .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing operand1".to_string()))?;
-        let op2_str = node.operand2.as_ref()
+        let op2_str = node
+            .operand2
+            .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing operand2".to_string()))?;
-        let dest_str = node.destination.as_ref()
+        let dest_str = node
+            .destination
+            .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing destination".to_string()))?;
 
         let op1 = self.read_operand(op1_str)?;
@@ -821,7 +977,8 @@ impl ProgramExecutor {
 
         if dest.is_word_device() {
             let device = dest.as_word_device().unwrap();
-            self.memory.write_word(device, dest.address, result as u16)?;
+            self.memory
+                .write_word(device, dest.address, result as u16)?;
         }
 
         Ok(())
@@ -829,11 +986,17 @@ impl ProgramExecutor {
 
     /// Execute division with zero check
     fn execute_math_div(&self, node: &LadderNode) -> ExecutionResult<()> {
-        let op1_str = node.operand1.as_ref()
+        let op1_str = node
+            .operand1
+            .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing operand1".to_string()))?;
-        let op2_str = node.operand2.as_ref()
+        let op2_str = node
+            .operand2
+            .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing operand2".to_string()))?;
-        let dest_str = node.destination.as_ref()
+        let dest_str = node
+            .destination
+            .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing destination".to_string()))?;
 
         let op1 = self.read_operand(op1_str)?;
@@ -851,7 +1014,8 @@ impl ProgramExecutor {
 
         if dest.is_word_device() {
             let device = dest.as_word_device().unwrap();
-            self.memory.write_word(device, dest.address, result as u16)?;
+            self.memory
+                .write_word(device, dest.address, result as u16)?;
         }
 
         Ok(())
@@ -859,11 +1023,17 @@ impl ProgramExecutor {
 
     /// Execute modulo with zero check
     fn execute_math_mod(&self, node: &LadderNode) -> ExecutionResult<()> {
-        let op1_str = node.operand1.as_ref()
+        let op1_str = node
+            .operand1
+            .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing operand1".to_string()))?;
-        let op2_str = node.operand2.as_ref()
+        let op2_str = node
+            .operand2
+            .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing operand2".to_string()))?;
-        let dest_str = node.destination.as_ref()
+        let dest_str = node
+            .destination
+            .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing destination".to_string()))?;
 
         let op1 = self.read_operand(op1_str)?;
@@ -880,7 +1050,8 @@ impl ProgramExecutor {
 
         if dest.is_word_device() {
             let device = dest.as_word_device().unwrap();
-            self.memory.write_word(device, dest.address, result as u16)?;
+            self.memory
+                .write_word(device, dest.address, result as u16)?;
         }
 
         Ok(())
@@ -888,9 +1059,12 @@ impl ProgramExecutor {
 
     /// Execute move operation
     fn execute_move(&self, node: &LadderNode) -> ExecutionResult<()> {
-        let op1_str = node.operand1.as_ref()
-            .ok_or_else(|| ExecutionError::InvalidAddress("Missing operand1 (source)".to_string()))?;
-        let dest_str = node.destination.as_ref()
+        let op1_str = node.operand1.as_ref().ok_or_else(|| {
+            ExecutionError::InvalidAddress("Missing operand1 (source)".to_string())
+        })?;
+        let dest_str = node
+            .destination
+            .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing destination".to_string()))?;
 
         let value = self.read_operand(op1_str)?;
@@ -935,7 +1109,12 @@ impl Default for ProgramExecutor {
 mod tests {
     use super::*;
 
-    fn create_executor() -> (ProgramExecutor, Arc<DeviceMemory>, Arc<TimerManager>, Arc<CounterManager>) {
+    fn create_executor() -> (
+        ProgramExecutor,
+        Arc<DeviceMemory>,
+        Arc<TimerManager>,
+        Arc<CounterManager>,
+    ) {
         let memory = Arc::new(DeviceMemory::new());
         let timer_mgr = Arc::new(TimerManager::new());
         let counter_mgr = Arc::new(CounterManager::new());
@@ -1238,16 +1417,14 @@ mod tests {
 
         let program = LadderProgram {
             name: "Test".to_string(),
-            networks: vec![
-                LadderNetwork {
-                    id: 0,
-                    nodes: vec![LadderNode::series(vec![
-                        LadderNode::contact(NodeType::ContactNo, "M0"),
-                        LadderNode::coil(NodeType::CoilOut, "P0"),
-                    ])],
-                    comment: None,
-                },
-            ],
+            networks: vec![LadderNetwork {
+                id: 0,
+                nodes: vec![LadderNode::series(vec![
+                    LadderNode::contact(NodeType::ContactNo, "M0"),
+                    LadderNode::coil(NodeType::CoilOut, "P0"),
+                ])],
+                comment: None,
+            }],
         };
 
         // M0 false - P0 should stay false

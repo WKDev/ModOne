@@ -96,9 +96,11 @@ pub use canvas_sync::{
 
 // Re-export simulation commands
 pub use sim::{
+    ladder_force_device, ladder_release_force, ladder_start_monitoring, ladder_stop_monitoring,
     sim_add_breakpoint, sim_add_watch, sim_continue, sim_get_breakpoints,
     sim_get_debugger_state, sim_get_memory_snapshot, sim_get_scan_info, sim_get_status,
-    sim_get_watches, sim_pause, sim_read_device, sim_read_memory_range, sim_remove_breakpoint,
+    sim_load_program, sim_get_watches, sim_pause, sim_read_device, sim_read_memory_range,
+    sim_remove_breakpoint,
     sim_remove_watch, sim_reset, sim_resume, sim_run, sim_step, sim_stop, sim_write_device,
     SimState,
 };

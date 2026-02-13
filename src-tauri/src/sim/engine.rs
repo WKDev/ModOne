@@ -5,6 +5,7 @@
 
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -13,10 +14,15 @@ use thiserror::Error;
 use tokio::sync::oneshot;
 
 use super::counter::CounterManager;
+use super::canvas_sync::CanvasSync;
 use super::executor::{LadderProgram, ProgramExecutor};
 use super::memory::DeviceMemory;
+use super::modserver_sync::ModServerSync;
 use super::timer::TimerManager;
-use super::types::{ScanCycleInfo, SimulationConfig, SimulationState, SimulationStatus};
+use super::types::{
+    ScanCycleInfo, SimBitDeviceType, SimWordDeviceType, SimulationConfig, SimulationState,
+    SimulationStatus,
+};
 
 // ============================================================================
 // Error Types
@@ -158,6 +164,20 @@ pub struct OneSimEngine {
 
     // Shutdown signal
     shutdown_tx: RwLock<Option<oneshot::Sender<()>>>,
+
+    // Monitoring
+    /// Whether monitoring is active (shared with command handler)
+    monitoring_active: RwLock<Option<Arc<AtomicBool>>>,
+    /// Forced device values (shared with command handler)
+    forced_devices: RwLock<Option<Arc<parking_lot::RwLock<HashMap<String, serde_json::Value>>>>>,
+
+    // Canvas synchronization
+    /// Canvas sync for PLC output -> circuit block state updates
+    canvas_sync: RwLock<Option<Arc<CanvasSync>>>,
+
+    // ModServer synchronization
+    /// Bidirectional sync between DeviceMemory and ModbusMemory
+    modserver_sync: RwLock<Option<Arc<ModServerSync>>>,
 }
 
 impl OneSimEngine {
@@ -190,6 +210,10 @@ impl OneSimEngine {
             last_error: RwLock::new(None),
             app_handle: RwLock::new(None),
             shutdown_tx: RwLock::new(None),
+            monitoring_active: RwLock::new(None),
+            forced_devices: RwLock::new(None),
+            canvas_sync: RwLock::new(None),
+            modserver_sync: RwLock::new(None),
         }
     }
 
@@ -223,6 +247,10 @@ impl OneSimEngine {
             last_error: RwLock::new(None),
             app_handle: RwLock::new(None),
             shutdown_tx: RwLock::new(None),
+            monitoring_active: RwLock::new(None),
+            forced_devices: RwLock::new(None),
+            canvas_sync: RwLock::new(None),
+            modserver_sync: RwLock::new(None),
         }
     }
 
@@ -264,9 +292,198 @@ impl OneSimEngine {
         *self.config.write() = config;
     }
 
+    /// Set monitoring references from command state
+    pub fn set_monitoring_state(
+        &self,
+        active: Arc<AtomicBool>,
+        forced: Arc<parking_lot::RwLock<HashMap<String, serde_json::Value>>>,
+    ) {
+        *self.monitoring_active.write() = Some(active);
+        *self.forced_devices.write() = Some(forced);
+    }
+
+    /// Apply forced device values after each scan cycle
+    fn apply_forced_devices(&self) {
+        let forced_guard = self.forced_devices.read();
+        let forced = match forced_guard.as_ref() {
+            Some(f) => f.read(),
+            None => return,
+        };
+
+        if forced.is_empty() {
+            return;
+        }
+
+        for (address, value) in forced.iter() {
+            let upper = address.to_uppercase();
+            let (dev_type, addr_str) = if upper.starts_with("TD") || upper.starts_with("CD") {
+                (&upper[..2], &upper[2..])
+            } else if upper.len() >= 2 {
+                (&upper[..1], &upper[1..])
+            } else {
+                continue;
+            };
+
+            let addr: u16 = match addr_str.parse() {
+                Ok(a) => a,
+                Err(_) => {
+                    self.emit_monitoring_error(format!("Invalid forced device address: {}", address));
+                    continue;
+                }
+            };
+
+            match dev_type {
+                "P" | "M" | "K" => {
+                    if let Some(v) = value.as_bool() {
+                        let device = match dev_type {
+                            "P" => SimBitDeviceType::P,
+                            "M" => SimBitDeviceType::M,
+                            "K" => SimBitDeviceType::K,
+                            _ => continue,
+                        };
+                        if let Err(err) = self.memory.write_bit(device, addr, v) {
+                            self.emit_monitoring_error(format!("Failed forcing {}: {}", address, err));
+                        }
+                    }
+                }
+                "D" | "R" | "Z" | "N" => {
+                    if let Some(v) = value.as_u64() {
+                        let device = match dev_type {
+                            "D" => SimWordDeviceType::D,
+                            "R" => SimWordDeviceType::R,
+                            "Z" => SimWordDeviceType::Z,
+                            "N" => SimWordDeviceType::N,
+                            _ => continue,
+                        };
+                        if let Err(err) = self.memory.write_word(device, addr, v as u16) {
+                            self.emit_monitoring_error(format!("Failed forcing {}: {}", address, err));
+                        }
+                    }
+                }
+                "TD" => {
+                    if let Some(v) = value.as_u64() {
+                        if let Err(err) = self.memory.write_word(SimWordDeviceType::Td, addr, v as u16)
+                        {
+                            self.emit_monitoring_error(format!("Failed forcing {}: {}", address, err));
+                        }
+                    }
+                }
+                "CD" => {
+                    if let Some(v) = value.as_u64() {
+                        if let Err(err) = self.memory.write_word(SimWordDeviceType::Cd, addr, v as u16)
+                        {
+                            self.emit_monitoring_error(format!("Failed forcing {}: {}", address, err));
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Emit monitoring update event with device states
+    fn emit_monitoring_update(&self) {
+        let active_guard = self.monitoring_active.read();
+        let is_active = match active_guard.as_ref() {
+            Some(a) => a.load(Ordering::Relaxed),
+            None => false,
+        };
+
+        if !is_active {
+            return;
+        }
+
+        if let Some(handle) = self.app_handle.read().as_ref() {
+            let mut devices = Vec::new();
+
+            for (dev_type, dev_name) in &[
+                (SimBitDeviceType::P, "P"),
+                (SimBitDeviceType::M, "M"),
+                (SimBitDeviceType::K, "K"),
+            ] {
+                let max_addr = dev_type.default_size().min(256) as u16;
+                for addr in 0..max_addr {
+                    if let Ok(val) = self.memory.read_bit(*dev_type, addr) {
+                        if val {
+                            devices.push(serde_json::json!({
+                                "address": format!("{}{}", dev_name, addr),
+                                "value": val
+                            }));
+                        }
+                    }
+                }
+            }
+
+            for (dev_type, dev_name) in &[(SimBitDeviceType::T, "T"), (SimBitDeviceType::C, "C")] {
+                let max_addr = 256u16.min(dev_type.default_size() as u16);
+                for addr in 0..max_addr {
+                    if let Ok(val) = self.memory.read_bit(*dev_type, addr) {
+                        if val {
+                            devices.push(serde_json::json!({
+                                "address": format!("{}{}", dev_name, addr),
+                                "value": val
+                            }));
+                        }
+                    }
+                }
+            }
+
+            for addr in 0u16..100 {
+                if let Ok(val) = self.memory.read_word(SimWordDeviceType::D, addr) {
+                    if val != 0 {
+                        devices.push(serde_json::json!({
+                            "address": format!("D{}", addr),
+                            "value": val
+                        }));
+                    }
+                }
+            }
+
+            let timer_states = self.timer_mgr.get_all_states();
+            let timers: Vec<serde_json::Value> = timer_states
+                .iter()
+                .map(|(addr, state)| {
+                    serde_json::json!({
+                        "address": format!("T{}", addr),
+                        "state": state
+                    })
+                })
+                .collect();
+
+            let counter_states = self.counter_mgr.get_all_states();
+            let counters: Vec<serde_json::Value> = counter_states
+                .iter()
+                .map(|(addr, state)| {
+                    serde_json::json!({
+                        "address": format!("C{}", addr),
+                        "state": state
+                    })
+                })
+                .collect();
+
+            let payload = serde_json::json!({
+                "devices": devices,
+                "timers": timers,
+                "counters": counters
+            });
+
+            let _ = handle.emit("ladder:monitoring-update", &payload);
+        }
+    }
+
     /// Get simulation configuration
     pub fn get_config(&self) -> SimulationConfig {
         self.config.read().clone()
+    }
+
+    /// Set the canvas sync for PLC output synchronization
+    pub fn set_canvas_sync(&self, sync: Arc<CanvasSync>) {
+        *self.canvas_sync.write() = Some(sync);
+    }
+
+    /// Set the ModServer sync for DeviceMemory ↔ ModbusMemory synchronization
+    pub fn set_modserver_sync(&self, sync: Arc<ModServerSync>) {
+        *self.modserver_sync.write() = Some(sync);
     }
 
     // ========================================================================
@@ -460,6 +677,9 @@ impl OneSimEngine {
         // Phase 3: Output Scan
         self.output_scan();
 
+        // Apply forced device values (override after scan)
+        self.apply_forced_devices();
+
         // Update statistics
         let elapsed = start.elapsed();
         self.update_statistics(elapsed);
@@ -475,6 +695,11 @@ impl OneSimEngine {
             // Emit every 10 scans to reduce overhead
             self.emit_scan_complete();
         }
+
+        // Emit monitoring update (every 5 scans)
+        if count % 5 == 0 {
+            self.emit_monitoring_update();
+        }
     }
 
     // ========================================================================
@@ -483,22 +708,33 @@ impl OneSimEngine {
 
     /// Input scan phase - sync from external sources
     fn input_scan(&self) {
-        // TODO: Implement ModServer synchronization
-        // For now, this is a placeholder that does nothing
-        // In the future, this will:
-        // 1. Read discrete inputs from Modbus to P relays
-        // 2. Read externally written holding registers to D registers
+        // Canvas inputs (plc_in blocks) write directly to shared DeviceMemory
+        // via CanvasSync::handle_plc_input_change(), so no explicit read is needed here.
+
+        // ModServer input sync: Modbus Discrete Inputs → P relays,
+        // External HR writes → D registers
+        if let Some(ref sync) = *self.modserver_sync.read() {
+            if let Err(e) = sync.sync_inputs() {
+                log::warn!("ModServer input sync failed: {}", e);
+            }
+        }
     }
 
     /// Output scan phase - sync to external destinations
     fn output_scan(&self) {
-        // TODO: Implement ModServer synchronization
-        // For now, this is a placeholder that does nothing
-        // In the future, this will:
-        // 1. Write M relays to Modbus coils
-        // 2. Write K relays to Modbus coils (with offset)
-        // 3. Write D registers to Modbus holding registers
-        // 4. Write T/C contacts and values
+        // Sync PLC outputs to canvas circuit blocks
+        if let Some(ref sync) = *self.canvas_sync.read() {
+            if let Err(e) = sync.update_plc_outputs() {
+                log::warn!("Canvas sync output update failed: {}", e);
+            }
+        }
+
+        // ModServer output sync: M/K/T/C → Coils, D/TD/CD → Holding Registers
+        if let Some(ref sync) = *self.modserver_sync.read() {
+            if let Err(e) = sync.sync_outputs() {
+                log::warn!("ModServer output sync failed: {}", e);
+            }
+        }
     }
 
     // ========================================================================
@@ -633,6 +869,19 @@ impl OneSimEngine {
             };
 
             let _ = handle.emit("sim:scan-complete", &event);
+        }
+    }
+
+    /// Emit monitoring error event
+    fn emit_monitoring_error(&self, message: String) {
+        if let Some(handle) = self.app_handle.read().as_ref() {
+            let _ = handle.emit(
+                "ladder:monitoring-error",
+                &serde_json::json!({
+                    "message": message,
+                    "timestamp": chrono::Utc::now().to_rfc3339()
+                }),
+            );
         }
     }
 }

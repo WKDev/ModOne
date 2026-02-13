@@ -9,9 +9,7 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use crate::sim::{
-    CanvasSync, DeviceMemory, PlcBlockMapping, PlcBlockType, PlcInputChange,
-};
+use crate::sim::{CanvasSync, DeviceMemory, PlcBlockMapping, PlcBlockType, PlcInputChange};
 
 // ============================================================================
 // Managed State
@@ -48,6 +46,11 @@ impl CanvasSyncState {
             sim_memory,
             enabled: RwLock::new(false),
         }
+    }
+
+    /// Get canvas sync instance for engine wiring
+    pub fn canvas_sync(&self) -> Option<Arc<CanvasSync>> {
+        Some(Arc::clone(&self.sync))
     }
 }
 
@@ -265,7 +268,9 @@ pub fn canvas_sync_update_outputs(state: State<'_, CanvasSyncState>) -> Result<u
 
 /// Force update all PLC outputs (ignores change detection)
 #[tauri::command]
-pub fn canvas_sync_force_update_outputs(state: State<'_, CanvasSyncState>) -> Result<usize, String> {
+pub fn canvas_sync_force_update_outputs(
+    state: State<'_, CanvasSyncState>,
+) -> Result<usize, String> {
     if !*state.enabled.read() {
         return Ok(0);
     }

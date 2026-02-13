@@ -19,6 +19,8 @@ pub use error::{ModOneError, ModOneResult};
 pub use logging::{ErrorLogger, SharedErrorLogger, LogEntry};
 
 use project::{AutoSaveManager, ProjectManager};
+use sim::DeviceMemory;
+use std::sync::Arc;
 
 // Re-export commands for registration
 use commands::{
@@ -75,9 +77,11 @@ use commands::{
     parser_parse_csv_file, parser_parse_csv_grouped, parser_parse_modbus_address,
     parser_program_exists, parser_save_program,
     // Simulation commands
+    ladder_force_device, ladder_release_force, ladder_start_monitoring, ladder_stop_monitoring,
     sim_add_breakpoint, sim_add_watch, sim_continue, sim_get_breakpoints,
     sim_get_debugger_state, sim_get_memory_snapshot, sim_get_scan_info, sim_get_status,
-    sim_get_watches, sim_pause, sim_read_device, sim_read_memory_range, sim_remove_breakpoint,
+    sim_load_program, sim_get_watches, sim_pause, sim_read_device, sim_read_memory_range,
+    sim_remove_breakpoint,
     sim_remove_watch, sim_reset, sim_resume, sim_run, sim_step, sim_stop, sim_write_device,
     SimState,
     // Explorer commands
@@ -109,11 +113,13 @@ pub fn run() {
     // Initialize Scenario Executor state (shares Modbus memory)
     let scenario_executor_state = ScenarioExecutorState::new(modbus_state.memory.clone());
 
-    // Initialize Canvas Sync state
-    let canvas_sync_state = CanvasSyncState::default();
-
-    // Initialize Simulation state
-    let sim_state = SimState::default();
+    // Initialize Canvas Sync and Simulation states with shared memory
+    let shared_device_memory = Arc::new(DeviceMemory::new());
+    let canvas_sync_state = CanvasSyncState::with_memory(Arc::clone(&shared_device_memory));
+    let sim_state = SimState::with_memory_and_modbus(
+        Arc::clone(&shared_device_memory),
+        Arc::clone(&modbus_state.memory),
+    );
 
     // Initialize error logger
     let error_logger = ErrorLogger::new_shared()
@@ -297,6 +303,7 @@ pub fn run() {
             sim_reset,
             sim_get_status,
             sim_get_scan_info,
+            sim_load_program,
             sim_read_device,
             sim_write_device,
             sim_read_memory_range,
@@ -310,6 +317,10 @@ pub fn run() {
             sim_step,
             sim_continue,
             sim_get_debugger_state,
+            ladder_start_monitoring,
+            ladder_stop_monitoring,
+            ladder_force_device,
+            ladder_release_force,
             // Explorer commands
             list_project_files,
             read_file_contents,

@@ -68,6 +68,14 @@ export const simulationService = {
   },
 
   /**
+   * Load a ladder program for simulation
+   * Must be called before start() to provide the program to execute
+   */
+  async loadProgram(program: unknown): Promise<void> {
+    await invoke('sim_load_program', { program });
+  },
+
+  /**
    * Get the current simulation status from the store
    */
   getStatus() {

@@ -749,7 +749,14 @@ impl ScenarioExecutor {
 // ============================================================================
 
 /// Parse a Modbus address string (e.g., "C:0x0001", "H:0x0100")
+/// Also supports PLC address format (e.g., "P0001", "M0001", "D0100")
 pub fn parse_modbus_address(address: &str) -> Result<(MemoryType, u16), String> {
+    // Try PLC address format first (e.g., P0001, M0001, K0001, T0001, C0001, D0100, F0001)
+    if let Some(result) = try_parse_plc_address(address) {
+        return result;
+    }
+
+    // Fall back to Modbus address format (e.g., "C:0x0001", "H:0x0100")
     let parts: Vec<&str> = address.split(':').collect();
     if parts.len() != 2 {
         return Err(format!("Invalid address format: {}", address));
@@ -775,6 +782,70 @@ pub fn parse_modbus_address(address: &str) -> Result<(MemoryType, u16), String> 
     };
 
     Ok((memory_type, addr))
+}
+
+// ============================================================================
+// PLC Address Mapping Constants (matching modserver_sync.rs)
+// ============================================================================
+
+/// M relay → Coil offset
+const PLC_M_COIL_OFFSET: u16 = 0;
+/// K relay → Coil offset
+const PLC_K_COIL_OFFSET: u16 = 8192;
+/// T contact → Coil offset
+const PLC_T_COIL_OFFSET: u16 = 10240;
+/// C contact → Coil offset
+const PLC_C_COIL_OFFSET: u16 = 12288;
+/// P relay → Discrete Input offset
+const PLC_P_DI_OFFSET: u16 = 0;
+/// F relay → Discrete Input offset
+const PLC_F_DI_OFFSET: u16 = 2048;
+/// D register → Holding Register offset
+const PLC_D_HR_OFFSET: u16 = 0;
+
+/// Try to parse a PLC-style address (e.g., "P0001", "M0001", "D0100")
+/// Returns None if the address doesn't match PLC format.
+fn try_parse_plc_address(address: &str) -> Option<Result<(MemoryType, u16), String>> {
+    let trimmed = address.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    // Check if first character is a valid PLC device prefix
+    let first_char = trimmed.chars().next()?;
+    let rest = &trimmed[1..];
+
+    // Must have numeric part after prefix
+    if rest.is_empty() || !rest.chars().next()?.is_ascii_digit() {
+        return None;
+    }
+
+    // Also reject if it contains ':', which would be Modbus format
+    if trimmed.contains(':') {
+        return None;
+    }
+
+    let device_addr: u16 = match rest.parse() {
+        Ok(v) => v,
+        Err(e) => return Some(Err(format!("Invalid PLC address number '{}': {}", rest, e))),
+    };
+
+    let result = match first_char {
+        // Bit devices → Discrete Inputs
+        'P' | 'p' => Ok((MemoryType::DiscreteInput, PLC_P_DI_OFFSET + device_addr)),
+        'F' | 'f' => Ok((MemoryType::DiscreteInput, PLC_F_DI_OFFSET + device_addr)),
+        // Bit devices → Coils  (note: 'C' without ':' = PLC Counter, not Modbus Coil)
+        'M' | 'm' => Ok((MemoryType::Coil, PLC_M_COIL_OFFSET + device_addr)),
+        'K' | 'k' => Ok((MemoryType::Coil, PLC_K_COIL_OFFSET + device_addr)),
+        'T' | 't' => Ok((MemoryType::Coil, PLC_T_COIL_OFFSET + device_addr)),
+        'C' | 'c' => Ok((MemoryType::Coil, PLC_C_COIL_OFFSET + device_addr)),
+        // Word devices → Holding Registers
+        'D' | 'd' => Ok((MemoryType::HoldingRegister, PLC_D_HR_OFFSET + device_addr)),
+        // Not a PLC address prefix — let Modbus parser handle it
+        _ => return None,
+    };
+
+    Some(result)
 }
 
 // ============================================================================
@@ -1080,5 +1151,116 @@ mod tests {
 
         assert_eq!(executor.event_queue.len(), 0);
         assert_eq!(executor.executed_count, 1);
+    }
+
+    // ====================================================================
+    // PLC Address Format Tests
+    // ====================================================================
+
+    #[test]
+    fn test_parse_plc_address_p_relay() {
+        // P0001 → Discrete Input at offset 0 + 1 = 1
+        let (mt, addr) = parse_modbus_address("P0001").unwrap();
+        assert_eq!(mt, MemoryType::DiscreteInput);
+        assert_eq!(addr, 1);
+
+        // P0000 → Discrete Input 0
+        let (mt, addr) = parse_modbus_address("P0000").unwrap();
+        assert_eq!(mt, MemoryType::DiscreteInput);
+        assert_eq!(addr, 0);
+    }
+
+    #[test]
+    fn test_parse_plc_address_m_relay() {
+        // M0001 → Coil at offset 0 + 1 = 1
+        let (mt, addr) = parse_modbus_address("M0001").unwrap();
+        assert_eq!(mt, MemoryType::Coil);
+        assert_eq!(addr, 1);
+
+        // M0100 → Coil 100
+        let (mt, addr) = parse_modbus_address("M0100").unwrap();
+        assert_eq!(mt, MemoryType::Coil);
+        assert_eq!(addr, 100);
+    }
+
+    #[test]
+    fn test_parse_plc_address_k_relay() {
+        // K0001 → Coil at offset 8192 + 1 = 8193
+        let (mt, addr) = parse_modbus_address("K0001").unwrap();
+        assert_eq!(mt, MemoryType::Coil);
+        assert_eq!(addr, 8193);
+    }
+
+    #[test]
+    fn test_parse_plc_address_t_contact() {
+        // T0001 → Coil at offset 10240 + 1 = 10241
+        let (mt, addr) = parse_modbus_address("T0001").unwrap();
+        assert_eq!(mt, MemoryType::Coil);
+        assert_eq!(addr, 10241);
+    }
+
+    #[test]
+    fn test_parse_plc_address_c_counter() {
+        // C0001 (PLC Counter, no colon) → Coil at offset 12288 + 1 = 12289
+        let (mt, addr) = parse_modbus_address("C0001").unwrap();
+        assert_eq!(mt, MemoryType::Coil);
+        assert_eq!(addr, 12289);
+    }
+
+    #[test]
+    fn test_parse_plc_address_d_register() {
+        // D0100 → Holding Register at offset 0 + 100 = 100
+        let (mt, addr) = parse_modbus_address("D0100").unwrap();
+        assert_eq!(mt, MemoryType::HoldingRegister);
+        assert_eq!(addr, 100);
+    }
+
+    #[test]
+    fn test_parse_plc_address_f_relay() {
+        // F0001 → Discrete Input at offset 2048 + 1 = 2049
+        let (mt, addr) = parse_modbus_address("F0001").unwrap();
+        assert_eq!(mt, MemoryType::DiscreteInput);
+        assert_eq!(addr, 2049);
+    }
+
+    #[test]
+    fn test_parse_plc_address_lowercase() {
+        // Lowercase should work too
+        let (mt, addr) = parse_modbus_address("p0001").unwrap();
+        assert_eq!(mt, MemoryType::DiscreteInput);
+        assert_eq!(addr, 1);
+
+        let (mt, addr) = parse_modbus_address("m0050").unwrap();
+        assert_eq!(mt, MemoryType::Coil);
+        assert_eq!(addr, 50);
+    }
+
+    #[test]
+    fn test_parse_modbus_format_still_works() {
+        // Existing Modbus format should still work
+        let (mt, addr) = parse_modbus_address("C:0x0001").unwrap();
+        assert_eq!(mt, MemoryType::Coil);
+        assert_eq!(addr, 1);
+
+        let (mt, addr) = parse_modbus_address("DI:100").unwrap();
+        assert_eq!(mt, MemoryType::DiscreteInput);
+        assert_eq!(addr, 100);
+
+        let (mt, addr) = parse_modbus_address("H:1000").unwrap();
+        assert_eq!(mt, MemoryType::HoldingRegister);
+        assert_eq!(addr, 1000);
+    }
+
+    #[test]
+    fn test_parse_plc_c_vs_modbus_c() {
+        // "C0001" (no colon) = PLC Counter → Coil 12289
+        let (mt, addr) = parse_modbus_address("C0001").unwrap();
+        assert_eq!(mt, MemoryType::Coil);
+        assert_eq!(addr, 12289);
+
+        // "C:1" (with colon) = Modbus Coil → Coil 1
+        let (mt, addr) = parse_modbus_address("C:1").unwrap();
+        assert_eq!(mt, MemoryType::Coil);
+        assert_eq!(addr, 1);
     }
 }
