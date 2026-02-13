@@ -20,7 +20,9 @@ import { useDocumentContext } from '../../../contexts/DocumentContext';
 import { useLadderUIStore } from '../../../stores/ladderUIStore';
 import { useDocumentRegistry } from '../../../stores/documentRegistry';
 import { isLadderDocument } from '../../../types/document';
-import type { LadderElement, LadderGridConfig, GridPosition } from '../../../types/ladder';
+import type { LadderElement, LadderElementType, LadderGridConfig, GridPosition, WireProperties } from '../../../types/ladder';
+import { isWireType } from '../../../types/ladder';
+import { updateAdjacentWires } from '../utils/wireGenerator';
 
 export interface UseLadderKeyboardShortcutsOptions {
   /** Whether shortcuts are enabled */
@@ -108,6 +110,15 @@ export function useLadderKeyboardShortcuts(
       return;
     }
 
+    // Record positions before deletion for adjacent wire updates
+    const deletedPositions: GridPosition[] = [];
+    idsToDelete.forEach((id) => {
+      const el = doc.data.elements.get(id);
+      if (el) {
+        deletedPositions.push({ ...el.position });
+      }
+    });
+
     registry.pushHistory(documentId, `Delete ${idsToDelete.length} element(s)`);
     registry.updateLadderData(documentId, (data) => {
       idsToDelete.forEach((id) => {
@@ -116,6 +127,22 @@ export function useLadderKeyboardShortcuts(
       data.wires = data.wires.filter(
         (wire) => !idsToDelete.includes(wire.from.elementId) && !idsToDelete.includes(wire.to.elementId)
       );
+
+      // Auto-update adjacent wire elements after deletion
+      for (const pos of deletedPositions) {
+        const adjacentUpdates = updateAdjacentWires(pos, data.elements, data.gridConfig);
+        for (const update of adjacentUpdates) {
+          const adjElement = data.elements.get(update.elementId);
+          if (adjElement && isWireType(adjElement.type)) {
+            (adjElement as { type: LadderElementType }).type = update.newType;
+            if (update.newDirection) {
+              (adjElement.properties as WireProperties).direction = update.newDirection as WireProperties['direction'];
+            } else {
+              delete (adjElement.properties as WireProperties).direction;
+            }
+          }
+        }
+      }
     });
     useLadderUIStore.getState().clearSelection();
   }, [documentId, selectedElementIds, mode]);
@@ -188,6 +215,8 @@ export function useLadderKeyboardShortcuts(
 
     registry.pushHistory(documentId, `Paste ${clipboard.length} element(s)`);
     registry.updateLadderData(documentId, (data) => {
+      const pastedPositions: GridPosition[] = [];
+
       clipboard.forEach((element) => {
         const newPosition = {
           row: element.position.row + offsetRow,
@@ -204,7 +233,24 @@ export function useLadderKeyboardShortcuts(
         cloned.selected = false;
         data.elements.set(newId, cloned);
         newIds.push(newId);
+        pastedPositions.push(newPosition);
       });
+
+      // Auto-update adjacent wire elements after paste
+      for (const pos of pastedPositions) {
+        const adjacentUpdates = updateAdjacentWires(pos, data.elements, data.gridConfig);
+        for (const update of adjacentUpdates) {
+          const adjElement = data.elements.get(update.elementId);
+          if (adjElement && isWireType(adjElement.type)) {
+            (adjElement as { type: LadderElementType }).type = update.newType;
+            if (update.newDirection) {
+              (adjElement.properties as WireProperties).direction = update.newDirection as WireProperties['direction'];
+            } else {
+              delete (adjElement.properties as WireProperties).direction;
+            }
+          }
+        }
+      }
     });
 
     uiStore.setSelection(newIds);
@@ -250,6 +296,20 @@ export function useLadderKeyboardShortcuts(
       registry.pushHistory(documentId, `Duplicate ${element.type}`);
       registry.updateLadderData(documentId, (data) => {
         data.elements.set(newId, cloned);
+
+        // Auto-update adjacent wire elements after duplication
+        const adjacentUpdates = updateAdjacentWires(availablePosition, data.elements, data.gridConfig);
+        for (const update of adjacentUpdates) {
+          const adjElement = data.elements.get(update.elementId);
+          if (adjElement && isWireType(adjElement.type)) {
+            (adjElement as { type: LadderElementType }).type = update.newType;
+            if (update.newDirection) {
+              (adjElement.properties as WireProperties).direction = update.newDirection as WireProperties['direction'];
+            } else {
+              delete (adjElement.properties as WireProperties).direction;
+            }
+          }
+        }
       });
     });
   }, [documentId, selectedElementIds, mode]);
@@ -267,9 +327,14 @@ export function useLadderKeyboardShortcuts(
     useLadderUIStore.getState().selectAll(Array.from(doc.data.elements.keys()));
   }, [documentId]);
 
-  // Handle escape
+  // Handle escape — clear active tool first, then selection
   const handleEscape = useCallback(() => {
-    useLadderUIStore.getState().clearSelection();
+    const store = useLadderUIStore.getState();
+    if (store.activeTool !== null) {
+      store.clearActiveTool();
+    } else {
+      store.clearSelection();
+    }
   }, []);
 
   // Handle enter (edit element)

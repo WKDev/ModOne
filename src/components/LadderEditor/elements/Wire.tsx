@@ -145,7 +145,10 @@ function getWirePath(
       };
 
     default:
-      return { lines: [] };
+      console.warn(`[Wire] Unknown wire type: "${type}", falling back to horizontal`);
+      return {
+        lines: [{ x1: 0, y1: height / 2, x2: width, y2: height / 2 }],
+      };
   }
 }
 

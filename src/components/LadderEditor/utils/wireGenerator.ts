@@ -237,7 +237,13 @@ function connectElementsOnRow(
 }
 
 /**
- * Generate all wires for a set of elements
+ * Generate all wires for a set of elements.
+ *
+ * @deprecated This function is not used. The editor uses wire-as-element
+ * (wire_h, wire_v, wire_corner, wire_junction elements in the elements Map)
+ * rather than LadderWire[] objects. The `data.wires` array is always empty.
+ * This function is kept temporarily for reference but should be removed
+ * in a future cleanup pass.
  */
 export function generateWires(
   elements: LadderElement[],
@@ -452,19 +458,31 @@ const { TOP, BOTTOM, LEFT, RIGHT } = WireDirection;
 
 /**
  * Maps a WireDirection bitmask to the corresponding WireComponentType.
- * Covers all 11 valid combinations of 2, 3, and 4 directions.
+ * Covers:
+ * - 4 single-direction cases (dead-end / stub wires)
+ * - 6 two-direction combinations (straight + corner)
+ * - 4 three-direction combinations (T-junctions)
+ * - 1 four-direction combination (cross)
  */
 const DIRECTION_TO_WIRE_TYPE: Record<number, WireComponentType> = {
+  // Single-direction (dead-end stubs — render as nearest straight wire)
+  [LEFT]:                        'horizontal',
+  [RIGHT]:                       'horizontal',
+  [TOP]:                         'vertical',
+  [BOTTOM]:                      'vertical',
+  // Two-direction (straight + corner)
   [LEFT | RIGHT]:                'horizontal',
   [TOP | BOTTOM]:                'vertical',
   [LEFT | BOTTOM]:               'corner_tl',
   [RIGHT | BOTTOM]:              'corner_tr',
   [LEFT | TOP]:                  'corner_bl',
   [RIGHT | TOP]:                 'corner_br',
+  // Three-direction (T-junctions)
   [LEFT | RIGHT | BOTTOM]:       'junction_t',
   [LEFT | RIGHT | TOP]:          'junction_b',
   [TOP | BOTTOM | RIGHT]:        'junction_l',
   [TOP | BOTTOM | LEFT]:         'junction_r',
+  // Four-direction (cross)
   [TOP | BOTTOM | LEFT | RIGHT]: 'cross',
 };
 
@@ -473,6 +491,11 @@ const DIRECTION_TO_WIRE_TYPE: Record<number, WireComponentType> = {
  * Falls back to 'horizontal' for unmapped combinations.
  */
 export function resolveWireTypeFromDirections(directions: number): WireComponentType {
+  // Validate bitmask range: valid values are 0-15 (4 bits: TOP|BOTTOM|LEFT|RIGHT)
+  if (directions < 0 || directions > 15) {
+    console.warn(`[wireGenerator] Invalid direction bitmask: ${directions}, expected 0-15. Falling back to horizontal.`);
+    return 'horizontal';
+  }
   return DIRECTION_TO_WIRE_TYPE[directions] ?? 'horizontal';
 }
 
@@ -530,13 +553,32 @@ export function getElementDirections(element: LadderElement): number {
 // ============================================================================
 
 /**
- * Helper: look up element at a grid position from a Map<string, LadderElement>.
+ * Build a position-keyed index for O(1) lookups.
+ * Call once before batch neighbor analysis operations.
+ */
+function buildPositionIndex(elements: Map<string, LadderElement>): Map<string, LadderElement> {
+  const index = new Map<string, LadderElement>();
+  for (const el of elements.values()) {
+    index.set(`${el.position.row}-${el.position.col}`, el);
+  }
+  return index;
+}
+
+/**
+ * Helper: look up element at a grid position.
+ * Accepts either a position index (O(1)) or elements Map (O(n) fallback).
  */
 function getElementAtPosition(
   row: number,
   col: number,
   elements: Map<string, LadderElement>
 ): LadderElement | undefined {
+  // If elements is already a position index (key format "row-col"), use O(1) lookup
+  const key = `${row}-${col}`;
+  const directHit = elements.get(key);
+  if (directHit) return directHit;
+
+  // Fallback: linear scan for when elements is the id-keyed Map
   for (const el of elements.values()) {
     if (el.position.row === row && el.position.col === col) return el;
   }
@@ -699,6 +741,8 @@ export interface WireTypeUpdate {
  *
  * Only returns updates for wire-type elements (wire_h, wire_v, wire_corner, wire_junction).
  * Logic elements (contact, coil, etc.) are never modified.
+ *
+ * Uses a position index internally for O(1) lookups instead of O(n) scans.
  */
 export function updateAdjacentWires(
   position: GridPosition,
@@ -708,6 +752,9 @@ export function updateAdjacentWires(
 ): WireTypeUpdate[] {
   const updates: WireTypeUpdate[] = [];
   const { row, col } = position;
+
+  // Build position index for O(1) lookups during neighbor analysis
+  const posIndex = buildPositionIndex(elements);
 
   // Check all 4 neighbors
   const neighbors: Array<{ r: number; c: number }> = [
@@ -721,7 +768,7 @@ export function updateAdjacentWires(
     // Skip out of bounds
     if (r < 0 || c < 0 || c >= gridConfig.columns) continue;
 
-    const neighbor = getElementAtPosition(r, c, elements);
+    const neighbor = getElementAtPosition(r, c, posIndex);
     if (!neighbor) continue;
 
     // Only update wire-type elements
@@ -806,8 +853,56 @@ export interface ParallelBranch {
 }
 
 /**
+ * Check whether two rows share a common horizontal wire path,
+ * indicating they belong to the same rung group (not independent rungs).
+ * Rows are considered connected if there exists a column where both rows
+ * have elements that share horizontal connectivity (either directly adjacent
+ * or connected through horizontal wires).
+ */
+function rowsShareHorizontalPath(
+  row1: number,
+  row2: number,
+  elements: LadderElement[],
+  targetCol: number
+): boolean {
+  // Check if there's a vertical wire or junction connecting these rows at the target column
+  for (const el of elements) {
+    if (!isWireType(el.type)) continue;
+    if (el.position.col !== targetCol) continue;
+
+    // A vertical wire between the two rows indicates a connection
+    if (el.type === 'wire_v' || el.type === 'wire_junction') {
+      const minRow = Math.min(row1, row2);
+      const maxRow = Math.max(row1, row2);
+      if (el.position.row > minRow && el.position.row < maxRow) {
+        return true;
+      }
+    }
+  }
+
+  // Check adjacent columns for shared structure
+  // If elements on both rows exist and share a common adjacent column, they're related
+  const row1Cols = new Set<number>();
+  const row2Cols = new Set<number>();
+  for (const el of elements) {
+    if (isRailType(el.type) || isWireType(el.type)) continue;
+    if (el.position.row === row1) row1Cols.add(el.position.col);
+    if (el.position.row === row2) row2Cols.add(el.position.col);
+  }
+
+  // If both rows have elements in multiple shared columns, they're likely parallel branches
+  let sharedColCount = 0;
+  for (const col of row1Cols) {
+    if (row2Cols.has(col)) sharedColCount++;
+  }
+  return sharedColCount >= 2;
+}
+
+/**
  * Detect columns where multiple logic elements are vertically aligned,
  * indicating parallel branches that need vertical wire connections.
+ * Includes connectivity verification to avoid false positives from
+ * unrelated rungs sharing the same column.
  */
 export function findParallelBranches(
   elements: LadderElement[],
@@ -831,12 +926,29 @@ export function findParallelBranches(
     if (rows.length < 2) continue;
 
     const sorted = rows.sort((a, b) => a - b);
-    branches.push({
-      column: col,
-      startRow: sorted[0],
-      endRow: sorted[sorted.length - 1],
-      branchRows: sorted,
-    });
+
+    // Verify connectivity: check that rows are actually part of the same
+    // parallel branch structure, not independent rungs at the same column
+    const connectedRows: number[] = [sorted[0]];
+    for (let i = 1; i < sorted.length; i++) {
+      const prevRow = sorted[i - 1];
+      const currRow = sorted[i];
+
+      // Adjacent rows (gap ≤ 1) are assumed connected
+      // Rows with gap > 1 must have verified connectivity
+      if (currRow - prevRow <= 1 || rowsShareHorizontalPath(prevRow, currRow, elements, col)) {
+        connectedRows.push(currRow);
+      }
+    }
+
+    if (connectedRows.length >= 2) {
+      branches.push({
+        column: col,
+        startRow: connectedRows[0],
+        endRow: connectedRows[connectedRows.length - 1],
+        branchRows: connectedRows,
+      });
+    }
   }
 
   return branches;
@@ -927,7 +1039,7 @@ export function generateJunctionAtBranchPoint(
 }
 
 export default {
-  generateWires,
+  // generateWires is deprecated — wire-as-element is the active pattern
   getConnectionPoints,
   validateConnection,
   getWireTypeForConnection,

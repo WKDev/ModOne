@@ -273,6 +273,20 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
       pushHistoryAction(documentId, `Duplicate ${element.type}`);
       updateLadderData(documentId, (docData) => {
         docData.elements.set(newId, newElement);
+
+        // Phase 2: Auto-update adjacent wire elements after duplication
+        const adjacentUpdates = updateAdjacentWires(availablePosition, docData.elements, docData.gridConfig);
+        for (const update of adjacentUpdates) {
+          const adjElement = docData.elements.get(update.elementId);
+          if (adjElement && isWireType(adjElement.type)) {
+            (adjElement as { type: LadderElementType }).type = update.newType;
+            if (update.newDirection) {
+              (adjElement.properties as WireProperties).direction = update.newDirection as WireProperties['direction'];
+            } else {
+              delete (adjElement.properties as WireProperties).direction;
+            }
+          }
+        }
       });
 
       return newId;
@@ -339,11 +353,45 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
         return;
       }
 
+      // Record the old position before moving for adjacent wire updates
+      const elementToMove = data.elements.get(id);
+      const oldPosition = elementToMove ? { ...elementToMove.position } : null;
+
       pushHistoryAction(documentId);
       updateLadderData(documentId, (docData) => {
         const element = docData.elements.get(id);
         if (element) {
           element.position = { ...position };
+
+          // Update adjacent wires around the OLD position (now vacated)
+          if (oldPosition) {
+            const oldUpdates = updateAdjacentWires(oldPosition, docData.elements, docData.gridConfig);
+            for (const update of oldUpdates) {
+              const adjElement = docData.elements.get(update.elementId);
+              if (adjElement && isWireType(adjElement.type)) {
+                (adjElement as { type: LadderElementType }).type = update.newType;
+                if (update.newDirection) {
+                  (adjElement.properties as WireProperties).direction = update.newDirection as WireProperties['direction'];
+                } else {
+                  delete (adjElement.properties as WireProperties).direction;
+                }
+              }
+            }
+          }
+
+          // Update adjacent wires around the NEW position (now occupied)
+          const newUpdates = updateAdjacentWires(position, docData.elements, docData.gridConfig);
+          for (const update of newUpdates) {
+            const adjElement = docData.elements.get(update.elementId);
+            if (adjElement && isWireType(adjElement.type)) {
+              (adjElement as { type: LadderElementType }).type = update.newType;
+              if (update.newDirection) {
+                (adjElement.properties as WireProperties).direction = update.newDirection as WireProperties['direction'];
+              } else {
+                delete (adjElement.properties as WireProperties).direction;
+              }
+            }
+          }
         }
       });
     },
@@ -358,7 +406,24 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
       updateLadderData(documentId, (docData) => {
         const element = docData.elements.get(id);
         if (element) {
+          const oldType = element.type;
           Object.assign(element, updates);
+
+          // Phase 2: If element type changed, recalculate adjacent wires
+          if (updates.type && updates.type !== oldType) {
+            const adjacentUpdates = updateAdjacentWires(element.position, docData.elements, docData.gridConfig);
+            for (const update of adjacentUpdates) {
+              const adjElement = docData.elements.get(update.elementId);
+              if (adjElement && isWireType(adjElement.type)) {
+                (adjElement as { type: LadderElementType }).type = update.newType;
+                if (update.newDirection) {
+                  (adjElement.properties as WireProperties).direction = update.newDirection as WireProperties['direction'];
+                } else {
+                  delete (adjElement.properties as WireProperties).direction;
+                }
+              }
+            }
+          }
         }
       });
     },
