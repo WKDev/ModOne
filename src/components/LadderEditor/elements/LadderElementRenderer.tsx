@@ -88,9 +88,9 @@ const VALID_CORNER_TYPES = new Set<WireComponentType>([
   'corner_tl', 'corner_tr', 'corner_bl', 'corner_br',
 ]);
 
-/** Valid junction wire subtypes */
+/** Valid junction wire subtypes (including 'cross' for 4-way intersection) */
 const VALID_JUNCTION_TYPES = new Set<WireComponentType>([
-  'junction_t', 'junction_b', 'junction_l', 'junction_r',
+  'junction_t', 'junction_b', 'junction_l', 'junction_r', 'cross',
 ]);
 
 /**
@@ -114,6 +114,9 @@ function resolveWireType(elementType: string, properties: Record<string, unknown
     if (direction && VALID_CORNER_TYPES.has(direction)) {
       return direction;
     }
+    if (direction) {
+      console.warn(`[LadderElementRenderer] Invalid corner direction "${direction}", falling back to corner_tl`);
+    }
     
     // Fallback to connectedDirections bitmask if available
     const connectedDirections = properties?.connectedDirections as number | undefined;
@@ -132,6 +135,9 @@ function resolveWireType(elementType: string, properties: Record<string, unknown
     const direction = properties?.direction as WireComponentType | undefined;
     if (direction && VALID_JUNCTION_TYPES.has(direction)) {
       return direction;
+    }
+    if (direction) {
+      console.warn(`[LadderElementRenderer] Invalid junction direction "${direction}", falling back to junction_t`);
     }
     
     // Fallback to connectedDirections bitmask if available

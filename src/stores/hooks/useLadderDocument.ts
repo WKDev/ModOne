@@ -35,6 +35,9 @@ import {
 import {
   resolveWireElementType,
   updateAdjacentWires,
+  recalculateWireType,
+  applyWireTypeUpdate,
+  recalculateAllWireTypes,
 } from '../../components/LadderEditor/utils/wireGenerator';
 import type { WireProperties } from '../../types/ladder';
 
@@ -220,18 +223,12 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
         // Add the new element
         docData.elements.set(id, newElement);
 
-        // Phase 1.7: Auto-update adjacent wire elements
+        // Auto-update adjacent wire elements
         const adjacentUpdates = updateAdjacentWires(position, docData.elements, docData.gridConfig);
         for (const update of adjacentUpdates) {
           const adjElement = docData.elements.get(update.elementId);
           if (adjElement && isWireType(adjElement.type)) {
-            // Update the wire type and direction in-place
-            (adjElement as { type: LadderElementType }).type = update.newType;
-            if (update.newDirection) {
-              (adjElement.properties as WireProperties).direction = update.newDirection as WireProperties['direction'];
-            } else {
-              delete (adjElement.properties as WireProperties).direction;
-            }
+            applyWireTypeUpdate(adjElement, update);
           }
         }
       });
@@ -274,17 +271,18 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
       updateLadderData(documentId, (docData) => {
         docData.elements.set(newId, newElement);
 
-        // Phase 2: Auto-update adjacent wire elements after duplication
+        // Recalculate the duplicated element's own wire type at its new position
+        const selfUpdate = recalculateWireType(newElement, docData.elements, docData.gridConfig);
+        if (selfUpdate) {
+          applyWireTypeUpdate(newElement, selfUpdate);
+        }
+
+        // Auto-update adjacent wire elements after duplication
         const adjacentUpdates = updateAdjacentWires(availablePosition, docData.elements, docData.gridConfig);
         for (const update of adjacentUpdates) {
           const adjElement = docData.elements.get(update.elementId);
           if (adjElement && isWireType(adjElement.type)) {
-            (adjElement as { type: LadderElementType }).type = update.newType;
-            if (update.newDirection) {
-              (adjElement.properties as WireProperties).direction = update.newDirection as WireProperties['direction'];
-            } else {
-              delete (adjElement.properties as WireProperties).direction;
-            }
+            applyWireTypeUpdate(adjElement, update);
           }
         }
       });
@@ -325,18 +323,13 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
           (wire) => wire.from.elementId !== id && wire.to.elementId !== id
         );
 
-        // Phase 1.8: Auto-update adjacent wire elements after deletion
+        // Auto-update adjacent wire elements after deletion
         if (removedPosition) {
           const adjacentUpdates = updateAdjacentWires(removedPosition, docData.elements, docData.gridConfig);
           for (const update of adjacentUpdates) {
             const adjElement = docData.elements.get(update.elementId);
             if (adjElement && isWireType(adjElement.type)) {
-              (adjElement as { type: LadderElementType }).type = update.newType;
-              if (update.newDirection) {
-                (adjElement.properties as WireProperties).direction = update.newDirection as WireProperties['direction'];
-              } else {
-                delete (adjElement.properties as WireProperties).direction;
-              }
+              applyWireTypeUpdate(adjElement, update);
             }
           }
         }
@@ -363,18 +356,19 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
         if (element) {
           element.position = { ...position };
 
+          // Recalculate the moved element's own wire type at its new position
+          const selfUpdate = recalculateWireType(element, docData.elements, docData.gridConfig);
+          if (selfUpdate) {
+            applyWireTypeUpdate(element, selfUpdate);
+          }
+
           // Update adjacent wires around the OLD position (now vacated)
           if (oldPosition) {
             const oldUpdates = updateAdjacentWires(oldPosition, docData.elements, docData.gridConfig);
             for (const update of oldUpdates) {
               const adjElement = docData.elements.get(update.elementId);
               if (adjElement && isWireType(adjElement.type)) {
-                (adjElement as { type: LadderElementType }).type = update.newType;
-                if (update.newDirection) {
-                  (adjElement.properties as WireProperties).direction = update.newDirection as WireProperties['direction'];
-                } else {
-                  delete (adjElement.properties as WireProperties).direction;
-                }
+                applyWireTypeUpdate(adjElement, update);
               }
             }
           }
@@ -384,12 +378,7 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
           for (const update of newUpdates) {
             const adjElement = docData.elements.get(update.elementId);
             if (adjElement && isWireType(adjElement.type)) {
-              (adjElement as { type: LadderElementType }).type = update.newType;
-              if (update.newDirection) {
-                (adjElement.properties as WireProperties).direction = update.newDirection as WireProperties['direction'];
-              } else {
-                delete (adjElement.properties as WireProperties).direction;
-              }
+              applyWireTypeUpdate(adjElement, update);
             }
           }
         }
@@ -402,6 +391,10 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
     (id: string, updates: Partial<LadderElement>) => {
       if (!documentId || !data) return;
 
+      // Record old position before update for wire recalculation
+      const currentElement = data.elements.get(id);
+      const oldPosition = currentElement?.position ? { ...currentElement.position } : null;
+
       pushHistoryAction(documentId);
       updateLadderData(documentId, (docData) => {
         const element = docData.elements.get(id);
@@ -409,19 +402,36 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
           const oldType = element.type;
           Object.assign(element, updates);
 
-          // Phase 2: If element type changed, recalculate adjacent wires
-          if (updates.type && updates.type !== oldType) {
+          const typeChanged = updates.type && updates.type !== oldType;
+          const positionChanged = updates.position && oldPosition &&
+            (updates.position.row !== oldPosition.row || updates.position.col !== oldPosition.col);
+
+          // If element type or position changed, recalculate adjacent wires
+          if (typeChanged || positionChanged) {
+            // Update wires around old position if position changed
+            if (positionChanged && oldPosition) {
+              const oldUpdates = updateAdjacentWires(oldPosition, docData.elements, docData.gridConfig);
+              for (const update of oldUpdates) {
+                const adjElement = docData.elements.get(update.elementId);
+                if (adjElement && isWireType(adjElement.type)) {
+                  applyWireTypeUpdate(adjElement, update);
+                }
+              }
+            }
+
+            // Update wires around current position
             const adjacentUpdates = updateAdjacentWires(element.position, docData.elements, docData.gridConfig);
             for (const update of adjacentUpdates) {
               const adjElement = docData.elements.get(update.elementId);
               if (adjElement && isWireType(adjElement.type)) {
-                (adjElement as { type: LadderElementType }).type = update.newType;
-                if (update.newDirection) {
-                  (adjElement.properties as WireProperties).direction = update.newDirection as WireProperties['direction'];
-                } else {
-                  delete (adjElement.properties as WireProperties).direction;
-                }
+                applyWireTypeUpdate(adjElement, update);
               }
+            }
+
+            // Recalculate the element's own wire type if it's a wire
+            const selfUpdate = recalculateWireType(element, docData.elements, docData.gridConfig);
+            if (selfUpdate) {
+              applyWireTypeUpdate(element, selfUpdate);
             }
           }
         }
@@ -479,6 +489,9 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
         docData.elements = newElements;
         docData.wires = [];
         docData.comment = ast.networks[0]?.comment;
+
+        // Recalculate all wire types based on neighbors after bulk load
+        recalculateAllWireTypes(docData.elements, docData.gridConfig);
       });
     },
     [documentId, updateLadderData]
@@ -508,7 +521,26 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
       if (!documentId) return;
 
       updateLadderData(documentId, (docData) => {
+        const oldColumns = docData.gridConfig.columns;
         docData.gridConfig = { ...docData.gridConfig, ...config };
+        const newColumns = docData.gridConfig.columns;
+
+        // If columns shrunk, remove elements beyond new boundary and recalculate wires
+        if (newColumns < oldColumns) {
+          const toRemove: string[] = [];
+          for (const [elId, el] of docData.elements) {
+            if (el.position.col >= newColumns) {
+              toRemove.push(elId);
+            }
+          }
+          if (toRemove.length > 0) {
+            for (const elId of toRemove) {
+              docData.elements.delete(elId);
+            }
+            // Recalculate wire types for elements near the new boundary
+            recalculateAllWireTypes(docData.elements, docData.gridConfig);
+          }
+        }
       });
     },
     [documentId, updateLadderData]

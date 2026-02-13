@@ -7,6 +7,7 @@
 
 import type {
   LadderElement,
+  LadderElementType,
   LadderWire,
   LadderGridConfig,
   GridPosition,
@@ -536,6 +537,9 @@ export function getElementDirections(element: LadderElement): number {
     if (dir && WIRE_DIRECTION_PROPERTY_MAP[dir] !== undefined) {
       return WIRE_DIRECTION_PROPERTY_MAP[dir];
     }
+    if (dir) {
+      console.warn(`[wireGenerator] Unknown wire direction "${dir}" for ${type}, using default`);
+    }
     // Defaults
     return type === 'wire_corner' ? (LEFT | BOTTOM) : (LEFT | RIGHT | BOTTOM);
   }
@@ -1038,6 +1042,79 @@ export function generateJunctionAtBranchPoint(
   return resolved;
 }
 
+// ============================================================================
+// Phase 2 Helpers: recalculateWireType() + applyWireTypeUpdate()
+// ============================================================================
+
+/**
+ * Recalculate the wire type of the element at a given position based on
+ * its current neighbors. Unlike updateAdjacentWires() which updates
+ * NEIGHBORS, this updates the element ITSELF.
+ *
+ * Returns a WireTypeUpdate if the element's type should change, or null
+ * if no change is needed (or if the element is not a wire).
+ */
+export function recalculateWireType(
+  element: LadderElement,
+  elements: Map<string, LadderElement>,
+  gridConfig: LadderGridConfig,
+  graph?: ConnectivityGraph
+): WireTypeUpdate | null {
+  if (!isWireType(element.type)) return null;
+
+  const neighborDirs = analyzeNeighborDirections(element.position, elements, gridConfig, graph);
+  const ownBase = getBaseWireDirections(element.type);
+  const combined = ownBase | neighborDirs;
+
+  const newComponentType = DIRECTION_TO_WIRE_TYPE[combined];
+  if (!newComponentType) return null;
+
+  const resolved = componentTypeToWireType(newComponentType);
+
+  // Check if actually changed
+  const currentDirection = (element.properties as WireProperties)?.direction;
+  if (resolved.type === element.type && resolved.direction === currentDirection) {
+    return null;
+  }
+
+  return {
+    elementId: element.id,
+    newType: resolved.type,
+    newDirection: resolved.direction,
+  };
+}
+
+/**
+ * Apply a WireTypeUpdate to an element (Immer-safe).
+ * Uses `= undefined` instead of `delete` for safer Immer compatibility.
+ */
+export function applyWireTypeUpdate(element: LadderElement, update: WireTypeUpdate): void {
+  (element as { type: LadderElementType }).type = update.newType;
+  const props = (element.properties ?? {}) as WireProperties;
+  if (update.newDirection) {
+    props.direction = update.newDirection as WireProperties['direction'];
+  } else {
+    props.direction = undefined;
+  }
+}
+
+/**
+ * Recalculate wire types for ALL wire elements in the elements Map.
+ * Used after bulk operations like loadFromAST where the entire Map is replaced.
+ */
+export function recalculateAllWireTypes(
+  elements: Map<string, LadderElement>,
+  gridConfig: LadderGridConfig
+): void {
+  const wireElements = Array.from(elements.values()).filter(el => isWireType(el.type));
+  for (const wireEl of wireElements) {
+    const update = recalculateWireType(wireEl, elements, gridConfig);
+    if (update) {
+      applyWireTypeUpdate(wireEl, update);
+    }
+  }
+}
+
 export default {
   // generateWires is deprecated — wire-as-element is the active pattern
   getConnectionPoints,
@@ -1050,6 +1127,10 @@ export default {
   analyzeNeighborDirections,
   resolveWireElementType,
   updateAdjacentWires,
+  // Phase 2 helpers
+  recalculateWireType,
+  applyWireTypeUpdate,
+  recalculateAllWireTypes,
   // Phase 3 exports
   findParallelBranches,
   generateVerticalWireSegments,

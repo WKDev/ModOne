@@ -20,9 +20,9 @@ import { useDocumentContext } from '../../../contexts/DocumentContext';
 import { useLadderUIStore } from '../../../stores/ladderUIStore';
 import { useDocumentRegistry } from '../../../stores/documentRegistry';
 import { isLadderDocument } from '../../../types/document';
-import type { LadderElement, LadderElementType, LadderGridConfig, GridPosition, WireProperties } from '../../../types/ladder';
+import type { LadderElement, LadderGridConfig, GridPosition } from '../../../types/ladder';
 import { isWireType } from '../../../types/ladder';
-import { updateAdjacentWires } from '../utils/wireGenerator';
+import { updateAdjacentWires, recalculateWireType, applyWireTypeUpdate } from '../utils/wireGenerator';
 
 export interface UseLadderKeyboardShortcutsOptions {
   /** Whether shortcuts are enabled */
@@ -134,12 +134,7 @@ export function useLadderKeyboardShortcuts(
         for (const update of adjacentUpdates) {
           const adjElement = data.elements.get(update.elementId);
           if (adjElement && isWireType(adjElement.type)) {
-            (adjElement as { type: LadderElementType }).type = update.newType;
-            if (update.newDirection) {
-              (adjElement.properties as WireProperties).direction = update.newDirection as WireProperties['direction'];
-            } else {
-              delete (adjElement.properties as WireProperties).direction;
-            }
+            applyWireTypeUpdate(adjElement, update);
           }
         }
       }
@@ -236,18 +231,24 @@ export function useLadderKeyboardShortcuts(
         pastedPositions.push(newPosition);
       });
 
+      // Recalculate pasted wire elements' own types at new positions
+      for (const newId of newIds) {
+        const pastedEl = data.elements.get(newId);
+        if (pastedEl && isWireType(pastedEl.type)) {
+          const selfUpdate = recalculateWireType(pastedEl, data.elements, data.gridConfig);
+          if (selfUpdate) {
+            applyWireTypeUpdate(pastedEl, selfUpdate);
+          }
+        }
+      }
+
       // Auto-update adjacent wire elements after paste
       for (const pos of pastedPositions) {
         const adjacentUpdates = updateAdjacentWires(pos, data.elements, data.gridConfig);
         for (const update of adjacentUpdates) {
           const adjElement = data.elements.get(update.elementId);
           if (adjElement && isWireType(adjElement.type)) {
-            (adjElement as { type: LadderElementType }).type = update.newType;
-            if (update.newDirection) {
-              (adjElement.properties as WireProperties).direction = update.newDirection as WireProperties['direction'];
-            } else {
-              delete (adjElement.properties as WireProperties).direction;
-            }
+            applyWireTypeUpdate(adjElement, update);
           }
         }
       }
@@ -297,17 +298,20 @@ export function useLadderKeyboardShortcuts(
       registry.updateLadderData(documentId, (data) => {
         data.elements.set(newId, cloned);
 
+        // Recalculate the duplicated element's own wire type at its new position
+        if (isWireType(cloned.type)) {
+          const selfUpdate = recalculateWireType(cloned, data.elements, data.gridConfig);
+          if (selfUpdate) {
+            applyWireTypeUpdate(cloned, selfUpdate);
+          }
+        }
+
         // Auto-update adjacent wire elements after duplication
         const adjacentUpdates = updateAdjacentWires(availablePosition, data.elements, data.gridConfig);
         for (const update of adjacentUpdates) {
           const adjElement = data.elements.get(update.elementId);
           if (adjElement && isWireType(adjElement.type)) {
-            (adjElement as { type: LadderElementType }).type = update.newType;
-            if (update.newDirection) {
-              (adjElement.properties as WireProperties).direction = update.newDirection as WireProperties['direction'];
-            } else {
-              delete (adjElement.properties as WireProperties).direction;
-            }
+            applyWireTypeUpdate(adjElement, update);
           }
         }
       });
