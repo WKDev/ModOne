@@ -14,12 +14,7 @@ import { DurationCell } from './cells/DurationCell';
 import { NoteCell } from './cells/NoteCell';
 import { parseAddress } from './utils/addressParser';
 import type { ScenarioEvent } from '../../types/scenario';
-
-// ============================================================================
-// Types
-// ============================================================================
-
-type ColumnKey = 'enabled' | 'time' | 'address' | 'value' | 'persist' | 'duration' | 'note';
+import type { ColumnKey } from './constants';
 
 interface ScenarioCellProps {
   event: ScenarioEvent;

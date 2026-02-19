@@ -6,6 +6,7 @@
 
 import {
   memo,
+  useMemo,
   useState,
   useCallback,
   useRef,
@@ -17,6 +18,7 @@ import { Plus } from 'lucide-react';
 import { useScenarioStore, selectEvents, selectExecutionState, selectSelectedEventIds } from '../../stores/scenarioStore';
 import { ScenarioRow } from './ScenarioRow';
 import { ScenarioContextMenu } from './ScenarioContextMenu';
+import { COLUMNS, GRID_TEMPLATE_COLUMNS } from './constants';
 
 // ============================================================================
 // Types
@@ -33,24 +35,6 @@ interface CellPosition {
   row: number;
   column: number;
 }
-
-type ColumnKey = 'enabled' | 'time' | 'address' | 'value' | 'persist' | 'duration' | 'note';
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-const COLUMNS: { key: ColumnKey; label: string; width: string }[] = [
-  { key: 'enabled', label: '', width: '30px' },
-  { key: 'time', label: 'Time (s)', width: '80px' },
-  { key: 'address', label: 'Address', width: '120px' },
-  { key: 'value', label: 'Value', width: '80px' },
-  { key: 'persist', label: 'Persist', width: '70px' },
-  { key: 'duration', label: 'Duration', width: '80px' },
-  { key: 'note', label: 'Note', width: '1fr' },
-];
-
-const GRID_TEMPLATE_COLUMNS = COLUMNS.map((c) => c.width).join(' ');
 
 // ============================================================================
 // Helper Functions
@@ -69,14 +53,12 @@ export const ScenarioGrid = memo(function ScenarioGrid({
   const events = useScenarioStore(selectEvents);
   const executionState = useScenarioStore(selectExecutionState);
   const selectedEventIds = useScenarioStore(selectSelectedEventIds);
-  const {
-    addEvent,
-    selectEvent,
-    selectRange,
-    removeSelectedEvents,
-    duplicateEvent,
-    toggleEventEnabled,
-  } = useScenarioStore();
+  const addEvent = useScenarioStore((state) => state.addEvent);
+  const selectEvent = useScenarioStore((state) => state.selectEvent);
+  const selectRange = useScenarioStore((state) => state.selectRange);
+  const removeSelectedEvents = useScenarioStore((state) => state.removeSelectedEvents);
+  const duplicateEvent = useScenarioStore((state) => state.duplicateEvent);
+  const toggleEventEnabled = useScenarioStore((state) => state.toggleEventEnabled);
 
   // Focus state
   const [focusedCell, setFocusedCell] = useState<CellPosition | null>(null);
@@ -118,11 +100,15 @@ export const ScenarioGrid = memo(function ScenarioGrid({
     }
   }, [executionState.currentEventIndex, executionState.status, events]);
 
-  // Get selected row indices
-  const selectedIndices = new Set(
-    events
-      .map((e, i) => (selectedEventIds.includes(e.id) ? i : -1))
-      .filter((i) => i >= 0)
+  // Get selected row indices (memoized to avoid creating new Set every render)
+  const selectedIndices = useMemo(
+    () =>
+      new Set(
+        events
+          .map((e, i) => (selectedEventIds.includes(e.id) ? i : -1))
+          .filter((i) => i >= 0)
+      ),
+    [events, selectedEventIds]
   );
 
   // Handle cell focus
@@ -130,9 +116,9 @@ export const ScenarioGrid = memo(function ScenarioGrid({
     setFocusedCell({ row, column });
   }, []);
 
-  // Handle cell edit
+  // Handle cell edit (no-op: cells are always editable, kept for ScenarioRow API)
   const handleCellEdit = useCallback((_row: number, _column: number) => {
-    // For now, cells are always editable
+    // Intentionally empty — cells are always editable
   }, []);
 
   // Handle keyboard navigation

@@ -6,7 +6,7 @@
  * giving child components access to the document ID and type.
  */
 
-import { createContext, useContext, ReactNode, memo } from 'react';
+import { createContext, useContext, useMemo, ReactNode, memo } from 'react';
 import type { DocumentType } from '../types/document';
 
 // ============================================================================
@@ -137,11 +137,10 @@ export const DocumentProvider = memo(function DocumentProvider({
   tabId,
   children,
 }: DocumentProviderProps) {
-  const value: DocumentContextValue = {
-    documentId,
-    documentType,
-    tabId,
-  };
+  const value = useMemo<DocumentContextValue>(
+    () => ({ documentId, documentType, tabId }),
+    [documentId, documentType, tabId]
+  );
 
   return (
     <DocumentContext.Provider value={value}>

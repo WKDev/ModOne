@@ -5,8 +5,8 @@
  * Integrates with Tauri dialogs and backend commands.
  */
 
-import { useCallback, useState } from 'react';
-import { open, save } from '@tauri-apps/plugin-dialog';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { open, save, ask } from '@tauri-apps/plugin-dialog';
 import { useScenarioStore } from '../../../stores/scenarioStore';
 import { scenarioService } from '../../../services/scenarioService';
 
@@ -113,35 +113,8 @@ export function useScenarioFileOps(): UseScenarioFileOpsReturn {
   // ============================================================================
 
   /**
-   * Save the current scenario
-   */
-  const saveScenario = useCallback(async (): Promise<boolean> => {
-    if (!scenario) return false;
-
-    // If no file path, use Save As
-    if (!filePath) {
-      return saveScenarioAs();
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      await scenarioService.save(filePath, scenario);
-      markClean();
-      return true;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to save scenario';
-      setError(message);
-      console.error('Failed to save scenario:', err);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [scenario, filePath, markClean]);
-
-  /**
    * Save the scenario to a new file
+   * (declared before saveScenario so it can be referenced via ref)
    */
   const saveScenarioAs = useCallback(async (): Promise<boolean> => {
     if (!scenario) return false;
@@ -179,6 +152,37 @@ export function useScenarioFileOps(): UseScenarioFileOpsReturn {
       setIsLoading(false);
     }
   }, [scenario, setFilePath, markClean]);
+
+  /**
+   * Save the current scenario (uses saveScenarioAs if no filePath)
+   */
+  const saveScenarioAsRef = useRef(saveScenarioAs);
+  saveScenarioAsRef.current = saveScenarioAs;
+
+  const saveScenario = useCallback(async (): Promise<boolean> => {
+    if (!scenario) return false;
+
+    // If no file path, use Save As
+    if (!filePath) {
+      return saveScenarioAsRef.current();
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await scenarioService.save(filePath, scenario);
+      markClean();
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save scenario';
+      setError(message);
+      console.error('Failed to save scenario:', err);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [scenario, filePath, markClean]);
 
   // ============================================================================
   // Unsaved Changes Handling
@@ -289,10 +293,10 @@ export function useScenarioFileOps(): UseScenarioFileOpsReturn {
         const events = await scenarioService.importCSV(selected as string);
 
         if (events.length > 0) {
-          // Ask user whether to merge or replace
-          // For now, use browser confirm as a simple solution
-          const shouldReplace = confirm(
-            `Import ${events.length} events.\n\nClick OK to replace existing events, or Cancel to merge with existing.`
+          // Ask user whether to replace or merge
+          const shouldReplace = await ask(
+            `Import ${events.length} events.\n\nClick Yes to replace existing events, or No to merge with existing.`,
+            { title: 'Import CSV', kind: 'info' }
           );
 
           if (shouldReplace) {
@@ -370,6 +374,17 @@ export function useScenarioFileOps(): UseScenarioFileOpsReturn {
   // Return
   // ============================================================================
 
+  // Memoize the unsaved dialog props to prevent creating a new object every render
+  const unsavedDialog = useMemo<UnsavedDialogProps>(
+    () => ({
+      isOpen: showUnsavedDialog,
+      onSave: handleUnsavedSave,
+      onDontSave: handleUnsavedDontSave,
+      onCancel: handleUnsavedCancel,
+    }),
+    [showUnsavedDialog, handleUnsavedSave, handleUnsavedDontSave, handleUnsavedCancel]
+  );
+
   return {
     newScenario,
     openScenario,
@@ -379,12 +394,7 @@ export function useScenarioFileOps(): UseScenarioFileOpsReturn {
     exportCsv,
     isLoading,
     error,
-    unsavedDialog: {
-      isOpen: showUnsavedDialog,
-      onSave: handleUnsavedSave,
-      onDontSave: handleUnsavedDontSave,
-      onCancel: handleUnsavedCancel,
-    },
+    unsavedDialog,
   };
 }
 

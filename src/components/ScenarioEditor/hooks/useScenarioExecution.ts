@@ -96,6 +96,10 @@ export function useScenarioExecution(): UseScenarioExecutionReturn {
   // Track mounted state
   const mountedRef = useRef(true);
 
+  // Track latest completedEvents via ref to avoid stale closure
+  const completedEventsRef = useRef(executionState.completedEvents);
+  completedEventsRef.current = executionState.completedEvents;
+
   // ============================================================================
   // Event Listeners
   // ============================================================================
@@ -134,9 +138,9 @@ export function useScenarioExecution(): UseScenarioExecutionReturn {
       listen<EventExecutedPayload>('scenario:event-executed', (event) => {
         if (!mountedRef.current) return;
 
-        // Update completed events in store
+        // Use ref to get latest completedEvents, avoiding stale closure
         setExecutionState({
-          completedEvents: [...executionState.completedEvents, event.payload.eventId],
+          completedEvents: [...completedEventsRef.current, event.payload.eventId],
         });
       })
     );
@@ -180,7 +184,7 @@ export function useScenarioExecution(): UseScenarioExecutionReturn {
       mountedRef.current = false;
       unlisteners.forEach((p) => p.then((fn) => fn()));
     };
-  }, [setExecutionState, executionState.completedEvents]);
+  }, [setExecutionState]); // Removed executionState.completedEvents — use ref instead
 
   // ============================================================================
   // Control Functions

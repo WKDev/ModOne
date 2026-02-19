@@ -8,12 +8,11 @@ import { memo, useCallback, type KeyboardEvent, type MouseEvent } from 'react';
 import { useScenarioStore } from '../../stores/scenarioStore';
 import { ScenarioCell } from './ScenarioCell';
 import type { ScenarioEvent, ScenarioExecutionState } from '../../types/scenario';
+import { type ColumnKey, COLUMNS, GRID_TEMPLATE_COLUMNS } from './constants';
 
 // ============================================================================
 // Types
 // ============================================================================
-
-type ColumnKey = 'enabled' | 'time' | 'address' | 'value' | 'persist' | 'duration' | 'note';
 
 interface CellPosition {
   row: number;
@@ -35,21 +34,7 @@ interface RowProps {
   readonly?: boolean;
 }
 
-// ============================================================================
-// Constants
-// ============================================================================
-
-const COLUMNS: { key: ColumnKey; label: string; width: string }[] = [
-  { key: 'enabled', label: '', width: '30px' },
-  { key: 'time', label: 'Time (s)', width: '80px' },
-  { key: 'address', label: 'Address', width: '120px' },
-  { key: 'value', label: 'Value', width: '80px' },
-  { key: 'persist', label: 'Persist', width: '70px' },
-  { key: 'duration', label: 'Duration', width: '80px' },
-  { key: 'note', label: 'Note', width: '1fr' },
-];
-
-const GRID_TEMPLATE_COLUMNS = COLUMNS.map((c) => c.width).join(' ');
+// Constants imported from ./constants
 
 // ============================================================================
 // Helper Functions

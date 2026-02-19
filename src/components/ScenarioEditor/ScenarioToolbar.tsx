@@ -409,17 +409,17 @@ export const ScenarioToolbar = memo(function ScenarioToolbar({
       // Skip if typing in an input field
       if (isInputElement(e.target)) return;
 
+      // Shift+F5: Stop (must check before F5 alone)
+      if (e.key === 'F5' && e.shiftKey) {
+        e.preventDefault();
+        handleStop();
+        return;
+      }
+
       // F5 or Space: Toggle play/pause
       if (e.key === 'F5' || (e.key === ' ' && !e.shiftKey)) {
         e.preventDefault();
         handlePlayPause();
-        return;
-      }
-
-      // Shift+F5: Stop
-      if (e.key === 'F5' && e.shiftKey) {
-        e.preventDefault();
-        handleStop();
         return;
       }
 

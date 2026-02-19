@@ -51,17 +51,17 @@ export const ScenarioEditorPanel = memo(function ScenarioEditorPanel(
   // File operations
   const fileOps = useScenarioFileOps();
 
-  // Store access
-  const scenario = useScenarioStore((state) => state.scenario);
-  const newScenario = useScenarioStore((state) => state.newScenario);
-
   // Settings dialog state
   const [showSettings, setShowSettings] = useState(false);
 
-  // Initialize with new scenario if none loaded
-  if (!scenario) {
-    newScenario();
-  }
+  // Initialize with new scenario if none loaded (run once on mount)
+  useEffect(() => {
+    const { scenario: currentScenario, newScenario } =
+      useScenarioStore.getState();
+    if (!currentScenario) {
+      newScenario();
+    }
+  }, []);
 
   // ============================================================================
   // Render
