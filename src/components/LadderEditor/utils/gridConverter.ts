@@ -784,11 +784,14 @@ export function groupElementsByRow(
 }
 
 /**
- * Detect parallel groups from wire topology
+ * Detect parallel groups from wire topology.
+ * Accepts an optional `allElements` map to scan for wire_v/wire_junction elements
+ * that are filtered out of `rowGroups` by `groupElementsByRow()`.
  */
 export function detectParallelGroups(
   rowGroups: RowGroups,
-  wires: LadderWire[]
+  wires: LadderWire[],
+  allElements?: Map<string, LadderElement>
 ): ParallelGroup[] {
   const groups: ParallelGroup[] = [];
 
@@ -797,22 +800,23 @@ export function detectParallelGroups(
 
   // Phase 3.6: Also scan elements for wire_v and wire_junction types
   // This handles cases where vertical connections exist as grid elements
-  // rather than LadderWire objects
+  // rather than LadderWire objects.
+  // NOTE: We scan `allElements` (the full elements Map) because `rowGroups`
+  // has wire_* elements filtered out by `groupElementsByRow()`.
   const columnWiresFromElements = new Map<number, Set<number>>();
-  for (const elements of rowGroups.values()) {
-    for (const el of elements) {
-      if (el.type === 'wire_v' || el.type === 'wire_junction') {
-        const col = el.position.col;
-        const row = el.position.row;
-        if (!columnWiresFromElements.has(col)) {
-          columnWiresFromElements.set(col, new Set());
-        }
-        const s = columnWiresFromElements.get(col)!;
-        // A vertical wire at (row, col) implies connections to row-1 and row+1
-        s.add(row);
-        if (row > 0) s.add(row - 1);
-        s.add(row + 1);
+  const elementsToScan = allElements ? allElements.values() : [];
+  for (const el of elementsToScan) {
+    if (el.type === 'wire_v' || el.type === 'wire_junction') {
+      const col = el.position.col;
+      const row = el.position.row;
+      if (!columnWiresFromElements.has(col)) {
+        columnWiresFromElements.set(col, new Set());
       }
+      const s = columnWiresFromElements.get(col)!;
+      // A vertical wire at (row, col) implies connections to row-1 and row+1
+      s.add(row);
+      if (row > 0) s.add(row - 1);
+      s.add(row + 1);
     }
   }
 
@@ -1290,7 +1294,8 @@ export function gridToAST(
   }
 
   // Step 2: Detect parallel connections from wires
-  const parallelGroups = detectParallelGroups(rowGroups, wires);
+  // Pass full elements map so wire_v/wire_junction elements can be scanned
+  const parallelGroups = detectParallelGroups(rowGroups, wires, elements);
 
   // Step 3: Build AST from groups
   const rawAST = buildASTFromGroups(rowGroups, parallelGroups);

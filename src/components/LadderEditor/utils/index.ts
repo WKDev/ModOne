@@ -6,7 +6,7 @@
 
 // Wire generation utilities
 export {
-  generateWires,
+  // generateWires is deprecated (wire-as-element is the active pattern)
   generateVerticalWire,
   getConnectionPoints,
   validateConnection,

@@ -28,6 +28,8 @@ export interface LadderCellProps {
   readonly?: boolean;
   /** Whether this is a valid drop target for current drag */
   isValidDropTarget?: boolean;
+  /** Whether an active tool is selected (for crosshair cursor) */
+  hasActiveTool?: boolean;
   /** Called when cell is clicked */
   onClick?: (position: GridPosition, shiftKey: boolean, ctrlKey: boolean) => void;
   /** Called when cell is double-clicked */
@@ -50,6 +52,7 @@ export function LadderCell({
   isSelected = false,
   readonly = false,
   isValidDropTarget = true,
+  hasActiveTool = false,
   onClick,
   onDoubleClick,
   className,
@@ -117,7 +120,9 @@ export function LadderCell({
         !element && !children && !isDragActive && 'bg-neutral-900/20',
         // Readonly state
         readonly && 'cursor-default',
-        !readonly && !isDragActive && 'cursor-pointer',
+        // Crosshair cursor when active tool is selected and cell is empty
+        !readonly && !isDragActive && hasActiveTool && !element && 'cursor-crosshair',
+        !readonly && !isDragActive && !hasActiveTool && 'cursor-pointer',
         className
       )}
       style={{ width, height }}

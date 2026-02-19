@@ -229,19 +229,9 @@ export function useLadderDragDrop(): UseLadderDragDropResult {
         col: overData.col,
       };
 
-      // Handle toolbox item drop -> create new element
+      // Toolbox items are now placed via click-to-place (LadderGrid handleCellClick).
+      // Only handle grid element drops here for moving existing elements.
       if (activeData.type === 'toolbox-item') {
-        const validation = canPlaceAt(activeData.elementType, targetPosition);
-
-        if (validation.valid) {
-          const newId = ladderDoc.addElement(activeData.elementType, targetPosition);
-          if (newId) {
-            setSelection([newId]);
-          }
-        } else {
-          // Could show a toast notification here
-          console.warn('Invalid placement:', validation.reason);
-        }
         return;
       }
 

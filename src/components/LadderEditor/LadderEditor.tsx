@@ -1,7 +1,7 @@
 /**
  * LadderEditor Component
  *
- * Main ladder diagram editor with drag-and-drop support.
+ * Main ladder diagram editor with GxWorks-style top toolbar.
  * Integrates toolbox, grid, properties panel, and toolbar.
  */
 
@@ -37,22 +37,11 @@ export interface LadderEditorProps {
 }
 
 /**
- * DragOverlay content based on active drag item
+ * DragOverlay content for grid element moves
  */
 function DragOverlayContent({ activeId }: { activeId: string | null }) {
   if (!activeId) return null;
 
-  // Check if dragging from toolbox
-  if (activeId.startsWith('toolbox-')) {
-    const elementType = activeId.replace('toolbox-', '');
-    return (
-      <div className="px-3 py-2 bg-neutral-800 border border-blue-500 rounded shadow-lg text-sm text-neutral-200">
-        {elementType.replace(/_/g, ' ')}
-      </div>
-    );
-  }
-
-  // Dragging grid element
   return (
     <div className="px-3 py-2 bg-neutral-800 border border-blue-500 rounded shadow-lg text-sm text-neutral-200 opacity-80">
       Moving...
@@ -111,6 +100,7 @@ export function LadderEditor({
 
   useEffect(() => {
     useLadderUIStore.getState().clearSelection();
+    useLadderUIStore.getState().clearActiveTool();
   }, [documentId]);
 
   // Drag and drop handlers
@@ -184,16 +174,13 @@ export function LadderEditor({
           {/* Toolbar */}
           <LadderToolbar />
 
-          {/* Content area with toolbox and grid */}
-          <div className="flex-1 flex overflow-hidden">
-            {/* Toolbox */}
-            {showToolbox && (
-              <LadderToolbox
-                disabled={isMonitorMode}
-                className="border-r border-neutral-700 shrink-0"
-              />
-            )}
+          {/* Element toolbox strip (GxWorks-style) */}
+          {showToolbox && (
+            <LadderToolbox disabled={isMonitorMode} />
+          )}
 
+          {/* Content area with grid and properties */}
+          <div className="flex-1 flex overflow-hidden">
             {/* Grid area */}
             <div className="flex-1 flex flex-col overflow-hidden">
               {/* Comment header */}
