@@ -1,12 +1,11 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { MainLayout } from './components/layout/MainLayout';
 import { useLayoutPersistenceStore } from './stores/layoutPersistenceStore';
 import { useToolPanelStore } from './stores/toolPanelStore';
-import { useEditorAreaStore } from './stores/editorAreaStore';
 import { ThemeProvider } from './providers/ThemeProvider';
 import { useStateSync } from './hooks/useStateSync';
 import { useWindowClose } from './hooks/useWindowClose';
-import { useUndoRedoKeyboard } from './hooks/useUndoRedoKeyboard';
+import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { FloatingWindowContent } from './components/floating/FloatingWindowContent';
 import { FloatingWindowRenderer } from './components/floating/FloatingWindowRenderer';
 import { CommandPalette, useCommandPalette, registerAllCommands } from './components/CommandPalette';
@@ -40,25 +39,10 @@ function MainWindowContent() {
   const { initialize } = useLayoutPersistenceStore();
   const initializeToolPanel = useToolPanelStore((state) => state.initializeDefaultTabs);
   const toolPanelTabs = useToolPanelStore((state) => state.tabs);
-  const openSettingsTab = useEditorAreaStore((state) => state.openSettingsTab);
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Command palette state (useCommandPalette hook handles Ctrl+Shift+P shortcut)
   const { isOpen: isPaletteOpen, close: closePalette } = useCommandPalette();
-
-  // Handle Ctrl+, keyboard shortcut for settings
-  const handleSettingsShortcut = useCallback((e: KeyboardEvent) => {
-    const isCtrlOrCmd = e.ctrlKey || e.metaKey;
-    if (isCtrlOrCmd && e.key === ',') {
-      e.preventDefault();
-      openSettingsTab();
-    }
-  }, [openSettingsTab]);
-
-  useEffect(() => {
-    document.addEventListener('keydown', handleSettingsShortcut);
-    return () => document.removeEventListener('keydown', handleSettingsShortcut);
-  }, [handleSettingsShortcut]);
 
   // Window close handling with unsaved changes detection
   const {
@@ -68,11 +52,11 @@ function MainWindowContent() {
     handleCancel: handleWindowCloseCancel,
   } = useWindowClose();
 
-// Initialize cross-window state synchronization
+  // Initialize cross-window state synchronization
   useStateSync();
 
-  // Initialize global undo/redo keyboard shortcuts (Ctrl+Z, Ctrl+Y)
-  useUndoRedoKeyboard();
+  // Unified global keyboard shortcuts (reads overrides from settings)
+  useGlobalShortcuts();
 
   // Register all commands on mount
   useEffect(() => {

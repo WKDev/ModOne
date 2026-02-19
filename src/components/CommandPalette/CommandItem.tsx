@@ -3,9 +3,11 @@
  *
  * Individual command item displayed in the command palette.
  * Shows command icon, label, and keyboard shortcut.
+ * Displays effective shortcut (override > default) from settings.
  */
 
 import { forwardRef, memo } from 'react';
+import { useSettingsStore } from '../../stores/settingsStore';
 import type { Command } from './types';
 
 /**
@@ -34,6 +36,10 @@ export const CommandItem = memo(
     { command, isSelected, onClick },
     ref
   ) {
+    // Show effective shortcut: user override > default
+    const overrides = useSettingsStore.getState().getMergedSettings().keybindingOverrides;
+    const effectiveShortcut = overrides[command.id] || command.shortcut;
+
     return (
       <div
         ref={ref}
@@ -66,7 +72,7 @@ export const CommandItem = memo(
         </div>
 
         {/* Keyboard Shortcut Badge */}
-        {command.shortcut && (
+        {effectiveShortcut && (
           <kbd
             className="
               flex-shrink-0 px-1.5 py-0.5 text-xs font-mono
@@ -74,7 +80,7 @@ export const CommandItem = memo(
               border border-neutral-600
             "
           >
-            {command.shortcut}
+            {effectiveShortcut}
           </kbd>
         )}
       </div>

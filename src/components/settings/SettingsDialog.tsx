@@ -1,12 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Settings, MonitorCog, Network, Palette, X, Search } from 'lucide-react';
+import { Settings, MonitorCog, Network, Palette, Keyboard, X, Search } from 'lucide-react';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { GeneralSettings } from './GeneralSettings';
 import { SimulationSettings } from './SimulationSettings';
 import { ModbusSettings } from './ModbusSettings';
 import { AppearanceSettings } from './AppearanceSettings';
+import { KeyboardShortcutsSettings } from './KeyboardShortcutsSettings';
 
-type SettingsCategory = 'general' | 'simulation' | 'modbus' | 'appearance';
+type SettingsCategory = 'general' | 'simulation' | 'modbus' | 'appearance' | 'shortcuts';
 
 interface SettingsDialogProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ const categories: { id: SettingsCategory; label: string; icon: React.ReactNode }
   { id: 'simulation', label: '시뮬레이션', icon: <MonitorCog size={18} /> },
   { id: 'modbus', label: 'Modbus', icon: <Network size={18} /> },
   { id: 'appearance', label: '외관', icon: <Palette size={18} /> },
+  { id: 'shortcuts', label: '단축키', icon: <Keyboard size={18} /> },
 ];
 
 export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
@@ -99,8 +101,8 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
         <div
           className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg shadow-xl flex flex-col"
           style={{
-            width: 'min(80vw, 800px)',
-            height: 'min(80vh, 600px)',
+            width: 'min(90vw, 960px)',
+            height: 'min(85vh, 680px)',
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -167,6 +169,9 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                   {activeCategory === 'modbus' && <ModbusSettings searchFilter={searchFilter} />}
                   {activeCategory === 'appearance' && (
                     <AppearanceSettings searchFilter={searchFilter} />
+                  )}
+                  {activeCategory === 'shortcuts' && (
+                    <KeyboardShortcutsSettings searchFilter={searchFilter} />
                   )}
                 </>
               )}

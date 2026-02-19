@@ -3,6 +3,7 @@
 //! This module provides the IPC interface for loading and saving
 //! application-wide settings to the app data directory.
 
+use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{BufReader, BufWriter};
 use std::path::PathBuf;
@@ -45,6 +46,12 @@ pub struct AppSettings {
     pub font_size: u8,
     pub grid_display: bool,
     pub animation_enabled: bool,
+
+    // Keyboard shortcut overrides
+    // Only stores user-modified bindings. Key: command ID, Value: key combo string.
+    // e.g. { "edit.undo": "Ctrl+Shift+Z" }
+    #[serde(default)]
+    pub keybinding_overrides: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -116,6 +123,9 @@ impl Default for AppSettings {
             font_size: 14,
             grid_display: true,
             animation_enabled: true,
+
+            // Keyboard shortcut overrides (empty = all defaults)
+            keybinding_overrides: HashMap::new(),
         }
     }
 }

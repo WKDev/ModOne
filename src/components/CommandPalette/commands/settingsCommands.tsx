@@ -35,7 +35,7 @@ export function registerSettingsCommands(): void {
       shortcut: 'Ctrl+K Ctrl+S',
       keywords: ['shortcuts', 'keybindings', 'keyboard', 'hotkeys'],
       execute: () => {
-        console.log('Keyboard Shortcuts');
+        useEditorAreaStore.getState().openSettingsTab();
       },
     },
     {

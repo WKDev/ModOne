@@ -43,6 +43,11 @@ export interface AppSettings {
   fontSize: number; // 12-20
   gridDisplay: boolean;
   animationEnabled: boolean;
+
+  // Keyboard shortcut overrides
+  // Only stores user-modified bindings. Key: command ID, Value: key combo string.
+  // e.g. { "edit.undo": "Ctrl+Shift+Z" }
+  keybindingOverrides: Record<string, string>;
 }
 
 /**
@@ -75,4 +80,7 @@ export const defaultSettings: AppSettings = {
   fontSize: 14,
   gridDisplay: true,
   animationEnabled: true,
+
+  // Keyboard shortcut overrides (empty = all defaults)
+  keybindingOverrides: {},
 };

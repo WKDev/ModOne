@@ -23,6 +23,18 @@
   --color-border-focus: #3b82f6;
   --color-accent: #2563eb;
   --color-accent-hover: #1d4ed8;
+
+  /* Aliases used by components */
+  --bg-primary: var(--color-bg-primary);
+  --bg-secondary: var(--color-bg-secondary);
+  --bg-tertiary: var(--color-bg-tertiary);
+  --text-primary: var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-muted);
+  --border-color: var(--color-border);
+  --border-focus: var(--color-border-focus);
+  --accent-color: var(--color-accent);
+  --accent-color-hover: var(--color-accent-hover);
 }
 
 .dark {
@@ -37,6 +49,18 @@
   --color-border-focus: #60a5fa;
   --color-accent: #3b82f6;
   --color-accent-hover: #60a5fa;
+
+  /* Aliases used by components */
+  --bg-primary: var(--color-bg-primary);
+  --bg-secondary: var(--color-bg-secondary);
+  --bg-tertiary: var(--color-bg-tertiary);
+  --text-primary: var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-muted);
+  --border-color: var(--color-border);
+  --border-focus: var(--color-border-focus);
+  --accent-color: var(--color-accent);
+  --accent-color-hover: var(--color-accent-hover);
 }
 
 /* Reset for Tailwind compatibility */
