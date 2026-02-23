@@ -60,15 +60,13 @@ export function setupStateSync<T>(
     shouldBroadcast?: (state: T) => boolean;
     /** Transform state before broadcasting */
     transformForBroadcast?: (state: T) => Partial<T>;
-    /** Merge received state with current state */
-    mergeState?: (current: T, received: Partial<T>) => T;
   } = {}
 ): StateSyncController<T> {
   const windowId = getWindowId();
   let unlistenFn: UnlistenFn | null = null;
   let isActive = false;
 
-  const { shouldBroadcast, transformForBroadcast, mergeState } = options;
+  const { shouldBroadcast, transformForBroadcast } = options;
 
   /**
    * Broadcast state to other windows
@@ -108,13 +106,7 @@ export function setupStateSync<T>(
     }
 
     try {
-      // Apply received state
-      if (mergeState) {
-        // If we have a merge function, use it (requires getting current state externally)
-        setState(state as T);
-      } else {
-        setState(state);
-      }
+      setState(state);
     } catch (error) {
       console.error(`Failed to apply synced state for ${storeName}:`, error);
     }

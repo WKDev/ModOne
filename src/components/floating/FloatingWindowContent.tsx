@@ -5,7 +5,7 @@
  * Renders the panel content with a window header.
  */
 
-import { useCallback } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { Window } from '@tauri-apps/api/window';
 import { usePanelStore } from '../../stores/panelStore';
 
@@ -49,6 +49,30 @@ export function FloatingWindowContent({
     state.panels.find((p) => p.id === panelId)
   );
   const dockPanel = usePanelStore((state) => state.dockPanel);
+  const [isLoading, setIsLoading] = useState(!panel);
+
+  useEffect(() => {
+    if (panel) {
+      setIsLoading(false);
+      return;
+    }
+
+    // Poll for panel availability (state sync may be in progress)
+    const maxRetries = 30; // 30 x 100ms = 3 seconds
+    let retries = 0;
+    const timer = setInterval(() => {
+      const currentPanel = usePanelStore.getState().panels.find((p) => p.id === panelId);
+      if (currentPanel) {
+        setIsLoading(false);
+        clearInterval(timer);
+      } else if (++retries >= maxRetries) {
+        setIsLoading(false);
+        clearInterval(timer);
+      }
+    }, 100);
+
+    return () => clearInterval(timer);
+  }, [panel, panelId]);
 
   const handleDock = useCallback(async () => {
     try {
@@ -91,6 +115,16 @@ export function FloatingWindowContent({
   }, [windowId]);
 
   if (!panel) {
+    if (isLoading) {
+      return (
+        <div className="h-screen w-screen flex items-center justify-center bg-gray-900 text-gray-400">
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-6 h-6 border-2 border-gray-600 border-t-gray-300 rounded-full animate-spin" />
+            <span className="text-sm">Loading panel...</span>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-gray-900 text-gray-400">
         Panel not found

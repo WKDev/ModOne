@@ -1,0 +1,47 @@
+TASK 6: Fix StateSync Race Conditions + "Panel Not Found" Loading State
+=======================================================================
+Date: 2026-02-23
+
+VERIFICATION RESULTS
+--------------------
+
+1. grep "Loading panel" FloatingWindowContent.tsx
+   PASS: Found at line 123
+   <span className="text-sm">Loading panel...</span>
+
+2. grep "animate-spin" FloatingWindowContent.tsx
+   PASS: Found at line 122
+   <div className="w-6 h-6 border-2 border-gray-600 border-t-gray-300 rounded-full animate-spin" />
+
+3. grep "mergeState" stateSync.ts
+   PASS: NO MATCHES FOUND (dead code removed)
+
+4. grep "requestWithTimeout|timeout|3000" useStateSync.ts
+   PASS: Found at lines 154, 159, 167, 168, 169
+   const requestWithTimeout = async (storeName: string) => {
+   setTimeout(() => reject(new Error(`State request timeout for ${storeName}`)), 3000)
+   requestWithTimeout('panel-store');
+   requestWithTimeout('window-store');
+   requestWithTimeout('sidebar-store');
+
+CHANGES MADE
+------------
+
+1. src/components/floating/FloatingWindowContent.tsx
+   - Added useState, useEffect to React imports
+   - Added isLoading state (initialized to !panel)
+   - Added useEffect that polls panelStore for up to 3 seconds (30x100ms)
+   - Changed early return to show spinner when isLoading=true
+   - Falls through to "Panel not found" only after polling completes
+
+2. src/utils/stateSync.ts
+   - Removed mergeState option from options type definition
+   - Removed mergeState from destructuring
+   - Simplified handleStateReceived: removed dead if/else, now just setState(state)
+   - Added proper error message in catch block
+
+3. src/hooks/useStateSync.ts
+   - Wrapped requestStateFromMain calls in requestWithTimeout helper
+   - requestWithTimeout uses Promise.race with 3000ms timeout
+   - Catches and logs errors with console.warn
+   - All 3 stores (panel-store, window-store, sidebar-store) use the new wrapper

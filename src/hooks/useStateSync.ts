@@ -151,9 +151,22 @@ export function useStateSync(): void {
       cleanupFnsRef.current.push(sidebarRequestCleanup);
     } else {
       // Floating windows request state from main on init
-      requestStateFromMain('panel-store');
-      requestStateFromMain('window-store');
-      requestStateFromMain('sidebar-store');
+      const requestWithTimeout = async (storeName: string) => {
+        try {
+          await Promise.race([
+            requestStateFromMain(storeName),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error(`State request timeout for ${storeName}`)), 3000)
+            ),
+          ]);
+        } catch (error) {
+          console.warn(`Failed to request state from main for ${storeName}:`, error);
+        }
+      };
+
+      requestWithTimeout('panel-store');
+      requestWithTimeout('window-store');
+      requestWithTimeout('sidebar-store');
     }
 
     // Subscribe to store changes and broadcast
