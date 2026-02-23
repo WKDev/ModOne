@@ -107,6 +107,18 @@ describe('windowStore', () => {
 
       expect(useWindowStore.getState().floatingWindows.size).toBe(1);
     });
+
+    it('is idempotent — double unregister does not throw', () => {
+      useWindowStore.getState().registerFloatingWindow('win-1', 'panel-1', createBounds());
+      useWindowStore.getState().unregisterFloatingWindow('win-1');
+
+      // Second unregister should be a no-op, not throw
+      expect(() => {
+        useWindowStore.getState().unregisterFloatingWindow('win-1');
+      }).not.toThrow();
+
+      expect(useWindowStore.getState().floatingWindows.size).toBe(0);
+    });
   });
 
   describe('updateWindowBounds', () => {

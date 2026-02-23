@@ -215,20 +215,19 @@ describe('panelStore floating window actions', () => {
       expect(windowService.closeFloatingWindow).not.toHaveBeenCalled();
     });
 
-    it('handles windowService error gracefully', async () => {
+    it('handles windowService close error gracefully and still docks panel', async () => {
       const panelId = usePanelStore.getState().addPanel('console', '1 / 1 / 2 / 2');
       vi.mocked(windowService.createFloatingWindow).mockResolvedValue('floating-win-1');
       await usePanelStore.getState().undockPanel(panelId, createBounds());
-
       vi.mocked(windowService.closeFloatingWindow).mockRejectedValue(new Error('Close failed'));
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
+      const consoleSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
       const result = await usePanelStore.getState().dockPanel(panelId);
-
-      expect(result).toBe(false);
+      // dockPanel should succeed even if close fails (window may already be closed)
+      expect(result).toBe(true);
       expect(consoleSpy).toHaveBeenCalled();
-
-      consoleSpy.mockRestore();
+      const panel = usePanelStore.getState().panels.find((p) => p.id === panelId);
+      expect(panel?.isFloating).toBe(false);
+      expect(panel?.windowId).toBe(null);
     });
   });
 
