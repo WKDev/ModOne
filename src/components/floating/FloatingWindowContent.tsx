@@ -8,7 +8,7 @@
 import { useCallback } from 'react';
 import { Window } from '@tauri-apps/api/window';
 import { usePanelStore } from '../../stores/panelStore';
-import { useWindowStore } from '../../stores/windowStore';
+
 import { windowService } from '../../services/windowService';
 import { FloatingWindowHeader } from './FloatingWindowHeader';
 
@@ -49,10 +49,6 @@ export function FloatingWindowContent({
     state.panels.find((p) => p.id === panelId)
   );
   const dockPanel = usePanelStore((state) => state.dockPanel);
-  const removePanel = usePanelStore((state) => state.removePanel);
-  const unregisterFloatingWindow = useWindowStore(
-    (state) => state.unregisterFloatingWindow
-  );
 
   const handleDock = useCallback(async () => {
     try {
@@ -88,12 +84,11 @@ export function FloatingWindowContent({
   const handleClose = useCallback(async () => {
     try {
       await windowService.closeFloatingWindow(windowId);
-      unregisterFloatingWindow(windowId);
-      removePanel(panelId);
+
     } catch (error) {
       console.error('Failed to close window:', error);
     }
-  }, [windowId, panelId, unregisterFloatingWindow, removePanel]);
+  }, [windowId]);
 
   if (!panel) {
     return (

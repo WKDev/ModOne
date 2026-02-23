@@ -1,0 +1,34 @@
+TASK: Fix Double-Unregister Race + Single Cleanup Path for Floating Window Close
+
+VERIFICATION RESULTS (Mon Feb 23 2026):
+
+1. unregisterFloatingWindow in FloatingWindowContent.tsx: NO MATCHES ✅
+2. removePanel in FloatingWindowContent.tsx: NO MATCHES ✅
+3. removePanel in FloatingWindowRenderer.tsx: NO MATCHES ✅
+4. setPanelFloating in FloatingWindowRenderer.tsx: 4 MATCHES ✅
+   - line 29: const setPanelFloating = usePanelStore((state) => state.setPanelFloating);
+   - line 46: setPanelFloating(event.panelId, true, event.windowId);
+   - line 56: setPanelFloating(windowState.panelId, false, null);  // Dock the panel back, don't delete it
+   - line 89: setPanelFloating (in deps array)
+5. closeFloatingWindow in FloatingWindowContent.tsx: 1 MATCH ✅
+   - line 86: await windowService.closeFloatingWindow(windowId);
+
+CHANGES MADE:
+
+FloatingWindowContent.tsx:
+- Removed useWindowStore import (no longer needed)
+- Removed removePanel hook subscription
+- Removed unregisterFloatingWindow hook subscription
+- Simplified handleClose to ONLY call windowService.closeFloatingWindow(windowId)
+- Updated dependency array to [windowId] only
+
+FloatingWindowRenderer.tsx:
+- Removed removePanel hook subscription (no longer used)
+- Changed onWindowClosed handler to use setPanelFloating(panelId, false, null) instead of removePanel(panelId)
+- This docks the panel back instead of deleting it
+- unregisterFloatingWindow remains — Map.delete() is idempotent (safe for double-call)
+- Removed removePanel from useEffect dependency array
+
+IDEMPOTENCY VERIFIED:
+- windowStore.ts unregisterFloatingWindow uses Map.delete() which is a no-op for missing keys ✅
+- dockPanel cleanup path: if dockPanel runs first, FloatingWindowRenderer close handler will find windowState=undefined and skip setPanelFloating, then safely call unregisterFloatingWindow (no-op) ✅

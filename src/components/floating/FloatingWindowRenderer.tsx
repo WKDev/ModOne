@@ -27,7 +27,6 @@ export function FloatingWindowRenderer() {
   const setFocusedWindow = useWindowStore((state) => state.setFocusedWindow);
 
   const setPanelFloating = usePanelStore((state) => state.setPanelFloating);
-  const removePanel = usePanelStore((state) => state.removePanel);
 
   useEffect(() => {
     const unlisteners: (() => void)[] = [];
@@ -54,7 +53,7 @@ export function FloatingWindowRenderer() {
           // Get panel ID before unregistering
           const windowState = useWindowStore.getState().floatingWindows.get(windowId);
           if (windowState) {
-            removePanel(windowState.panelId);
+            setPanelFloating(windowState.panelId, false, null);  // Dock the panel back, don't delete it
           }
           unregisterFloatingWindow(windowId);
         });
@@ -88,7 +87,7 @@ export function FloatingWindowRenderer() {
     updateWindowBounds,
     setFocusedWindow,
     setPanelFloating,
-    removePanel,
+
   ]);
 
   // This component doesn't render anything visible
