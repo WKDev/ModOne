@@ -825,11 +825,16 @@ export const usePanelStore = create<PanelStore>()(
           return false;
         }
 
+        // Attempt to close the floating window — non-fatal if already closed
         try {
-          // Close the floating window
           await windowService.closeFloatingWindow(panel.windowId);
+        } catch (error) {
+          // Window may already be closed (OS close, on_window_event, etc.) — this is OK
+          console.debug('Window close during dock (may already be closed):', error);
+        }
 
-          // Unregister from window store
+        try {
+          // Unregister from window store (idempotent — safe if already unregistered)
           useWindowStore.getState().unregisterFloatingWindow(panel.windowId);
 
           // Update panel state
@@ -842,7 +847,6 @@ export const usePanelStore = create<PanelStore>()(
                       isFloating: false,
                       windowId: null,
                       floatingBounds: undefined,
-                      // Restore to a default grid area if no target specified
                       gridArea: p.gridArea || '1 / 1 / 2 / 2',
                     }
                   : p
