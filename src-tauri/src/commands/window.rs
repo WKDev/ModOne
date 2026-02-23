@@ -80,15 +80,15 @@ pub async fn window_create_floating(
     bounds: WindowBounds,
 ) -> Result<String, String> {
     // Generate unique window ID
-    let window_id = format!("floating-{}", Uuid::new_v4().to_string().split('-').next().unwrap_or("0000"));
+    let window_id = format!("floating-{}", Uuid::new_v4());
 
     // Create the URL for the floating window
     // The frontend will handle routing based on query params
     let url = format!("index.html?floating=true&windowId={}&panelId={}&panelType={}",
         window_id, panel_id, panel_type);
 
-    // Build the new window
-    let window = WebviewWindowBuilder::new(
+    // Build the new window (Tauri v2 builder uses logical coordinates/sizes)
+    let _window = WebviewWindowBuilder::new(
         &app,
         &window_id,
         WebviewUrl::App(url.into()),
@@ -112,7 +112,7 @@ pub async fn window_create_floating(
     };
 
     {
-        let mut registry = state.lock().map_err(|e| format!("Failed to lock state: {}", e))?;
+        let mut registry = state.lock().unwrap_or_else(|e| e.into_inner());
         registry.register(info);
     }
 
@@ -144,7 +144,7 @@ pub async fn window_close_floating(
 
     // Unregister from state
     {
-        let mut registry = state.lock().map_err(|e| format!("Failed to lock state: {}", e))?;
+        let mut registry = state.lock().unwrap_or_else(|e| e.into_inner());
         registry.unregister(&window_id);
     }
 
@@ -171,15 +171,15 @@ pub async fn window_update_bounds(
         .ok_or_else(|| format!("Window not found: {}", window_id))?;
 
     // Update position and size
-    window.set_position(tauri::PhysicalPosition::new(bounds.x as i32, bounds.y as i32))
+    window.set_position(tauri::LogicalPosition::new(bounds.x, bounds.y))
         .map_err(|e| format!("Failed to set position: {}", e))?;
 
-    window.set_size(tauri::PhysicalSize::new(bounds.width as u32, bounds.height as u32))
+    window.set_size(tauri::LogicalSize::new(bounds.width, bounds.height))
         .map_err(|e| format!("Failed to set size: {}", e))?;
 
     // Update state
     {
-        let mut registry = state.lock().map_err(|e| format!("Failed to lock state: {}", e))?;
+        let mut registry = state.lock().unwrap_or_else(|e| e.into_inner());
         registry.update_bounds(&window_id, bounds.clone());
     }
 
@@ -210,7 +210,7 @@ pub async fn window_focus_floating(
 pub async fn window_list_floating(
     state: tauri::State<'_, FloatingWindowState>,
 ) -> Result<Vec<FloatingWindowInfo>, String> {
-    let registry = state.lock().map_err(|e| format!("Failed to lock state: {}", e))?;
+    let registry = state.lock().unwrap_or_else(|e| e.into_inner());
     Ok(registry.list())
 }
 
@@ -225,15 +225,16 @@ pub async fn window_get_floating_info(
     if let Some(window) = app.get_webview_window(&window_id) {
         let position = window.outer_position().map_err(|e| format!("Failed to get position: {}", e))?;
         let size = window.outer_size().map_err(|e| format!("Failed to get size: {}", e))?;
+        let scale_factor = window.scale_factor().map_err(|e| format!("Failed to get scale factor: {}", e))?;
 
-        let mut registry = state.lock().map_err(|e| format!("Failed to lock state: {}", e))?;
+        let mut registry = state.lock().unwrap_or_else(|e| e.into_inner());
 
         // Update bounds in registry
         let bounds = WindowBounds {
-            x: position.x as f64,
-            y: position.y as f64,
-            width: size.width as f64,
-            height: size.height as f64,
+            x: position.x as f64 / scale_factor,
+            y: position.y as f64 / scale_factor,
+            width: size.width as f64 / scale_factor,
+            height: size.height as f64 / scale_factor,
         };
         registry.update_bounds(&window_id, bounds);
 
@@ -282,4 +283,25 @@ pub async fn window_floating_exists(
     window_id: String,
 ) -> Result<bool, String> {
     Ok(app.get_webview_window(&window_id).is_some())
+}
+
+/// Close all floating windows and clean up the registry.
+/// Used when the main window is closing.
+pub fn close_all_floating_windows(app: &tauri::AppHandle, state: &FloatingWindowState) {
+    let window_ids: Vec<String> = {
+        let registry = state.lock().unwrap_or_else(|e| e.into_inner());
+        registry.list().iter().map(|info| info.window_id.clone()).collect()
+    };
+
+    for window_id in window_ids {
+        if let Some(window) = app.get_webview_window(&window_id) {
+            if let Err(e) = window.close() {
+                log::warn!("Failed to close floating window {}: {}", window_id, e);
+            }
+        }
+        let mut registry = state.lock().unwrap_or_else(|e| e.into_inner());
+        registry.unregister(&window_id);
+    }
+
+    log::info!("Closed all floating windows");
 }

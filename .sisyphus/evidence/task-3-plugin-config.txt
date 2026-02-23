@@ -1,0 +1,21 @@
+# Task 3 Evidence: window-state plugin configured to exclude floating windows
+
+## API Used
+tauri-plugin-window-state v2.4.1 Builder::with_filter()
+- Signature: with_filter<F>(self, filter_callback: F) -> Self
+  where F: Fn(&str) -> bool + Send + Sync + 'static
+- Return true to save state, false to skip
+
+## Configuration in src-tauri/src/lib.rs (lines 142-146)
+        // Exclude floating windows ("floating-" prefix) from state persistence --
+        // they are ephemeral and managed by FloatingWindowRegistry, not the plugin.
+        .plugin(tauri_plugin_window_state::Builder::default()
+            .with_filter(|label| !label.starts_with("floating-"))
+            .build())
+
+## Effect
+- Main window: state IS saved/restored (label "main" does not start with "floating-")
+- Floating windows: state NOT saved/restored (labels like "floating-<uuid>" are excluded)
+
+## cargo check
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.67s (exit 0)

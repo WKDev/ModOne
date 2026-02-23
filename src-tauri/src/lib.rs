@@ -92,6 +92,7 @@ use commands::{
     window_minimize_floating, window_maximize_floating, window_floating_exists,
     FloatingWindowState, FloatingWindowRegistry,
 };
+use commands::window::close_all_floating_windows;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -138,7 +139,11 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        // Exclude floating windows ("floating-" prefix) from state persistence --
+        // they are ephemeral and managed by FloatingWindowRegistry, not the plugin.
+        .plugin(tauri_plugin_window_state::Builder::default()
+            .with_filter(|label| !label.starts_with("floating-"))
+            .build())
         .manage(project_manager)
         .manage(auto_save_manager)
         .manage(modbus_state)
@@ -159,6 +164,39 @@ pub fn run() {
                 log::info!("Debug mode enabled with logging plugin");
             }
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            use tauri::{Emitter, Manager, WindowEvent};
+
+            let label = window.label().to_string();
+
+            match event {
+                WindowEvent::Destroyed => {
+                    if label.starts_with("floating-") {
+                        log::info!("Floating window destroyed by OS: {}", label);
+
+                        if let Some(state) = window.try_state::<FloatingWindowState>() {
+                            let mut registry = state.lock().unwrap_or_else(|e| e.into_inner());
+                            registry.unregister(&label);
+                        }
+
+                        if let Err(e) = window.app_handle().emit(
+                            "floating-window-closed",
+                            &serde_json::json!({ "windowId": label }),
+                        ) {
+                            log::warn!("Failed to emit floating-window-closed for {}: {}", label, e);
+                        }
+                    }
+
+                    if label == "main" {
+                        log::info!("Main window closing - cleaning up floating windows");
+                        if let Some(state) = window.try_state::<FloatingWindowState>() {
+                            close_all_floating_windows(window.app_handle(), &state);
+                        }
+                    }
+                }
+                _ => {}
+            }
         })
         .invoke_handler(tauri::generate_handler![
             greet,

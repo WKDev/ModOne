@@ -1,0 +1,11 @@
+# Task 3 Evidence: Full UUID in window.rs
+
+## Verification: No truncation (split-next pattern)
+grep -n "split.*-.*next" => NO MATCH (old truncation removed)
+
+## Verification: Full UUID used
+src-tauri/src/commands/window.rs:83:    let window_id = format!("floating-{}", Uuid::new_v4());
+
+## cargo check result
+warning: ... (7 warnings, no errors)
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.67s

@@ -116,6 +116,7 @@ pub use window::{
     window_focus_floating, window_list_floating, window_get_floating_info,
     window_minimize_floating, window_maximize_floating, window_floating_exists,
     FloatingWindowState, FloatingWindowRegistry, FloatingWindowInfo, WindowBounds,
+    close_all_floating_windows,
 };
 
 // Re-export schematic commands
