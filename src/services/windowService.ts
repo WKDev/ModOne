@@ -15,6 +15,10 @@ interface WindowCreatedPayload {
   windowId: string;
   panelId: string;
   panelType: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 /**
@@ -124,7 +128,7 @@ export const windowService = {
    * Listen for floating window created events
    */
   onWindowCreated(
-    callback: (data: { windowId: string; panelId: string; panelType: string }) => void
+    callback: (data: { windowId: string; panelId: string; panelType: string; x: number; y: number; width: number; height: number }) => void
   ): Promise<UnlistenFn> {
     return listen<WindowCreatedPayload>('floating-window-created', (event) => {
       callback(event.payload);

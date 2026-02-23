@@ -1,0 +1,69 @@
+TASK 5: Include Bounds in `floating-window-created` Event
+========================================================
+
+VERIFICATION RESULTS
+====================
+
+1. Rust Changes (src-tauri/src/commands/window.rs)
+   ✅ Added bounds clone before moving into info struct (line 106-107)
+   ✅ Updated event emission to include bounds fields (lines 127-130):
+      - "x": event_bounds.x
+      - "y": event_bounds.y
+      - "width": event_bounds.width
+      - "height": event_bounds.height
+   ✅ cargo check passed with no errors (only pre-existing warnings)
+
+2. TypeScript Changes (src/services/windowService.ts)
+   ✅ Updated WindowCreatedPayload interface (lines 14-22):
+      - Added x: number
+      - Added y: number
+      - Added width: number
+      - Added height: number
+   ✅ Updated onWindowCreated callback type (line 131):
+      - Now includes all bounds fields in callback signature
+
+3. Component Changes (src/components/floating/FloatingWindowRenderer.tsx)
+   ✅ Removed hardcoded bounds (x: 0, y: 0, width: 600, height: 400)
+   ✅ Updated to use actual bounds from event (lines 42-45):
+      - x: event.x
+      - y: event.y
+      - width: event.width
+      - height: event.height
+
+VERIFICATION COMMANDS
+=====================
+
+Cargo check result:
+  Command: cd src-tauri && cargo check 2>&1
+  Result: Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.19s
+  Status: ✅ PASSED
+
+Bounds fields in event:
+  Command: grep -n '"x":' src-tauri/src/commands/window.rs
+  Result: 127:        "x": event_bounds.x,
+  Status: ✅ FOUND
+
+Hardcoded bounds removed:
+  Command: grep -n 'x: 0.*y: 0.*width: 600' src/components/floating/FloatingWindowRenderer.tsx
+  Result: (no output - pattern not found)
+  Status: ✅ REMOVED
+
+Actual bounds usage:
+  Command: grep -n 'event.x' src/components/floating/FloatingWindowRenderer.tsx
+  Result: 42:            x: event.x,
+  Status: ✅ FOUND
+
+FILES MODIFIED
+==============
+1. src-tauri/src/commands/window.rs (2 changes)
+2. src/services/windowService.ts (2 changes)
+3. src/components/floating/FloatingWindowRenderer.tsx (1 change)
+
+TASK COMPLETION
+===============
+All requirements met:
+✅ Rust event includes bounds fields
+✅ TypeScript interface updated
+✅ Component uses actual bounds
+✅ cargo check passes
+✅ Ready for commit

@@ -103,6 +103,9 @@ pub async fn window_create_floating(
     .build()
     .map_err(|e| format!("Failed to create floating window: {}", e))?;
 
+    // Clone bounds before moving into info
+    let event_bounds = bounds.clone();
+
     // Register the window in our state
     let info = FloatingWindowInfo {
         window_id: window_id.clone(),
@@ -121,6 +124,10 @@ pub async fn window_create_floating(
         "windowId": window_id,
         "panelId": panel_id,
         "panelType": panel_type,
+        "x": event_bounds.x,
+        "y": event_bounds.y,
+        "width": event_bounds.width,
+        "height": event_bounds.height,
     })).map_err(|e| format!("Failed to emit event: {}", e))?;
 
     log::info!("Created floating window: {} for panel: {}", window_id, panel_id);

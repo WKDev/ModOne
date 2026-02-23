@@ -39,10 +39,10 @@ export function FloatingWindowRenderer() {
         const unlistenCreated = await windowService.onWindowCreated((event) => {
           console.log('Floating window created:', event);
           registerFloatingWindow(event.windowId, event.panelId, {
-            x: 0,
-            y: 0,
-            width: 600,
-            height: 400,
+            x: event.x,
+            y: event.y,
+            width: event.width,
+            height: event.height,
           });
           setPanelFloating(event.panelId, true, event.windowId);
         });
