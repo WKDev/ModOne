@@ -1397,7 +1397,7 @@ export const useCanvasStore = create<CanvasStore>()(
       redo: () => {
         set(
           (state) => {
-            if (state.historyIndex + 1 >= state.history.length - 1) return;
+            if (state.historyIndex + 1 > state.history.length - 1) return;
 
             state.historyIndex++;
             const snapshot = state.history[state.historyIndex + 1];
