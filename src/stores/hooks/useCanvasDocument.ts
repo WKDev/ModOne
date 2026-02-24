@@ -40,7 +40,7 @@ import {
   getWiresConnectedToJunction,
   recalculateAutoHandles,
 } from '../../components/OneCanvas/utils/canvasHelpers';
-import { polylineToHandles, simplifyWireHandles } from '../../components/OneCanvas/utils/wireSimplifier';
+import { polylineToHandles, simplifyWireHandles, enforceOrthogonalPolyline } from '../../components/OneCanvas/utils/wireSimplifier';
 
 // ============================================================================
 // Types
@@ -613,7 +613,8 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       updateCanvasData(documentId, (docData) => {
         const wire = docData.wires.find((w) => w.id === wireId);
         if (!wire) return;
-        const handles = polylineToHandles([...poly], wire.handles, 'user');
+        const enforcedPoly = enforceOrthogonalPolyline([...poly]);
+        const handles = polylineToHandles(enforcedPoly, wire.handles, 'user');
         wire.handles = handles.length > 0 ? handles : undefined;
         wire.routingMode = routingMode;
       });

@@ -8,7 +8,7 @@
 import type { GeomApi, Poly, Position, Wire, WireEndpoint, WireHandle } from '../types';
 import { isPortEndpoint } from '../types';
 import { generateId } from './canvasHelpers';
-import { getPortAbsolutePosition } from './wirePathCalculator';
+import { getPortAbsolutePosition, PORT_EXIT_DISTANCE } from './wirePathCalculator';
 
 function manhattan(a: Position, b: Position): number {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
@@ -28,6 +28,60 @@ function resolveEndpointPosition(endpoint: WireEndpoint, geom: GeomApi): Positio
 
   const junction = geom.junctions.get(endpoint.junctionId);
   return junction ? clonePosition(junction.position) : null;
+}
+
+function resolvePortDirection(endpoint: WireEndpoint, geom: GeomApi): 'top' | 'bottom' | 'left' | 'right' | null {
+  if (!isPortEndpoint(endpoint)) return null;
+  const block = geom.components.get(endpoint.componentId);
+  if (!block) return null;
+  const port = block.ports.find((candidate) => candidate.id === endpoint.portId);
+  return port?.position ?? null;
+}
+
+function inferDirectionFromSegment(origin: Position, neighbor: Position | null): 'top' | 'bottom' | 'left' | 'right' | null {
+  if (!neighbor) return null;
+  const dx = neighbor.x - origin.x;
+  const dy = neighbor.y - origin.y;
+  if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return null;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0 ? 'right' : 'left';
+  }
+  return dy >= 0 ? 'bottom' : 'top';
+}
+
+function moveByDirection(pos: Position, direction: 'top' | 'bottom' | 'left' | 'right', distance: number): Position {
+  switch (direction) {
+    case 'top':
+      return { x: pos.x, y: pos.y - distance };
+    case 'bottom':
+      return { x: pos.x, y: pos.y + distance };
+    case 'left':
+      return { x: pos.x - distance, y: pos.y };
+    case 'right':
+      return { x: pos.x + distance, y: pos.y };
+  }
+}
+
+function bridgeHorizontalFirst(a: Position, b: Position): Position[] {
+  if (Math.abs(a.x - b.x) < 1 || Math.abs(a.y - b.y) < 1) {
+    return [];
+  }
+  return [{ x: b.x, y: a.y }];
+}
+
+function orthogonalizePairs(points: readonly Position[]): Position[] {
+  if (points.length < 2) return points.map(clonePosition);
+  const output: Position[] = [clonePosition(points[0])];
+  for (let i = 1; i < points.length; i++) {
+    const next = clonePosition(points[i]);
+    const prev = output[output.length - 1];
+    output.push(...bridgeHorizontalFirst(prev, next), next);
+  }
+  return output;
+}
+
+function hasSamePoint(points: readonly Position[], target: Position): boolean {
+  return points.some((point) => Math.abs(point.x - target.x) < 1 && Math.abs(point.y - target.y) < 1);
 }
 
 export function simplifyOrthogonal(poly: Poly, eps: number = 0.5): Position[] {
@@ -120,6 +174,48 @@ export function buildWirePolyline(wire: Wire, geom: GeomApi): Position[] | null 
 
   const handlePositions = (wire.handles ?? []).map((handle) => clonePosition(handle.position));
   return [fromPos, ...handlePositions, toPos];
+}
+
+export function buildCanonicalWirePolyline(wire: Wire, geom: GeomApi): Position[] | null {
+  const fromPos = resolveEndpointPosition(wire.from, geom);
+  const toPos = resolveEndpointPosition(wire.to, geom);
+  if (!fromPos || !toPos) {
+    return null;
+  }
+
+  const handlePositions = (wire.handles ?? []).map((handle) => clonePosition(handle.position));
+  const fromNeighbor = handlePositions[0] ?? toPos;
+  const toNeighbor = handlePositions[handlePositions.length - 1] ?? fromPos;
+
+  const fromDirection = isPortEndpoint(wire.from)
+    ? wire.fromExitDirection ?? resolvePortDirection(wire.from, geom)
+    : inferDirectionFromSegment(fromPos, fromNeighbor) ?? 'right';
+  const toDirection = isPortEndpoint(wire.to)
+    ? wire.toExitDirection ?? resolvePortDirection(wire.to, geom)
+    : inferDirectionFromSegment(toPos, toNeighbor) ?? 'right';
+
+  if (!fromDirection || !toDirection) {
+    return simplifyOrthogonal(orthogonalizePairs([fromPos, ...handlePositions, toPos]));
+  }
+
+  const endpointDist = Math.hypot(toPos.x - fromPos.x, toPos.y - fromPos.y);
+  const exitDistance = endpointDist < 40 ? Math.min(PORT_EXIT_DISTANCE, endpointDist * 0.33) : PORT_EXIT_DISTANCE;
+
+  const fromExit = moveByDirection(fromPos, fromDirection, exitDistance);
+  const toExit = moveByDirection(toPos, toDirection, exitDistance);
+
+  const raw: Position[] = [fromPos, fromExit, ...handlePositions, toExit, toPos];
+  const simplified = simplifyOrthogonal(orthogonalizePairs(raw));
+
+  const withRequiredExitPoints = simplified.map(clonePosition);
+  if (!hasSamePoint(withRequiredExitPoints, fromExit)) {
+    withRequiredExitPoints.splice(1, 0, clonePosition(fromExit));
+  }
+  if (!hasSamePoint(withRequiredExitPoints, toExit)) {
+    withRequiredExitPoints.splice(withRequiredExitPoints.length - 1, 0, clonePosition(toExit));
+  }
+
+  return orthogonalizePairs(withRequiredExitPoints);
 }
 
 export function polylineToHandles(
@@ -284,4 +380,27 @@ export function dragSegment(
   }
 
   return result;
+}
+
+
+export function enforceOrthogonalPolyline(poly: Position[]): Position[] {
+  if (poly.length < 2) return poly.map(clonePosition);
+
+  const result: Position[] = [clonePosition(poly[0])];
+  for (let i = 1; i < poly.length; i++) {
+    const current = poly[i];
+    const prev = result[result.length - 1];
+    const dx = Math.abs(current.x - prev.x);
+    const dy = Math.abs(current.y - prev.y);
+
+    if (dx > 1 && dy > 1) {
+      // 대각 구간 → bridge point 삽입 (horizontal-first)
+      const bridge: Position = { x: current.x, y: prev.y };
+      result.push(clonePosition(bridge));
+    }
+
+    result.push(clonePosition(current));
+  }
+
+  return simplifyOrthogonal(result);
 }

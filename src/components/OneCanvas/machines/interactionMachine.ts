@@ -4,7 +4,7 @@ import { DRAG_THRESHOLD_PX } from '../constants/interaction';
 import { WireGeometryCache } from '../geometry/geometryCache';
 import { getDragDirection } from '../components/SelectionBox';
 import { isBlockInBox, isJunctionInBox, selectWiresInBox } from '../geometry/collision';
-import { getPortAbsolutePosition } from '../utils/wirePathCalculator';
+import { getPortAbsolutePosition, PORT_EXIT_DISTANCE } from '../utils/wirePathCalculator';
 import {
   buildWirePolyline,
   simplifyOrthogonal,
@@ -26,6 +26,7 @@ import type {
   WireEndpoint,
   Block,
 } from '../types';
+import { isPortEndpoint } from '../types';
 
 export type Modifiers = { ctrl: boolean; shift: boolean; alt: boolean; meta: boolean };
 
@@ -38,11 +39,8 @@ export type PointerTarget =
   | {
       kind: 'wire_segment';
       wireId: string;
-      handleA: number;
-      handleB: number;
+      segIndex: number;
       orientation: 'horizontal' | 'vertical';
-      positionA: Position;
-      positionB: Position;
     }
   | {
       kind: 'wire_handle';
@@ -121,6 +119,7 @@ export interface InteractionContext {
   segmentContainerRect: DOMRect | null;
   segmentPoly: Position[] | null;
   segmentPolySegIndex: number;
+  segmentWasDirect: boolean;
 
   handleWireId: string | null;
   handleIndex: number;
@@ -173,6 +172,7 @@ const initialContext: InteractionContext = {
   segmentContainerRect: null,
   segmentPoly: null,
   segmentPolySegIndex: -1,
+  segmentWasDirect: false,
 
   handleWireId: null,
   handleIndex: -1,
@@ -247,6 +247,46 @@ function resolveEndpointPosition(
   }
 
   return getPortAbsolutePosition(block, endpoint.portId);
+}
+
+function resolveWireEndpointExitPoint(
+  wire: Wire,
+  end: 'from' | 'to',
+  components: Map<string, Block>
+): Position | null {
+  const endpoint = end === 'from' ? wire.from : wire.to;
+  if (!isPortEndpoint(endpoint)) {
+    return null;
+  }
+
+  const block = components.get(endpoint.componentId);
+  if (!block) {
+    return null;
+  }
+
+  const port = block.ports.find((p) => p.id === endpoint.portId);
+  if (!port) {
+    return null;
+  }
+
+  const basePos = getPortAbsolutePosition(block, endpoint.portId);
+  if (!basePos) {
+    return null;
+  }
+
+  const direction = end === 'from' ? wire.fromExitDirection ?? port.position : wire.toExitDirection ?? port.position;
+  switch (direction) {
+    case 'top':
+      return { x: basePos.x, y: basePos.y - PORT_EXIT_DISTANCE };
+    case 'bottom':
+      return { x: basePos.x, y: basePos.y + PORT_EXIT_DISTANCE };
+    case 'left':
+      return { x: basePos.x - PORT_EXIT_DISTANCE, y: basePos.y };
+    case 'right':
+      return { x: basePos.x + PORT_EXIT_DISTANCE, y: basePos.y };
+    default:
+      return null;
+  }
 }
 
 function closestPointOnSegment(point: Position, a: Position, b: Position): { point: Position; distance: number } {
@@ -463,6 +503,7 @@ export const interactionMachine = setup({
       segmentContainerRect: null,
       segmentPoly: null,
       segmentPolySegIndex: -1,
+      segmentWasDirect: false,
 
       handleWireId: null,
       handleIndex: -1,
@@ -919,24 +960,27 @@ export const interactionMachine = setup({
         return context;
       }
 
-      // handleA is an index into wire.handles[]; polyline index = handleA + 1
-      const rawSegIndex = event.target.handleA + 1;
-      const { poly, segIndex } = ensureMovableSegment(rawPoly, rawSegIndex);
-      const orientation = getSegmentOrientation(poly, segIndex);
+      const rawSegIndex = event.target.segIndex;
+      const isDirect = rawPoly.length === 2;
+      const prepared = isDirect
+        ? { poly: rawPoly, segIndex: 0 }
+        : ensureMovableSegment(rawPoly, rawSegIndex);
+      const orientation = getSegmentOrientation(prepared.poly, prepared.segIndex);
 
       return {
         ...context,
         segmentWireId: wireId,
-        segmentPoly: poly,
-        segmentPolySegIndex: segIndex,
+        segmentPoly: prepared.poly,
+        segmentPolySegIndex: prepared.segIndex,
+        segmentWasDirect: isDirect,
         segmentOrientation: orientation,
         segmentStartCanvasPos: { ...event.canvasPosition },
         segmentIsFirstMove: true,
         // Keep legacy fields at defaults (unused in new flow)
-        segmentHandleA: event.target.handleA,
-        segmentHandleB: event.target.handleB,
-        segmentStartPositionA: { ...event.target.positionA },
-        segmentStartPositionB: { ...event.target.positionB },
+        segmentHandleA: -1,
+        segmentHandleB: -1,
+        segmentStartPositionA: null,
+        segmentStartPositionB: null,
         segmentAppliedDelta: { x: 0, y: 0 },
       };
     }),
@@ -956,6 +1000,7 @@ export const interactionMachine = setup({
       const absDy = event.canvasPosition.y - context.segmentStartCanvasPos.y;
 
       let perpDelta: number;
+      let targetCoordinate: number;
       if (context.segmentOrientation === 'horizontal') {
         const origY = context.segmentPoly[context.segmentPolySegIndex].y;
         let targetY = origY + absDy;
@@ -963,6 +1008,7 @@ export const interactionMachine = setup({
           targetY = Math.round(targetY / adapter.getGridSize()) * adapter.getGridSize();
         }
         perpDelta = targetY - origY;
+        targetCoordinate = targetY;
       } else {
         const origX = context.segmentPoly[context.segmentPolySegIndex].x;
         let targetX = origX + absDx;
@@ -970,9 +1016,53 @@ export const interactionMachine = setup({
           targetX = Math.round(targetX / adapter.getGridSize()) * adapter.getGridSize();
         }
         perpDelta = targetX - origX;
+        targetCoordinate = targetX;
       }
 
-      const newPoly = dragSegment(context.segmentPoly, context.segmentPolySegIndex, perpDelta);
+      let newPoly: Position[];
+      if (context.segmentWasDirect && context.segmentPoly.length === 2) {
+        const start = context.segmentPoly[0];
+        const end = context.segmentPoly[1];
+        if (!start || !end) {
+          return context;
+        }
+
+        const wire = adapter.getWires().find((candidate) => candidate.id === context.segmentWireId);
+        const components = adapter.getComponents();
+        const fromExit = wire ? resolveWireEndpointExitPoint(wire, 'from', components) : null;
+        const toExit = wire ? resolveWireEndpointExitPoint(wire, 'to', components) : null;
+
+        const fromAnchor = fromExit ?? start;
+        const toAnchor = toExit ?? end;
+
+        if (context.segmentOrientation === 'horizontal') {
+          const next: Position[] = [{ ...start }];
+          if (Math.abs(fromAnchor.x - start.x) > 0.5 || Math.abs(fromAnchor.y - start.y) > 0.5) {
+            next.push({ ...fromAnchor });
+          }
+          next.push({ x: fromAnchor.x, y: targetCoordinate });
+          next.push({ x: toAnchor.x, y: targetCoordinate });
+          if (Math.abs(toAnchor.x - end.x) > 0.5 || Math.abs(toAnchor.y - end.y) > 0.5) {
+            next.push({ ...toAnchor });
+          }
+          next.push({ ...end });
+          newPoly = simplifyOrthogonal(next);
+        } else {
+          const next: Position[] = [{ ...start }];
+          if (Math.abs(fromAnchor.x - start.x) > 0.5 || Math.abs(fromAnchor.y - start.y) > 0.5) {
+            next.push({ ...fromAnchor });
+          }
+          next.push({ x: targetCoordinate, y: fromAnchor.y });
+          next.push({ x: targetCoordinate, y: toAnchor.y });
+          if (Math.abs(toAnchor.x - end.x) > 0.5 || Math.abs(toAnchor.y - end.y) > 0.5) {
+            next.push({ ...toAnchor });
+          }
+          next.push({ ...end });
+          newPoly = simplifyOrthogonal(next);
+        }
+      } else {
+        newPoly = dragSegment(context.segmentPoly, context.segmentPolySegIndex, perpDelta);
+      }
       const skipHistory = !context.segmentIsFirstMove;
       adapter.commitWirePolyline(context.segmentWireId, newPoly, 'manual', skipHistory);
 

@@ -2,10 +2,12 @@ import { useEffect, useState, useMemo } from 'react';
 import { MainLayout } from './components/layout/MainLayout';
 import { useLayoutPersistenceStore } from './stores/layoutPersistenceStore';
 import { useToolPanelStore } from './stores/toolPanelStore';
+import { useProjectStore } from './stores/projectStore';
 import { ThemeProvider } from './providers/ThemeProvider';
 import { useStateSync } from './hooks/useStateSync';
 import { useWindowClose } from './hooks/useWindowClose';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { FloatingWindowContent } from './components/floating/FloatingWindowContent';
 import { FloatingWindowRenderer } from './components/floating/FloatingWindowRenderer';
 import { CommandPalette, useCommandPalette, registerAllCommands } from './components/CommandPalette';
@@ -41,6 +43,8 @@ function MainWindowContent() {
   const { initialize } = useLayoutPersistenceStore();
   const initializeToolPanel = useToolPanelStore((state) => state.initializeDefaultTabs);
   const toolPanelTabs = useToolPanelStore((state) => state.tabs);
+  const projectName = useProjectStore((state) => state.currentProject?.config.project.name);
+  const isModified = useProjectStore((state) => state.isModified);
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Command palette state (useCommandPalette hook handles Ctrl+Shift+P shortcut)
@@ -64,6 +68,14 @@ function MainWindowContent() {
   useEffect(() => {
     registerAllCommands();
   }, []);
+
+  useEffect(() => {
+    const title = `ModOne${projectName ? ` - ${projectName}` : ''}${isModified ? ' *' : ''}`;
+
+    getCurrentWindow().setTitle(title).catch((error) => {
+      console.error('Failed to update window title:', error);
+    });
+  }, [projectName, isModified]);
 
   // Initialize layout persistence on mount
   useEffect(() => {

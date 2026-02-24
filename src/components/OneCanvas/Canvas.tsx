@@ -64,13 +64,6 @@ interface CanvasProps {
 
    // Wire interaction callbacks
    onWireContextMenu?: (wireId: string, position: Position, screenPos: { x: number; y: number }) => void;
-   onWireHandleContextMenu?: (wireId: string, handleIndex: number, e: React.MouseEvent) => void;
-   onWireEndpointSegmentDragStart?: (
-     wireId: string,
-     end: 'from' | 'to',
-     orientation: 'horizontal' | 'vertical',
-     e: React.MouseEvent
-   ) => void;
 
   // Component update
   onUpdateComponent?: (id: string, updates: Partial<Block>) => void;
@@ -117,8 +110,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
     onEndWire,
     onBlockDragStart,
     onWireContextMenu,
-    onWireHandleContextMenu,
-    onWireEndpointSegmentDragStart,
     onUpdateComponent,
     className = '',
     gridSize: propGridSize,
@@ -229,14 +220,12 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
               onButtonPress={onButtonPress}
               onButtonRelease={onButtonRelease}
               plcOutputStates={plcOutputStates}
-              onStartWire={onStartWire}
-              onEndWire={onEndWire}
-               onBlockDragStart={onBlockDragStart}
-               onWireContextMenu={onWireContextMenu}
-               onWireHandleContextMenu={onWireHandleContextMenu}
-               onWireEndpointSegmentDragStart={onWireEndpointSegmentDragStart}
-               onUpdateComponent={onUpdateComponent}
-               wireDraftPolys={wireDraftPolys}
+                onStartWire={onStartWire}
+                onEndWire={onEndWire}
+                onBlockDragStart={onBlockDragStart}
+                onWireContextMenu={onWireContextMenu}
+                onUpdateComponent={onUpdateComponent}
+                wireDraftPolys={wireDraftPolys}
             />
           </div>
         </TransformedLayer>

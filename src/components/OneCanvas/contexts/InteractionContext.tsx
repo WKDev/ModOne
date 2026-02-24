@@ -173,31 +173,18 @@ export function resolvePointerTarget(
   const segmentNode = target.closest('[data-wire-segment]') as HTMLElement | null;
   if (segmentNode) {
     const wireId = segmentNode.getAttribute('data-wire-id');
-    const handleA = parseIntAttr(segmentNode.getAttribute('data-handle-a'));
-    const handleB = parseIntAttr(segmentNode.getAttribute('data-handle-b'));
+    const segIndex = parseIntAttr(segmentNode.getAttribute('data-seg-index'));
     const orientation = segmentNode.getAttribute('data-orientation');
-    const ax = parseFloatAttr(segmentNode.getAttribute('data-pos-a-x'));
-    const ay = parseFloatAttr(segmentNode.getAttribute('data-pos-a-y'));
-    const bx = parseFloatAttr(segmentNode.getAttribute('data-pos-b-x'));
-    const by = parseFloatAttr(segmentNode.getAttribute('data-pos-b-y'));
     if (
       wireId &&
-      handleA !== null &&
-      handleB !== null &&
-      (orientation === 'horizontal' || orientation === 'vertical') &&
-      ax !== null &&
-      ay !== null &&
-      bx !== null &&
-      by !== null
+      segIndex !== null &&
+      (orientation === 'horizontal' || orientation === 'vertical')
     ) {
       return {
         kind: 'wire_segment',
         wireId,
-        handleA,
-        handleB,
+        segIndex,
         orientation,
-        positionA: { x: ax, y: ay },
-        positionB: { x: bx, y: by },
       };
     }
   }

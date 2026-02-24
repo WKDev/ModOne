@@ -83,7 +83,7 @@ export function getWireEndpoints(
 // ============================================================================
 
 /** Exit distance from port before routing */
-const PORT_EXIT_DISTANCE = 20;
+export const PORT_EXIT_DISTANCE = 20;
 
 /**
  * Generate a port-direction aware orthogonal wire path with rounded corners.

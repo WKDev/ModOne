@@ -23,13 +23,6 @@ interface CanvasContentProps {
 
   // Wire interaction handlers
    onWireContextMenu?: (wireId: string, position: Position, screenPos: { x: number; y: number }) => void;
-   onWireHandleContextMenu?: (wireId: string, handleIndex: number, e: React.MouseEvent) => void;
-   onWireEndpointSegmentDragStart?: (
-     wireId: string,
-     end: 'from' | 'to',
-     orientation: 'horizontal' | 'vertical',
-     e: React.MouseEvent
-   ) => void;
    /** Draft polylines for rubber-band preview (wireId → polyline) */
    wireDraftPolys?: ReadonlyMap<string, readonly Position[]>;
 }
@@ -56,12 +49,10 @@ export function CanvasContent({
   plcOutputStates,
   onStartWire,
   onEndWire,
-    onBlockDragStart,
-    onWireContextMenu,
-    onWireHandleContextMenu,
-    onWireEndpointSegmentDragStart,
-   onUpdateComponent,
-   wireDraftPolys,
+     onBlockDragStart,
+     onWireContextMenu,
+    onUpdateComponent,
+    wireDraftPolys,
 }: CanvasContentProps) {
   // Calculate port positions for wire rendering
   const getPortPosition = (blockId: string, portId: string) => {
@@ -124,15 +115,13 @@ export function CanvasContent({
               to={toPos}
               isSelected={selectedWireIds?.has(wire.id)}
               onClick={onWireClick}
-              handles={wire.handles}
-              fromExitDirection={wire.fromExitDirection}
-              toExitDirection={wire.toExitDirection}
-               onContextMenu={onWireContextMenu}
-               onHandleContextMenu={onWireHandleContextMenu}
-               onEndpointSegmentDragStart={onWireEndpointSegmentDragStart}
-              label={wire.label}
-              wireNumber={wire.wireNumber}
-              draftPoly={wireDraftPolys?.get(wire.id)}
+               handles={wire.handles}
+               fromExitDirection={wire.fromExitDirection}
+               toExitDirection={wire.toExitDirection}
+                onContextMenu={onWireContextMenu}
+               label={wire.label}
+               wireNumber={wire.wireNumber}
+               draftPoly={wireDraftPolys?.get(wire.id)}
             />
           );
         })}

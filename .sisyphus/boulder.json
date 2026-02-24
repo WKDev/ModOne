@@ -1,13 +1,10 @@
 {
-  "active_plan": "/Users/chson/Projects/ModOne/.sisyphus/plans/macos-titlebar-restore.md",
-  "started_at": "2026-02-24T02:18:09.461Z",
-  "completed_at": "2026-02-24T03:30:00.000Z",
+  "active_plan": "/Users/chson/Projects/ModOne/.sisyphus/plans/wire-geometry-unification.md",
+  "started_at": "2026-02-24T05:56:06.887Z",
   "session_ids": [
-    "ses_372db0440ffe8KOMVvfZUfhjSA"
+    "ses_3725a6375ffenUV40xLvfh8VRs"
   ],
-  "plan_name": "macos-titlebar-restore",
+  "plan_name": "wire-geometry-unification",
   "agent": "atlas",
-  "status": "completed",
-  "tasks_completed": 11,
-  "tasks_total": 11
+  "status": "in_progress"
 }

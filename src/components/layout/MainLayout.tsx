@@ -1,4 +1,3 @@
-import { MacWindowBar } from "./MacWindowBar";
 import { MenuBar } from './MenuBar';
 import { Toolbar } from './Toolbar';
 import { StatusBar } from './StatusBar';
@@ -12,7 +11,7 @@ export function MainLayout() {
     <div data-testid="main-layout" className="h-screen w-screen overflow-hidden flex flex-col bg-gray-900 text-gray-100">
       {/* Header: Menu Bar + Toolbar */}
       <header className="flex-shrink-0">
-        {IS_MAC ? <MacWindowBar /> : <MenuBar />}
+        {!IS_MAC && <MenuBar />}
         <Toolbar />
       </header>
 

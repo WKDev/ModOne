@@ -31,7 +31,6 @@ import {
   type Position,
 } from '../../OneCanvas';
 import type { Block, Junction, Wire } from '../../OneCanvas/types';
-import type { HandleConstraint, PortEndpoint, PortPosition } from '../../OneCanvas/types';
 import { CanvasMinimap } from '../../OneCanvas/components/CanvasMinimap';
 import { CanvasToolbar } from '../../OneCanvas/CanvasToolbar';
 import { SchematicPageBar } from '../../OneCanvas/components/SchematicPageBar';
@@ -129,8 +128,6 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
     addWire,
     removeWire,
     updateComponent,
-    removeWireHandle,
-    insertEndpointHandle,
     selectedIds,
     setSelection,
     addToSelection,
@@ -428,114 +425,6 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
 
 
 
-  const handleEndpointSegmentDragStart = useCallback(
-    (wireId: string, end: 'from' | 'to', orientation: 'horizontal' | 'vertical', event: React.MouseEvent) => {
-      const wire = wires.find((w) => w.id === wireId);
-      if (!wire?.handles?.length) return;
-
-      if (!isPortEndpoint(wire.from) || !isPortEndpoint(wire.to)) return;
-
-      const computeExitPos = (endpoint: PortEndpoint, exitDir?: PortPosition): Position | null => {
-        const comp = components.get(endpoint.componentId);
-        if (!comp) return null;
-
-        const port = comp.ports.find((p) => p.id === endpoint.portId); // Safe: optional chaining used throughout
-        if (!port) return null;
-
-        const offset = port.offset ?? 0.5;
-        const dir = exitDir || port.position;
-        let portPos: Position;
-
-        switch (port.position) {
-          case 'top':
-            portPos = { x: comp.position.x + comp.size.width * offset, y: comp.position.y };
-            break;
-          case 'bottom':
-            portPos = { x: comp.position.x + comp.size.width * offset, y: comp.position.y + comp.size.height };
-            break;
-          case 'left':
-            portPos = { x: comp.position.x, y: comp.position.y + comp.size.height * offset };
-            break;
-          case 'right':
-            portPos = { x: comp.position.x + comp.size.width, y: comp.position.y + comp.size.height * offset };
-            break;
-          default:
-            portPos = { x: comp.position.x + comp.size.width / 2, y: comp.position.y + comp.size.height / 2 };
-        }
-
-        const dist = 20;
-        switch (dir) {
-          case 'top':
-            return { x: portPos.x, y: portPos.y - dist };
-          case 'bottom':
-            return { x: portPos.x, y: portPos.y + dist };
-          case 'left':
-            return { x: portPos.x - dist, y: portPos.y };
-          case 'right':
-            return { x: portPos.x + dist, y: portPos.y };
-          default:
-            return null;
-        }
-      };
-
-      const constraint: HandleConstraint = orientation === 'horizontal' ? 'vertical' : 'horizontal';
-
-      if (end === 'from') {
-        const fromEndpoint = wire.from as PortEndpoint;
-        const exitPos = computeExitPos(fromEndpoint, wire.fromExitDirection);
-        if (!exitPos) return;
-
-        const firstHandlePos = wire.handles[0].position;
-        const secondPos: Position =
-          orientation === 'vertical'
-            ? { x: exitPos.x, y: firstHandlePos.y }
-            : { x: firstHandlePos.x, y: exitPos.y };
-
-        insertEndpointHandle(wireId, 'from', [
-          { position: exitPos, constraint },
-          { position: secondPos, constraint },
-        ]);
-
-        sendPointerDown(event, {
-          kind: 'wire_segment',
-          wireId,
-          handleA: 0,
-          handleB: 1,
-          orientation,
-          positionA: exitPos,
-          positionB: secondPos,
-        });
-      } else {
-        const toEndpoint = wire.to as PortEndpoint;
-        const exitPos = computeExitPos(toEndpoint, wire.toExitDirection);
-        if (!exitPos) return;
-
-        const lastIdx = wire.handles.length - 1;
-        const lastHandlePos = wire.handles[lastIdx].position;
-        const firstPos: Position =
-          orientation === 'vertical'
-            ? { x: exitPos.x, y: lastHandlePos.y }
-            : { x: lastHandlePos.x, y: exitPos.y };
-
-        insertEndpointHandle(wireId, 'to', [
-          { position: firstPos, constraint },
-          { position: exitPos, constraint },
-        ]);
-
-        sendPointerDown(event, {
-          kind: 'wire_segment',
-          wireId,
-          handleA: lastIdx + 1,
-          handleB: lastIdx + 2,
-          orientation,
-          positionA: firstPos,
-          positionB: exitPos,
-        });
-      }
-    },
-    [components, insertEndpointHandle, sendPointerDown, wires]
-  );
-
   const handleBlockClick = useCallback(
     (blockId: string, event: React.MouseEvent) => {
       event.stopPropagation();
@@ -594,15 +483,6 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
       setWireContextMenu(null);
     },
     [removeWire, wireContextMenu]
-  );
-
-  const handleWireHandleContextMenu = useCallback(
-    (wireId: string, handleIndex: number, event: React.MouseEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-      removeWireHandle(wireId, handleIndex);
-    },
-    [removeWireHandle]
   );
 
   const [draggedType, setDraggedType] = useState<BlockType | null>(null);
@@ -824,11 +704,9 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
                   onEndWire={handleEndWire}
                    onBlockDragStart={handleBlockDragStart}
                    onWireContextMenu={handleWireContextMenu}
-                   onWireHandleContextMenu={handleWireHandleContextMenu}
-                   onWireEndpointSegmentDragStart={handleEndpointSegmentDragStart}
-                  onUpdateComponent={handleUpdateComponent}
-                  debugMode={debugMode}
-                />
+                   onUpdateComponent={handleUpdateComponent}
+                   debugMode={debugMode}
+                 />
 
                 <CanvasMinimap
                   components={components}

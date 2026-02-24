@@ -55,7 +55,7 @@ import {
   getWiresConnectedToJunction,
   recalculateAutoHandles,
 } from '../components/OneCanvas/utils/canvasHelpers';
-import { polylineToHandles, simplifyWireHandles } from '../components/OneCanvas/utils/wireSimplifier';
+import { polylineToHandles, simplifyWireHandles, enforceOrthogonalPolyline } from '../components/OneCanvas/utils/wireSimplifier';
 import { alignComponents, distributeComponents, flipComponents } from '../components/OneCanvas/utils/canvas-commands';
 import { isValidConnection } from '../components/OneCanvas/utils/connectionValidator';
 
@@ -1124,7 +1124,8 @@ export const useCanvasStore = create<CanvasStore>()(
             }
             const wire = state.wires.find((w) => w.id === wireId);
             if (!wire) return;
-            const handles = polylineToHandles([...poly], wire.handles, 'user');
+            const enforcedPoly = enforceOrthogonalPolyline([...poly]);
+            const handles = polylineToHandles(enforcedPoly, wire.handles, 'user');
             wire.handles = handles.length > 0 ? handles : undefined;
             wire.routingMode = routingMode;
             state.isDirty = true;
