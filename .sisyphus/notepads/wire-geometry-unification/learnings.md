@@ -84,3 +84,34 @@ Both `blocks: Map<string, Block>` and `junctions: Map<string, Junction>` match G
 ### Build/Test Results
 - `pnpm build`: ✓ exit 0, 2423 modules
 - `pnpm test`: 670 passed, 1 known LadderEditor failure (unrelated: store.clearActiveTool not a function)
+
+
+## [2026-02-24] Task 6: Round-trip Integration Tests
+
+### Test File Created
+`src/components/OneCanvas/utils/__tests__/wireGeometryRoundtrip.test.ts` — 8 tests, all passing
+
+### Key Test Patterns
+- `stripCanonicalExitPoints` is NOT exported from interactionMachine.ts; must be replicated inline in tests
+- Same `makeBlock / makeGeom / makeHandle / assertOrthogonal` helper pattern as `buildCanonicalWirePolyline.test.ts`
+- Wire type requires only `id`, `from`, `to` — all other fields optional
+- `routingMode: 'manual'` used in all test wires (matches existing test convention)
+
+### Round-trip Verification
+- `buildCanonicalWirePolyline` → 5-point poly for right-to-left wire with y-offset (fromPos, fromExit, handle, toExit, toPos)
+- `stripCanonicalExitPoints(poly)` → 3-point stripped poly using `poly.slice(2,-2)`
+- `polylineToHandles(stripped, [], 'auto')` → 1 handle with 'vertical' constraint
+- Rebuild with that handle → same 5-point poly — STABLE
+
+### Exit Distance Clamping
+- Short wire (block a at x=0 w=20, block b at x=30 w=20): ports at (20,10) and (30,10), dist=10px
+- exitDistance = min(20, 10*0.33) ≈ 3.3px (well below PORT_EXIT_DISTANCE=20)
+
+### enforceOrthogonalPolyline Behavior
+- Diagonal input [(0,0),(100,100),(200,100)] → inserts bridge at (100,0) → 4 points
+- Already-orthogonal 4-point poly → passes through unchanged (same length)
+
+### Test Results
+- 8 tests, 8 passed, 0 failed
+- Full suite: 678 passed, 1 pre-existing LadderEditor failure (unchanged)
+- Evidence saved to `.sisyphus/evidence/task-6-test-suite.txt`
