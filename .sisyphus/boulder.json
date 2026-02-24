@@ -1,12 +1,13 @@
 {
   "active_plan": "/Users/chson/Projects/ModOne/.sisyphus/plans/macos-titlebar-restore.md",
   "started_at": "2026-02-24T02:18:09.461Z",
+  "completed_at": "2026-02-24T03:30:00.000Z",
   "session_ids": [
     "ses_372db0440ffe8KOMVvfZUfhjSA"
   ],
   "plan_name": "macos-titlebar-restore",
   "agent": "atlas",
-  "status": "in_progress",
-  "tasks_completed": 0,
+  "status": "completed",
+  "tasks_completed": 11,
   "tasks_total": 11
 }

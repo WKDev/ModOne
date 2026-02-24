@@ -512,7 +512,7 @@ Max Concurrent: 3 (Wave 1)
 
 ---
 
-- [ ] 7. Final Verification and Commit
+- [x] 7. Final Verification and Commit
 
   **What to do**:
   - Run full verification:
@@ -565,19 +565,19 @@ Max Concurrent: 3 (Wave 1)
 
 > 4 review agents run in PARALLEL. ALL must APPROVE. Rejection → fix → re-run.
 
-- [ ] F1. **Plan Compliance Audit** — `oracle`
+- [x] F1. **Plan Compliance Audit** — `oracle`
   Read the plan end-to-end. For each "Must Have": verify implementation exists. For each "Must NOT Have": search codebase for forbidden patterns. Check all deliverables.
   Output: `Must Have [N/N] | Must NOT Have [N/N] | Tasks [N/N] | VERDICT: APPROVE/REJECT`
 
-- [ ] F2. **Code Quality Review** — `unspecified-high`
+- [x] F2. **Code Quality Review** — `unspecified-high`
   Run `pnpm run build` + `cargo check` + `pnpm run test`. Review all changed/new files for type safety, error handling, unused imports. Check for AI slop.
   Output: `Build [PASS/FAIL] | Cargo [PASS/FAIL] | Tests [N pass/N fail] | VERDICT`
 
-- [ ] F3. **Cross-Platform QA** — `unspecified-high`
+- [x] F3. **Cross-Platform QA** — `unspecified-high`
   Verify: (1) `tauri.conf.json` still has `decorations: false` (not globally changed), (2) MenuBar.tsx still renders WindowControls for non-Mac, (3) MainLayout conditionally renders MacWindowBar vs MenuBar, (4) No `#[cfg(target_os = "macos")]` leaks outside menu/titlebar setup.
   Output: `Platform checks [N/N pass] | VERDICT`
 
-- [ ] F4. **Scope Fidelity Check** — `deep`
+- [x] F4. **Scope Fidelity Check** — `deep`
   For each task: read "What to do", read actual diff. Verify 1:1 compliance. Check "Must NOT do". Detect unaccounted changes.
   Output: `Tasks [N/N compliant] | VERDICT`
 
@@ -606,10 +606,10 @@ grep 'MacWindowBar\|IS_MAC' src/components/layout/MainLayout.tsx  # Expected: ma
 ```
 
 ### Final Checklist
-- [ ] All "Must Have" present
-- [ ] All "Must NOT Have" absent
-- [ ] macOS: native Overlay titlebar with traffic lights
-- [ ] macOS: native app menu mirroring baseMenus
-- [ ] macOS: MacWindowBar with project name + drag region
-- [ ] Windows/Linux: unchanged MenuBar + WindowControls
-- [ ] Build + Cargo + Tests all pass
+- [x] All "Must Have" present
+- [x] All "Must NOT Have" absent
+- [x] macOS: native Overlay titlebar with traffic lights
+- [x] macOS: native app menu mirroring baseMenus
+- [x] macOS: MacWindowBar with project name + drag region
+- [x] Windows/Linux: unchanged MenuBar + WindowControls
+- [x] Build + Cargo + Tests all pass
