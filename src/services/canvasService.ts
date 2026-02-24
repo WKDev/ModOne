@@ -28,7 +28,7 @@ export class CanvasServiceError extends Error {
     public readonly path?: string,
     public readonly cause?: Error
   ) {
-    super(message);
+    super(message, { cause });
     this.name = 'CanvasServiceError';
   }
 }
@@ -166,7 +166,8 @@ export const canvasService = {
   async circuitExists(path: string): Promise<boolean> {
     try {
       return await invoke<boolean>('canvas_circuit_exists', { path });
-    } catch {
+    } catch (error) {
+      console.warn('circuitExists: unexpected error', error);
       return false;
     }
   },
