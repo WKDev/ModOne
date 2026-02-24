@@ -11,6 +11,7 @@ import { FloatingWindowRenderer } from './components/floating/FloatingWindowRend
 import { CommandPalette, useCommandPalette, registerAllCommands } from './components/CommandPalette';
 import { ProjectDialogProvider } from './contexts/ProjectDialogContext';
 import { UnsavedChangesDialog } from './components/project/UnsavedChangesDialog';
+import { useMacosNativeMenu } from "./hooks/useMacosNativeMenu";
 
 /**
  * Parse URL parameters to detect floating window mode
@@ -36,6 +37,7 @@ function useFloatingWindowParams() {
  * Main window content - full application with VSCode-style layout
  */
 function MainWindowContent() {
+  useMacosNativeMenu();
   const { initialize } = useLayoutPersistenceStore();
   const initializeToolPanel = useToolPanelStore((state) => state.initializeDefaultTabs);
   const toolPanelTabs = useToolPanelStore((state) => state.tabs);

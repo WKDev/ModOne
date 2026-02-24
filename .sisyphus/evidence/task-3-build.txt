@@ -1,0 +1,25 @@
+
+> modone@0.1.0 build /Users/chson/Projects/ModOne
+> tsc && vite build
+
+vite v7.3.1 building client environment for production...
+transforming...
+✓ 2422 modules transformed.
+rendering chunks...
+[plugin vite:reporter] 
+(!) /Users/chson/Projects/ModOne/node_modules/.pnpm/@tauri-apps+api@2.9.1/node_modules/@tauri-apps/api/event.js is dynamically imported by /Users/chson/Projects/ModOne/src/utils/documentSync.ts but also statically imported by /Users/chson/Projects/ModOne/node_modules/.pnpm/@tauri-apps+api@2.9.1/node_modules/@tauri-apps/api/window.js, /Users/chson/Projects/ModOne/src/components/ScenarioEditor/hooks/useScenarioExecution.ts, /Users/chson/Projects/ModOne/src/hooks/useModbusMemory.ts, /Users/chson/Projects/ModOne/src/hooks/useMonitoring.ts, /Users/chson/Projects/ModOne/src/hooks/useSimulation.ts, /Users/chson/Projects/ModOne/src/services/windowService.ts, /Users/chson/Projects/ModOne/src/utils/stateSync.ts, dynamic import will not move module into another chunk.
+
+computing gzip size...
+build/index.html                              0.45 kB │ gzip:   0.30 kB
+build/assets/index-CPIw3ejU.css              69.98 kB │ gzip:  12.44 kB
+build/assets/index-jeGglOH5.js                0.13 kB │ gzip:   0.14 kB
+build/assets/purify.es-Bzr520pe.js           22.45 kB │ gzip:   8.63 kB
+build/assets/index.es-BioI8O56.js           158.58 kB │ gzip:  52.93 kB
+build/assets/html2canvas.esm-DXEQVQnt.js    201.04 kB │ gzip:  47.43 kB
+build/assets/index-BF24oSJw.js            1,585.31 kB │ gzip: 469.47 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 3.10s

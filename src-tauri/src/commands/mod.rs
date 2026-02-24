@@ -8,6 +8,7 @@ pub mod canvas_sync;
 pub mod explorer;
 pub mod layout;
 pub mod logging;
+pub mod menu;
 pub mod modbus;
 pub mod parser;
 pub mod project;

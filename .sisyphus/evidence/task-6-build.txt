@@ -1,0 +1,18 @@
+T6 complete
+
+> modone@0.1.0 build /Users/chson/Projects/ModOne
+> tsc && vite build
+
+vite v7.3.1 building client environment for production...
+transforming...
+✓ 2424 modules transformed.
+rendering chunks...
+computing gzip size...
+build/index.html                              0.45 kB │ gzip:   0.30 kB
+build/assets/index-BEvcPb6o.css              70.01 kB │ gzip:  12.46 kB
+build/assets/index-Bz6Hq1Va.js                0.13 kB │ gzip:   0.13 kB
+build/assets/purify.es-Bzr520pe.js           22.45 kB │ gzip:   8.63 kB
+build/assets/index.es-DKFvNBc6.js           158.58 kB │ gzip:  52.93 kB
+build/assets/html2canvas.esm-DXEQVQnt.js    201.04 kB │ gzip:  47.43 kB
+build/assets/index-B7W9eeMG.js            1,587.27 kB │ gzip: 470.47 kB
+✓ built in 2.73s

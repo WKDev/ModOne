@@ -297,6 +297,8 @@ export function MenuBar() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
+  const actionIdRef = useRef(0);
+  const resizeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
     currentLayoutName,
@@ -317,7 +319,14 @@ export function MenuBar() {
 
   const handleMaximize = useCallback(async () => {
     try {
-      await appWindow.toggleMaximize();
+      const actionId = ++actionIdRef.current;
+      const m = await appWindow.isMaximized();
+      if (actionId !== actionIdRef.current) return; // stale — another action fired
+      if (m) {
+        await appWindow.unmaximize();
+      } else {
+        await appWindow.maximize();
+      }
       // State will be updated by the resize listener below
     } catch (error) {
       console.error('Failed to toggle maximize:', error);
@@ -351,13 +360,16 @@ export function MenuBar() {
         setIsMaximized(maximized);
 
         // Listen for resize events to track maximize/restore
-        unlisten = await appWindow.onResized(async () => {
-          try {
-            const nowMaximized = await appWindow.isMaximized();
-            setIsMaximized(nowMaximized);
-          } catch {
-            // Ignore errors during teardown
-          }
+        unlisten = await appWindow.onResized(() => {
+          if (resizeDebounceRef.current) clearTimeout(resizeDebounceRef.current);
+          resizeDebounceRef.current = setTimeout(async () => {
+            try {
+              const nowMaximized = await appWindow.isMaximized();
+              setIsMaximized(nowMaximized);
+            } catch {
+              // Ignore errors during teardown
+            }
+          }, 150);
         });
       } catch (error) {
         console.error('Failed to set up window resize listener:', error);
@@ -367,6 +379,7 @@ export function MenuBar() {
     setup();
 
     return () => {
+      if (resizeDebounceRef.current) clearTimeout(resizeDebounceRef.current);
       if (unlisten) unlisten();
     };
   }, []);
@@ -466,16 +479,6 @@ export function MenuBar() {
         data-testid="menu-bar"
         className="h-8 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)] flex items-center text-sm select-none"
       >
-        {/* Mac: Controls on left */}
-        {IS_MAC && (
-          <WindowControls
-            isMaximized={isMaximized}
-            onMinimize={handleMinimize}
-            onMaximize={handleMaximize}
-            onClose={handleClose}
-          />
-        )}
-
         {/* Menu items */}
         <div className="flex items-center px-2">
           {menus.map((menu) => (
@@ -516,7 +519,7 @@ export function MenuBar() {
         <div
           className="flex-1 h-full"
           data-tauri-drag-region
-          onDoubleClick={handleDragRegionDoubleClick}
+          onDoubleClick={IS_MAC ? undefined : handleDragRegionDoubleClick}
         />
 
         {/* Windows/Linux: Controls on right */}

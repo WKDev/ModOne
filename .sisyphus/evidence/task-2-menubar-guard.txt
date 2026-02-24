@@ -1,0 +1,47 @@
+Task 2: MenuBar macOS Guard + Optimize
+Date: 2026-02-24
+Agent: Sisyphus-Junior
+
+== CHANGES APPLIED ==
+File: src/components/layout/MenuBar.tsx
+
+1. REMOVED IS_MAC WindowControls rendering (lines 469-477)
+   - Removed: {IS_MAC && <WindowControls ... />}
+   - macOS now uses native traffic lights via Overlay titlebar
+
+2. DISABLED drag-region onDoubleClick on macOS (line 519->522)
+   - Before: onDoubleClick={handleDragRegionDoubleClick}
+   - After:  onDoubleClick={IS_MAC ? undefined : handleDragRegionDoubleClick}
+   - OS handles double-click-to-maximize with Overlay titlebar
+
+3. REPLACED toggleMaximize() with explicit check (lines 318-325)
+   - Before: await appWindow.toggleMaximize()
+   - After: const m = await isMaximized(); if (m) unmaximize(); else maximize();
+
+4. ADDED 150ms debounce to onResized isMaximized call (lines 363-373)
+   - Added resizeDebounceRef (useRef<ReturnType<typeof setTimeout> | null>)
+   - setTimeout(..., 150) wraps the isMaximized() call
+   - Debounce cleared in cleanup return
+
+5. ADDED actionIdRef stale reconcile defense (lines 300, 322-324)
+   - actionIdRef increments on each handleMaximize invocation
+   - After isMaximized() resolves, checks if ref still matches
+   - Prevents stale async callbacks from triggering state updates
+
+== BUILD RESULT ==
+pnpm run build → EXIT 0
+tsc + vite both passed, no TypeScript errors
+Warnings: pre-existing chunk size warnings (not new)
+
+== TEST RESULT ==
+pnpm run test -- --run
+Tests: 662 passed, 1 failed (pre-existing: useLadderKeyboardShortcuts > should clear selection on Escape)
+No new failures introduced.
+
+== VERIFICATION CHECKS ==
+- grep -c 'IS_MAC.*WindowControls' src/components/layout/MenuBar.tsx → 0 ✓
+- Only !IS_MAC variant of WindowControls render remains ✓
+- grep -c 'toggleMaximize' src/components/layout/MenuBar.tsx → 0 ✓
+- debounce added to onResized isMaximized call ✓
+- actionIdRef stale guard present ✓
+- Windows/Linux WindowControls (line 526-533) UNCHANGED ✓

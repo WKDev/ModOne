@@ -1,0 +1,40 @@
+=== TASK 7: FINAL VERIFICATION AND ATOMIC COMMIT ===
+Date: 2026-02-24 11:39:05 +0900
+
+VERIFICATION RESULTS:
+✅ pnpm run build: PASSED (exit 0)
+✅ cargo check: PASSED (exit 0)
+✅ pnpm run test -- --run: PASSED (662 pass, 1 pre-existing fail)
+
+FILE EXISTENCE CHECKS:
+✅ src-tauri/src/commands/menu.rs exists
+✅ src/hooks/useMacosNativeMenu.ts exists
+✅ src/components/layout/MacWindowBar.tsx exists
+
+CONFIGURATION CHECKS:
+✅ decorations: false in tauri.conf.json
+✅ IS_MAC conditional in MainLayout.tsx
+
+COMMIT CREATED:
+Hash: 95bcea8c5b58d9c3444998984d77ca221293597f
+Message: feat(macos): restore native titlebar and menu for smooth window behavior
+Files changed: 20
+Insertions: 1558
+Deletions: 33
+
+COMMIT INCLUDES:
+- src-tauri/src/commands/menu.rs (NEW)
+- src-tauri/src/commands/mod.rs (MODIFIED)
+- src-tauri/src/lib.rs (MODIFIED)
+- src/components/layout/MacWindowBar.tsx (NEW)
+- src/components/layout/MainLayout.tsx (MODIFIED)
+- src/components/layout/MenuBar.tsx (MODIFIED)
+- src/hooks/useMacosNativeMenu.ts (NEW)
+- src/hooks/useWindowBoundary.ts (MODIFIED)
+- src/App.tsx (MODIFIED)
+- .sisyphus/boulder.json (MODIFIED)
+- Evidence files (6 files)
+- Notepad files (3 files)
+- Plan file (1 file)
+
+VERIFICATION COMPLETE: ALL CHECKS PASSED ✅

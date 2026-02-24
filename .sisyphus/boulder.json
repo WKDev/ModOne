@@ -1,13 +1,12 @@
 {
-  "active_plan": "/Users/chson/Projects/ModOne/.sisyphus/plans/onecanvas-stability-fixes.md",
-  "started_at": "2026-02-24T01:34:01.993Z",
-  "completed_at": "2026-02-24T08:00:00.000Z",
+  "active_plan": "/Users/chson/Projects/ModOne/.sisyphus/plans/macos-titlebar-restore.md",
+  "started_at": "2026-02-24T02:18:09.461Z",
   "session_ids": [
     "ses_372db0440ffe8KOMVvfZUfhjSA"
   ],
-  "plan_name": "onecanvas-stability-fixes",
+  "plan_name": "macos-titlebar-restore",
   "agent": "atlas",
-  "status": "completed",
-  "tasks_completed": 12,
-  "tasks_total": 12
+  "status": "in_progress",
+  "tasks_completed": 0,
+  "tasks_total": 11
 }

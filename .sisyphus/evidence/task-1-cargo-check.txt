@@ -1,0 +1,61 @@
+    Blocking waiting for file lock on build directory
+    Checking modone v0.1.0 (/Users/chson/Projects/ModOne/src-tauri)
+warning: field `hold_off_remaining` is never read
+   --> src/canvas/scope.rs:134:5
+    |
+126 | struct TriggerState {
+    |        ------------ field in this struct
+...
+134 |     hold_off_remaining: f32,
+    |     ^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: constant `SIM_SCAN_COMPLETE_EVENT` is never used
+   --> src/commands/sim.rs:139:7
+    |
+139 | const SIM_SCAN_COMPLETE_EVENT: &str = "sim:scan-complete";
+    |       ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: fields `auto_save_enabled` and `auto_save_interval_secs` are never read
+   --> src/project/mod.rs:268:5
+    |
+260 | pub struct ProjectManager {
+    |            -------------- fields in this struct
+...
+268 |     auto_save_enabled: bool,
+    |     ^^^^^^^^^^^^^^^^^
+...
+271 |     auto_save_interval_secs: u64,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `ProjectManager` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: variable `projectDir` should have a snake case name
+   --> src/commands/project.rs:109:5
+    |
+109 |     projectDir: PathBuf,
+    |     ^^^^^^^^^^ help: convert the identifier to snake case: `project_dir`
+    |
+    = note: `#[warn(non_snake_case)]` on by default
+
+warning: variable `plcManufacturer` should have a snake case name
+   --> src/commands/project.rs:110:5
+    |
+110 |     plcManufacturer: String,
+    |     ^^^^^^^^^^^^^^^ help: convert the identifier to snake case: `plc_manufacturer`
+
+warning: variable `plcModel` should have a snake case name
+   --> src/commands/project.rs:111:5
+    |
+111 |     plcModel: String,
+    |     ^^^^^^^^ help: convert the identifier to snake case: `plc_model`
+
+warning: variable `scanTimeMs` should have a snake case name
+   --> src/commands/project.rs:112:5
+    |
+112 |     scanTimeMs: Option<u32>,
+    |     ^^^^^^^^^^ help: convert the identifier to snake case: `scan_time_ms`
+
+warning: `modone` (lib) generated 7 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.92s

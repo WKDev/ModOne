@@ -163,6 +163,20 @@ pub fn run() {
                 )?;
                 log::info!("Debug mode enabled with logging plugin");
             }
+
+            #[cfg(target_os = "macos")]
+            {
+                use crate::commands::menu::build_macos_menu;
+                use tauri::{Manager, TitleBarStyle};
+
+                let window = app.get_webview_window("main").unwrap();
+                window.set_decorations(true).unwrap();
+                window.set_title_bar_style(TitleBarStyle::Overlay).unwrap();
+
+                let menu = build_macos_menu(&app.handle())?;
+                app.set_menu(menu)?;
+            }
+
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -196,6 +210,13 @@ pub fn run() {
                     }
                 }
                 _ => {}
+            }
+        })
+        .on_menu_event(|app, event| {
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::Emitter;
+                let _ = app.emit("native-menu-command", event.id().as_ref());
             }
         })
         .invoke_handler(tauri::generate_handler![

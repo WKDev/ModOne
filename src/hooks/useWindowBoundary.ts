@@ -19,7 +19,7 @@ interface WindowBoundaryResult {
   /** Convert client coordinates to screen coordinates */
   getScreenPosition: (clientX: number, clientY: number) => { x: number; y: number } | null;
   /** Update bounds manually (for resize events) */
-  refreshBounds: () => Promise<void>;
+  refreshBounds: () => void;
 }
 
 /**
@@ -29,27 +29,61 @@ export function useWindowBoundary(): WindowBoundaryResult {
   const [mainWindowBounds, setMainWindowBounds] = useState<Bounds | null>(null);
   const [isOutsideMainWindow, setIsOutsideMainWindow] = useState(false);
   const boundsRef = useRef<Bounds | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const pendingRef = useRef(false);
 
-  // Update bounds from Tauri window
-  const refreshBounds = useCallback(async () => {
+  // Actual refresh logic: fetch bounds and update state only if changed
+  const doActualRefresh = useCallback(async () => {
     try {
       const mainWindow = Window.getCurrent();
       const position = await mainWindow.outerPosition();
       const size = await mainWindow.innerSize();
 
-      const bounds: Bounds = {
+      const newBounds: Bounds = {
         x: position.x,
         y: position.y,
         width: size.width,
         height: size.height,
       };
 
-      boundsRef.current = bounds;
-      setMainWindowBounds(bounds);
+      // Only update state if bounds actually changed (shallow compare)
+      const currentBounds = boundsRef.current;
+      if (
+        !currentBounds ||
+        currentBounds.x !== newBounds.x ||
+        currentBounds.y !== newBounds.y ||
+        currentBounds.width !== newBounds.width ||
+        currentBounds.height !== newBounds.height
+      ) {
+        boundsRef.current = newBounds;
+        setMainWindowBounds(newBounds);
+      }
     } catch (error) {
       console.warn('Failed to get window bounds:', error);
     }
   }, []);
+
+  // Schedule refresh with rAF coalescing to reduce IPC backlog during rapid resize/move
+  const refreshBounds = useCallback(() => {
+    if (rafRef.current !== null) {
+      // Already scheduled, mark as pending for retry
+      pendingRef.current = true;
+      return;
+    }
+
+    rafRef.current = requestAnimationFrame(async () => {
+      rafRef.current = null;
+      const shouldRetry = pendingRef.current;
+      pendingRef.current = false;
+
+      await doActualRefresh();
+
+      // If more events came in during the refresh, schedule another
+      if (shouldRetry) {
+        refreshBounds();
+      }
+    });
+  }, [doActualRefresh]);
 
   // Fetch main window bounds on mount and listen for changes
   useEffect(() => {
@@ -79,6 +113,11 @@ export function useWindowBoundary(): WindowBoundaryResult {
     setupListeners();
 
     return () => {
+      // Cleanup: cancel any pending rAF on unmount
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
       if (unlistenMove) unlistenMove();
       if (unlistenResize) unlistenResize();
     };
