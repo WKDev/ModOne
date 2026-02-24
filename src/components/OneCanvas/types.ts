@@ -245,7 +245,13 @@ export interface BaseBlock<T extends BlockType = BlockType> {
   size: Size;
   /** Connection ports */
   ports: Port[];
-  /** Whether block is selected */
+  /**
+   * @deprecated Rendering-layer selection flag. Do NOT use as the authoritative source
+   * of truth for selection state. The canonical selection state is in
+   * `useCanvasFacade().selectedIds` (a Set<string>). This field is synchronized
+   * from selectedIds during render and is used by CanvasContent.tsx for
+   * junction rendering. Modifying this directly will cause state drift.
+   */
   selected?: boolean;
   /** Optional display label */
   label?: string;
@@ -622,7 +628,13 @@ export interface Junction {
   id: string;
   /** Position on canvas (center-based) */
   position: Position;
-  /** Whether junction is selected */
+  /**
+   * @deprecated Rendering-layer selection flag. Do NOT use as the authoritative source
+   * of truth for selection state. The canonical selection state is in
+   * `useCanvasFacade().selectedIds` (a Set<string>). This field is synchronized
+   * from selectedIds during render and is used by CanvasContent.tsx for
+   * junction rendering. Modifying this directly will cause state drift.
+   */
   selected?: boolean;
 }
 
@@ -686,7 +698,13 @@ export interface Wire {
   from: WireEndpoint;
   /** Destination endpoint */
   to: WireEndpoint;
-  /** Whether wire is selected */
+  /**
+   * @deprecated Rendering-layer selection flag. Do NOT use as the authoritative source
+   * of truth for selection state. The canonical selection state is in
+   * `useCanvasFacade().selectedIds` (a Set<string>). This field is synchronized
+   * from selectedIds during render and is used by CanvasContent.tsx for
+   * junction rendering. Modifying this directly will cause state drift.
+   */
   selected?: boolean;
   /** Optional wire color */
   color?: string;
