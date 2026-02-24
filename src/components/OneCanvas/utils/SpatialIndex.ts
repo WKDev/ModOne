@@ -1,6 +1,7 @@
 import RBush, { type BBox } from 'rbush';
 
 import type { Block, BoundingBox, Junction, Position, Wire } from '../types';
+import { buildCanonicalWirePolyline } from './wireSimplifier';
 
 export interface SpatialItem extends BBox {
   id: string;
@@ -91,28 +92,13 @@ export class SpatialIndex {
       });
     }
 
-    const resolveEndpointPosition = (endpoint: Wire['from']): Position | null => {
-      if ('componentId' in endpoint) {
-        const block = blocks.get(endpoint.componentId);
-        if (!block) {
-          return null;
-        }
-        return getPortWorldPosition(block, endpoint.portId);
-      }
-
-      const junction = junctions.get(endpoint.junctionId);
-      return junction ? junction.position : null;
-    };
+    const geom = { components: blocks, junctions };
 
     for (const wire of wires) {
-      const from = resolveEndpointPosition(wire.from);
-      const to = resolveEndpointPosition(wire.to);
-
-      if (!from || !to) {
+      const points = buildCanonicalWirePolyline(wire, geom);
+      if (!points || points.length < 2) {
         continue;
       }
-
-      const points: Position[] = [from, ...(wire.handles?.map((handle) => handle.position) ?? []), to];
 
       for (let segIndex = 0; segIndex < points.length - 1; segIndex += 1) {
         const start = points[segIndex];

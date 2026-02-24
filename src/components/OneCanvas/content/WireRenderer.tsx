@@ -59,6 +59,8 @@ interface WireProps {
   wireNumber?: string;
   /** Draft polyline override for rubber-band preview (suppresses interactive elements) */
   draftPoly?: readonly Position[];
+  /** Pre-computed canonical polyline for segment hit detection (indices match drag engine) */
+  canonicalPoly?: readonly Position[];
 }
 
 // ============================================================================
@@ -106,6 +108,7 @@ export const Wire = memo(function Wire({
   label,
   wireNumber,
   draftPoly,
+  canonicalPoly,
 }: WireProps) {
   // Extract positions from handles
   const handlePositions = handles?.map((h) => h.position);
@@ -152,6 +155,9 @@ export const Wire = memo(function Wire({
   const segmentPoints = (() => {
     if (draftPoly && draftPoly.length >= 2) {
       return [...draftPoly];
+    }
+    if (canonicalPoly && canonicalPoly.length >= 2) {
+      return [...canonicalPoly];
     }
     return [{ ...from }, ...(handles?.map((handle) => ({ ...handle.position })) ?? []), { ...to }];
   })();

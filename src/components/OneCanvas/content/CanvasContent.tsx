@@ -1,4 +1,5 @@
 import type { Block, Wire, Junction, Position } from '../types';
+import { buildCanonicalWirePolyline } from '../utils/wireSimplifier';
 import { BlockRenderer } from './BlockRenderer';
 import { Wire as WireComponent } from './WireRenderer';
 
@@ -87,6 +88,8 @@ export function CanvasContent({
     return { x, y };
   };
 
+  const geom = { components: blocks, junctions };
+
   return (
     <>
       {/* SVG layer for wires (rendered behind blocks) */}
@@ -106,6 +109,7 @@ export function CanvasContent({
               : junctions.get(wire.to.junctionId)?.position;
 
           if (!fromPos || !toPos) return null;
+          const canonicalPoly = buildCanonicalWirePolyline(wire, geom) ?? undefined;
 
           return (
             <WireComponent
@@ -122,6 +126,7 @@ export function CanvasContent({
                label={wire.label}
                wireNumber={wire.wireNumber}
                draftPoly={wireDraftPolys?.get(wire.id)}
+               canonicalPoly={canonicalPoly}
             />
           );
         })}
