@@ -1,13 +1,12 @@
 {
-  "active_plan": "C:\\Users\\chanh\\Projects\\ModOne\\.sisyphus\\plans\\custom_titlebar.md",
-  "started_at": "2026-02-13T00:02:46.491Z",
+  "active_plan": "/Users/chson/Projects/ModOne/.sisyphus/plans/onecanvas-stability-fixes.md",
+  "started_at": "2026-02-24T01:34:01.993Z",
   "session_ids": [
-    "ses_3abc6c691ffewTKTKts0NrcD5X"
+    "ses_372db0440ffe8KOMVvfZUfhjSA"
   ],
-  "plan_name": "custom_titlebar",
+  "plan_name": "onecanvas-stability-fixes",
   "agent": "atlas",
-  "status": "completed",
-  "tasks_completed": 2,
-  "tasks_total": 2,
-  "completed_at": "2026-02-13T00:10:00.000Z"
+  "status": "in_progress",
+  "tasks_completed": 0,
+  "tasks_total": 12
 }

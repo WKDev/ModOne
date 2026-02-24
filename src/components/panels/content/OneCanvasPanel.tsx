@@ -388,7 +388,7 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
     (blockId: string, portId: string) => {
       const portPosition = getPortPosition(components as Map<string, Block>, blockId, portId);
       const block = components.get(blockId);
-      const port = block?.ports.find((p) => p.id === portId);
+      const port = block?.ports.find((p) => p.id === portId); // Safe: block is filtered by optional chaining, returns undefined if missing
       if (!portPosition || !port) {
         return;
       }
@@ -439,7 +439,7 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
         const comp = components.get(endpoint.componentId);
         if (!comp) return null;
 
-        const port = comp.ports.find((p) => p.id === endpoint.portId);
+        const port = comp.ports.find((p) => p.id === endpoint.portId); // Safe: optional chaining used throughout
         if (!port) return null;
 
         const offset = port.offset ?? 0.5;

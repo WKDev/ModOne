@@ -361,12 +361,22 @@ export function useCanvasSync(options: UseCanvasSyncOptions = {}): UseCanvasSync
 
   // Auto-init on mount if enabled
   useEffect(() => {
+    let mounted = true;
     if (autoInit) {
-      init().catch(console.error);
+      init()
+        .then(() => {
+          // If component unmounted while init() was still running (listen() hadn't resolved yet),
+          // the cleanup already fired with unlistenRef.current === null. Clean up now.
+          if (!mounted && unlistenRef.current) {
+            unlistenRef.current();
+            unlistenRef.current = null;
+          }
+        })
+        .catch(console.error);
     }
-
     // Cleanup on unmount
     return () => {
+      mounted = false;
       if (unlistenRef.current) {
         unlistenRef.current();
         unlistenRef.current = null;
