@@ -115,3 +115,48 @@ Both `blocks: Map<string, Block>` and `junctions: Map<string, Junction>` match G
 - 8 tests, 8 passed, 0 failed
 - Full suite: 678 passed, 1 pre-existing LadderEditor failure (unchanged)
 - Evidence saved to `.sisyphus/evidence/task-6-test-suite.txt`
+
+---
+
+## Task 7: E2E Playwright Verification (2026-02-24)
+
+### Test Setup
+- App: Tauri + Vite, dev server at `http://localhost:1420`
+- Tauri API requires mock injection for browser testing: `window.__TAURI_INTERNALS__ = { metadata: { currentWindow: { label: 'main' }, windows: [...] }, ipc: async () => {} }`
+- Must also mock `window.__TAURI__ = { invoke: async () => {} }`
+- Panel type for OneCanvas tab: `'one-canvas'` (not `'canvas'`)
+- Circuit injection via: `useDocumentRegistry.getState().loadCanvasCircuit(docId, circuit)`
+
+### Wire State Access Pattern (Browser/Vite)
+```js
+// Access Zustand stores via Vite ES module system
+import('/src/stores/documentRegistry.ts').then(m => m.useDocumentRegistry.getState().loadCanvasCircuit(docId, circuit))
+import('/src/stores/editorAreaStore.ts').then(m => m.useEditorAreaStore.getState().addTab('one-canvas', 'title'))
+```
+
+### Wire Segment Drag Mechanism
+- Segment `<line>` elements with `data-wire-segment=""` are rendered ONLY when wire is selected
+- These elements carry `data-seg-index`, `data-orientation`, `data-wire-id`
+- `InteractionContext.tsx:173` uses `target.closest('[data-wire-segment]')` to detect segment drag
+- SVG coordinate offset (for default viewport): `screen_x = canvas_x + 494`, `screen_y = canvas_y + 185` (scale 1:1 at default zoom)
+
+### Verified Wire Paths
+All paths confirmed orthogonal (horizontal + vertical only, NO diagonals):
+- **Initial**: `M 160 230 L 292 230 Q 300 230 300 238 L 300 372 Q 300 380 308 380 L 500 380`
+- **After drag 1** (vertical x: 300→360): `M 160 230 L 352 230 Q 360 230 360 238 L 360 372 Q 360 380 368 380 L 500 380`
+- **After drag 2** (vertical x: 360→420): `M 160 230 L 412 230 Q 420 230 420 238 L 420 372 Q 420 380 428 380 L 500 380`
+
+### Test Outcomes
+- ✅ App starts and OneCanvas panel is accessible (with Tauri mock)
+- ✅ Wire drag: select wire → drag vertical segment → horizontal/vertical only, no diagonals
+- ✅ Re-drag: second drag on same wire segment works correctly
+- ✅ `buildCanonicalWirePolyline` single source of truth confirmed working
+- ✅ `enforceOrthogonalPolyline` safety net confirmed (all segments remain orthogonal)
+- Screenshots saved to `.sisyphus/evidence/task-7-wire-drag-1.png` and `task-7-wire-drag-2.png`
+
+### Gotchas
+- `colinear handles` (all same y) → simplified away by `simplifyWireHandles` → wire becomes straight line → no bend to drag
+  - Use different y values for handles to create actual bends
+- Wire segments only exist in DOM when wire IS selected → click wire first, then drag segment
+- Horizontal `<line>` elements have `getBoundingClientRect().height = 0` — SVG stroke-width handles hit area
+- `'catch'` literal in Playwright `browser_run_code` strings causes SyntaxError — avoid try/catch blocks in code strings
