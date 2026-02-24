@@ -28,7 +28,8 @@ export class CanvasServiceError extends Error {
     public readonly path?: string,
     public readonly cause?: Error
   ) {
-    super(message, { cause });
+    super(message);
+    this.cause = cause;
     this.name = 'CanvasServiceError';
   }
 }

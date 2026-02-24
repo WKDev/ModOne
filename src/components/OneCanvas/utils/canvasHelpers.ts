@@ -120,7 +120,7 @@ export function recalculateAutoHandles(
 
   if (hasUserHandles) {
     // Preserve only user handles; discard auto handles
-    const userHandles = wire.handles?.filter((h) => h.source === 'user');
+    const userHandles = wire.handles?.filter((h) => h.source === 'user') ?? [];
     return userHandles.length > 0 ? userHandles : undefined;
   }
 
