@@ -44,12 +44,9 @@ export const SelectionBoundingBox = memo(function SelectionBoundingBox({
   wires,
   junctions,
 }: SelectionBoundingBoxProps) {
-  console.log('[SelectionBoundingBox] Render - selectedIds:', selectedIds.size, Array.from(selectedIds));
-
   // Calculate bounding box for all selected elements
   const boundingBox = useMemo((): BoundingBox | null => {
     if (selectedIds.size === 0) {
-      console.log('[SelectionBoundingBox] No selection');
       return null;
     }
 
@@ -127,7 +124,6 @@ export const SelectionBoundingBox = memo(function SelectionBoundingBox({
     });
 
     if (!hasElements) {
-      console.log('[SelectionBoundingBox] No elements found');
       return null;
     }
 
@@ -139,12 +135,10 @@ export const SelectionBoundingBox = memo(function SelectionBoundingBox({
       width: maxX - minX + padding * 2,
       height: maxY - minY + padding * 2,
     };
-    console.log('[SelectionBoundingBox] Calculated box:', box);
     return box;
   }, [selectedIds, components, wires, junctions]);
 
   if (!boundingBox) {
-    console.log('[SelectionBoundingBox] No bounding box');
     return null;
   }
 
@@ -152,12 +146,9 @@ export const SelectionBoundingBox = memo(function SelectionBoundingBox({
   if (selectedIds.size === 1) {
     const singleId = Array.from(selectedIds)[0];
     if (components.has(singleId)) {
-      console.log('[SelectionBoundingBox] Single block - using individual highlight only');
       return null;
     }
   }
-
-  console.log('[SelectionBoundingBox] Rendering box:', boundingBox);
 
   return (
     <div
