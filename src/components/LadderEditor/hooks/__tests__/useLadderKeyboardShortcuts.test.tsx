@@ -14,6 +14,7 @@ const mockClearSelection = vi.fn();
 const mockSelectAll = vi.fn();
 const mockSetClipboard = vi.fn();
 const mockSetSelection = vi.fn();
+const mockClearActiveTool = vi.fn();
 
 let uiStoreState: Record<string, unknown> = {};
 
@@ -25,7 +26,9 @@ vi.mock('../../../../stores/ladderUIStore', () => {
   const store = (selector: (s: Record<string, unknown>) => unknown) => selector(uiStoreState);
   store.getState = () => ({
     ...uiStoreState,
+    activeTool: uiStoreState.activeTool ?? null,
     clearSelection: mockClearSelection,
+    clearActiveTool: mockClearActiveTool,
     selectAll: mockSelectAll,
     setClipboard: mockSetClipboard,
     setSelection: mockSetSelection,
@@ -96,6 +99,7 @@ vi.mock('../../../../types/document', () => ({
 describe('useLadderKeyboardShortcuts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockClearActiveTool.mockClear();
 
     // Default UI store state
     uiStoreState = {
@@ -254,7 +258,13 @@ describe('useLadderKeyboardShortcuts', () => {
       expect(mockSelectAll).toHaveBeenCalledTimes(1);
     });
 
-    it('should clear selection on Escape', () => {
+    it('should clear selection on Escape when no active tool', () => {
+      uiStoreState = {
+        selectedElementIds: new Set(['element-1', 'element-2']),
+        mode: 'edit',
+        activeTool: null,
+      };
+
       renderHook(() => useLadderKeyboardShortcuts());
 
       act(() => {
@@ -262,6 +272,24 @@ describe('useLadderKeyboardShortcuts', () => {
       });
 
       expect(mockClearSelection).toHaveBeenCalledTimes(1);
+      expect(mockClearActiveTool).not.toHaveBeenCalled();
+    });
+
+    it('should clear active tool on Escape when tool is active', () => {
+      uiStoreState = {
+        selectedElementIds: new Set(['element-1', 'element-2']),
+        mode: 'edit',
+        activeTool: 'contact_no',
+      };
+
+      renderHook(() => useLadderKeyboardShortcuts());
+
+      act(() => {
+        simulateKeyDown('Escape');
+      });
+
+      expect(mockClearActiveTool).toHaveBeenCalledTimes(1);
+      expect(mockClearSelection).not.toHaveBeenCalled();
     });
   });
 
