@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/browser-test';
 import { selectors } from './utils/selectors';
 import { testPorts } from './fixtures';
 
@@ -157,7 +157,7 @@ test.describe('Modbus Menu', () => {
     await page.click(selectors.menuModbus);
 
     // Should see Server Settings, Start/Stop options
-    const menuContent = page.locator('.bg-gray-800.border.border-gray-700.rounded.shadow-lg');
+    const menuContent = page.locator('[data-testid="menu-server-settings"]');
     await expect(menuContent).toBeVisible();
 
     // Check for common menu items

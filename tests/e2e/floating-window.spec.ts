@@ -8,7 +8,7 @@
  * Full multi-window testing requires Tauri webdriver setup.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/browser-test';
 import { selectors } from './utils/selectors';
 
 test.describe('Floating Window System', () => {
@@ -100,7 +100,7 @@ test.describe('Floating Window System', () => {
       await page.click(selectors.menuView);
 
       // Look for menu dropdown
-      const dropdown = page.locator('.bg-gray-800.border.border-gray-700.rounded.shadow-lg');
+      const dropdown = page.locator('[data-testid="menu-toggle-sidebar"]');
       await expect(dropdown).toBeVisible();
     });
 
@@ -109,7 +109,7 @@ test.describe('Floating Window System', () => {
       await page.waitForTimeout(100);
 
       // Check for common panel menu items
-      const menuContent = await page.locator('.bg-gray-800.border.border-gray-700').textContent();
+      const menuContent = await page.locator('[data-testid="menu-toggle-sidebar"]').textContent();
       expect(menuContent).toBeTruthy();
     });
   });
@@ -119,7 +119,7 @@ test.describe('Floating Window System', () => {
       // Verify zustand store is functioning
       const storeExists = await page.evaluate(() => {
         // Check if React is rendering (indicates app is loaded)
-        return document.querySelector('#root')?.children.length > 0;
+        return (document.querySelector('#root')?.children.length ?? 0) > 0;
       });
       expect(storeExists).toBe(true);
     });

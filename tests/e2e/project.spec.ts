@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/browser-test';
 import { selectors } from './utils/selectors';
 import { testProjectNames, shortcuts } from './fixtures';
 

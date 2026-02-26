@@ -5,6 +5,7 @@
 import mockConfig from './mock-config.json' with { type: 'json' };
 import testMemoryValues from './test-memory-values.json' with { type: 'json' };
 import expectedLayouts from './expected-layouts.json' with { type: 'json' };
+export { injectTauriMocks, createBrowserFixtures } from './tauri-mocks';
 
 export { mockConfig, testMemoryValues, expectedLayouts };
 
