@@ -135,7 +135,7 @@ pub fn run() {
     // Initialize scope state
     let scope_state = ScopeState::default();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
@@ -143,7 +143,12 @@ pub fn run() {
         // they are ephemeral and managed by FloatingWindowRegistry, not the plugin.
         .plugin(tauri_plugin_window_state::Builder::default()
             .with_filter(|label| !label.starts_with("floating-"))
-            .build())
+            .build());
+
+    #[cfg(feature = "webdriver")]
+    let builder = builder.plugin(tauri_plugin_webdriver::init());
+
+    builder
         .manage(project_manager)
         .manage(auto_save_manager)
         .manage(modbus_state)
