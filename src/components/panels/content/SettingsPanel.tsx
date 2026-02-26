@@ -118,7 +118,7 @@ export function SettingsPanel() {
 
       {/* Error display */}
       {error && (
-        <div className="px-4 py-2 bg-red-500/10 text-red-500 text-sm border-t border-red-500/20">
+        <div className="px-4 py-2 bg-[var(--color-error)]/10 text-[var(--color-error)] text-sm border-t border-[var(--color-error)]/20">
           오류: {error}
         </div>
       )}

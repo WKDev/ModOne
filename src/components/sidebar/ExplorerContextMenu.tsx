@@ -235,25 +235,25 @@ export function ExplorerContextMenu({
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 min-w-[200px] py-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl"
+      className="fixed z-50 min-w-[200px] py-1 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg shadow-xl"
       style={{ left: position.x, top: position.y }}
     >
       {itemsWithSeparators.map((item, index) => (
         <div key={item.action}>
           {item.separator && index > 0 && (
-            <div className="my-1 border-t border-gray-700" />
+            <div className="my-1 border-t border-[var(--color-border)]" />
           )}
           <button
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left text-gray-300 hover:bg-gray-700 hover:text-white"
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]"
             onClick={() => handleAction(item.action)}
           >
-            <span className="w-4 h-4 flex items-center justify-center text-gray-400">
+            <span className="w-4 h-4 flex items-center justify-center text-[var(--color-text-muted)]">
               {item.icon}
             </span>
             <span className="flex-1">{item.label}</span>
           </button>
           {item.needsSeparatorAfter && (
-            <div className="my-1 border-t border-gray-700" />
+            <div className="my-1 border-t border-[var(--color-border)]" />
           )}
         </div>
       ))}

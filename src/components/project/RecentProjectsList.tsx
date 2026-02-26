@@ -137,7 +137,7 @@ export function RecentProjectsList({
 
   if (displayProjects.length === 0) {
     return (
-      <div className="text-center py-8 text-[var(--text-muted)]">
+      <div className="text-center py-8 text-[var(--color-text-muted)]">
         <FileText size={32} className="mx-auto mb-2 opacity-50" />
         <p className="text-sm">최근 프로젝트가 없습니다</p>
       </div>
@@ -155,29 +155,29 @@ export function RecentProjectsList({
             onContextMenu={(e) => handleContextMenu(e, project)}
             className={`
               group flex items-center gap-3 px-3 py-2 rounded cursor-pointer
-              hover:bg-[var(--bg-secondary)] transition-colors
+              hover:bg-[var(--color-bg-secondary)] transition-colors
               ${isLoading ? 'opacity-50 pointer-events-none' : ''}
             `}
           >
             {/* Icon */}
-            <div className="flex-shrink-0 w-8 h-8 rounded bg-[var(--accent-color)]/10 flex items-center justify-center">
-              <FileText size={16} className="text-[var(--accent-color)]" />
+            <div className="flex-shrink-0 w-8 h-8 rounded bg-[var(--color-accent)]/10 flex items-center justify-center">
+              <FileText size={16} className="text-[var(--color-accent)]" />
             </div>
 
             {/* Info */}
             <div className="flex-1 min-w-0">
-              <div className="font-medium text-sm text-[var(--text-primary)] truncate">
+              <div className="font-medium text-sm text-[var(--color-text-primary)] truncate">
                 {project.name}
               </div>
               {!compact && (
-                <div className="text-xs text-[var(--text-muted)] truncate" title={project.path}>
+                <div className="text-xs text-[var(--color-text-muted)] truncate" title={project.path}>
                   {truncatePath(project.path)}
                 </div>
               )}
             </div>
 
             {/* Time */}
-            <div className="flex-shrink-0 flex items-center gap-1 text-xs text-[var(--text-muted)]">
+            <div className="flex-shrink-0 flex items-center gap-1 text-xs text-[var(--color-text-muted)]">
               <Clock size={12} />
               <span>{formatRelativeTime(project.last_opened)}</span>
             </div>
@@ -188,9 +188,9 @@ export function RecentProjectsList({
                 e.stopPropagation();
                 handleContextMenu(e, project);
               }}
-              className="flex-shrink-0 p-1 opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-tertiary)] rounded transition-opacity"
+              className="flex-shrink-0 p-1 opacity-0 group-hover:opacity-100 hover:bg-[var(--color-bg-tertiary)] rounded transition-opacity"
             >
-              <MoreVertical size={14} className="text-[var(--text-muted)]" />
+              <MoreVertical size={14} className="text-[var(--color-text-muted)]" />
             </button>
           </div>
         ))}
@@ -200,7 +200,7 @@ export function RecentProjectsList({
       {contextMenu.isOpen && contextMenu.project && (
         <div
           ref={contextMenuRef}
-          className="fixed bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg shadow-xl py-1 min-w-[160px] z-50"
+          className="fixed bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-lg shadow-xl py-1 min-w-[160px] z-50"
           style={{
             left: contextMenu.x,
             top: contextMenu.y,
@@ -208,15 +208,15 @@ export function RecentProjectsList({
         >
           <button
             onClick={handleOpenFromContext}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)] transition-colors"
           >
             <FolderOpen size={14} />
             <span>열기</span>
           </button>
-          <div className="border-t border-[var(--border-color)] my-1" />
+          <div className="border-t border-[var(--color-border)] my-1" />
           <button
             onClick={handleRemoveFromList}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--color-error)] hover:bg-[var(--color-error)]/10 transition-colors"
           >
             <Trash2 size={14} />
             <span>목록에서 제거</span>

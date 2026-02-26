@@ -147,7 +147,7 @@ export function SaveLayoutDialog({ isOpen, onClose, onSaved }: SaveLayoutDialogP
                 htmlFor="layoutName"
                 className="block text-sm font-medium text-[var(--text-secondary)] mb-1"
               >
-                Layout Name <span className="text-red-500">*</span>
+                Layout Name <span className="text-[var(--color-error)]">*</span>
               </label>
               <input
                 id="layoutName"
@@ -171,7 +171,7 @@ export function SaveLayoutDialog({ isOpen, onClose, onSaved }: SaveLayoutDialogP
 
             {/* Overwrite Warning */}
             {showOverwriteWarning && (
-              <div className="flex items-start gap-2 px-3 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded text-sm text-yellow-600 dark:text-yellow-400">
+              <div className="flex items-start gap-2 px-3 py-2 bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/20 rounded text-sm text-[var(--color-warning)] text-[var(--color-warning)]">
                 <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
                 <span>
                   A layout with this name already exists. Saving will replace it.
@@ -181,7 +181,7 @@ export function SaveLayoutDialog({ isOpen, onClose, onSaved }: SaveLayoutDialogP
 
             {/* Error message */}
             {error && (
-              <div className="px-3 py-2 bg-red-500/10 border border-red-500/20 rounded text-sm text-red-500">
+              <div className="px-3 py-2 bg-[var(--color-error)]/10 border border-[var(--color-error)]/20 rounded text-sm text-[var(--color-error)]">
                 {error}
               </div>
             )}

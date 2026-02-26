@@ -133,7 +133,7 @@ export function TabContextMenu({
     <>
       <div
         ref={menuRef}
-        className="fixed z-50 min-w-[180px] py-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl"
+        className="fixed z-50 min-w-[180px] py-1 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg shadow-xl"
         style={{ left: position.x, top: position.y }}
       >
         {TAB_CONTEXT_MENU_ITEMS.map((item, index) => {
@@ -142,23 +142,23 @@ export function TabContextMenu({
           return (
             <div key={item.action}>
               {item.separator && index > 0 && (
-                <div className="my-1 border-t border-gray-700" />
+                <div className="my-1 border-t border-[var(--color-border)]" />
               )}
               <button
                 className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left
                   ${disabled
-                    ? 'text-gray-500 cursor-not-allowed'
-                    : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                    ? 'text-[var(--color-text-muted)] cursor-not-allowed'
+                    : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]'
                   }`}
                 onClick={() => !disabled && handleAction(item.action)}
                 disabled={disabled}
               >
-                <span className="w-4 h-4 flex items-center justify-center text-gray-400">
+                <span className="w-4 h-4 flex items-center justify-center text-[var(--color-text-muted)]">
                   {ACTION_ICONS[item.action]}
                 </span>
                 <span className="flex-1">{item.label}</span>
                 {item.shortcut && (
-                  <span className="text-xs text-gray-500">{item.shortcut}</span>
+                  <span className="text-xs text-[var(--color-text-muted)]">{item.shortcut}</span>
                 )}
               </button>
             </div>

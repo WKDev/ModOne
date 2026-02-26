@@ -269,7 +269,7 @@ export function KeyboardShortcutsSettings({
 
       {/* Conflict warning */}
       {conflictWarning && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded text-xs text-yellow-400">
+        <div className="flex items-center gap-2 px-3 py-2 bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/30 rounded text-xs text-[var(--color-warning)]">
           <AlertTriangle size={14} className="flex-shrink-0" />
           {conflictWarning.message}
         </div>

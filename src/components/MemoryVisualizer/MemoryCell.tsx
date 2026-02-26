@@ -61,8 +61,8 @@ export const MemoryCell = memo(function MemoryCell({
           w-full h-8 flex items-center justify-center
           text-sm font-medium transition-colors
           ${boolValue
-            ? 'bg-green-600 hover:bg-green-500 text-white'
-            : 'bg-neutral-700 hover:bg-neutral-600 text-neutral-300'
+            ? 'bg-[var(--color-success)] hover:bg-[var(--color-success)] text-[var(--color-text-primary)]'
+            : 'bg-[var(--color-bg-tertiary)] hover:bg-[var(--color-bg-hover)] text-[var(--color-text-secondary)]'
           }
           ${isSelected ? 'ring-2 ring-blue-500 ring-inset' : ''}
           ${isReadOnly ? 'cursor-default opacity-80' : 'cursor-pointer'}
@@ -87,7 +87,7 @@ export const MemoryCell = memo(function MemoryCell({
       className={`
         w-full h-8 px-1 flex items-center justify-center
         text-xs font-mono truncate transition-colors
-        bg-neutral-800 hover:bg-neutral-700 text-neutral-200
+        bg-[var(--color-bg-secondary)] hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)]
         ${isSelected ? 'ring-2 ring-blue-500 ring-inset' : ''}
         ${isReadOnly ? 'cursor-default opacity-80' : 'cursor-pointer'}
       `}

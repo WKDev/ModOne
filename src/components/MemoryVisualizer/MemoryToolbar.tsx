@@ -52,16 +52,16 @@ export function MemoryToolbar({
   isLoading,
 }: MemoryToolbarProps) {
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-neutral-700 bg-neutral-800 p-2">
+    <div className="flex flex-wrap items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-2">
       {/* Memory Type Selector */}
       <div className="flex items-center gap-1">
-        <label className="text-xs text-neutral-400">Type:</label>
+        <label className="text-xs text-[var(--color-text-muted)]">Type:</label>
         <select
           value={config.memoryType}
           onChange={(e) =>
             onConfigChange({ memoryType: e.target.value as MemoryType })
           }
-          className="rounded border border-neutral-600 bg-neutral-700 px-2 py-1 text-sm text-white"
+          className="rounded border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] px-2 py-1 text-sm text-[var(--color-text-primary)]"
         >
           {MEMORY_TYPE_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -73,7 +73,7 @@ export function MemoryToolbar({
 
       {/* Start Address Input */}
       <div className="flex items-center gap-1">
-        <label className="text-xs text-neutral-400">Start:</label>
+        <label className="text-xs text-[var(--color-text-muted)]">Start:</label>
         <input
           type="number"
           min={0}
@@ -84,13 +84,13 @@ export function MemoryToolbar({
               startAddress: Math.max(0, parseInt(e.target.value) || 0),
             })
           }
-          className="w-20 rounded border border-neutral-600 bg-neutral-700 px-2 py-1 text-sm text-white"
+          className="w-20 rounded border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] px-2 py-1 text-sm text-[var(--color-text-primary)]"
         />
       </div>
 
       {/* Count Input */}
       <div className="flex items-center gap-1">
-        <label className="text-xs text-neutral-400">Count:</label>
+        <label className="text-xs text-[var(--color-text-muted)]">Count:</label>
         <input
           type="number"
           min={1}
@@ -101,17 +101,17 @@ export function MemoryToolbar({
               count: Math.min(1000, Math.max(1, parseInt(e.target.value) || 1)),
             })
           }
-          className="w-20 rounded border border-neutral-600 bg-neutral-700 px-2 py-1 text-sm text-white"
+          className="w-20 rounded border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] px-2 py-1 text-sm text-[var(--color-text-primary)]"
         />
       </div>
 
       {/* Columns Selector */}
       <div className="flex items-center gap-1">
-        <label className="text-xs text-neutral-400">Cols:</label>
+        <label className="text-xs text-[var(--color-text-muted)]">Cols:</label>
         <select
           value={config.columns}
           onChange={(e) => onConfigChange({ columns: parseInt(e.target.value) })}
-          className="rounded border border-neutral-600 bg-neutral-700 px-2 py-1 text-sm text-white"
+          className="rounded border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] px-2 py-1 text-sm text-[var(--color-text-primary)]"
         >
           {COLUMN_OPTIONS.map((col) => (
             <option key={col} value={col}>
@@ -123,7 +123,7 @@ export function MemoryToolbar({
 
       {/* Display Format Toggle */}
       <div className="flex items-center gap-1">
-        <label className="text-xs text-neutral-400">Format:</label>
+        <label className="text-xs text-[var(--color-text-muted)]">Format:</label>
         <div className="flex">
           {FORMAT_OPTIONS.map((fmt) => (
             <button
@@ -132,8 +132,8 @@ export function MemoryToolbar({
               onClick={() => onConfigChange({ displayFormat: fmt })}
               className={`px-2 py-1 text-xs transition-colors first:rounded-l last:rounded-r ${
                 config.displayFormat === fmt
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-neutral-700 text-neutral-300 hover:bg-neutral-600'
+                  ? 'bg-[var(--color-accent)] text-[var(--color-text-primary)]'
+                  : 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]'
               }`}
             >
               {fmt}
@@ -150,7 +150,7 @@ export function MemoryToolbar({
         type="button"
         onClick={onRefresh}
         disabled={isLoading}
-        className="flex items-center gap-1 rounded bg-neutral-700 px-2 py-1 text-sm text-white transition-colors hover:bg-neutral-600 disabled:opacity-50"
+        className="flex items-center gap-1 rounded bg-[var(--color-bg-tertiary)] px-2 py-1 text-sm text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-bg-hover)] disabled:opacity-50"
       >
         <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
         Refresh

@@ -68,7 +68,7 @@ export function FloatingWindowHeader({
 
   return (
     <div
-      className={`h-8 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-2 select-none flex-shrink-0 ${
+      className={`h-8 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)] flex items-center justify-between px-2 select-none flex-shrink-0 ${
         isDragging ? 'opacity-50' : ''
       }`}
     >
@@ -77,15 +77,15 @@ export function FloatingWindowHeader({
         draggable
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        className="flex items-center justify-center w-6 h-full cursor-grab hover:bg-gray-700 rounded transition-colors"
+        className="flex items-center justify-center w-6 h-full cursor-grab hover:bg-[var(--color-bg-tertiary)] rounded transition-colors"
         title="Drag to dock in main window"
       >
-        <GripVertical size={14} className="text-gray-400" />
+        <GripVertical size={14} className="text-[var(--color-text-muted)]" />
       </div>
 
       {/* Title - Tauri drag region for window movement */}
       <span
-        className="text-sm text-gray-200 truncate flex-1 ml-1"
+        className="text-sm text-[var(--color-text-secondary)] truncate flex-1 ml-1"
         data-tauri-drag-region
       >
         {title}
@@ -96,7 +96,7 @@ export function FloatingWindowHeader({
         {/* Dock button */}
         <button
           onClick={onDock}
-          className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+          className="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
           title="Dock to main window"
         >
           <ArrowDownLeft size={14} />
@@ -105,7 +105,7 @@ export function FloatingWindowHeader({
         {/* Minimize button */}
         <button
           onClick={onMinimize}
-          className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+          className="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
           title="Minimize"
         >
           <Minus size={14} />
@@ -114,7 +114,7 @@ export function FloatingWindowHeader({
         {/* Maximize/Restore button */}
         <button
           onClick={onMaximize}
-          className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+          className="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
           title="Maximize"
         >
           <Square size={12} />
@@ -123,7 +123,7 @@ export function FloatingWindowHeader({
         {/* Close button */}
         <button
           onClick={onClose}
-          className="w-6 h-6 flex items-center justify-center rounded hover:bg-red-600 text-gray-400 hover:text-white transition-colors"
+          className="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--color-error)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
           title="Close"
         >
           <X size={14} />

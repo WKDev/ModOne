@@ -145,12 +145,12 @@ export function ContextMenu({ position, onClose, items }: ContextMenuProps) {
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 min-w-40 rounded-lg border border-neutral-600 bg-neutral-800 py-1 shadow-xl"
+      className="fixed z-50 min-w-40 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] py-1 shadow-xl"
       style={{ left: adjustedPosition.x, top: adjustedPosition.y }}
     >
       {items.map((item, index) =>
         item.divider ? (
-          <hr key={index} className="my-1 border-neutral-700" />
+          <hr key={index} className="my-1 border-[var(--color-border)]" />
         ) : (
           <button
             key={index}
@@ -164,8 +164,8 @@ export function ContextMenu({ position, onClose, items }: ContextMenuProps) {
             disabled={item.disabled}
             className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors ${
               focusedIndex === index
-                ? 'bg-neutral-700 text-white'
-                : 'text-neutral-200 hover:bg-neutral-700'
+                ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)]'
+                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]'
             } ${item.disabled ? 'cursor-not-allowed opacity-50' : ''}`}
           >
             {item.icon}
@@ -200,12 +200,12 @@ export function buildCellMenuItems(
     isFavorite
       ? {
           label: 'Remove from Favorites',
-          icon: <Star size={14} className="text-yellow-500" fill="currentColor" />,
+          icon: <Star size={14} className="text-[var(--color-warning)]" fill="currentColor" />,
           onClick: handlers.onRemoveFromFavorites,
         }
       : {
           label: 'Add to Favorites',
-          icon: <Star size={14} className="text-yellow-500" />,
+          icon: <Star size={14} className="text-[var(--color-warning)]" />,
           onClick: handlers.onAddToFavorites,
         },
     { label: '', divider: true, onClick: () => {} },
@@ -299,7 +299,7 @@ export function buildFavoriteMenuItems(
     { label: '', divider: true, onClick: () => {} },
     {
       label: 'Remove',
-      icon: <Trash2 size={14} className="text-red-400" />,
+      icon: <Trash2 size={14} className="text-[var(--color-error)]" />,
       onClick: handlers.onRemove,
     },
   ];

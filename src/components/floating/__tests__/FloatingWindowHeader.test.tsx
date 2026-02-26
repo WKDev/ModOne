@@ -154,13 +154,13 @@ describe('FloatingWindowHeader', () => {
     it('has dark background styling', () => {
       render(<FloatingWindowHeader {...defaultProps} />);
       const header = screen.getByText('Test Panel').closest('div');
-      expect(header?.className).toContain('bg-gray-800');
+      expect(header?.className).toContain('bg-[var(--color-bg-secondary)]');
     });
 
     it('title text has correct styling', () => {
       render(<FloatingWindowHeader {...defaultProps} />);
       const title = screen.getByText('Test Panel');
-      expect(title.className).toContain('text-gray-200');
+      expect(title.className).toContain('text-[var(--color-text-secondary)]');
     });
   });
 

@@ -57,14 +57,14 @@ export function ToolPanel() {
   // Collapsed state - show only the tab bar header
   if (!isVisible) {
     return (
-      <div className="flex-shrink-0 border-t border-gray-700 bg-gray-800">
+      <div className="flex-shrink-0 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
         <div className="flex items-center h-8 px-2">
           {/* Tab buttons as toggle triggers */}
           <div className="flex items-center gap-1">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                className="px-3 py-1 text-xs text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
+                className="px-3 py-1 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] rounded transition-colors"
                 onClick={() => {
                   setActiveTab(tab.id);
                   toggle();
@@ -79,7 +79,7 @@ export function ToolPanel() {
 
           {/* Expand button */}
           <button
-            className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-600 text-gray-400 hover:text-white"
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
             onClick={toggle}
             title="Show Panel"
           >
@@ -92,7 +92,7 @@ export function ToolPanel() {
 
   return (
     <div
-      className="flex-shrink-0 flex flex-col border-t border-gray-700 bg-gray-900"
+      className="flex-shrink-0 flex flex-col border-t border-[var(--color-border)] bg-[var(--color-bg-primary)]"
       style={{ height: `${height}px` }}
     >
       {/* Resize Handle */}
@@ -104,7 +104,7 @@ export function ToolPanel() {
       />
 
       {/* Tool Panel Header / Tab Bar */}
-      <div className="flex items-center h-8 bg-gray-800 border-b border-gray-700 flex-shrink-0">
+      <div className="flex items-center h-8 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)] flex-shrink-0">
         {/* Tabs */}
         <div className="flex-1 flex items-center overflow-x-auto scrollbar-hide">
           {tabs.map((tab) => (
@@ -122,7 +122,7 @@ export function ToolPanel() {
         <div className="flex items-center gap-1 px-2">
           {/* Collapse button */}
           <button
-            className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-600 text-gray-400 hover:text-white"
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
             onClick={toggle}
             title="Hide Panel"
           >
@@ -130,7 +130,7 @@ export function ToolPanel() {
           </button>
           {/* Close button */}
           <button
-            className="w-6 h-6 flex items-center justify-center rounded hover:bg-red-600 text-gray-400 hover:text-white"
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--color-error)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
             onClick={hide}
             title="Close Panel"
           >
@@ -168,8 +168,8 @@ function ToolTab({
       data-tab-id={id}
       className={`px-4 h-full text-xs font-medium transition-colors
         ${isActive
-          ? 'text-gray-100 border-b-2 border-blue-500 bg-gray-900'
-          : 'text-gray-400 hover:text-gray-200 border-b-2 border-transparent'
+          ? 'text-[var(--color-text-primary)] border-b-2 border-[var(--color-accent)] bg-[var(--color-bg-primary)]'
+          : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] border-b-2 border-transparent'
         }`}
       onClick={onClick}
     >

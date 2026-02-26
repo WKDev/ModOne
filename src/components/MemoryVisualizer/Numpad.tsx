@@ -40,16 +40,16 @@ export const Numpad = memo(function Numpad({
 
   const buttonClass = `
     w-10 h-10 rounded
-    bg-neutral-700 hover:bg-neutral-600 active:bg-neutral-500
-    text-white font-mono text-lg
+    bg-[var(--color-bg-tertiary)] hover:bg-[var(--color-bg-hover)] active:bg-[var(--color-border)]
+    text-[var(--color-text-primary)] font-mono text-lg
     flex items-center justify-center
     transition-colors
   `;
 
   const actionButtonClass = `
     w-10 h-10 rounded
-    bg-neutral-600 hover:bg-neutral-500 active:bg-neutral-400
-    text-white font-mono text-sm
+    bg-[var(--color-bg-hover)] hover:bg-[var(--color-border)] active:bg-[var(--color-text-muted)]
+    text-[var(--color-text-primary)] font-mono text-sm
     flex items-center justify-center
     transition-colors
   `;

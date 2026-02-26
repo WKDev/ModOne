@@ -310,17 +310,17 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
       <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
         <div
           data-testid="new-project-dialog"
-          className="bg-gray-800 border border-gray-600 rounded-lg shadow-xl w-full max-w-md"
+          className="bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-lg shadow-xl w-full max-w-md"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-600">
-            <h2 className="text-lg font-medium text-gray-100">새 프로젝트</h2>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)]">
+            <h2 className="text-lg font-medium text-[var(--color-text-primary)]">새 프로젝트</h2>
             <button
               data-testid="new-project-close"
               onClick={onClose}
               disabled={isSubmitting}
-              className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-gray-100 disabled:opacity-50"
+              className="p-1 hover:bg-[var(--color-bg-secondary)] rounded text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] disabled:opacity-50"
             >
               <X size={20} />
             </button>
@@ -332,9 +332,9 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
             <div>
               <label
                 htmlFor="projectName"
-                className="block text-sm font-medium text-gray-300 mb-1"
+                className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1"
               >
-                프로젝트 이름 <span className="text-red-500">*</span>
+                프로젝트 이름 <span className="text-[var(--color-error)]">*</span>
               </label>
               <input
                 id="projectName"
@@ -344,13 +344,13 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
                 onChange={(e) => handleProjectNameChange(e.target.value)}
                 placeholder="MyProject"
                 disabled={isSubmitting}
-                className={`w-full px-3 py-2 bg-gray-700 border rounded text-sm text-gray-100 placeholder:text-gray-500 focus:outline-none disabled:opacity-50 ${
-                  projectNameError ? 'border-red-500 focus:border-red-500' : 'border-gray-600 focus:border-blue-500'
+                className={`w-full px-3 py-2 bg-[var(--color-bg-secondary)] border rounded text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none disabled:opacity-50 ${
+                  projectNameError ? 'border-[var(--color-error)] focus:border-[var(--color-error)]' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'
                 }`}
                 autoFocus
               />
               {projectNameError && (
-                <p className="mt-1 text-xs text-red-500">{projectNameError}</p>
+                <p className="mt-1 text-xs text-[var(--color-error)]">{projectNameError}</p>
               )}
             </div>
 
@@ -358,9 +358,9 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
             <div>
               <label
                 htmlFor="savePath"
-                className="block text-sm font-medium text-gray-300 mb-1"
+                className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1"
               >
-                프로젝트 폴더 <span className="text-red-500">*</span>
+                프로젝트 폴더 <span className="text-[var(--color-error)]">*</span>
               </label>
               <div className="flex gap-2">
                 <input
@@ -370,8 +370,8 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
                   onChange={handleSavePathChange}
                   placeholder="프로젝트 폴더 경로"
                   disabled={isSubmitting}
-                  className={`flex-1 px-3 py-2 bg-gray-700 border rounded text-sm text-gray-100 placeholder:text-gray-500 focus:outline-none disabled:opacity-50 ${
-                    savePathError ? 'border-red-500 focus:border-red-500' : 'border-gray-600 focus:border-blue-500'
+                  className={`flex-1 px-3 py-2 bg-[var(--color-bg-secondary)] border rounded text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none disabled:opacity-50 ${
+                    savePathError ? 'border-[var(--color-error)] focus:border-[var(--color-error)]' : 'border-[var(--color-border)] focus:border-[var(--color-accent)]'
                   }`}
                 />
                 <button
@@ -379,15 +379,15 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
                   data-testid="project-folder-select"
                   onClick={handleSelectFolder}
                   disabled={isSubmitting}
-                  className="px-3 py-2 bg-gray-700 border border-gray-600 rounded text-gray-400 hover:bg-gray-600 hover:text-gray-100 disabled:opacity-50 transition-colors"
+                  className="px-3 py-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-text-primary)] disabled:opacity-50 transition-colors"
                 >
                   <FolderOpen size={18} />
                 </button>
               </div>
               {savePathError && (
-                <p className="mt-1 text-xs text-red-500">{savePathError}</p>
+                <p className="mt-1 text-xs text-[var(--color-error)]">{savePathError}</p>
               )}
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                 이 폴더에 프로젝트 파일과 canvas, ladder, scenario 폴더가 생성됩니다.
               </p>
             </div>
@@ -396,7 +396,7 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
             <div>
               <label
                 htmlFor="plcManufacturer"
-                className="block text-sm font-medium text-gray-300 mb-1"
+                className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1"
               >
                 PLC 제조사
               </label>
@@ -405,7 +405,7 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
                 value={plcManufacturer}
                 onChange={(e) => setPlcManufacturer(e.target.value as PlcManufacturer)}
                 disabled={isSubmitting}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-gray-100 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                className="w-full px-3 py-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)] disabled:opacity-50"
               >
                 {PLC_MANUFACTURERS.map((manufacturer) => (
                   <option key={manufacturer.value} value={manufacturer.value}>
@@ -419,7 +419,7 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
             <div>
               <label
                 htmlFor="plcModel"
-                className="block text-sm font-medium text-gray-300 mb-1"
+                className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1"
               >
                 PLC 모델
               </label>
@@ -430,7 +430,7 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
                 onChange={(e) => setPlcModel(e.target.value)}
                 placeholder="XGK-CPUH (선택)"
                 disabled={isSubmitting}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-gray-100 placeholder:text-gray-500 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                className="w-full px-3 py-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] disabled:opacity-50"
               />
             </div>
 
@@ -438,7 +438,7 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
             <div>
               <label
                 htmlFor="scanTimeMs"
-                className="block text-sm font-medium text-gray-300 mb-1"
+                className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1"
               >
                 스캔 타임 (ms)
               </label>
@@ -449,13 +449,13 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
                 onChange={(e) => setScanTimeMs(Math.max(1, parseInt(e.target.value) || 1))}
                 min={1}
                 disabled={isSubmitting}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-gray-100 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                className="w-full px-3 py-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)] disabled:opacity-50"
               />
             </div>
 
             {/* Error message */}
             {error && (
-              <div className="px-3 py-2 bg-red-500/10 border border-red-500/20 rounded text-sm text-red-500">
+              <div className="px-3 py-2 bg-[var(--color-error)]/10 border border-[var(--color-error)]/20 rounded text-sm text-[var(--color-error)]">
                 {error}
               </div>
             )}
@@ -467,7 +467,7 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
                 data-testid="cancel-project-btn"
                 onClick={onClose}
                 disabled={isSubmitting}
-                className="px-4 py-2 text-sm text-gray-400 hover:bg-gray-700 rounded disabled:opacity-50 transition-colors"
+                className="px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] rounded disabled:opacity-50 transition-colors"
               >
                 취소
               </button>
@@ -475,7 +475,7 @@ export function NewProjectDialog({ isOpen, onClose, onCreated }: NewProjectDialo
                 type="submit"
                 data-testid="create-project-btn"
                 disabled={!isFormValid || isSubmitting}
-                className="px-4 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                className="px-4 py-2 text-sm bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
               >
                 {isSubmitting && <Loader2 size={16} className="animate-spin" />}
                 {isSubmitting ? '생성 중...' : '생성'}

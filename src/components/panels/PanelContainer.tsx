@@ -61,8 +61,8 @@ export function PanelContainer() {
   if (dockedPanels.length === 0) {
     return (
       <div
-        className={`h-full w-full flex items-center justify-center text-gray-500 ${
-          isFloatingDragOver ? 'ring-2 ring-purple-500 ring-inset bg-purple-500/10' : ''
+        className={`h-full w-full flex items-center justify-center text-[var(--color-text-muted)] ${
+          isFloatingDragOver ? 'ring-2 ring-[var(--color-accent)] ring-inset bg-[var(--color-accent)]/10' : ''
         }`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -72,7 +72,7 @@ export function PanelContainer() {
           <p className="text-lg mb-2">No panels open</p>
           <p className="text-sm">Use View menu to open panels</p>
           {isFloatingDragOver && (
-            <p className="text-sm text-purple-400 mt-2">Drop here to dock panel</p>
+            <p className="text-sm text-[var(--color-accent)] mt-2">Drop here to dock panel</p>
           )}
         </div>
       </div>
@@ -82,7 +82,7 @@ export function PanelContainer() {
   return (
     <div
       style={gridStyle}
-      className={`p-1 ${isFloatingDragOver ? 'ring-2 ring-purple-500 ring-inset' : ''}`}
+      className={`p-1 ${isFloatingDragOver ? 'ring-2 ring-[var(--color-accent)] ring-inset' : ''}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}

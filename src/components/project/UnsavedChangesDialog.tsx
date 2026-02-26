@@ -60,23 +60,23 @@ export function UnsavedChangesDialog({
       {/* Dialog */}
       <div className="fixed inset-0 flex items-center justify-center z-[60] p-4">
         <div
-          className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg shadow-xl w-full max-w-sm"
+          className="bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-lg shadow-xl w-full max-w-sm"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Content */}
           <div className="p-6">
             {/* Warning Icon */}
             <div className="flex items-center gap-3 mb-4">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-yellow-500/10 flex items-center justify-center">
-                <AlertTriangle size={20} className="text-yellow-500" />
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[var(--color-warning)]/10 flex items-center justify-center">
+                <AlertTriangle size={20} className="text-[var(--color-warning)]" />
               </div>
-              <h3 className="text-lg font-medium text-[var(--text-primary)]">
+              <h3 className="text-lg font-medium text-[var(--color-text-primary)]">
                 저장되지 않은 변경 사항
               </h3>
             </div>
 
             {/* Message */}
-            <p className="text-sm text-[var(--text-secondary)] mb-6 ml-[52px]">
+            <p className="text-sm text-[var(--color-text-secondary)] mb-6 ml-[52px]">
               현재 프로젝트에 저장되지 않은 변경 사항이 있습니다.
               저장하지 않으면 변경 내용이 손실됩니다.
             </p>
@@ -86,21 +86,21 @@ export function UnsavedChangesDialog({
               <button
                 onClick={onCancel}
                 disabled={isSaving}
-                className="px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] rounded disabled:opacity-50 transition-colors"
+                className="px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] rounded disabled:opacity-50 transition-colors"
               >
                 취소
               </button>
               <button
                 onClick={onDontSave}
                 disabled={isSaving}
-                className="px-4 py-2 text-sm bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded disabled:opacity-50 transition-colors"
+                className="px-4 py-2 text-sm bg-[var(--color-error)]/10 text-[var(--color-error)] hover:bg-[var(--color-error)]/20 rounded disabled:opacity-50 transition-colors"
               >
                 저장 안 함
               </button>
               <button
                 onClick={handleSave}
                 disabled={isSaving}
-                className="px-4 py-2 text-sm bg-[var(--accent-color)] text-white hover:bg-[var(--accent-color-hover)] rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                className="px-4 py-2 text-sm bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
               >
                 {isSaving && <Loader2 size={16} className="animate-spin" />}
                 {isSaving ? '저장 중...' : '저장'}

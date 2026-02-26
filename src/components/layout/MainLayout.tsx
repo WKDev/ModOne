@@ -8,7 +8,7 @@ import { ToolPanel } from './ToolPanel';
 export function MainLayout() {
   const IS_MAC = navigator.userAgent.includes("Mac");
   return (
-    <div data-testid="main-layout" className="h-screen w-screen overflow-hidden flex flex-col bg-gray-900 text-gray-100">
+    <div data-testid="main-layout" className="h-screen w-screen overflow-hidden flex flex-col bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
       {/* Header: Menu Bar + Toolbar */}
       <header className="flex-shrink-0">
         {!IS_MAC && <MenuBar />}
@@ -21,7 +21,7 @@ export function MainLayout() {
         <Sidebar />
 
         {/* Main Content: Editor + Tool Panel (VSCode-style) */}
-        <main data-testid="panel-container" className="flex-1 flex flex-col overflow-hidden bg-gray-900">
+        <main data-testid="panel-container" className="flex-1 flex flex-col overflow-hidden bg-[var(--color-bg-primary)]">
           {/* Editor Area - takes remaining space */}
           <div className="flex-1 overflow-hidden">
             <EditorArea />

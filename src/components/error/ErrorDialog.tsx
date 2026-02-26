@@ -58,16 +58,16 @@ export function ErrorDialog({
         }
       }}
     >
-      <div className="mx-4 w-full max-w-md rounded-lg border border-neutral-700 bg-neutral-800 shadow-xl">
+      <div className="mx-4 w-full max-w-md rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-neutral-700 px-4 py-3">
+        <div className="flex items-center justify-between border-b border-[var(--border-color)] px-4 py-3">
           <div className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-red-500" />
-            <h2 className="font-semibold text-white">{title}</h2>
+            <AlertCircle className="h-5 w-5 text-[var(--color-error)]" />
+            <h2 className="font-semibold text-[var(--text-primary)]">{title}</h2>
           </div>
           <button
             onClick={onClose}
-            className="rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-white"
+            className="rounded p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)]"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
@@ -76,23 +76,23 @@ export function ErrorDialog({
 
         {/* Content */}
         <div className="px-4 py-4">
-          <p className="text-sm text-neutral-300">{message}</p>
+          <p className="text-sm text-[var(--text-secondary)]">{message}</p>
 
           {/* Additional info for specific error types */}
           {error.type === 'ConfigValidationError' && (
-            <div className="mt-3 rounded bg-neutral-900 p-2 text-xs text-neutral-400">
-              <span className="font-medium text-neutral-300">Field:</span>{' '}
+            <div className="mt-3 rounded bg-[var(--bg-secondary)] p-2 text-xs text-[var(--text-muted)]">
+              <span className="font-medium text-[var(--text-secondary)]">Field:</span>{' '}
               {(error.message as { field: string; message: string }).field}
             </div>
           )}
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end gap-2 border-t border-neutral-700 px-4 py-3">
+        <div className="flex justify-end gap-2 border-t border-[var(--border-color)] px-4 py-3">
           {canOpenBackup && (
             <button
               onClick={onOpenBackup}
-              className="flex items-center gap-2 rounded bg-amber-600 px-3 py-1.5 text-sm text-white transition-colors hover:bg-amber-500"
+              className="flex items-center gap-2 rounded bg-[var(--color-warning)] px-3 py-1.5 text-sm text-white transition-colors hover:opacity-90"
             >
               <FileArchive className="h-4 w-4" />
               Open Backup
@@ -102,7 +102,7 @@ export function ErrorDialog({
           {onIgnore && (
             <button
               onClick={onIgnore}
-              className="flex items-center gap-2 rounded bg-neutral-700 px-3 py-1.5 text-sm text-white transition-colors hover:bg-neutral-600"
+              className="flex items-center gap-2 rounded bg-[var(--bg-secondary)] px-3 py-1.5 text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)]"
             >
               <XCircle className="h-4 w-4" />
               Ignore
@@ -112,7 +112,7 @@ export function ErrorDialog({
           {canRetry && (
             <button
               onClick={onRetry}
-              className="flex items-center gap-2 rounded bg-blue-600 px-3 py-1.5 text-sm text-white transition-colors hover:bg-blue-500"
+              className="flex items-center gap-2 rounded bg-[var(--color-info)] px-3 py-1.5 text-sm text-white transition-colors hover:opacity-90"
             >
               <RefreshCw className="h-4 w-4" />
               Retry
@@ -122,7 +122,7 @@ export function ErrorDialog({
           {onViewLogs && (
             <button
               onClick={onViewLogs}
-              className="flex items-center gap-2 rounded bg-neutral-700 px-3 py-1.5 text-sm text-white transition-colors hover:bg-neutral-600"
+              className="flex items-center gap-2 rounded bg-[var(--bg-secondary)] px-3 py-1.5 text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)]"
             >
               <FolderOpen className="h-4 w-4" />
               View Logs
@@ -131,7 +131,7 @@ export function ErrorDialog({
 
           <button
             onClick={onClose}
-            className="rounded bg-neutral-600 px-3 py-1.5 text-sm text-white transition-colors hover:bg-neutral-500"
+            className="rounded bg-[var(--bg-secondary)] px-3 py-1.5 text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-tertiary)]"
           >
             Close
           </button>

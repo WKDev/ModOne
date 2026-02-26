@@ -347,7 +347,7 @@ export function MemoryVisualizerPanel() {
   // ============================================================================
 
   return (
-    <div className="flex h-full flex-col bg-neutral-900 text-white">
+    <div className="flex h-full flex-col bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
       {/* Toolbar */}
       <MemoryToolbar
         config={config}
@@ -358,7 +358,7 @@ export function MemoryVisualizerPanel() {
 
       {/* Error display */}
       {error && (
-        <div className="bg-red-900/50 px-3 py-2 text-sm text-red-300">
+        <div className="bg-[var(--color-error)]/20 px-3 py-2 text-sm text-[var(--color-error)]">
           {error}
         </div>
       )}

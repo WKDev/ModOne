@@ -15,14 +15,14 @@ function ActivityBarItem({ icon, panel, tooltip, isActive, onClick }: ActivityBa
       data-testid={`activity-${panel}`}
       className={`w-12 h-12 flex items-center justify-center relative ${
         isActive
-          ? 'text-white'
-          : 'text-gray-500 hover:text-gray-300'
+          ? 'text-[var(--color-text-primary)]'
+          : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
       }`}
       onClick={onClick}
       title={tooltip}
     >
       {isActive && (
-        <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500" />
+        <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-[var(--color-accent)]" />
       )}
       {icon}
     </button>
@@ -50,7 +50,7 @@ export function ActivityBar() {
   ];
 
   return (
-    <div data-testid="activity-bar" className="w-12 bg-gray-900 border-r border-gray-700 flex flex-col">
+    <div data-testid="activity-bar" className="w-12 bg-[var(--color-bg-primary)] border-r border-[var(--color-border)] flex flex-col">
       {items.map((item) => (
         <ActivityBarItem
           key={item.panel}

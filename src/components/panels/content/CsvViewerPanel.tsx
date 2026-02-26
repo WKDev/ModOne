@@ -61,20 +61,20 @@ const TableHeaderCell = memo(function TableHeaderCell({
 
   return (
     <th
-      className="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider
-                 bg-gray-800 sticky top-0 cursor-pointer hover:bg-gray-700 select-none"
+      className="px-3 py-2 text-left text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider
+                 bg-[var(--color-bg-secondary)] sticky top-0 cursor-pointer hover:bg-[var(--color-bg-tertiary)] select-none"
       onClick={() => onSort(columnIndex)}
     >
       <div className="flex items-center gap-1">
         <span className="truncate">{header || `Column ${columnIndex + 1}`}</span>
         {isSorted ? (
           sortDirection === 'asc' ? (
-            <ArrowUp size={14} className="flex-shrink-0 text-blue-400" />
+            <ArrowUp size={14} className="flex-shrink-0 text-[var(--color-accent)]" />
           ) : (
-            <ArrowDown size={14} className="flex-shrink-0 text-blue-400" />
+            <ArrowDown size={14} className="flex-shrink-0 text-[var(--color-accent)]" />
           )
         ) : (
-          <ArrowUpDown size={14} className="flex-shrink-0 text-gray-600" />
+          <ArrowUpDown size={14} className="flex-shrink-0 text-[var(--color-text-muted)]" />
         )}
       </div>
     </th>
@@ -203,8 +203,8 @@ export const CsvViewerPanel = memo(function CsvViewerPanel({
   // Loading state
   if (isLoading) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-gray-500 p-4">
-        <RefreshCw size={48} className="mb-4 animate-spin text-gray-600" />
+      <div className="h-full flex flex-col items-center justify-center text-[var(--color-text-muted)] p-4">
+        <RefreshCw size={48} className="mb-4 animate-spin text-[var(--color-text-muted)]" />
         <p className="text-sm">Loading CSV file...</p>
       </div>
     );
@@ -213,9 +213,9 @@ export const CsvViewerPanel = memo(function CsvViewerPanel({
   // Error state
   if (error) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-gray-500 p-4">
-        <FileWarning size={48} className="mb-4 text-red-500" />
-        <h3 className="text-lg font-medium mb-2 text-red-400">Error</h3>
+      <div className="h-full flex flex-col items-center justify-center text-[var(--color-text-muted)] p-4">
+        <FileWarning size={48} className="mb-4 text-[var(--color-error)]" />
+        <h3 className="text-lg font-medium mb-2 text-[var(--color-error)]">Error</h3>
         <p className="text-sm text-center">{error}</p>
       </div>
     );
@@ -224,8 +224,8 @@ export const CsvViewerPanel = memo(function CsvViewerPanel({
   // No file state
   if (!filePath) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-gray-500 p-4">
-        <Table size={48} className="mb-4 text-gray-600" />
+      <div className="h-full flex flex-col items-center justify-center text-[var(--color-text-muted)] p-4">
+        <Table size={48} className="mb-4 text-[var(--color-text-muted)]" />
         <h3 className="text-lg font-medium mb-2">CSV Viewer</h3>
         <p className="text-sm text-center">No file loaded</p>
       </div>
@@ -235,8 +235,8 @@ export const CsvViewerPanel = memo(function CsvViewerPanel({
   // No data state
   if (!csvData) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-gray-500 p-4">
-        <Table size={48} className="mb-4 text-gray-600" />
+      <div className="h-full flex flex-col items-center justify-center text-[var(--color-text-muted)] p-4">
+        <Table size={48} className="mb-4 text-[var(--color-text-muted)]" />
         <h3 className="text-lg font-medium mb-2">CSV Viewer</h3>
         <p className="text-sm text-center">No data available</p>
       </div>
@@ -244,27 +244,27 @@ export const CsvViewerPanel = memo(function CsvViewerPanel({
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-900">
+    <div className="h-full flex flex-col bg-[var(--color-bg-primary)]">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-700">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--color-border)]">
         <div className="flex-1 flex items-center gap-2">
-          <Search size={16} className="text-gray-500" />
+          <Search size={16} className="text-[var(--color-text-muted)]" />
           <input
             type="text"
             placeholder="Search..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 max-w-xs bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm
-                     text-gray-300 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            className="flex-1 max-w-xs bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-2 py-1 text-sm
+                     text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)]"
           />
         </div>
-        <div className="text-xs text-gray-500">
+        <div className="text-xs text-[var(--color-text-muted)]">
           {processedRows.length} / {csvData.rows.length} rows
         </div>
       </div>
 
       {/* File path */}
-      <div className="px-3 py-1 text-xs text-gray-500 border-b border-gray-700 truncate">
+      <div className="px-3 py-1 text-xs text-[var(--color-text-muted)] border-b border-[var(--color-border)] truncate">
         {relativePath || filePath}
       </div>
 
@@ -273,8 +273,8 @@ export const CsvViewerPanel = memo(function CsvViewerPanel({
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider
-                           bg-gray-800 sticky top-0 w-12">
+              <th className="px-3 py-2 text-left text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider
+                           bg-[var(--color-bg-secondary)] sticky top-0 w-12">
                 #
               </th>
               {csvData.headers.map((header, index) => (
@@ -289,19 +289,19 @@ export const CsvViewerPanel = memo(function CsvViewerPanel({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-800">
+          <tbody className="divide-y divide-[var(--color-border)]">
             {processedRows.map((row, rowIndex) => (
               <tr
                 key={rowIndex}
-                className="hover:bg-gray-800/50 transition-colors"
+                className="hover:bg-[var(--color-bg-secondary)]/50 transition-colors"
               >
-                <td className="px-3 py-1.5 text-xs text-gray-500 font-mono">
+                <td className="px-3 py-1.5 text-xs text-[var(--color-text-muted)] font-mono">
                   {rowIndex + 1}
                 </td>
                 {row.map((cell, cellIndex) => (
                   <td
                     key={cellIndex}
-                    className="px-3 py-1.5 text-sm text-gray-300 whitespace-nowrap"
+                    className="px-3 py-1.5 text-sm text-[var(--color-text-primary)] whitespace-nowrap"
                   >
                     {cell}
                   </td>
@@ -312,7 +312,7 @@ export const CsvViewerPanel = memo(function CsvViewerPanel({
         </table>
 
         {processedRows.length === 0 && (
-          <div className="p-8 text-center text-gray-500 text-sm">
+          <div className="p-8 text-center text-[var(--color-text-muted)] text-sm">
             {searchTerm ? 'No matching rows found' : 'No data in CSV'}
           </div>
         )}

@@ -8,9 +8,9 @@ interface StatusIndicatorProps {
 
 function StatusIndicator({ status }: StatusIndicatorProps) {
   const colorMap: Record<SimulationStatus, string> = {
-    running: 'bg-green-500',
-    paused: 'bg-yellow-500',
-    stopped: 'bg-gray-500',
+    running: 'bg-[var(--color-success)]',
+    paused: 'bg-[var(--color-warning)]',
+    stopped: 'bg-[var(--color-text-muted)]',
   };
 
   const labelMap: Record<SimulationStatus, string> = {
@@ -43,19 +43,19 @@ export function StatusBar() {
   };
 
   return (
-    <div data-testid="status-bar" className="h-6 bg-gray-800 border-t border-gray-700 flex items-center justify-between px-4 text-xs font-mono">
+    <div data-testid="status-bar" className="h-6 bg-[var(--color-bg-secondary)] border-t border-[var(--color-border)] flex items-center justify-between px-4 text-xs font-mono">
       {/* Left Section: Simulation Status */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-1.5">
-          <Activity size={12} className="text-gray-400" />
+          <Activity size={12} className="text-[var(--color-text-muted)]" />
           <StatusIndicator status={simulationStatus} />
         </div>
       </div>
 
       {/* Center Section: Scan Time */}
-      <div className="flex items-center gap-1.5 text-gray-400">
+      <div className="flex items-center gap-1.5 text-[var(--color-text-muted)]">
         <span>Scan:</span>
-        <span className="text-gray-200">{scanTime}ms</span>
+        <span className="text-[var(--color-text-secondary)]">{scanTime}ms</span>
       </div>
 
       {/* Right Section: Modbus + Memory */}
@@ -66,31 +66,31 @@ export function StatusBar() {
           title={modbusConnected ? 'Modbus Connected' : 'Modbus Disconnected'}
         >
           {modbusConnected ? (
-            <Wifi size={12} className="text-green-500" />
+            <Wifi size={12} className="text-[var(--color-success)]" />
           ) : (
-            <WifiOff size={12} className="text-gray-500" />
+            <WifiOff size={12} className="text-[var(--color-text-muted)]" />
           )}
-          <span className={modbusConnected ? 'text-gray-200' : 'text-gray-500'}>
+          <span className={modbusConnected ? 'text-[var(--color-text-secondary)]' : 'text-[var(--color-text-muted)]'}>
             TCP:{modbusPort}
           </span>
         </div>
 
         {/* Memory Usage */}
         <div className="flex items-center gap-1.5" title="Memory Usage">
-          <Cpu size={12} className="text-gray-400" />
-          <span className="text-gray-400">{memoryUsageMb}MB</span>
+          <Cpu size={12} className="text-[var(--color-text-muted)]" />
+          <span className="text-[var(--color-text-muted)]">{memoryUsageMb}MB</span>
         </div>
 
         {/* Theme Toggle */}
         <button
           onClick={toggleTheme}
-          className="flex items-center justify-center w-5 h-5 rounded hover:bg-gray-700 transition-colors"
+          className="flex items-center justify-center w-5 h-5 rounded hover:bg-[var(--color-bg-tertiary)] transition-colors"
           title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
           {isDark ? (
-            <Sun size={12} className="text-yellow-400" />
+            <Sun size={12} className="text-[var(--color-warning)]" />
           ) : (
-            <Moon size={12} className="text-gray-400" />
+            <Moon size={12} className="text-[var(--color-text-muted)]" />
           )}
         </button>
       </div>

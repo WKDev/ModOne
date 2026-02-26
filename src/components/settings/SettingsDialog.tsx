@@ -180,7 +180,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
 
           {/* Error display */}
           {error && (
-            <div className="px-4 py-2 bg-red-500/10 text-red-500 text-sm border-t border-red-500/20">
+            <div className="px-4 py-2 bg-[var(--color-error)]/10 text-[var(--color-error)] text-sm border-t border-[var(--color-error)]/20">
               오류: {error}
             </div>
           )}
@@ -232,7 +232,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                 </button>
                 <button
                   onClick={handleDiscardAndClose}
-                  className="px-4 py-1.5 text-sm bg-red-500 text-white hover:bg-red-600 rounded"
+                  className="px-4 py-1.5 text-sm bg-[var(--color-error)] text-white hover:bg-[var(--color-error)] rounded"
                 >
                   변경 사항 버리기
                 </button>

@@ -117,16 +117,16 @@ export function FloatingWindowContent({
   if (!panel) {
     if (isLoading) {
       return (
-        <div className="h-screen w-screen flex items-center justify-center bg-gray-900 text-gray-400">
+        <div className="h-screen w-screen flex items-center justify-center bg-[var(--color-bg-primary)] text-[var(--color-text-muted)]">
           <div className="flex flex-col items-center gap-2">
-            <div className="w-6 h-6 border-2 border-gray-600 border-t-gray-300 rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-[var(--color-border)] border-t-[var(--color-text-secondary)] rounded-full animate-spin" />
             <span className="text-sm">Loading panel...</span>
           </div>
         </div>
       );
     }
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-gray-900 text-gray-400">
+      <div className="h-screen w-screen flex items-center justify-center bg-[var(--color-bg-primary)] text-[var(--color-text-muted)]">
         Panel not found
       </div>
     );
@@ -135,7 +135,7 @@ export function FloatingWindowContent({
   const ContentComponent = panelContentMap[panel.type];
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-gray-900 overflow-hidden">
+    <div className="h-screen w-screen flex flex-col bg-[var(--color-bg-primary)] overflow-hidden">
       <FloatingWindowHeader
         title={panel.title}
         windowId={windowId}

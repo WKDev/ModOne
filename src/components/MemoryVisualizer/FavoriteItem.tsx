@@ -65,17 +65,17 @@ export const FavoriteItem = memo(function FavoriteItem({
     currentValue !== undefined
       ? typeof currentValue === 'boolean'
         ? currentValue
-          ? 'text-green-400'
-          : 'text-neutral-400'
-        : 'text-green-400'
-      : 'text-neutral-500';
+          ? 'text-[var(--color-success)]'
+          : 'text-[var(--color-text-muted)]'
+        : 'text-[var(--color-success)]'
+      : 'text-[var(--color-text-muted)]';
 
   return (
     <div
       className={`flex items-center gap-2 rounded border p-2 transition-colors ${
         isDragging
-          ? 'border-blue-500 bg-neutral-700 opacity-50'
-          : 'border-neutral-700 bg-neutral-800 hover:border-neutral-600'
+          ? 'border-[var(--color-border-focus)] bg-[var(--color-bg-tertiary)] opacity-50'
+          : 'border-[var(--color-border)] bg-[var(--color-bg-secondary)] hover:border-[var(--color-text-muted)]'
       }`}
       onContextMenu={onContextMenu}
       onClick={onClick}
@@ -84,7 +84,7 @@ export const FavoriteItem = memo(function FavoriteItem({
       {/* Drag handle */}
       <div
         {...dragHandleProps}
-        className="cursor-grab text-neutral-500 hover:text-neutral-400"
+        className="cursor-grab text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
       >
         <GripVertical size={14} />
       </div>
@@ -99,8 +99,8 @@ export const FavoriteItem = memo(function FavoriteItem({
 
       {/* Label and address info */}
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm text-white">{item.label}</div>
-        <div className="text-xs text-neutral-400">
+        <div className="truncate text-sm text-[var(--color-text-primary)]">{item.label}</div>
+        <div className="text-xs text-[var(--color-text-muted)]">
           {getMemoryTypeShortName(item.memoryType)}:{item.address} •{' '}
           {item.displayFormat}
         </div>
@@ -118,7 +118,7 @@ export const FavoriteItem = memo(function FavoriteItem({
           e.stopPropagation();
           onEdit();
         }}
-        className="rounded p-1 text-neutral-400 hover:bg-neutral-700 hover:text-white"
+        className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]"
         title="Edit favorite"
       >
         <Pencil size={14} />
@@ -129,7 +129,7 @@ export const FavoriteItem = memo(function FavoriteItem({
           e.stopPropagation();
           onRemove();
         }}
-        className="rounded p-1 text-neutral-400 hover:bg-neutral-700 hover:text-red-400"
+        className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-error)]"
         title="Remove favorite"
       >
         <Trash2 size={14} />

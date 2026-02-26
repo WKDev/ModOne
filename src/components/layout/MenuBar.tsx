@@ -16,10 +16,16 @@ import { commandRegistry } from '../CommandPalette/commandRegistry';
 const IS_MAC = navigator.userAgent.includes('Mac');
 
 // ============================================================================
-// Cached Tauri window reference
+// Cached Tauri window reference (lazy, browser-safe)
 // ============================================================================
 
-const appWindow = getCurrentWindow();
+function getAppWindow() {
+  try {
+    return getCurrentWindow();
+  } catch {
+    return null;
+  }
+}
 
 // ============================================================================
 // Window Controls Component (extracted to avoid re-creation on every render)
@@ -311,7 +317,7 @@ export function MenuBar() {
 
   const handleMinimize = useCallback(async () => {
     try {
-      await appWindow.minimize();
+      await getAppWindow()?.minimize();
     } catch (error) {
       console.error('Failed to minimize window:', error);
     }
@@ -320,12 +326,12 @@ export function MenuBar() {
   const handleMaximize = useCallback(async () => {
     try {
       const actionId = ++actionIdRef.current;
-      const m = await appWindow.isMaximized();
+      const m = await getAppWindow()?.isMaximized();
       if (actionId !== actionIdRef.current) return; // stale — another action fired
       if (m) {
-        await appWindow.unmaximize();
+        await getAppWindow()?.unmaximize();
       } else {
-        await appWindow.maximize();
+        await getAppWindow()?.maximize();
       }
       // State will be updated by the resize listener below
     } catch (error) {
@@ -337,7 +343,7 @@ export function MenuBar() {
     // close() triggers onCloseRequested — the useWindowClose hook in App.tsx
     // intercepts this to handle unsaved changes properly.
     try {
-      await appWindow.close();
+      await getAppWindow()?.close();
     } catch (error) {
       console.error('Failed to close window:', error);
     }
@@ -356,16 +362,16 @@ export function MenuBar() {
     const setup = async () => {
       try {
         // Check initial state
-        const maximized = await appWindow.isMaximized();
-        setIsMaximized(maximized);
+        const maximized = await getAppWindow()?.isMaximized();
+        setIsMaximized(maximized ?? false);
 
         // Listen for resize events to track maximize/restore
-        unlisten = await appWindow.onResized(() => {
+        unlisten = await getAppWindow()?.onResized(() => {
           if (resizeDebounceRef.current) clearTimeout(resizeDebounceRef.current);
           resizeDebounceRef.current = setTimeout(async () => {
             try {
-              const nowMaximized = await appWindow.isMaximized();
-              setIsMaximized(nowMaximized);
+              const nowMaximized = await getAppWindow()?.isMaximized();
+              setIsMaximized(nowMaximized ?? false);
             } catch {
               // Ignore errors during teardown
             }

@@ -55,23 +55,23 @@ export function ConsolePanel() {
   const getLevelColor = (level: LogEntry['level']) => {
     switch (level) {
       case 'info':
-        return 'text-blue-400';
+        return 'text-[var(--color-info)]';
       case 'warn':
-        return 'text-yellow-400';
+        return 'text-[var(--color-warning)]';
       case 'error':
-        return 'text-red-400';
+        return 'text-[var(--color-error)]';
       default:
-        return 'text-gray-400';
+        return 'text-[var(--color-text-muted)]';
     }
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-900">
+    <div className="h-full flex flex-col bg-[var(--color-bg-primary)]">
       {/* Console Toolbar */}
-      <div className="h-8 flex items-center justify-between px-2 border-b border-gray-700 flex-shrink-0">
-        <span className="text-xs text-gray-500">Output</span>
+      <div className="h-8 flex items-center justify-between px-2 border-b border-[var(--color-border)] flex-shrink-0">
+        <span className="text-xs text-[var(--color-text-muted)]">Output</span>
         <button
-          className="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-white"
+          className="p-1 rounded hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
           onClick={clearLogs}
           title="Clear Console"
         >
@@ -85,19 +85,19 @@ export function ConsolePanel() {
         className="flex-1 overflow-auto font-mono text-xs p-2 space-y-0.5"
       >
         {logs.length === 0 ? (
-          <div className="text-gray-600 text-center py-4">
+          <div className="text-[var(--color-text-muted)] text-center py-4">
             No output
           </div>
         ) : (
           logs.map((log) => (
             <div key={log.id} className="flex gap-2">
-              <span className="text-gray-600 flex-shrink-0">
+              <span className="text-[var(--color-text-muted)] flex-shrink-0">
                 [{formatTimestamp(log.timestamp)}]
               </span>
               <span className={`flex-shrink-0 ${getLevelColor(log.level)}`}>
                 [{log.level.toUpperCase()}]
               </span>
-              <span className="text-gray-300">{log.message}</span>
+              <span className="text-[var(--color-text-secondary)]">{log.message}</span>
             </div>
           ))
         )}

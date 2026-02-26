@@ -24,6 +24,7 @@ import {
   RefreshCw,
   ChevronDownSquare,
   ChevronRightSquare,
+  FilePlus,
 } from 'lucide-react';
 import { useExplorerStore } from '../../stores/explorerStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -31,6 +32,7 @@ import { useFileOpen } from '../../hooks/useFileOpen';
 import { getFolderIcon } from '../../utils/fileTypeResolver';
 import { fileDialogService } from '../../services/fileDialogService';
 import { importService } from '../../services/importService';
+import { commandRegistry } from '../CommandPalette/commandRegistry';
 import type { ProjectFileNode, FileTypeInfo } from '../../types/fileTypes';
 import {
   ExplorerContextMenu,
@@ -344,11 +346,25 @@ export function ExplorerPanel() {
   if (!currentProject) {
     return (
       <div className="py-2">
-        <div className="px-4 py-8 text-center text-gray-500 text-sm">
-          <p>No project open</p>
-          <p className="mt-2 text-xs">
-            Use File &gt; Open Project to get started
-          </p>
+        <div className="px-4 py-8 text-center">
+          <p className="text-[var(--color-text-muted)] text-sm">No project open</p>
+          <p className="mt-6 text-xs text-[var(--color-text-secondary)] mb-6">Use File &gt; Open Project to get started</p>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={() => commandRegistry.execute('file.new')}
+              className="flex items-center gap-2 px-4 py-2 rounded bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white transition-colors"
+            >
+              <FilePlus size={16} />
+              Create Project
+            </button>
+            <button
+              onClick={() => commandRegistry.execute('file.open')}
+              className="flex items-center gap-2 px-4 py-2 rounded border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] transition-colors"
+            >
+              <FolderOpen size={16} />
+              Open Project
+            </button>
+          </div>
         </div>
       </div>
     );

@@ -23,6 +23,11 @@
   --color-border-focus: #3b82f6;
   --color-accent: #2563eb;
   --color-accent-hover: #1d4ed8;
+  --color-success: #16a34a;
+  --color-error: #dc2626;
+  --color-warning: #d97706;
+  --color-info: #2563eb;
+  --color-bg-hover: #f3f4f6;
 
   /* Aliases used by components */
   --bg-primary: var(--color-bg-primary);
@@ -35,6 +40,11 @@
   --border-focus: var(--color-border-focus);
   --accent-color: var(--color-accent);
   --accent-color-hover: var(--color-accent-hover);
+  --success-color: var(--color-success);
+  --error-color: var(--color-error);
+  --warning-color: var(--color-warning);
+  --info-color: var(--color-info);
+  --bg-hover: var(--color-bg-hover);
 }
 
 .dark {
@@ -49,6 +59,11 @@
   --color-border-focus: #60a5fa;
   --color-accent: #3b82f6;
   --color-accent-hover: #60a5fa;
+  --color-success: #22c55e;
+  --color-error: #ef4444;
+  --color-warning: #eab308;
+  --color-info: #60a5fa;
+  --color-bg-hover: #374151;
 
   /* Aliases used by components */
   --bg-primary: var(--color-bg-primary);
@@ -61,6 +76,11 @@
   --border-focus: var(--color-border-focus);
   --accent-color: var(--color-accent);
   --accent-color-hover: var(--color-accent-hover);
+  --success-color: var(--color-success);
+  --error-color: var(--color-error);
+  --warning-color: var(--color-warning);
+  --info-color: var(--color-info);
+  --bg-hover: var(--color-bg-hover);
 }
 
 /* Reset for Tailwind compatibility */

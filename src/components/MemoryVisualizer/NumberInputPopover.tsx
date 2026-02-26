@@ -187,19 +187,19 @@ export function NumberInputPopover({
   return (
     <div
       ref={popoverRef}
-      className="fixed z-50 rounded-lg border border-neutral-600 bg-neutral-800 p-3 shadow-xl"
+      className="fixed z-50 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-3 shadow-xl"
       style={adjustedPosition}
     >
       {/* Header */}
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-sm text-neutral-400">Address: {address}</span>
+        <span className="text-sm text-[var(--color-text-muted)]">Address: {address}</span>
         <div className="flex gap-1">
           <button
             type="button"
             className={`rounded px-2 py-1 text-xs transition-colors ${
               inputMode === 'DEC'
-                ? 'bg-blue-600 text-white'
-                : 'bg-neutral-700 text-neutral-300 hover:bg-neutral-600'
+                ? 'bg-[var(--color-accent)] text-[var(--color-text-primary)]'
+                : 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]'
             }`}
             onClick={() => setInputMode('DEC')}
           >
@@ -209,8 +209,8 @@ export function NumberInputPopover({
             type="button"
             className={`rounded px-2 py-1 text-xs transition-colors ${
               inputMode === 'HEX'
-                ? 'bg-blue-600 text-white'
-                : 'bg-neutral-700 text-neutral-300 hover:bg-neutral-600'
+                ? 'bg-[var(--color-accent)] text-[var(--color-text-primary)]'
+                : 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]'
             }`}
             onClick={() => setInputMode('HEX')}
           >
@@ -225,12 +225,12 @@ export function NumberInputPopover({
         type="text"
         value={inputValue}
         onChange={handleInputChange}
-        className="mb-2 w-full rounded border border-neutral-600 bg-neutral-900 px-2 py-1 font-mono text-lg text-white"
+        className="mb-2 w-full rounded border border-[var(--color-border)] bg-[var(--color-bg-primary)] px-2 py-1 font-mono text-lg text-[var(--color-text-primary)]"
         spellCheck={false}
       />
 
       {/* Error message */}
-      {error && <p className="mb-2 text-xs text-red-400">{error}</p>}
+      {error && <p className="mb-2 text-xs text-[var(--color-error)]">{error}</p>}
 
       {/* Numpad */}
       <Numpad
@@ -244,7 +244,7 @@ export function NumberInputPopover({
       <div className="mt-3 flex gap-2">
         <button
           type="button"
-          className="flex flex-1 items-center justify-center gap-1 rounded bg-neutral-700 py-2 text-sm text-white transition-colors hover:bg-neutral-600"
+          className="flex flex-1 items-center justify-center gap-1 rounded bg-[var(--color-bg-tertiary)] py-2 text-sm text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-bg-tertiary)]"
           onClick={onCancel}
         >
           <X size={16} />
@@ -252,7 +252,7 @@ export function NumberInputPopover({
         </button>
         <button
           type="button"
-          className="flex flex-1 items-center justify-center gap-1 rounded bg-blue-600 py-2 text-sm text-white transition-colors hover:bg-blue-500"
+          className="flex flex-1 items-center justify-center gap-1 rounded bg-[var(--color-accent)] py-2 text-sm text-[var(--color-text-primary)] transition-colors hover:bg-[var(--color-accent-hover)]"
           onClick={handleApply}
         >
           <Check size={16} />

@@ -113,11 +113,11 @@ export function TabBar({
   // Empty state
   if (tabs.length === 0) {
     return (
-      <div className="flex items-center h-8 bg-gray-900 border-b border-gray-700 px-2">
-        <span className="text-xs text-gray-500 italic">No tabs</span>
+      <div className="flex items-center h-8 bg-[var(--color-bg-primary)] border-b border-[var(--color-border)] px-2">
+        <span className="text-xs text-[var(--color-text-muted)] italic">No tabs</span>
         {onAddTab && (
           <button
-            className="ml-2 w-6 h-6 flex items-center justify-center rounded hover:bg-gray-700 text-gray-400 hover:text-white"
+            className="ml-2 w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
             onClick={onAddTab}
             title="Add tab"
           >
@@ -129,14 +129,14 @@ export function TabBar({
   }
 
   return (
-    <div className="flex items-center h-8 bg-gray-900 border-b border-gray-700">
+    <div className="flex items-center h-8 bg-[var(--color-bg-primary)] border-b border-[var(--color-border)]">
       {/* Left scroll button */}
       {showScrollButtons && (
         <button
           className={`flex-shrink-0 w-6 h-full flex items-center justify-center
             ${canScrollLeft
-              ? 'text-gray-400 hover:text-white hover:bg-gray-700'
-              : 'text-gray-600 cursor-not-allowed'
+              ? 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)]'
+              : 'text-[var(--color-text-muted)] cursor-not-allowed'
             }`}
           onClick={scrollLeft}
           disabled={!canScrollLeft}
@@ -156,7 +156,7 @@ export function TabBar({
           <div
             key={tab.id}
             className={`relative ${
-              dragOverIndex === index ? 'before:absolute before:left-0 before:top-0 before:bottom-0 before:w-0.5 before:bg-blue-500' : ''
+              dragOverIndex === index ? 'before:absolute before:left-0 before:top-0 before:bottom-0 before:w-0.5 before:bg-[var(--color-accent)]' : ''
             }`}
             onDragOver={(e) => handleDragOver(e, index)}
             onDrop={(e) => handleDrop(e, index)}
@@ -179,7 +179,7 @@ export function TabBar({
         <div
           className={`flex-shrink-0 w-4 h-full ${
             dragOverIndex === tabs.length
-              ? 'bg-blue-500/20 border-l-2 border-blue-500'
+              ? 'bg-[var(--color-accent)]/20 border-l-2 border-[var(--color-accent)]'
               : ''
           }`}
           onDragOver={(e) => handleDragOver(e, tabs.length)}
@@ -192,8 +192,8 @@ export function TabBar({
         <button
           className={`flex-shrink-0 w-6 h-full flex items-center justify-center
             ${canScrollRight
-              ? 'text-gray-400 hover:text-white hover:bg-gray-700'
-              : 'text-gray-600 cursor-not-allowed'
+              ? 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)]'
+              : 'text-[var(--color-text-muted)] cursor-not-allowed'
             }`}
           onClick={scrollRight}
           disabled={!canScrollRight}
@@ -205,8 +205,8 @@ export function TabBar({
       {/* Add tab button */}
       {onAddTab && (
         <button
-          className="flex-shrink-0 w-6 h-full flex items-center justify-center border-l border-gray-700
-            text-gray-400 hover:text-white hover:bg-gray-700"
+          className="flex-shrink-0 w-6 h-full flex items-center justify-center border-l border-[var(--color-border)]
+            text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)]"
           onClick={onAddTab}
           title="Add tab"
         >

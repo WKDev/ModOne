@@ -64,7 +64,7 @@ export const ScenarioContextMenu = memo(function ScenarioContextMenu({
   return (
     <div
       ref={menuRef}
-      className="fixed bg-neutral-800 border border-neutral-600 rounded-lg shadow-xl py-1 z-50 min-w-[180px]"
+      className="fixed bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg shadow-xl py-1 z-50 min-w-[180px]"
       style={{ left: x, top: y }}
     >
       {menuItems.map((item, index) => (
@@ -72,8 +72,8 @@ export const ScenarioContextMenu = memo(function ScenarioContextMenu({
           key={index}
           className={`
             w-full px-3 py-2 text-sm text-left flex items-center gap-2
-            hover:bg-neutral-700 transition-colors
-            ${item.danger ? 'text-red-400 hover:text-red-300' : 'text-neutral-200'}
+            hover:bg-[var(--color-bg-tertiary)] transition-colors
+            ${item.danger ? 'text-[var(--color-error)] hover:text-[var(--color-error)]' : 'text-[var(--color-text-secondary)]'}
           `}
           onClick={() => {
             item.onClick();

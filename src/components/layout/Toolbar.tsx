@@ -25,10 +25,10 @@ function ToolbarButton({ icon, tooltip, onClick, disabled, active }: ToolbarButt
     <button
       className={`w-8 h-8 flex items-center justify-center rounded ${
         disabled
-          ? 'opacity-50 cursor-not-allowed text-gray-500'
+          ? 'opacity-50 cursor-not-allowed text-[var(--color-text-muted)]'
           : active
-          ? 'bg-gray-600 text-white'
-          : 'hover:bg-gray-700 text-gray-300 hover:text-white'
+          ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)]'
+          : 'hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
       }`}
       onClick={onClick}
       disabled={disabled}
@@ -40,7 +40,7 @@ function ToolbarButton({ icon, tooltip, onClick, disabled, active }: ToolbarButt
 }
 
 function ToolbarSeparator() {
-  return <div className="h-6 w-px bg-gray-600 mx-1" />;
+  return <div className="h-6 w-px bg-[var(--color-bg-tertiary)] mx-1" />;
 }
 
 export function Toolbar() {
@@ -57,7 +57,7 @@ export function Toolbar() {
   const isPaused = simulationStatus === 'paused';
 
   return (
-    <div className="h-10 bg-gray-800 border-b border-gray-700 flex items-center px-2 gap-0.5">
+    <div className="h-10 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)] flex items-center px-2 gap-0.5">
       {/* Project Group */}
       <ToolbarButton
         icon={<FilePlus size={18} />}

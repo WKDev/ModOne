@@ -147,9 +147,9 @@ export function DraggablePanel({
       ref={setRefs}
       className={`relative flex flex-col rounded overflow-hidden ${
         isActive
-          ? 'ring-2 ring-blue-500'
-          : 'ring-1 ring-gray-700'
-      } bg-gray-800 ${isDragging ? 'opacity-50 shadow-2xl z-50' : ''}`}
+          ? 'ring-2 ring-[var(--color-accent)]'
+          : 'ring-1 ring-[var(--color-border)]'
+      } bg-[var(--color-bg-secondary)] ${isDragging ? 'opacity-50 shadow-2xl z-50' : ''}`}
       style={{ gridArea: panel.gridArea }}
       onDragOver={handleFloatingDragOver}
       onDragLeave={handleFloatingDragLeave}
@@ -190,7 +190,7 @@ function DragHandle({ attributes, listeners, isDragging }: DragHandleProps) {
       {...listeners}
       className={`absolute top-0 left-0 w-6 h-8 flex items-center justify-center z-10
         ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}
-        text-gray-500 hover:text-gray-300 hover:bg-gray-600/50 transition-colors`}
+        text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)]/50 transition-colors`}
       title="Drag to move panel"
     >
       <GripVertical size={14} />
@@ -210,27 +210,27 @@ function DropZoneOverlay({ isOver, dropPosition, isFloatingDrag = false }: DropZ
       <div className="absolute inset-0 z-40 pointer-events-none">
         {/* Semi-transparent overlay to indicate valid drop target */}
         <div className={`absolute inset-0 border-2 border-dashed rounded ${
-          isFloatingDrag ? 'border-purple-500/50' : 'border-gray-600/50'
+          isFloatingDrag ? 'border-[var(--color-accent)]/50' : 'border-[var(--color-border)]/50'
         }`} />
       </div>
     );
   }
 
   // Render highlighted drop zone based on position
-  // Use purple for floating drags, blue for regular dnd-kit drags
+  // Use accent color for all drop zones
   const getPositionStyles = (): string => {
-    const color = isFloatingDrag ? 'purple' : 'blue';
     switch (dropPosition) {
+
       case 'top':
-        return `top-0 left-0 right-0 h-1/4 bg-${color}-500/30 border-b-2 border-${color}-500`;
+        return `top-0 left-0 right-0 h-1/4 bg-[var(--color-accent)]/30 border-b-2 border-[var(--color-accent)]`;
       case 'bottom':
-        return `bottom-0 left-0 right-0 h-1/4 bg-${color}-500/30 border-t-2 border-${color}-500`;
+        return `bottom-0 left-0 right-0 h-1/4 bg-[var(--color-accent)]/30 border-t-2 border-[var(--color-accent)]`;
       case 'left':
-        return `top-1/4 bottom-1/4 left-0 w-1/4 bg-${color}-500/30 border-r-2 border-${color}-500`;
+        return `top-1/4 bottom-1/4 left-0 w-1/4 bg-[var(--color-accent)]/30 border-r-2 border-[var(--color-accent)]`;
       case 'right':
-        return `top-1/4 bottom-1/4 right-0 w-1/4 bg-${color}-500/30 border-l-2 border-${color}-500`;
+        return `top-1/4 bottom-1/4 right-0 w-1/4 bg-[var(--color-accent)]/30 border-l-2 border-[var(--color-accent)]`;
       case 'center':
-        return 'top-1/4 bottom-1/4 left-1/4 right-1/4 bg-green-500/30 border-2 border-dashed border-green-500';
+        return 'top-1/4 bottom-1/4 left-1/4 right-1/4 bg-[var(--color-success)]/30 border-2 border-dashed border-[var(--color-success)]';
       default:
         return '';
     }

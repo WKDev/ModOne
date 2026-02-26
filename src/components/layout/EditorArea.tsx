@@ -6,12 +6,13 @@
  */
 
 import { useRef, useState, useCallback } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FilePlus, FolderOpen } from 'lucide-react';
 import { useEditorAreaStore } from '../../stores/editorAreaStore';
 import { Tab } from '../panels/Tab';
 import { TabContent } from '../panels/TabContent';
 import { useTabClose } from '../../hooks/useTabClose';
 import { UnsavedChangesDialog } from '../project/UnsavedChangesDialog';
+import { commandRegistry } from '../CommandPalette/commandRegistry';
 
 export function EditorArea() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -122,11 +123,27 @@ export function EditorArea() {
   // Empty state
   if (tabs.length === 0) {
     return (
-      <div className="flex flex-col h-full w-full bg-gray-900">
-        <div className="flex-1 flex items-center justify-center text-gray-500">
+      <div className="flex flex-col h-full w-full bg-[var(--color-bg-primary)]">
+        <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <p className="text-lg mb-2">No files open</p>
-            <p className="text-sm">Open a file from the Explorer to get started</p>
+            <p className="text-lg mb-2 text-[var(--color-text-muted)]">No files open</p>
+            <p className="text-sm mb-6 text-[var(--color-text-secondary)]">Open a file from the Explorer to get started</p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => commandRegistry.execute('file.new')}
+                className="flex items-center gap-2 px-4 py-2 rounded bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white transition-colors"
+              >
+                <FilePlus size={16} />
+                New Canvas
+              </button>
+              <button
+                onClick={() => commandRegistry.execute('file.open')}
+                className="flex items-center gap-2 px-4 py-2 rounded border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] transition-colors"
+              >
+                <FolderOpen size={16} />
+                Open Project
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -134,16 +151,16 @@ export function EditorArea() {
   }
 
   return (
-    <div className="flex flex-col h-full w-full bg-gray-900">
+    <div className="flex flex-col h-full w-full bg-[var(--color-bg-primary)]">
       {/* Tab Bar */}
-      <div className="flex items-center h-9 bg-gray-900 border-b border-gray-700 flex-shrink-0">
+      <div className="flex items-center h-9 bg-[var(--color-bg-primary)] border-b border-[var(--color-border)] flex-shrink-0">
         {/* Left scroll button */}
         {showScrollButtons && (
           <button
             className={`flex-shrink-0 w-6 h-full flex items-center justify-center
               ${canScrollLeft
-                ? 'text-gray-400 hover:text-white hover:bg-gray-700'
-                : 'text-gray-600 cursor-not-allowed'
+                ? 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)]'
+                : 'text-[var(--color-text-muted)] cursor-not-allowed'
               }`}
             onClick={scrollLeft}
             disabled={!canScrollLeft}
@@ -164,7 +181,7 @@ export function EditorArea() {
               key={tab.id}
               className={`relative ${
                 dragOverIndex === index
-                  ? 'before:absolute before:left-0 before:top-0 before:bottom-0 before:w-0.5 before:bg-blue-500'
+                  ? 'before:absolute before:left-0 before:top-0 before:bottom-0 before:w-0.5 before:bg-[var(--color-accent)]'
                   : ''
               }`}
               onDragOver={(e) => handleDragOver(e, index)}
@@ -188,7 +205,7 @@ export function EditorArea() {
           <div
             className={`flex-shrink-0 w-4 h-full ${
               dragOverIndex === tabs.length
-                ? 'bg-blue-500/20 border-l-2 border-blue-500'
+                ? 'bg-[var(--color-accent)]/20 border-l-2 border-[var(--color-accent)]'
                 : ''
             }`}
             onDragOver={(e) => handleDragOver(e, tabs.length)}
@@ -201,8 +218,8 @@ export function EditorArea() {
           <button
             className={`flex-shrink-0 w-6 h-full flex items-center justify-center
               ${canScrollRight
-                ? 'text-gray-400 hover:text-white hover:bg-gray-700'
-                : 'text-gray-600 cursor-not-allowed'
+                ? 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)]'
+                : 'text-[var(--color-text-muted)] cursor-not-allowed'
               }`}
             onClick={scrollRight}
             disabled={!canScrollRight}
@@ -290,27 +307,27 @@ function EditorAreaContextMenu({
 
   return (
     <div
-      className="fixed z-50 bg-gray-800 border border-gray-700 rounded shadow-lg py-1 min-w-[160px]"
+      className="fixed z-50 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded shadow-lg py-1 min-w-[160px]"
       style={{ left: position.x, top: position.y }}
       onClick={(e) => e.stopPropagation()}
     >
       {menuItems.map((item, index) => (
         <div key={item.action}>
           {item.separator && index > 0 && (
-            <div className="border-t border-gray-700 my-1" />
+            <div className="border-t border-[var(--color-border)] my-1" />
           )}
           <button
             className={`w-full px-3 py-1.5 text-left text-sm flex items-center justify-between
               ${item.disabled
-                ? 'text-gray-500 cursor-not-allowed'
-                : 'text-gray-200 hover:bg-gray-700'
+                ? 'text-[var(--color-text-muted)] cursor-not-allowed'
+                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]'
               }`}
             onClick={() => !item.disabled && handleAction(item.action)}
             disabled={item.disabled}
           >
             <span>{item.label}</span>
             {item.shortcut && (
-              <span className="text-xs text-gray-500 ml-4">{item.shortcut}</span>
+              <span className="text-xs text-[var(--color-text-muted)] ml-4">{item.shortcut}</span>
             )}
           </button>
         </div>

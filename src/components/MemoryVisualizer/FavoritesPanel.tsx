@@ -57,28 +57,28 @@ export function FavoritesPanel({
   const [isExpanded, setIsExpanded] = useState(true);
 
   return (
-    <div className="border-t border-neutral-700">
+    <div className="border-t border-[var(--color-border)]">
       {/* Header */}
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex w-full items-center gap-2 p-2 transition-colors hover:bg-neutral-800"
+        className="flex w-full items-center gap-2 p-2 transition-colors hover:bg-[var(--color-bg-secondary)]"
       >
         {isExpanded ? (
-          <ChevronDown size={14} className="text-neutral-400" />
+          <ChevronDown size={14} className="text-[var(--color-text-muted)]" />
         ) : (
-          <ChevronRight size={14} className="text-neutral-400" />
+          <ChevronRight size={14} className="text-[var(--color-text-muted)]" />
         )}
-        <Star size={14} className="text-yellow-500" />
-        <span className="text-sm font-medium text-white">Favorites</span>
-        <span className="text-xs text-neutral-500">({favorites.length})</span>
+        <Star size={14} className="text-[var(--color-warning)]" />
+        <span className="text-sm font-medium text-[var(--color-text-primary)]">Favorites</span>
+        <span className="text-xs text-[var(--color-text-muted)]">({favorites.length})</span>
       </button>
 
       {/* Content */}
       {isExpanded && (
         <div className="max-h-48 space-y-1 overflow-y-auto p-2">
           {favorites.length === 0 ? (
-            <p className="py-4 text-center text-xs text-neutral-500">
+            <p className="py-4 text-center text-xs text-[var(--color-text-muted)]">
               Right-click on a cell and select "Add to Favorites" to add items
               here.
             </p>

@@ -51,7 +51,7 @@ export const TabContent = memo(function TabContent({ tabs, activeTabId }: TabCon
 
   if (!activeTab) {
     return (
-      <div className="flex-1 flex items-center justify-center text-gray-500">
+      <div className="flex-1 flex items-center justify-center text-[var(--color-text-muted)]">
         <span className="text-sm">No active tab</span>
       </div>
     );
@@ -61,7 +61,7 @@ export const TabContent = memo(function TabContent({ tabs, activeTabId }: TabCon
 
   if (!ContentComponent) {
     return (
-      <div className="flex-1 flex items-center justify-center text-gray-500">
+      <div className="flex-1 flex items-center justify-center text-[var(--color-text-muted)]">
         <span className="text-sm">Unknown panel type: {activeTab.panelType}</span>
       </div>
     );

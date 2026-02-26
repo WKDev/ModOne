@@ -232,13 +232,13 @@ export function CommandPalette({
     >
       <div
         className="
-          w-full max-w-lg bg-neutral-800 rounded-lg shadow-2xl
-          border border-neutral-700 overflow-hidden
+          w-full max-w-lg bg-[var(--color-bg-secondary)] rounded-lg shadow-2xl
+          border border-[var(--color-border)] overflow-hidden
         "
       >
         {/* Search Input */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-neutral-700">
-          <Search className="w-5 h-5 text-neutral-400 flex-shrink-0" />
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--color-border)]">
+          <Search className="w-5 h-5 text-[var(--color-text-muted)] flex-shrink-0" />
           <input
             ref={inputRef}
             type="text"
@@ -247,7 +247,7 @@ export function CommandPalette({
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             className="
-              flex-1 bg-transparent text-neutral-100 placeholder-neutral-500
+              flex-1 bg-transparent text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)]
               outline-none text-sm
             "
             aria-label="Search commands"
@@ -258,8 +258,8 @@ export function CommandPalette({
           <button
             onClick={onClose}
             className="
-              p-1 rounded text-neutral-400 hover:text-neutral-200
-              hover:bg-neutral-700 transition-colors
+              p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]
+              hover:bg-[var(--color-bg-tertiary)] transition-colors
             "
             aria-label="Close command palette"
           >
@@ -275,7 +275,7 @@ export function CommandPalette({
           role="listbox"
         >
           {flattenedCommands.length === 0 ? (
-            <div className="px-4 py-8 text-center text-neutral-400 text-sm">
+            <div className="px-4 py-8 text-center text-[var(--color-text-muted)] text-sm">
               No commands found
             </div>
           ) : (
@@ -285,8 +285,8 @@ export function CommandPalette({
                 <div role="group" aria-label="Recent commands">
                   <div
                     className="
-                      px-3 py-1.5 text-xs font-medium text-neutral-400
-                      uppercase tracking-wider bg-neutral-800/50
+                      px-3 py-1.5 text-xs font-medium text-[var(--color-text-muted)]
+                      uppercase tracking-wider bg-[var(--color-bg-secondary)]/50
                       sticky top-0 z-10
                     "
                   >
@@ -343,24 +343,24 @@ export function CommandPalette({
         {/* Footer with hints */}
         <div
           className="
-            px-4 py-2 border-t border-neutral-700
-            flex items-center gap-4 text-xs text-neutral-500
+            px-4 py-2 border-t border-[var(--color-border)]
+            flex items-center gap-4 text-xs text-[var(--color-text-muted)]
           "
         >
           <span className="flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 bg-neutral-700 rounded text-neutral-400">
+            <kbd className="px-1.5 py-0.5 bg-[var(--color-bg-tertiary)] rounded text-[var(--color-text-muted)]">
               ↑↓
             </kbd>
             Navigate
           </span>
           <span className="flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 bg-neutral-700 rounded text-neutral-400">
+            <kbd className="px-1.5 py-0.5 bg-[var(--color-bg-tertiary)] rounded text-[var(--color-text-muted)]">
               ↵
             </kbd>
             Select
           </span>
           <span className="flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 bg-neutral-700 rounded text-neutral-400">
+            <kbd className="px-1.5 py-0.5 bg-[var(--color-bg-tertiary)] rounded text-[var(--color-text-muted)]">
               Esc
             </kbd>
             Close

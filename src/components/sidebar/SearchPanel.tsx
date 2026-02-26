@@ -46,10 +46,8 @@ export function SearchPanel() {
   });
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
 
-  const { tabs, activeTabId } = useEditorAreaStore((state) => ({
-    tabs: state.tabs,
-    activeTabId: state.activeTabId,
-  }));
+  const tabs = useEditorAreaStore((state) => state.tabs);
+  const activeTabId = useEditorAreaStore((state) => state.activeTabId);
 
   const activeDocumentId = useMemo(() => {
     const activeTab = tabs.find((tab) => tab.id === activeTabId);
@@ -252,25 +250,25 @@ export function SearchPanel() {
   return (
     <div className="flex flex-col h-full">
       {/* Search Input */}
-      <div className="p-2 space-y-2 border-b border-gray-700">
+      <div className="p-2 space-y-2 border-b border-[var(--color-border)]">
         <div className="relative">
           <Search
             size={14}
-            className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500"
+            className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
           />
           <input
             type="text"
             placeholder="Search components..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1.5 pl-7 pr-8 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            className="w-full bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded px-2 py-1.5 pl-7 pr-8 text-sm text-[var(--color-text-secondary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-border-focus)]"
           />
           <button
             onClick={() =>
               setOptions((prev) => ({ ...prev, showReplace: !prev.showReplace }))
             }
-            className={`absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-700 ${
-              options.showReplace ? 'text-blue-400' : 'text-gray-500'
+            className={`absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-[var(--color-bg-tertiary)] ${
+              options.showReplace ? 'text-[var(--color-info)]' : 'text-[var(--color-text-muted)]'
             }`}
             title="Toggle Replace"
           >
@@ -283,14 +281,14 @@ export function SearchPanel() {
           <div className="relative">
             <Replace
               size={14}
-              className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500"
+              className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
             />
             <input
               type="text"
               placeholder="Replace with..."
               value={replaceText}
               onChange={(e) => setReplaceText(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1.5 pl-7 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              className="w-full bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded px-2 py-1.5 pl-7 text-sm text-[var(--color-text-secondary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-border-focus)]"
             />
           </div>
         )}
@@ -306,9 +304,9 @@ export function SearchPanel() {
             }
             className={`px-2 py-0.5 rounded ${
               options.caseSensitive
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-700 text-gray-400 hover:text-gray-200'
-            }`}
+                ? 'bg-[var(--color-accent)] text-white'
+                : 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
+             }`}
             title="Match Case"
           >
             Aa
@@ -319,9 +317,9 @@ export function SearchPanel() {
             }
             className={`px-2 py-0.5 rounded ${
               options.wholeWord
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-700 text-gray-400 hover:text-gray-200'
-            }`}
+                ? 'bg-[var(--color-accent)] text-white'
+                : 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
+             }`}
             title="Match Whole Word"
           >
             ab
@@ -331,7 +329,7 @@ export function SearchPanel() {
           {options.showReplace && results.length > 0 && (
             <button
               onClick={handleReplaceAll}
-              className="ml-auto px-2 py-0.5 rounded bg-orange-600 text-white text-xs hover:bg-orange-500"
+              className="ml-auto px-2 py-0.5 rounded bg-[var(--color-warning)] text-white text-xs hover:opacity-90"
               title="Replace All"
             >
               Replace All ({results.length})
@@ -343,31 +341,31 @@ export function SearchPanel() {
       {/* Results */}
       <div className="flex-1 overflow-auto">
         {isSearching ? (
-          <div className="p-4 text-center text-gray-500 text-sm">
+          <div className="p-4 text-center text-[var(--color-text-muted)] text-sm">
             Searching...
           </div>
         ) : query.length < 2 ? (
-          <div className="p-4 text-center text-gray-500 text-sm">
+          <div className="p-4 text-center text-[var(--color-text-muted)] text-sm">
             Enter at least 2 characters to search
           </div>
         ) : results.length === 0 ? (
-          <div className="p-4 text-center text-gray-500 text-sm">
+          <div className="p-4 text-center text-[var(--color-text-muted)] text-sm">
             No results found for "{query}"
           </div>
         ) : (
           <div className="py-1">
             {/* Results summary */}
-            <div className="px-3 py-1 text-xs text-gray-400 border-b border-gray-800">
+            <div className="px-3 py-1 text-xs text-[var(--color-text-muted)] border-b border-[var(--color-border)]">
               {results.length} result{results.length > 1 ? 's' : ''} in{' '}
               {Object.keys(groupedResults).length} group
               {Object.keys(groupedResults).length > 1 ? 's' : ''}
             </div>
 
             {Object.entries(groupedResults).map(([file, fileResults]) => (
-              <div key={file} className="border-b border-gray-800">
+              <div key={file} className="border-b border-[var(--color-border)]">
                 {/* File header */}
                 <button
-                  className="w-full px-2 py-1.5 flex items-center gap-1 text-xs text-gray-300 hover:bg-gray-800"
+                  className="w-full px-2 py-1.5 flex items-center gap-1 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)]"
                   onClick={() => toggleFileExpanded(file)}
                 >
                   {expandedFiles.has(file) ? (
@@ -375,9 +373,9 @@ export function SearchPanel() {
                   ) : (
                     <ChevronRight size={12} />
                   )}
-                  <File size={12} className="text-gray-500" />
+                  <File size={12} className="text-[var(--color-text-muted)]" />
                   <span className="flex-1 text-left truncate">{file}</span>
-                  <span className="text-gray-600 ml-1">
+                  <span className="text-[var(--color-text-muted)] ml-1">
                     ({fileResults.length})
                   </span>
                 </button>
@@ -388,18 +386,18 @@ export function SearchPanel() {
                     {fileResults.map((result, index) => (
                       <div
                         key={index}
-                        className="group flex items-center hover:bg-gray-700"
+                        className="group flex items-center hover:bg-[var(--color-bg-tertiary)]"
                       >
                         <button
                           className="flex-1 px-4 py-1 text-left text-sm min-w-0"
                           onClick={() => handleResultClick(result)}
                         >
-                          <span className="text-blue-400 mr-2 text-xs">
+                          <span className="text-[var(--color-info)] mr-2 text-xs">
                             [{result.fieldName}]
                           </span>
-                          <span className="text-gray-300 break-all">
+                          <span className="text-[var(--color-text-secondary)] break-all">
                             {result.content.slice(0, result.matchStart)}
-                            <span className="bg-yellow-500/30 text-yellow-300">
+                            <span className="bg-[var(--color-warning)]/30 text-[var(--color-warning)]">
                               {result.content.slice(
                                 result.matchStart,
                                 result.matchEnd
@@ -413,7 +411,7 @@ export function SearchPanel() {
                         {options.showReplace && (
                           <button
                             onClick={() => handleReplace(result)}
-                            className="hidden group-hover:block px-2 py-1 text-xs text-orange-400 hover:text-orange-300"
+                            className="hidden group-hover:block px-2 py-1 text-xs text-[var(--color-warning)] hover:opacity-90"
                             title="Replace"
                           >
                             <Replace size={12} />

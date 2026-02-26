@@ -31,23 +31,23 @@ export function ModbusPanel() {
   return (
     <div className="p-3 space-y-4">
       {/* Connection Status */}
-      <div className="bg-gray-900 rounded-lg p-3">
-        <h3 className="text-xs font-semibold uppercase text-gray-400 mb-3">
+      <div className="bg-[var(--color-bg-primary)] rounded-lg p-3">
+        <h3 className="text-xs font-semibold uppercase text-[var(--color-text-muted)] mb-3">
           Server Status
         </h3>
 
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             {modbusConnected ? (
-              <Wifi size={16} className="text-green-500" />
+              <Wifi size={16} className="text-[var(--color-success)]" />
             ) : (
-              <WifiOff size={16} className="text-gray-500" />
+              <WifiOff size={16} className="text-[var(--color-text-muted)]" />
             )}
-            <span data-testid="tcp-status" className={modbusConnected ? 'text-green-400' : 'text-gray-400'}>
+            <span data-testid="tcp-status" className={modbusConnected ? 'text-[var(--color-success)]' : 'text-[var(--color-text-muted)]'}>
               {modbusConnected ? 'Running' : 'Stopped'}
             </span>
           </div>
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-[var(--color-text-muted)]">
             TCP:{modbusPort}
           </span>
         </div>
@@ -58,8 +58,8 @@ export function ModbusPanel() {
             data-testid="modbus-start-tcp"
             className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded text-sm ${
               modbusConnected
-                ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                : 'bg-green-600 hover:bg-green-700 text-white'
+                ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] cursor-not-allowed'
+                : 'bg-[var(--color-success)] hover:bg-[var(--color-success)] text-white'
             }`}
             onClick={handleStartServer}
             disabled={modbusConnected}
@@ -71,8 +71,8 @@ export function ModbusPanel() {
             data-testid="modbus-stop-tcp"
             className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded text-sm ${
               !modbusConnected
-                ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                : 'bg-red-600 hover:bg-red-700 text-white'
+                ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] cursor-not-allowed'
+                : 'bg-[var(--color-error)] hover:bg-[var(--color-error)] text-white'
             }`}
             onClick={handleStopServer}
             disabled={!modbusConnected}
@@ -84,16 +84,16 @@ export function ModbusPanel() {
       </div>
 
       {/* Memory Overview */}
-      <div className="bg-gray-900 rounded-lg p-3">
-        <h3 className="text-xs font-semibold uppercase text-gray-400 mb-3">
+      <div className="bg-[var(--color-bg-primary)] rounded-lg p-3">
+        <h3 className="text-xs font-semibold uppercase text-[var(--color-text-muted)] mb-3">
           Memory Overview
         </h3>
 
         <div className="space-y-2">
           {mockMemorySections.map((section) => (
             <div key={section.name} className="flex items-center justify-between text-sm">
-              <span className="text-gray-300">{section.name}</span>
-              <span className="text-gray-500">
+              <span className="text-[var(--color-text-secondary)]">{section.name}</span>
+              <span className="text-[var(--color-text-muted)]">
                 {section.used} / {section.count}
               </span>
             </div>
@@ -102,7 +102,7 @@ export function ModbusPanel() {
       </div>
 
       {/* Quick Info */}
-      <div className="text-xs text-gray-500 text-center">
+      <div className="text-xs text-[var(--color-text-muted)] text-center">
         <p>Modbus TCP Server</p>
         <p>Listening on port {modbusPort}</p>
       </div>

@@ -51,17 +51,17 @@ export function AutoSaveNotification({ duration = 3000 }: AutoSaveNotificationPr
   return (
     <div
       className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-2
-                 bg-green-50 dark:bg-green-900/30
-                 border border-green-200 dark:border-green-800
-                 text-green-800 dark:text-green-300
+                 bg-[var(--color-success)]/10
+                 border border-[var(--color-success)]/30
+                 text-[var(--color-success)]
                  rounded-lg shadow-lg
                  animate-fade-in"
     >
-      <CheckCircle size={18} className="text-green-500 dark:text-green-400" />
+      <CheckCircle size={18} className="text-[var(--color-success)]" />
       <div className="text-sm">
         <span className="font-medium">프로젝트 자동 저장됨</span>
         {timestamp && (
-          <span className="text-green-600 dark:text-green-400 ml-2 text-xs">{timeString}</span>
+          <span className="text-[var(--color-success)] ml-2 text-xs">{timeString}</span>
         )}
       </div>
     </div>

@@ -106,15 +106,15 @@ export function Panel({
       {/* Panel Header */}
       <div
         className={`h-8 flex items-center justify-between pl-7 pr-2 flex-shrink-0 ${
-          isActive ? 'bg-gray-700' : 'bg-gray-800'
-        } border-b border-gray-700`}
+          isActive ? 'bg-[var(--color-bg-tertiary)]' : 'bg-[var(--color-bg-secondary)]'
+        } border-b border-[var(--color-border)]`}
       >
-        <span className="text-sm text-gray-300 truncate">{title}</span>
+        <span className="text-sm text-[var(--color-text-secondary)] truncate">{title}</span>
 
         <div className="flex items-center gap-1">
           {canUndock && (
             <button
-              className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-600 text-gray-400 hover:text-white"
+              className="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
               onClick={(e) => {
                 e.stopPropagation();
                 handleUndock();
@@ -125,7 +125,7 @@ export function Panel({
             </button>
           )}
           <button
-            className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-600 text-gray-400 hover:text-white"
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
             onClick={(e) => {
               e.stopPropagation();
               onMinimize();
@@ -135,7 +135,7 @@ export function Panel({
             <Minus size={14} />
           </button>
           <button
-            className="w-6 h-6 flex items-center justify-center rounded hover:bg-gray-600 text-gray-400 hover:text-white"
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
             onClick={(e) => {
               e.stopPropagation();
               onMaximize();
@@ -145,7 +145,7 @@ export function Panel({
             <Square size={12} />
           </button>
           <button
-            className="w-6 h-6 flex items-center justify-center rounded hover:bg-red-600 text-gray-400 hover:text-white"
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--color-error)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
             onClick={(e) => {
               e.stopPropagation();
               onClose();

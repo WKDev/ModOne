@@ -4,6 +4,7 @@ import { ActivityBar } from './ActivityBar';
 import { ExplorerPanel } from '../sidebar/ExplorerPanel';
 import { SearchPanel } from '../sidebar/SearchPanel';
 import { ModbusPanel } from '../sidebar/ModbusPanel';
+import { PanelErrorBoundary } from './PanelErrorBoundary';
 
 export function Sidebar() {
   const { activePanel, isVisible, width, setWidth } = useSidebarStore();
@@ -64,19 +65,21 @@ export function Sidebar() {
 
       <div
         data-testid="sidebar-content"
-        className={`bg-gray-800 border-r border-gray-700 flex flex-col transition-all duration-200 overflow-hidden ${
+        className={`bg-[var(--color-bg-secondary)] border-r border-[var(--color-border)] flex flex-col transition-all duration-200 overflow-hidden ${
           isVisible ? '' : 'w-0'
         }`}
         style={{ width: isVisible ? width : 0 }}
       >
         {/* Panel Header */}
-        <div data-testid="sidebar-header" className="h-9 px-4 flex items-center border-b border-gray-700 text-xs font-semibold uppercase tracking-wider text-gray-400">
+        <div data-testid="sidebar-header" className="h-9 px-4 flex items-center border-b border-[var(--color-border)] text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
           {activePanel}
         </div>
 
         {/* Panel Content */}
         <div className="flex-1 overflow-auto">
-          {renderPanel()}
+          <PanelErrorBoundary key={activePanel} panelName={activePanel}>
+            {renderPanel()}
+          </PanelErrorBoundary>
         </div>
       </div>
 
@@ -84,7 +87,7 @@ export function Sidebar() {
       {isVisible && (
         <div
           data-testid="sidebar-resize-handle"
-          className="w-1 cursor-col-resize hover:bg-blue-500 active:bg-blue-500 transition-colors"
+          className="w-1 cursor-col-resize hover:bg-[var(--color-accent)] active:bg-[var(--color-accent)] transition-colors"
           onMouseDown={startResizing}
         />
       )}

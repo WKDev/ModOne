@@ -60,10 +60,10 @@ export function Tab({
     <div
       data-tab-id={id}
       className={`group relative flex items-center gap-1.5 px-3 h-8 min-w-[100px] max-w-[180px] cursor-pointer select-none
-        border-r border-gray-700 transition-colors duration-150
+        border-r border-[var(--color-border)] transition-colors duration-150
         ${isActive
-          ? 'bg-gray-800 text-gray-100 border-b-2 border-b-blue-500'
-          : 'bg-gray-900 text-gray-400 hover:bg-gray-800 hover:text-gray-200 border-b-2 border-b-transparent'
+          ? 'bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)] border-b-2 border-b-[var(--color-accent)]'
+          : 'bg-[var(--color-bg-primary)] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-text-secondary)] border-b-2 border-b-transparent'
         }`}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
@@ -84,7 +84,7 @@ export function Tab({
 
       {/* Title (with * prefix when modified) */}
       <span className="flex-1 truncate text-xs font-medium">
-        {isModified && <span className="text-gray-400">*</span>}
+        {isModified && <span className="text-[var(--color-text-muted)]">*</span>}
         {title}
       </span>
 
@@ -93,7 +93,7 @@ export function Tab({
         className={`flex-shrink-0 w-5 h-5 flex items-center justify-center rounded
           transition-opacity duration-150
           ${isActive || isHovered ? 'opacity-100' : 'opacity-0'}
-          hover:bg-gray-600 text-gray-400 hover:text-white`}
+          hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]`}
         onClick={handleCloseClick}
         title="Close"
       >

@@ -75,12 +75,12 @@ export function ResizeHandle({
 
   const baseClasses =
     direction === 'horizontal'
-      ? 'w-full h-1 cursor-row-resize hover:bg-blue-500/50 active:bg-blue-500'
-      : 'h-full w-1 cursor-col-resize hover:bg-blue-500/50 active:bg-blue-500';
+      ? 'w-full h-1 cursor-row-resize hover:bg-[var(--color-accent)]/50 active:bg-[var(--color-accent)]'
+      : 'h-full w-1 cursor-col-resize hover:bg-[var(--color-accent)]/50 active:bg-[var(--color-accent)]';
 
   return (
     <div
-      className={`flex-shrink-0 bg-gray-700 transition-colors ${baseClasses} ${className}`}
+      className={`flex-shrink-0 bg-[var(--color-bg-tertiary)] transition-colors ${baseClasses} ${className}`}
       onMouseDown={handleMouseDown}
     />
   );
