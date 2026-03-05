@@ -1,0 +1,9 @@
+Rules implemented in src/utils/symbolValidation.ts:
+1. at_least_one_pin
+2. unique_pin_ids
+3. pin_grid_snap
+4. valid_dimensions
+5. non_empty_name
+6. primitive_bounds
+
+build exit 0

@@ -1,0 +1,5 @@
+Build result: 0
+Files created:
+  src/services/symbolService.ts - 37 lines, exports: saveSymbol, loadSymbol, deleteSymbol, listSymbols, listAllSymbols
+  src/stores/symbolStore.ts - 83 lines, exports: useSymbolStore
+  src/hooks/useSymbolLibrary.ts - 40 lines, exports: useSymbolLibrary
