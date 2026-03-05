@@ -4,7 +4,9 @@
 //! defined mapping rules. This mapping aligns with the modserver_sync
 //! module for consistent address translation.
 
-use super::types::{BitDeviceType, DeviceAddress, DeviceType, ModbusAddress, ModbusAddressType, WordDeviceType};
+use super::types::{
+    BitDeviceType, DeviceAddress, DeviceType, ModbusAddress, ModbusAddressType, WordDeviceType,
+};
 use std::collections::HashMap;
 
 // ============================================================================
@@ -155,10 +157,20 @@ impl ModbusMapper {
     pub fn map_to_modbus(&self, device_addr: &DeviceAddress) -> Option<ModbusAddress> {
         // Cannot map indexed addresses statically
         if device_addr.index_register.is_some() {
+            let index_register = match device_addr.index_register {
+                Some(index) => index,
+                None => {
+                    log::warn!(
+                        "Expected index register for indexed address {}",
+                        device_addr.device.as_str()
+                    );
+                    return None;
+                }
+            };
             log::warn!(
                 "Indexed address {}[Z{}] cannot be mapped statically",
                 device_addr.device.as_str(),
-                device_addr.index_register.unwrap()
+                index_register
             );
             return None;
         }

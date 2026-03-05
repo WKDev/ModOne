@@ -173,7 +173,9 @@ pub fn migrate_project(
 }
 
 /// Read the config.yml from a legacy ZIP archive
-fn read_legacy_config(archive: &mut ZipArchive<BufReader<File>>) -> Result<ProjectConfig, MigrationError> {
+fn read_legacy_config(
+    archive: &mut ZipArchive<BufReader<File>>,
+) -> Result<ProjectConfig, MigrationError> {
     // Try to find config.yml
     let config_entry = archive.by_name("modone/config.yml");
 
@@ -189,7 +191,11 @@ fn read_legacy_config(archive: &mut ZipArchive<BufReader<File>>) -> Result<Proje
 }
 
 /// Map a legacy path to the new folder structure
-fn map_legacy_path(legacy_path: &str, target_dir: &Path, project: &FolderProject) -> Option<PathBuf> {
+fn map_legacy_path(
+    legacy_path: &str,
+    target_dir: &Path,
+    project: &FolderProject,
+) -> Option<PathBuf> {
     // Skip config.yml (merged into manifest)
     if legacy_path == "modone/config.yml" {
         return None;
@@ -202,14 +208,18 @@ fn map_legacy_path(legacy_path: &str, target_dir: &Path, project: &FolderProject
 
     // Map plc_csv/* -> ladder/*
     if legacy_path.starts_with("plc_csv/") {
-        let filename = legacy_path.strip_prefix("plc_csv/").unwrap();
-        return Some(project.ladder_dir().join(filename));
+        if let Some(filename) = legacy_path.strip_prefix("plc_csv/") {
+            return Some(project.ladder_dir().join(filename));
+        }
+        return None;
     }
 
     // Map one_canvas/* -> canvas/*
     if legacy_path.starts_with("one_canvas/") {
-        let filename = legacy_path.strip_prefix("one_canvas/").unwrap();
-        return Some(project.canvas_dir().join(filename));
+        if let Some(filename) = legacy_path.strip_prefix("one_canvas/") {
+            return Some(project.canvas_dir().join(filename));
+        }
+        return None;
     }
 
     // Map scenario.csv -> scenario/scenario.csv
@@ -219,8 +229,10 @@ fn map_legacy_path(legacy_path: &str, target_dir: &Path, project: &FolderProject
 
     // Other files in modone/ directory (not config.yml) - preserve structure
     if legacy_path.starts_with("modone/") && legacy_path != "modone/config.yml" {
-        let filename = legacy_path.strip_prefix("modone/").unwrap();
-        return Some(target_dir.join(filename));
+        if let Some(filename) = legacy_path.strip_prefix("modone/") {
+            return Some(target_dir.join(filename));
+        }
+        return None;
     }
 
     None
@@ -295,7 +307,8 @@ mod tests {
         // Create a minimal ZIP
         let file = File::create(&zip_path).unwrap();
         let mut zip = zip::ZipWriter::new(file);
-        zip.start_file("test.txt", zip::write::FileOptions::default()).unwrap();
+        zip.start_file("test.txt", zip::write::FileOptions::default())
+            .unwrap();
         use std::io::Write;
         zip.write_all(b"test").unwrap();
         zip.finish().unwrap();
@@ -323,13 +336,16 @@ mod tests {
             &project_dir,
             "TestProject",
             super::super::config::PlcSettings::default(),
-        ).unwrap();
+        )
+        .unwrap();
 
         // Test plc_csv mapping
         let result = map_legacy_path("plc_csv/test.csv", &project_dir, &project);
         assert!(result.is_some());
         let result_path = result.unwrap();
-        assert!(result_path.ends_with("ladder/test.csv") || result_path.ends_with("ladder\\test.csv"));
+        assert!(
+            result_path.ends_with("ladder/test.csv") || result_path.ends_with("ladder\\test.csv")
+        );
 
         // Test one_canvas mapping
         let result = map_legacy_path("one_canvas/diagram.json", &project_dir, &project);

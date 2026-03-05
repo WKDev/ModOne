@@ -533,7 +533,10 @@ impl ScenarioExecutor {
             // Process due events
             while let Some(scheduled) = self.event_queue.peek() {
                 if scheduled.execute_at <= elapsed {
-                    let scheduled = self.event_queue.pop().unwrap();
+                    let scheduled = self
+                        .event_queue
+                        .pop()
+                        .ok_or_else(|| "Event queue unexpectedly empty".to_string())?;
 
                     // Execute the event
                     match self.execute_event(&scheduled.event).await {

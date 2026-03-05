@@ -122,7 +122,10 @@ fn parse_device_address_string(s: &str) -> Result<DeviceAddress, ModOneError> {
     }
 
     // Match device type (first character)
-    let device_char = s.chars().next().unwrap();
+    let device_char = s
+        .chars()
+        .next()
+        .ok_or_else(|| ModOneError::Parse("Empty device address after trim".to_string()))?;
     let device_type = DeviceType::from_str(&device_char.to_string())
         .ok_or_else(|| ModOneError::Parse(format!("Invalid device type: {}", device_char)))?;
 

@@ -811,14 +811,29 @@ impl ProgramExecutor {
     /// Read bool value from device
     fn read_device_bool(&self, addr: &DeviceAddress) -> ExecutionResult<bool> {
         if addr.is_bit_device() {
-            let device = addr.as_bit_device().unwrap();
+            let device = addr.as_bit_device().ok_or_else(|| {
+                ExecutionError::InvalidAddress(format!(
+                    "Expected bit device, got {}",
+                    addr.to_string()
+                ))
+            })?;
             Ok(self.memory.read_bit(device, addr.address)?)
         } else if let Some(bit_idx) = addr.bit_index {
-            let device = addr.as_word_device().unwrap();
+            let device = addr.as_word_device().ok_or_else(|| {
+                ExecutionError::InvalidAddress(format!(
+                    "Expected word device for bit access, got {}",
+                    addr.to_string()
+                ))
+            })?;
             Ok(self.memory.read_word_bit(device, addr.address, bit_idx)?)
         } else {
             // Word device without bit index - read as bool (non-zero = true)
-            let device = addr.as_word_device().unwrap();
+            let device = addr.as_word_device().ok_or_else(|| {
+                ExecutionError::InvalidAddress(format!(
+                    "Expected word device, got {}",
+                    addr.to_string()
+                ))
+            })?;
             Ok(self.memory.read_word(device, addr.address)? != 0)
         }
     }
@@ -826,16 +841,31 @@ impl ProgramExecutor {
     /// Write bool value to device
     fn write_device_bool(&self, addr: &DeviceAddress, value: bool) -> ExecutionResult<()> {
         if addr.is_bit_device() {
-            let device = addr.as_bit_device().unwrap();
+            let device = addr.as_bit_device().ok_or_else(|| {
+                ExecutionError::InvalidAddress(format!(
+                    "Expected bit device, got {}",
+                    addr.to_string()
+                ))
+            })?;
             Ok(self.memory.write_bit(device, addr.address, value)?)
         } else if let Some(bit_idx) = addr.bit_index {
-            let device = addr.as_word_device().unwrap();
+            let device = addr.as_word_device().ok_or_else(|| {
+                ExecutionError::InvalidAddress(format!(
+                    "Expected word device for bit access, got {}",
+                    addr.to_string()
+                ))
+            })?;
             Ok(self
                 .memory
                 .write_word_bit(device, addr.address, bit_idx, value)?)
         } else {
             // Word device without bit index
-            let device = addr.as_word_device().unwrap();
+            let device = addr.as_word_device().ok_or_else(|| {
+                ExecutionError::InvalidAddress(format!(
+                    "Expected word device, got {}",
+                    addr.to_string()
+                ))
+            })?;
             Ok(self
                 .memory
                 .write_word(device, addr.address, if value { 1 } else { 0 })?)
@@ -854,11 +884,21 @@ impl ProgramExecutor {
             .ok_or_else(|| ExecutionError::InvalidAddress(operand.to_string()))?;
 
         if addr.is_word_device() {
-            let device = addr.as_word_device().unwrap();
+            let device = addr.as_word_device().ok_or_else(|| {
+                ExecutionError::InvalidAddress(format!(
+                    "Expected word device operand, got {}",
+                    addr.to_string()
+                ))
+            })?;
             Ok(self.memory.read_word(device, addr.address)? as i16 as i32)
         } else {
             // Bit device - return 0 or 1
-            let device = addr.as_bit_device().unwrap();
+            let device = addr.as_bit_device().ok_or_else(|| {
+                ExecutionError::InvalidAddress(format!(
+                    "Expected bit device operand, got {}",
+                    addr.to_string()
+                ))
+            })?;
             Ok(if self.memory.read_bit(device, addr.address)? {
                 1
             } else {
@@ -976,7 +1016,12 @@ impl ProgramExecutor {
             .ok_or_else(|| ExecutionError::InvalidAddress(dest_str.clone()))?;
 
         if dest.is_word_device() {
-            let device = dest.as_word_device().unwrap();
+            let device = dest.as_word_device().ok_or_else(|| {
+                ExecutionError::InvalidAddress(format!(
+                    "Expected word destination device, got {}",
+                    dest.to_string()
+                ))
+            })?;
             self.memory
                 .write_word(device, dest.address, result as u16)?;
         }
@@ -1013,7 +1058,12 @@ impl ProgramExecutor {
             .ok_or_else(|| ExecutionError::InvalidAddress(dest_str.clone()))?;
 
         if dest.is_word_device() {
-            let device = dest.as_word_device().unwrap();
+            let device = dest.as_word_device().ok_or_else(|| {
+                ExecutionError::InvalidAddress(format!(
+                    "Expected word destination device, got {}",
+                    dest.to_string()
+                ))
+            })?;
             self.memory
                 .write_word(device, dest.address, result as u16)?;
         }
@@ -1049,7 +1099,12 @@ impl ProgramExecutor {
             .ok_or_else(|| ExecutionError::InvalidAddress(dest_str.clone()))?;
 
         if dest.is_word_device() {
-            let device = dest.as_word_device().unwrap();
+            let device = dest.as_word_device().ok_or_else(|| {
+                ExecutionError::InvalidAddress(format!(
+                    "Expected word destination device, got {}",
+                    dest.to_string()
+                ))
+            })?;
             self.memory
                 .write_word(device, dest.address, result as u16)?;
         }
@@ -1073,7 +1128,12 @@ impl ProgramExecutor {
             .ok_or_else(|| ExecutionError::InvalidAddress(dest_str.clone()))?;
 
         if dest.is_word_device() {
-            let device = dest.as_word_device().unwrap();
+            let device = dest.as_word_device().ok_or_else(|| {
+                ExecutionError::InvalidAddress(format!(
+                    "Expected word destination device, got {}",
+                    dest.to_string()
+                ))
+            })?;
             self.memory.write_word(device, dest.address, value as u16)?;
         }
 

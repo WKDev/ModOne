@@ -169,12 +169,52 @@ impl DeviceMemory {
 
         let idx = address as usize;
         let value = match device {
-            SimBitDeviceType::P => *self.p_relays.read().get(idx).unwrap(),
-            SimBitDeviceType::M => *self.m_relays.read().get(idx).unwrap(),
-            SimBitDeviceType::K => *self.k_relays.read().get(idx).unwrap(),
-            SimBitDeviceType::F => *self.f_relays.read().get(idx).unwrap(),
-            SimBitDeviceType::T => *self.t_contacts.read().get(idx).unwrap(),
-            SimBitDeviceType::C => *self.c_contacts.read().get(idx).unwrap(),
+            SimBitDeviceType::P => self.p_relays.read().get(idx).map(|b| *b).ok_or_else(|| {
+                SimMemoryError::AddressOutOfRange {
+                    device: "P".to_string(),
+                    address,
+                    max: P_SIZE as u16 - 1,
+                }
+            })?,
+            SimBitDeviceType::M => self.m_relays.read().get(idx).map(|b| *b).ok_or_else(|| {
+                SimMemoryError::AddressOutOfRange {
+                    device: "M".to_string(),
+                    address,
+                    max: M_SIZE as u16 - 1,
+                }
+            })?,
+            SimBitDeviceType::K => self.k_relays.read().get(idx).map(|b| *b).ok_or_else(|| {
+                SimMemoryError::AddressOutOfRange {
+                    device: "K".to_string(),
+                    address,
+                    max: K_SIZE as u16 - 1,
+                }
+            })?,
+            SimBitDeviceType::F => self.f_relays.read().get(idx).map(|b| *b).ok_or_else(|| {
+                SimMemoryError::AddressOutOfRange {
+                    device: "F".to_string(),
+                    address,
+                    max: F_SIZE as u16 - 1,
+                }
+            })?,
+            SimBitDeviceType::T => {
+                self.t_contacts.read().get(idx).map(|b| *b).ok_or_else(|| {
+                    SimMemoryError::AddressOutOfRange {
+                        device: "T".to_string(),
+                        address,
+                        max: T_SIZE as u16 - 1,
+                    }
+                })?
+            }
+            SimBitDeviceType::C => {
+                self.c_contacts.read().get(idx).map(|b| *b).ok_or_else(|| {
+                    SimMemoryError::AddressOutOfRange {
+                        device: "C".to_string(),
+                        address,
+                        max: C_SIZE as u16 - 1,
+                    }
+                })?
+            }
         };
         Ok(value)
     }
@@ -466,7 +506,12 @@ impl DeviceMemory {
     ///
     /// Returns true if the previous value was false and current is true
     pub fn detect_rising_edge(&self, address: &str, current: bool) -> bool {
-        let previous = self.previous_bits.read().get(address).copied().unwrap_or(false);
+        let previous = self
+            .previous_bits
+            .read()
+            .get(address)
+            .copied()
+            .unwrap_or(false);
         !previous && current
     }
 
@@ -474,7 +519,12 @@ impl DeviceMemory {
     ///
     /// Returns true if the previous value was true and current is false
     pub fn detect_falling_edge(&self, address: &str, current: bool) -> bool {
-        let previous = self.previous_bits.read().get(address).copied().unwrap_or(false);
+        let previous = self
+            .previous_bits
+            .read()
+            .get(address)
+            .copied()
+            .unwrap_or(false);
         previous && !current
     }
 
@@ -869,7 +919,8 @@ mod tests {
         let mem = DeviceMemory::new();
 
         // Write individual bits
-        mem.write_word_bit(SimWordDeviceType::D, 0, 0, true).unwrap();
+        mem.write_word_bit(SimWordDeviceType::D, 0, 0, true)
+            .unwrap();
         mem.write_word_bit(SimWordDeviceType::D, 0, 15, true)
             .unwrap();
 

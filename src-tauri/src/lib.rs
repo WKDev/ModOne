@@ -177,9 +177,10 @@ pub fn run() {
                 use crate::commands::menu::build_macos_menu;
                 use tauri::{Manager, TitleBarStyle};
 
-                let window = app.get_webview_window("main").unwrap();
-                window.set_decorations(true).unwrap();
-                window.set_title_bar_style(TitleBarStyle::Overlay).unwrap();
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.set_decorations(true);
+                    let _ = window.set_title_bar_style(TitleBarStyle::Overlay);
+                }
 
                 let menu = build_macos_menu(&app.handle())?;
                 app.set_menu(menu)?;
