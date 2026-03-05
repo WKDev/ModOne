@@ -1,0 +1,6 @@
+Build result: 0
+Component location: src/components/OneCanvas/components/SymbolRenderer.tsx
+Exports: SymbolRenderer
+GraphicPrimitive cases handled: rect, circle, polyline, arc, text
+Props interface: SymbolRendererProps
+Status: Completed and verified

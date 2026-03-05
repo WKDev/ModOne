@@ -28,6 +28,9 @@ import { OverloadRelayBlock } from './blocks/OverloadRelayBlock';
 import { ContactorBlock } from './blocks/ContactorBlock';
 import { DisconnectSwitchBlock } from './blocks/DisconnectSwitchBlock';
 import { OffPageConnectorBlock } from './blocks/OffPageConnectorBlock';
+// SymbolRenderer will be used in Wave 3 when symbol store is wired in
+// import { SymbolRenderer } from './SymbolRenderer';
+import type { CustomSymbolBlock } from '../../../types/symbol';
 // JunctionBlock is now rendered as SVG dot in the wire layer (JunctionDot.tsx)
 
 // ============================================================================
@@ -39,8 +42,8 @@ interface BlockRendererProps {
   block: Block;
   /** Whether the block is selected */
   isSelected?: boolean;
-  /** Selection handler */
-  onSelect?: (blockId: string, addToSelection: boolean) => void;
+  /** Block click handler */
+  onBlockClick?: (blockId: string, e: React.MouseEvent) => void;
   /** Wire start handler */
   onStartWire?: (blockId: string, portId: string) => void;
   /** Wire end handler */
@@ -71,7 +74,7 @@ interface BlockRendererProps {
 export const BlockRenderer = memo(function BlockRenderer({
   block,
   isSelected,
-  onSelect,
+  onBlockClick,
   onStartWire,
   onEndWire,
   onDragStart,
@@ -85,7 +88,7 @@ export const BlockRenderer = memo(function BlockRenderer({
   // Common props for all block types
   const commonProps = {
     isSelected,
-    onSelect,
+    onBlockClick,
     onStartWire,
     onEndWire,
     connectedPorts,
@@ -189,6 +192,29 @@ export const BlockRenderer = memo(function BlockRenderer({
       case 'off_page_connector':
         return <OffPageConnectorBlock block={block} {...commonProps} />;
 
+      case 'custom_symbol': {
+        const csBlock = block as CustomSymbolBlock;
+        // Symbol definition lookup — for now render a placeholder if symbol is not loaded
+        // The actual symbol definition lookup will be wired in a later task (Wave 3)
+        // For now: if no symbol data is available, render a placeholder rect with the symbolId text
+        return (
+          <g>
+            <rect
+              x={0}
+              y={0}
+              width={block.size?.width ?? 60}
+              height={block.size?.height ?? 60}
+              fill="none"
+              stroke="#888"
+              strokeWidth={1}
+              strokeDasharray="4 2"
+            />
+            <text x={4} y={14} fontSize={10} fill="#666">
+              {csBlock.symbolId || 'custom'}
+            </text>
+          </g>
+        );
+      }
       default:
         // Unknown block type - render a placeholder
         return (

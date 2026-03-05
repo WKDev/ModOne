@@ -281,6 +281,9 @@ function getDefaultPorts(type: string, properties?: Record<string, unknown>): Po
       return [
         { id: 'conn', type: 'bidirectional', label: '', position: 'left' },
       ];
+    case 'custom_symbol':
+      // Custom symbols have no default ports; ports come from symbol definition
+      return [];
     default:
       return [];
   }

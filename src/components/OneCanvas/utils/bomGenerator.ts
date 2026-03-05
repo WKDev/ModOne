@@ -72,6 +72,7 @@ const TYPE_DISPLAY_NAMES: Record<BlockType, string> = {
   contactor: 'Contactor',
   disconnect_switch: 'Disconnect Switch',
   off_page_connector: 'Off-Page Connector',
+  custom_symbol: 'Custom Symbol',
 };
 
 // ============================================================================

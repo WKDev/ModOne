@@ -1,0 +1,64 @@
+# Task 9: Add custom_symbol branch to BlockRenderer.tsx
+
+## Build Result
+Exit Code: 0 (SUCCESS)
+
+Build output:
+```
+> modone@0.1.0 build
+> tsc && vite build
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 3.03s
+```
+
+## Files Modified
+
+### 1. src/components/OneCanvas/components/BlockRenderer.tsx
+- Added import for CustomSymbolBlock type from '../../../types/symbol'
+- Added comment about SymbolRenderer (will be used in Wave 3)
+- Added 'custom_symbol' case in the switch statement (lines 195-217)
+- Renders a placeholder SVG rect with dashed border and symbolId text
+- Placeholder ensures no TypeScript exhaustiveness errors and prevents crashes
+
+### 2. src/components/OneCanvas/types.ts
+- Added import: `import type { CustomSymbolBlock } from '../../types/symbol';`
+- Added CustomSymbolBlock to the Block union type (line 622)
+
+### 3. src/types/symbol.ts
+- Added import: `import type { BaseBlock } from '../components/OneCanvas/types';`
+- Updated CustomSymbolBlock to extend BaseBlock<'custom_symbol'>
+- Now includes all required BaseBlock properties: id, type, position, size, ports, etc.
+
+### 4. src/components/panels/content/PropertiesPanel.tsx
+- Added 'custom_symbol' case to PropertyEditorRouter switch statement (line 200)
+- Routes custom_symbol blocks to IndustrialProperties editor (same as other industrial components)
+
+## Changes Summary
+
+**Total files modified: 4**
+
+1. BlockRenderer.tsx: Added custom_symbol case with placeholder rendering
+2. types.ts: Added CustomSymbolBlock to Block union
+3. symbol.ts: Made CustomSymbolBlock extend BaseBlock
+4. PropertiesPanel.tsx: Added custom_symbol case to property editor router
+
+**Key Implementation Details:**
+- Placeholder renders a dashed-border rect (60x60 default) with symbolId text
+- No actual symbol definition lookup (deferred to Wave 3)
+- Full symbol-definition-aware rendering will be wired in Wave 3 when symbol store is integrated
+- SymbolRenderer component imported but commented out (will be used in Wave 3)
+- All TypeScript type checking passes
+- No exhaustiveness errors in switch statements
+
+## Wave 3 Preparation
+
+The following will be completed in Wave 3:
+1. Wire symbol store into canvas
+2. Implement actual symbol definition lookup
+3. Replace placeholder rendering with SymbolRenderer component
+4. Add symbol instance property editing UI
+5. Implement symbol unit selection UI

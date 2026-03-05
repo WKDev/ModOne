@@ -197,6 +197,7 @@ const PropertyEditorRouter = memo(function PropertyEditorRouter({
     case 'contactor':
     case 'disconnect_switch':
     case 'off_page_connector':
+    case 'custom_symbol':
       return (
         <IndustrialProperties
           component={component}

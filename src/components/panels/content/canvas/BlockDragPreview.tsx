@@ -30,6 +30,7 @@ export const BlockDragPreview = memo(function BlockDragPreview({ type, presetLab
     contactor: 'Contactor',
     disconnect_switch: 'Disconnect',
     off_page_connector: 'Off-Page',
+    custom_symbol: 'Custom',
   };
 
   return (
