@@ -1,10 +1,10 @@
 {
-  "active_plan": "/Users/chson/Projects/ModOne/.sisyphus/plans/wire-geometry-unification.md",
-  "started_at": "2026-02-24T05:56:06.887Z",
+  "active_plan": "/Users/chson/Projects/ModOne/.sisyphus/plans/custom-symbol-infra.md",
+  "started_at": "2026-02-27T05:25:02.320Z",
   "session_ids": [
-    "ses_3725a6375ffenUV40xLvfh8VRs"
+    "ses_3689c8e27ffehEY2iveNpY4NH4"
   ],
-  "plan_name": "wire-geometry-unification",
-  "agent": "atlas",
+  "plan_name": "custom-symbol-infra",
+  "agent": "sisyphus",
   "status": "in_progress"
 }

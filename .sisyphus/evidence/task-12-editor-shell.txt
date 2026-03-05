@@ -1,0 +1,10 @@
+# Task 12 Editor Shell Evidence
+
+Files:
+- src/components/SymbolEditor/SymbolEditor.tsx
+- src/components/SymbolEditor/EditorCanvas.tsx
+- src/components/SymbolEditor/EditorToolbar.tsx
+- src/components/SymbolEditor/index.ts
+
+Verification:
+- build exit 0 (`pnpm run build`)
