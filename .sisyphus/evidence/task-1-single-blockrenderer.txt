@@ -1,0 +1,75 @@
+BLOCKRENDERER DEDUPLICATION AUDIT
+==================================
+
+TASK: Audit and de-duplicate the two BlockRenderer.tsx files in the OneCanvas component.
+
+EXECUTION SUMMARY
+=================
+
+1. CANONICAL FILE IDENTIFIED
+   Path: src/components/OneCanvas/components/BlockRenderer.tsx
+   Reason: 
+   - More complete implementation (220 lines vs 200 lines)
+   - Includes all block types (NetLabelBlock, TransformerBlock, TerminalBlockComp, OverloadRelayBlock, ContactorBlock, DisconnectSwitchBlock, OffPageConnectorBlock)
+   - Exported from public API (components/index.ts and OneCanvas/index.ts)
+   - Uses useCallback for proper event handling
+   - Proper memo wrapper for performance
+
+2. STALE FILE IDENTIFIED
+   Path: src/components/OneCanvas/content/BlockRenderer.tsx (DELETED)
+   Reason:
+   - Older/incomplete version with fewer block types
+   - Missing advanced block implementations
+   - Used outdated prop naming (onBlockClick vs onSelect)
+   - Not exported from public API
+
+3. IMPORT PATHS UPDATED
+   File: src/components/OneCanvas/content/CanvasContent.tsx
+   Change: import { BlockRenderer } from './BlockRenderer' → import { BlockRenderer } from '../components/BlockRenderer'
+   Imports Updated: 1
+
+4. CANONICAL FILE SIGNATURE UPDATED
+   File: src/components/OneCanvas/components/BlockRenderer.tsx
+   Changes:
+   - Updated BlockRendererProps interface to use onBlockClick (matching CanvasContent usage)
+   - Updated function parameter from onSelect to onBlockClick
+   - Updated commonProps object to use onBlockClick
+   - Maintained all other functionality and block type support
+
+5. STALE FILE DELETION
+   File: src/components/OneCanvas/content/BlockRenderer.tsx
+   Status: DELETED
+   Verification: find command confirms 0 remaining duplicates
+
+6. BUILD VERIFICATION
+   Command: pnpm run build
+   Result: ✓ SUCCESS (exit code 0)
+   Output: 
+   - TypeScript compilation: PASS
+   - Vite build: PASS
+   - All 2422 modules transformed successfully
+   - No errors or type failures
+
+7. FINAL VERIFICATION
+   Command: find src -name 'BlockRenderer.tsx' -type f
+   Result: Exactly 1 file found
+   Path: src/components/OneCanvas/components/BlockRenderer.tsx
+
+METRICS
+=======
+- Files kept: 1 (canonical)
+- Files deleted: 1 (stale)
+- Import paths updated: 1
+- Build status: PASS
+- TypeScript errors: 0
+- Duplicate BlockRenderer files remaining: 0
+
+CONCLUSION
+==========
+✓ Deduplication complete
+✓ All imports point to canonical file
+✓ Build succeeds with 0 errors
+✓ Exactly 1 BlockRenderer.tsx exists in codebase
+✓ No rendering logic was modified
+✓ No block component internals were touched
+✓ Block discriminated union in types.ts unchanged

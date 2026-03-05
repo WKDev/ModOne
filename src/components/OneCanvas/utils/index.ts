@@ -21,7 +21,6 @@ export * from './netLabelResolver';
 export * from './circuitLibrary';
 export * from './iecWireColors';
 export * from './multiPageSchematic';
-export * from './symbolEditor';
 export * from './wireNumbering';
 export {
   alignBlocks,

@@ -1,6 +1,6 @@
 import type { Block, Wire, Junction, Position } from '../types';
 import { buildCanonicalWirePolyline } from '../utils/wireSimplifier';
-import { BlockRenderer } from './BlockRenderer';
+import { BlockRenderer } from '../components/BlockRenderer';
 import { Wire as WireComponent } from './WireRenderer';
 
 interface CanvasContentProps {
