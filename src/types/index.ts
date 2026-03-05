@@ -48,6 +48,9 @@ export * from './ladder';
 // OneSim types
 export * from './onesim';
 
+// Symbol types (custom symbol infrastructure)
+export * from './symbol';
+
 // Window types
 export type {
   Bounds,

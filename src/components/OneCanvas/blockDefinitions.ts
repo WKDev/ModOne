@@ -276,6 +276,11 @@ const BLOCK_DEFINITIONS: Record<BlockType, BlockDefinition> = {
       dangling: true,
     },
   },
+  custom_symbol: {
+    size: { width: 60, height: 60 },
+    defaultPorts: [],
+    defaultProps: { symbolId: '', selectedUnit: 0, instanceProperties: {} },
+  },
 };
 
 // ============================================================================

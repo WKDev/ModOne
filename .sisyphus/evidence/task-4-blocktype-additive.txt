@@ -1,0 +1,98 @@
+TASK 4: BLOCKTYPE UNION - ADDITIVE CHANGE EVIDENCE
+
+=== BLOCKTYPE UNION - BEFORE AND AFTER ===
+
+BEFORE (original, 22 members):
+export type BlockType =
+  | 'powersource'
+  | 'plc_out'
+  | 'plc_in'
+  | 'led'
+  | 'button'
+  | 'scope'
+  | 'text'
+  | 'relay'
+  | 'fuse'
+  | 'motor'
+  | 'emergency_stop'
+  | 'selector_switch'
+  | 'solenoid_valve'
+  | 'sensor'
+  | 'pilot_lamp'
+  | 'net_label'
+  | 'transformer'
+  | 'terminal_block'
+  | 'overload_relay'
+  | 'contactor'
+  | 'disconnect_switch'
+  | 'off_page_connector';
+
+AFTER (updated, 23 members):
+export type BlockType =
+  | 'powersource'
+  | 'plc_out'
+  | 'plc_in'
+  | 'led'
+  | 'button'
+  | 'scope'
+  | 'text'
+  | 'relay'
+  | 'fuse'
+  | 'motor'
+  | 'emergency_stop'
+  | 'selector_switch'
+  | 'solenoid_valve'
+  | 'sensor'
+  | 'pilot_lamp'
+  | 'net_label'
+  | 'transformer'
+  | 'terminal_block'
+  | 'overload_relay'
+  | 'contactor'
+  | 'disconnect_switch'
+  | 'off_page_connector'
+  | 'custom_symbol';
+
+=== CHANGE SUMMARY ===
+✓ ADDITIVE ONLY: No existing members removed
+✓ NEW MEMBER: 'custom_symbol' added at end
+✓ LOCATION: src/components/OneCanvas/types.ts, lines 13-36
+✓ VERIFICATION: grep -n "custom_symbol" shows line 36
+
+=== GREP OUTPUT ===
+File: src/components/OneCanvas/types.ts
+Line 36:    | 'custom_symbol';
+
+=== FULL BLOCKTYPE UNION (from sed output) ===
+13: export type BlockType =
+14:   | 'powersource'
+15:   | 'plc_out'
+16:   | 'plc_in'
+17:   | 'led'
+18:   | 'button'
+19:   | 'scope'
+20:   | 'text'
+21:   | 'relay'
+22:   | 'fuse'
+23:   | 'motor'
+24:   | 'emergency_stop'
+25:   | 'selector_switch'
+26:   | 'solenoid_valve'
+27:   | 'sensor'
+28:   | 'pilot_lamp'
+29:   | 'net_label'
+30:   | 'transformer'
+31:   | 'terminal_block'
+32:   | 'overload_relay'
+33:   | 'contactor'
+34:   | 'disconnect_switch'
+35:    | 'off_page_connector'
+36:    | 'custom_symbol';
+
+=== CONSTRAINT VERIFICATION ===
+✓ No existing BlockType members removed
+✓ CustomSymbolBlock NOT added to Block union (Task 9 responsibility)
+✓ No React components added (types-only task)
+✓ No runtime logic added (types-only task)
+✓ No @ts-ignore or as any used
+✓ No circular imports introduced

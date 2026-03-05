@@ -1,0 +1,493 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SymbolDefinition",
+  "description": "Complete symbol definition for custom electrical symbols",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "version",
+    "category",
+    "createdAt",
+    "updatedAt",
+    "width",
+    "height",
+    "graphics",
+    "pins",
+    "properties"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier"
+    },
+    "name": {
+      "type": "string",
+      "description": "Display name"
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic version",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional description"
+    },
+    "category": {
+      "type": "string",
+      "description": "Category (e.g., relay, switch, sensor)"
+    },
+    "author": {
+      "type": "string",
+      "description": "Author name"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Creation timestamp (ISO 8601)"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last modification timestamp (ISO 8601)"
+    },
+    "width": {
+      "type": "integer",
+      "multipleOf": 20,
+      "description": "Symbol width in pixels (multiple of 20)"
+    },
+    "height": {
+      "type": "integer",
+      "multipleOf": 20,
+      "description": "Symbol height in pixels (multiple of 20)"
+    },
+    "graphics": {
+      "type": "array",
+      "description": "Graphics for the symbol",
+      "items": {
+        "$ref": "#/definitions/GraphicPrimitive"
+      }
+    },
+    "pins": {
+      "type": "array",
+      "description": "Pins on the symbol",
+      "items": {
+        "$ref": "#/definitions/SymbolPin"
+      }
+    },
+    "units": {
+      "type": "array",
+      "maxItems": 4,
+      "description": "Optional multi-unit definitions",
+      "items": {
+        "$ref": "#/definitions/SymbolUnit"
+      }
+    },
+    "properties": {
+      "type": "array",
+      "description": "Configurable properties",
+      "items": {
+        "$ref": "#/definitions/SymbolProperty"
+      }
+    },
+    "runtimeStateSchema": {
+      "type": "object",
+      "description": "Optional runtime state schema (JSON Schema)"
+    }
+  },
+  "definitions": {
+    "SymbolPin": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "number",
+        "type",
+        "shape",
+        "position",
+        "orientation",
+        "length"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for this pin"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the pin"
+        },
+        "number": {
+          "type": "string",
+          "description": "Pin number (e.g., '1', 'A1')"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "input",
+            "output",
+            "bidirectional",
+            "power",
+            "passive"
+          ],
+          "description": "Electrical type"
+        },
+        "shape": {
+          "type": "string",
+          "enum": [
+            "line",
+            "inverted",
+            "clock"
+          ],
+          "description": "Visual shape"
+        },
+        "position": {
+          "type": "object",
+          "required": [
+            "x",
+            "y"
+          ],
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            }
+          },
+          "description": "Position relative to symbol origin"
+        },
+        "orientation": {
+          "type": "string",
+          "enum": [
+            "right",
+            "left",
+            "up",
+            "down"
+          ],
+          "description": "Pin orientation"
+        },
+        "length": {
+          "type": "number",
+          "description": "Pin line length in pixels"
+        },
+        "hidden": {
+          "type": "boolean",
+          "description": "Whether pin is hidden from display"
+        }
+      }
+    },
+    "GraphicPrimitive": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/RectPrimitive"
+        },
+        {
+          "$ref": "#/definitions/CirclePrimitive"
+        },
+        {
+          "$ref": "#/definitions/PolylinePrimitive"
+        },
+        {
+          "$ref": "#/definitions/ArcPrimitive"
+        },
+        {
+          "$ref": "#/definitions/TextPrimitive"
+        }
+      ]
+    },
+    "RectPrimitive": {
+      "type": "object",
+      "required": [
+        "kind",
+        "x",
+        "y",
+        "width",
+        "height",
+        "stroke",
+        "fill",
+        "strokeWidth"
+      ],
+      "properties": {
+        "kind": {
+          "const": "rect"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number"
+        },
+        "height": {
+          "type": "number"
+        },
+        "stroke": {
+          "type": "string"
+        },
+        "fill": {
+          "type": "string"
+        },
+        "strokeWidth": {
+          "type": "number"
+        }
+      }
+    },
+    "CirclePrimitive": {
+      "type": "object",
+      "required": [
+        "kind",
+        "cx",
+        "cy",
+        "r",
+        "stroke",
+        "fill",
+        "strokeWidth"
+      ],
+      "properties": {
+        "kind": {
+          "const": "circle"
+        },
+        "cx": {
+          "type": "number"
+        },
+        "cy": {
+          "type": "number"
+        },
+        "r": {
+          "type": "number"
+        },
+        "stroke": {
+          "type": "string"
+        },
+        "fill": {
+          "type": "string"
+        },
+        "strokeWidth": {
+          "type": "number"
+        }
+      }
+    },
+    "PolylinePrimitive": {
+      "type": "object",
+      "required": [
+        "kind",
+        "points",
+        "stroke",
+        "fill",
+        "strokeWidth"
+      ],
+      "properties": {
+        "kind": {
+          "const": "polyline"
+        },
+        "points": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "x",
+              "y"
+            ],
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "stroke": {
+          "type": "string"
+        },
+        "fill": {
+          "type": "string"
+        },
+        "strokeWidth": {
+          "type": "number"
+        }
+      }
+    },
+    "ArcPrimitive": {
+      "type": "object",
+      "required": [
+        "kind",
+        "cx",
+        "cy",
+        "r",
+        "startAngle",
+        "endAngle",
+        "stroke",
+        "fill",
+        "strokeWidth"
+      ],
+      "properties": {
+        "kind": {
+          "const": "arc"
+        },
+        "cx": {
+          "type": "number"
+        },
+        "cy": {
+          "type": "number"
+        },
+        "r": {
+          "type": "number"
+        },
+        "startAngle": {
+          "type": "number"
+        },
+        "endAngle": {
+          "type": "number"
+        },
+        "stroke": {
+          "type": "string"
+        },
+        "fill": {
+          "type": "string"
+        },
+        "strokeWidth": {
+          "type": "number"
+        }
+      }
+    },
+    "TextPrimitive": {
+      "type": "object",
+      "required": [
+        "kind",
+        "x",
+        "y",
+        "text",
+        "fontSize",
+        "fontFamily",
+        "fill"
+      ],
+      "properties": {
+        "kind": {
+          "const": "text"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "text": {
+          "type": "string"
+        },
+        "fontSize": {
+          "type": "number"
+        },
+        "fontFamily": {
+          "type": "string"
+        },
+        "fill": {
+          "type": "string"
+        },
+        "anchor": {
+          "type": "string",
+          "enum": [
+            "start",
+            "middle",
+            "end"
+          ]
+        }
+      }
+    },
+    "SymbolUnit": {
+      "type": "object",
+      "required": [
+        "unitId",
+        "name",
+        "graphics",
+        "pins"
+      ],
+      "properties": {
+        "unitId": {
+          "type": "integer",
+          "description": "Unit identifier (1-based)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Unit name (e.g., 'A', 'B', 'Unit 1')"
+        },
+        "graphics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/GraphicPrimitive"
+          }
+        },
+        "pins": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SymbolPin"
+          }
+        }
+      }
+    },
+    "SymbolProperty": {
+      "type": "object",
+      "required": [
+        "key",
+        "value",
+        "type"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Property key (e.g., 'voltage', 'color')"
+        },
+        "value": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "description": "Default value"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "string",
+            "number",
+            "boolean",
+            "enum"
+          ],
+          "description": "Property type"
+        },
+        "visible": {
+          "type": "boolean",
+          "description": "Whether property is visible in UI"
+        },
+        "editorType": {
+          "type": "string",
+          "enum": [
+            "text",
+            "number",
+            "checkbox",
+            "select"
+          ],
+          "description": "Editor widget type"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Options for enum/select types"
+        }
+      }
+    }
+  }
+}

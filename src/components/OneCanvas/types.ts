@@ -4,6 +4,7 @@
  * Types for circuit simulation canvas including blocks, wires, ports,
  * simulation state, and YAML serialization schema.
  */
+ import type { CustomSymbolBlock } from '../../types/symbol';
 
 // ============================================================================
 // Block Types
@@ -32,7 +33,8 @@ export type BlockType =
   | 'overload_relay'
   | 'contactor'
   | 'disconnect_switch'
-  | 'off_page_connector';
+   | 'off_page_connector'
+   | 'custom_symbol';
 
 /** Legacy block types (for migration) */
 export type LegacyBlockType = 'power_24v' | 'power_12v' | 'gnd';
@@ -616,7 +618,8 @@ export type Block =
   | OverloadRelayBlock
   | ContactorBlock
   | DisconnectSwitchBlock
-  | OffPageConnectorBlock;
+   | OffPageConnectorBlock
+   | CustomSymbolBlock;
 
 // ============================================================================
 // Junction (wire-level concept)
