@@ -1,0 +1,30 @@
+import type { SymbolDefinition } from '@/types/symbol';
+
+export const offPageConnectorSymbol: SymbolDefinition = {
+  id: 'builtin:off_page_connector',
+  name: 'Off-Page Connector',
+  version: '1.0.0',
+  description: 'Off-page signal continuation connector',
+  category: 'connection',
+  author: 'ModOne',
+  createdAt: '2026-03-05T00:00:00Z',
+  updatedAt: '2026-03-05T00:00:00Z',
+  width: 80,
+  height: 32,
+  graphics: [
+    { kind: 'polyline', points: [{ x: 0, y: 16 }, { x: 12, y: 16 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { kind: 'polyline', points: [{ x: 12, y: 4 }, { x: 64, y: 4 }, { x: 78, y: 16 }, { x: 64, y: 28 }, { x: 12, y: 28 }, { x: 12, y: 4 }], stroke: '#888', fill: 'transparent', strokeWidth: 2 },
+    { kind: 'text', x: 42, y: 20, text: 'OPC', fontSize: 10, fontFamily: 'Arial', fill: '#888', anchor: 'middle' },
+  ],
+  pins: [
+    { id: 'conn', name: 'CONN', number: '1', type: 'bidirectional', shape: 'line', position: { x: 0, y: 16 }, orientation: 'left', length: 0 },
+  ],
+  properties: [
+    { key: 'signalLabel', value: 'SIGNAL', type: 'string', visible: true, editorType: 'text' },
+    { key: 'direction', value: 'outgoing', type: 'string', visible: true, editorType: 'text' },
+    { key: 'targetPageId', value: '', type: 'string', visible: true, editorType: 'text' },
+    { key: 'targetPageNumber', value: '', type: 'string', visible: true, editorType: 'text' },
+    { key: 'targetPageName', value: '', type: 'string', visible: true, editorType: 'text' },
+    { key: 'dangling', value: true, type: 'boolean', visible: true, editorType: 'checkbox' },
+  ],
+};
