@@ -7,12 +7,18 @@ import {
   GitBranch,
   Type,
   MapPin,
+  Undo2,
+  Redo2,
 } from 'lucide-react';
 import type { EditorTool } from './SymbolEditor';
 
 interface EditorToolbarProps {
   currentTool: EditorTool;
   onToolChange: (tool: EditorTool) => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 interface ToolDef {
@@ -34,6 +40,10 @@ const TOOLS: ToolDef[] = [
 export const EditorToolbar = memo(function EditorToolbar({
   currentTool,
   onToolChange,
+  canUndo = false,
+  canRedo = false,
+  onUndo,
+  onRedo,
 }: EditorToolbarProps) {
   return (
     <div className="flex flex-col gap-1 p-2 bg-neutral-800 border-r border-neutral-700">
@@ -42,7 +52,7 @@ export const EditorToolbar = memo(function EditorToolbar({
           key={tool}
           type="button"
           title={label}
-            onClick={() => onToolChange(tool)}
+          onClick={() => onToolChange(tool)}
           className={`w-9 h-9 rounded flex items-center justify-center transition-colors duration-150 ${
             currentTool === tool
               ? 'bg-blue-600 text-white'
@@ -52,6 +62,35 @@ export const EditorToolbar = memo(function EditorToolbar({
           {icon}
         </button>
       ))}
+
+      <div className="my-1 border-t border-neutral-700" />
+
+      <button
+        type="button"
+        title="Undo (Ctrl+Z)"
+        onClick={onUndo}
+        disabled={!canUndo}
+        className={`w-9 h-9 rounded flex items-center justify-center transition-colors duration-150 ${
+          canUndo
+            ? 'text-neutral-400 hover:text-white hover:bg-neutral-700'
+            : 'text-neutral-600 cursor-not-allowed'
+        }`}
+      >
+        <Undo2 size={18} />
+      </button>
+      <button
+        type="button"
+        title="Redo (Ctrl+Shift+Z)"
+        onClick={onRedo}
+        disabled={!canRedo}
+        className={`w-9 h-9 rounded flex items-center justify-center transition-colors duration-150 ${
+          canRedo
+            ? 'text-neutral-400 hover:text-white hover:bg-neutral-700'
+            : 'text-neutral-600 cursor-not-allowed'
+        }`}
+      >
+        <Redo2 size={18} />
+      </button>
     </div>
   );
 });
