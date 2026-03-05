@@ -1,0 +1,34 @@
+T10: Toolbox Custom Symbols Section
+====================================
+Date: 2026-02-27
+
+Changes made to: src/components/OneCanvas/Toolbox.tsx
+
+New additions:
+- Added `projectDir?: string` prop to ToolboxProps interface
+- Added `Shapes` icon import from lucide-react
+- Added `useSymbolLibrary` hook import from '../../hooks/useSymbolLibrary'
+- Added `DraggableSymbolItemProps` interface
+- Added `DraggableSymbolItem` component (draggable custom symbol entry)
+- Added `CustomSymbolsSectionProps` interface
+- Added `CustomSymbolsSection` component (collapsible section with graceful degradation)
+- Updated `Toolbox` component to accept and forward `projectDir` prop
+- `<CustomSymbolsSection projectDir={projectDir} />` rendered after all built-in categories
+
+Drag data emitted per symbol:
+  type: 'toolbox-item'
+  blockType: 'custom_symbol'
+  presetProps: { symbolId: symbol.id, selectedUnit: 0, instanceProperties: {} }
+  presetLabel: symbol.name
+
+Graceful degradation:
+  - Section hidden if no projectDir
+  - Section hidden if no symbols and not loading
+  - Shows '…' count while loading
+
+Existing built-in sections: UNCHANGED (no modifications)
+
+Build result:
+  pnpm run build → exit 0 ✓ (2.91s)
+
+LSP diagnostics: clean (0 errors)

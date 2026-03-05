@@ -7,9 +7,10 @@
 import { memo, useState } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { ChevronDown, ChevronRight, Zap, Cpu, Lightbulb, Activity, Type, Cog, Shield, Link2, FolderOpen, ArrowRightLeft } from 'lucide-react';
+import { ChevronDown, ChevronRight, Zap, Cpu, Lightbulb, Activity, Type, Cog, Shield, Link2, FolderOpen, ArrowRightLeft, Shapes } from 'lucide-react';
 import type { BlockType } from './types';
 import type { Block } from './types';
+import { useSymbolLibrary } from '../../hooks/useSymbolLibrary';
 
 // ============================================================================
 // Types
@@ -32,6 +33,8 @@ interface ToolboxProps {
   className?: string;
   /** Callback to open the circuit library */
   onOpenLibrary?: () => void;
+  /** Project directory for loading custom symbols */
+  projectDir?: string;
 }
 
 interface DraggableBlockItemProps {
@@ -305,13 +308,111 @@ const CategorySection = memo(function CategorySection({
 });
 
 // ============================================================================
+// Custom Symbols Section
+// ============================================================================
+
+interface DraggableSymbolItemProps {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+const DraggableSymbolItem = memo(function DraggableSymbolItem({
+  id,
+  name,
+  description,
+}: DraggableSymbolItemProps) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `toolbox-custom_symbol-${id}`,
+    data: {
+      type: 'toolbox-item',
+      blockType: 'custom_symbol' as const,
+      presetProps: { symbolId: id, selectedUnit: 0, instanceProperties: {} },
+      presetLabel: name,
+    },
+  });
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className={`
+        px-3 py-2 rounded cursor-grab active:cursor-grabbing
+        bg-neutral-800 hover:bg-neutral-700
+        border border-transparent hover:border-neutral-600
+        transition-colors duration-150
+        ${isDragging ? 'ring-2 ring-blue-500' : ''}
+      `}
+      title={description ?? name}
+    >
+      <div className="text-sm text-white font-medium">{name}</div>
+      {description && <div className="text-xs text-neutral-400 truncate">{description}</div>}
+    </div>
+  );
+});
+
+interface CustomSymbolsSectionProps {
+  projectDir?: string;
+}
+
+const CustomSymbolsSection = memo(function CustomSymbolsSection({ projectDir }: CustomSymbolsSectionProps) {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const { allSymbols, isLoading } = useSymbolLibrary(projectDir ?? '');
+
+  // Only render if projectDir is provided and symbols exist (or loading)
+  if (!projectDir || (!isLoading && allSymbols.length === 0)) {
+    return null;
+  }
+
+  return (
+    <div className="border-b border-neutral-700 last:border-b-0">
+      <button
+        type="button"
+        className="
+          w-full px-3 py-2 flex items-center gap-2
+          text-sm text-neutral-300 font-medium
+          hover:bg-neutral-800 transition-colors
+        "
+        onClick={() => setIsExpanded((v) => !v)}
+      >
+        {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        <Shapes size={16} />
+        <span>Custom Symbols</span>
+        <span className="ml-auto text-xs text-neutral-500">
+          {isLoading ? '…' : allSymbols.length}
+        </span>
+      </button>
+      {isExpanded && (
+        <div className="px-2 pb-2 space-y-1">
+          {allSymbols.map((symbol) => (
+            <DraggableSymbolItem
+              key={symbol.id}
+              id={symbol.id}
+              name={symbol.name}
+              description={symbol.description}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+});
+
+// ============================================================================
 // Toolbox Component
 // ============================================================================
 
 /**
  * Toolbox panel with draggable block items.
  */
-export const Toolbox = memo(function Toolbox({ className = '', onOpenLibrary }: ToolboxProps) {
+export const Toolbox = memo(function Toolbox({ className = '', onOpenLibrary, projectDir }: ToolboxProps) {
   // Track expanded categories (all expanded by default)
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(BLOCK_CATEGORIES.map((c) => c.name))
@@ -361,6 +462,8 @@ export const Toolbox = memo(function Toolbox({ className = '', onOpenLibrary }: 
             onToggle={() => toggleCategory(category.name)}
           />
         ))}
+        {/* Custom Symbols section */}
+        <CustomSymbolsSection projectDir={projectDir} />
       </div>
     </div>
   );
