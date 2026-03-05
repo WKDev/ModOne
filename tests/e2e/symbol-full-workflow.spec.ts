@@ -84,14 +84,14 @@ test.describe('Symbol Full Lifecycle', () => {
       // Place an input pin on the left edge
       await page.click('[title="Pin"]');
       await page.mouse.click(canvasBox!.x + 80, canvasBox!.y + 110);
-      // Configure pin as input in the popover (if it appears)
+      // Configure pin in the popover (if it appears):
       // await page.click('button:has-text("Input")');
       // await page.click('button:has-text("OK")');
 
       // Place an output pin on the right edge
       await page.click('[title="Pin"]');
       await page.mouse.click(canvasBox!.x + 160, canvasBox!.y + 110);
-      // Configure pin as output in the popover
+      // Configure pin in the popover (if it appears):
       // await page.click('button:has-text("Output")');
       // await page.click('button:has-text("OK")');
 
@@ -106,7 +106,7 @@ test.describe('Symbol Full Lifecycle', () => {
       await page.click('[title="Close"]');
       await expect(page.locator('text=Symbol Editor')).not.toBeVisible();
 
-      // ── Step 4: Open LibraryBrowser and verify symbol is listed ──────────
+      // ── Step 4: Verify symbol appears in the library ─────────────────────
       // await page.click('[data-testid="activity-symbols"]');
       await expect(page.locator('input[placeholder="Search symbols..."]')).toBeVisible();
       await expect(
@@ -132,7 +132,7 @@ test.describe('Symbol Full Lifecycle', () => {
       await page.mouse.up();
 
       // Verify the custom symbol block appeared on canvas
-      await expect(page.locator('[data-symbol-id]'.first()).toBeVisible();
+      await expect(page.locator('[data-symbol-id]').first()).toBeVisible();
 
       // ── Step 6: Connect a wire to the custom symbol input pin ────────────
       const customBlock = page.locator('[data-symbol-id]').first();
@@ -160,7 +160,7 @@ test.describe('Symbol Full Lifecycle', () => {
       await page.mouse.up();
 
       // Wire must be present
-      await expect(page.locator('[data-wire-id]'.first()).toBeVisible();
+      await expect(page.locator('[data-wire-id]').first()).toBeVisible();
 
       // ── Step 7: Save the project ─────────────────────────────────────────
       await page.keyboard.press('Control+s');
@@ -173,10 +173,10 @@ test.describe('Symbol Full Lifecycle', () => {
 
       // ── Step 9: Verify canvas state is fully restored ────────────────────
       // Custom symbol block still on canvas
-      await expect(page.locator('[data-symbol-id]'.first()).toBeVisible();
+      await expect(page.locator('[data-symbol-id]').first()).toBeVisible();
 
       // Wire still connected
-      await expect(page.locator('[data-wire-id]'.first()).toBeVisible();
+      await expect(page.locator('[data-wire-id]').first()).toBeVisible();
 
       // ── Step 10: Verify no console errors during the entire flow ─────────
       expect(consoleErrors).toHaveLength(0);
@@ -202,7 +202,7 @@ test.describe('Symbol Full Lifecycle', () => {
     // await page.click('[data-testid="activity-symbols"]');
 
     // Symbol from previous session should still be listed
-    await expect(page.locator('[draggable="true"]'.first()).toBeVisible();
+    await expect(page.locator('[draggable="true"]').first()).toBeVisible();
   });
 
   test('no console errors occur when opening Symbol Editor on a new project', async ({ page }) => {
@@ -247,13 +247,11 @@ test.describe('Symbol Full Lifecycle', () => {
       'Requires a custom symbol with two pins already in the library'
     );
 
-    // Place the custom symbol on canvas
-    // (drag-drop from library as per symbol-placement tests)
-
-    // Verify the placed symbol has exactly two pins
+    // Place the custom symbol on canvas (drag-drop from library as per symbol-placement tests)
     const customBlock = page.locator('[data-symbol-id]').first();
     await expect(customBlock).toBeVisible();
 
+    // Verify the placed symbol has exactly two pins
     const pins = customBlock.locator('[data-pin-id]');
     await expect(pins).toHaveCount(2);
   });

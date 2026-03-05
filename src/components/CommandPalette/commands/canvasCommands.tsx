@@ -176,6 +176,22 @@ export function registerCanvasCommands(): void {
     // Block Addition Commands
     // ========================================================================
     {
+      id: 'canvas.openSymbolEditor',
+      category: 'canvas',
+      label: 'Open Symbol Editor',
+      description: 'Open the Symbol Editor in a new tab',
+      keywords: ['symbol', 'editor', 'custom'],
+      execute: () => {
+        const { tabs, addTab, setActiveTab } = useEditorAreaStore.getState();
+        const existingTab = tabs.find((tab) => tab.panelType === 'symbol-editor');
+        if (existingTab) {
+          setActiveTab(existingTab.id);
+          return;
+        }
+        addTab('symbol-editor', 'Symbol Editor');
+      },
+    },
+    {
       id: 'canvas.addButton',
       category: 'canvas',
       label: 'Add Button Block',

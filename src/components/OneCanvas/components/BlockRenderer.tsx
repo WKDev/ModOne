@@ -4,7 +4,7 @@
  * Dispatches to the appropriate block component based on block type.
  */
 
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 import type { Block } from '../types';
 import { PowerBlock } from './blocks/PowerBlock';
 import { LedBlock } from './blocks/LedBlock';
@@ -28,8 +28,9 @@ import { OverloadRelayBlock } from './blocks/OverloadRelayBlock';
 import { ContactorBlock } from './blocks/ContactorBlock';
 import { DisconnectSwitchBlock } from './blocks/DisconnectSwitchBlock';
 import { OffPageConnectorBlock } from './blocks/OffPageConnectorBlock';
-// SymbolRenderer will be used in Wave 3 when symbol store is wired in
-// import { SymbolRenderer } from './SymbolRenderer';
+import { SymbolRenderer } from './SymbolRenderer';
+import { useSymbolStore } from '@stores/symbolStore';
+import { useProjectStore } from '@stores/projectStore';
 import type { CustomSymbolBlock } from '../../../types/symbol';
 // JunctionBlock is now rendered as SVG dot in the wire layer (JunctionDot.tsx)
 
@@ -85,6 +86,35 @@ export const BlockRenderer = memo(function BlockRenderer({
   plcOutputStates,
   onUpdateComponent,
 }: BlockRendererProps) {
+  const { projectSymbols, globalSymbols, currentSymbol, loadSymbol } = useSymbolStore((state) => ({
+    projectSymbols: state.projectSymbols,
+    globalSymbols: state.globalSymbols,
+    currentSymbol: state.currentSymbol,
+    loadSymbol: state.loadSymbol,
+  }));
+  const currentProjectPath = useProjectStore((state) => state.currentProjectPath);
+
+  useEffect(() => {
+    if (block.type !== 'custom_symbol' || !currentProjectPath) {
+      return;
+    }
+
+    const csBlock = block as CustomSymbolBlock;
+    if (!csBlock.symbolId || currentSymbol?.id === csBlock.symbolId) {
+      return;
+    }
+
+    const scope = projectSymbols.some((symbol) => symbol.id === csBlock.symbolId)
+      ? 'project'
+      : globalSymbols.some((symbol) => symbol.id === csBlock.symbolId)
+        ? 'global'
+        : undefined;
+
+    if (scope) {
+      void loadSymbol(currentProjectPath, csBlock.symbolId, scope);
+    }
+  }, [block, currentProjectPath, currentSymbol?.id, globalSymbols, loadSymbol, projectSymbols]);
+
   // Common props for all block types
   const commonProps = {
     isSelected,
@@ -194,9 +224,11 @@ export const BlockRenderer = memo(function BlockRenderer({
 
       case 'custom_symbol': {
         const csBlock = block as CustomSymbolBlock;
-        // Symbol definition lookup — for now render a placeholder if symbol is not loaded
-        // The actual symbol definition lookup will be wired in a later task (Wave 3)
-        // For now: if no symbol data is available, render a placeholder rect with the symbolId text
+        const symbolDef = currentSymbol?.id === csBlock.symbolId ? currentSymbol : null;
+        if (symbolDef) {
+          return <SymbolRenderer symbol={symbolDef} scale={1} />;
+        }
+
         return (
           <g>
             <rect

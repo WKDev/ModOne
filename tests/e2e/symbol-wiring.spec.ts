@@ -16,11 +16,6 @@ import { selectors } from './utils/selectors';
  *
  * Wire elements:
  *   '[data-wire-id]'                           — a wire/connection segment in SVG
- *   'line[data-wire-id]', 'path[data-wire-id]' — SVG wire elements
- *
- * Toolbox / block palette:
- *   '[data-testid="toolbar-btn-button"]'       — button coil block in toolbox (example)
- *   '[data-testid="toolbar-btn-contact"]'      — NO contact block
  *
  * Wiring requires: open project, at least one placed custom symbol with pins,
  * and at least one placed built-in block. Marked test.fixme() because pin
@@ -73,7 +68,7 @@ test.describe('Symbol Wiring', () => {
     await page.mouse.up();
 
     // A wire element must now exist in the canvas SVG
-    await expect(page.locator('[data-wire-id]'.first()).toBeVisible();
+    await expect(page.locator('[data-wire-id]').first()).toBeVisible();
   });
 
   test('connects a wire from custom symbol output to another block input', async ({ page }) => {
@@ -109,7 +104,7 @@ test.describe('Symbol Wiring', () => {
     await page.mouse.up();
 
     // Wire created
-    await expect(page.locator('[data-wire-id]'.first()).toBeVisible();
+    await expect(page.locator('[data-wire-id]').first()).toBeVisible();
   });
 
   test('wire persists after project save and page reload', async ({ page }) => {
@@ -128,7 +123,7 @@ test.describe('Symbol Wiring', () => {
     await page.waitForTimeout(500);
 
     // Wire must still exist after reload
-    await expect(page.locator('[data-wire-id]'.first()).toBeVisible();
+    await expect(page.locator('[data-wire-id]').first()).toBeVisible();
   });
 
   test('cannot connect two output pins together', async ({ page }) => {
@@ -174,20 +169,20 @@ test.describe('Symbol Wiring', () => {
     );
 
     // Verify the wire exists
-    await expect(page.locator('[data-wire-id]'.first()).toBeVisible();
+    await expect(page.locator('[data-wire-id]').first()).toBeVisible();
 
     // Zoom in using Ctrl++
     await page.keyboard.press('Control+=');
     await page.waitForTimeout(200);
 
     // Wire should still be visible in the DOM
-    await expect(page.locator('[data-wire-id]'.first()).toBeVisible();
+    await expect(page.locator('[data-wire-id]').first()).toBeVisible();
 
     // Zoom back out
     await page.keyboard.press('Control+-');
     await page.waitForTimeout(200);
 
-    await expect(page.locator('[data-wire-id]'.first()).toBeVisible();
+    await expect(page.locator('[data-wire-id]').first()).toBeVisible();
   });
 
   test('status bar shows no errors after valid wiring', async ({ page }) => {
