@@ -6,6 +6,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { toast } from 'sonner';
 
 // ============================================================================
 // Types
@@ -116,12 +117,19 @@ export const scopeService = {
     bufferSize?: number,
     sampleRate?: number
   ): Promise<void> {
-    await invoke('scope_create', {
-      scopeId,
-      channels,
-      bufferSize,
-      sampleRate,
-    });
+    try {
+      await invoke('scope_create', {
+        scopeId,
+        channels,
+        bufferSize,
+        sampleRate,
+      });
+    } catch (error) {
+      toast.error('Failed to create scope', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -130,7 +138,14 @@ export const scopeService = {
    * @param scopeId - The scope identifier
    */
   async delete(scopeId: string): Promise<void> {
-    await invoke('scope_delete', { scopeId });
+    try {
+      await invoke('scope_delete', { scopeId });
+    } catch (error) {
+      toast.error('Failed to delete scope', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -140,7 +155,14 @@ export const scopeService = {
    * @returns true if scope exists
    */
   async exists(scopeId: string): Promise<boolean> {
-    return await invoke<boolean>('scope_exists', { scopeId });
+    try {
+      return await invoke<boolean>('scope_exists', { scopeId });
+    } catch (error) {
+      toast.error('Failed to check scope existence', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -149,7 +171,14 @@ export const scopeService = {
    * @returns Array of scope IDs
    */
   async list(): Promise<string[]> {
-    return await invoke<string[]>('scope_list');
+    try {
+      return await invoke<string[]>('scope_list');
+    } catch (error) {
+      toast.error('Failed to list scopes', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   // ==========================================================================
@@ -163,7 +192,14 @@ export const scopeService = {
    * @param run - true to run, false to stop
    */
   async runStop(scopeId: string, run: boolean): Promise<void> {
-    await invoke('scope_run_stop', { scopeId, run });
+    try {
+      await invoke('scope_run_stop', { scopeId, run });
+    } catch (error) {
+      toast.error('Failed to update scope run state', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -172,7 +208,14 @@ export const scopeService = {
    * @param scopeId - The scope identifier
    */
   async reset(scopeId: string): Promise<void> {
-    await invoke('scope_reset', { scopeId });
+    try {
+      await invoke('scope_reset', { scopeId });
+    } catch (error) {
+      toast.error('Failed to reset scope', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -181,7 +224,14 @@ export const scopeService = {
    * @param scopeId - The scope identifier
    */
   async armTrigger(scopeId: string): Promise<void> {
-    await invoke('scope_arm_trigger', { scopeId });
+    try {
+      await invoke('scope_arm_trigger', { scopeId });
+    } catch (error) {
+      toast.error('Failed to arm scope trigger', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -191,7 +241,14 @@ export const scopeService = {
    * @param settings - New scope settings
    */
   async updateSettings(scopeId: string, settings: ScopeSettings): Promise<void> {
-    await invoke('scope_update_settings', { scopeId, settings });
+    try {
+      await invoke('scope_update_settings', { scopeId, settings });
+    } catch (error) {
+      toast.error('Failed to update scope settings', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   // ==========================================================================
@@ -205,7 +262,14 @@ export const scopeService = {
    * @returns ScopeDisplayData with channel points, statistics, and trigger info
    */
   async getData(scopeId: string): Promise<ScopeDisplayData> {
-    return await invoke<ScopeDisplayData>('scope_get_data', { scopeId });
+    try {
+      return await invoke<ScopeDisplayData>('scope_get_data', { scopeId });
+    } catch (error) {
+      toast.error('Failed to get scope data', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -216,7 +280,14 @@ export const scopeService = {
    * @param voltage - Voltage value to add
    */
   async addSample(scopeId: string, channel: number, voltage: number): Promise<void> {
-    await invoke('scope_add_sample', { scopeId, channel, voltage });
+    try {
+      await invoke('scope_add_sample', { scopeId, channel, voltage });
+    } catch (error) {
+      toast.error('Scope sampling failed', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -226,7 +297,14 @@ export const scopeService = {
    * @param samples - Array of [channel, voltage] tuples
    */
   async addSamples(scopeId: string, samples: [number, number][]): Promise<void> {
-    await invoke('scope_add_samples', { scopeId, samples });
+    try {
+      await invoke('scope_add_samples', { scopeId, samples });
+    } catch (error) {
+      toast.error('Scope sampling failed', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   // ==========================================================================
@@ -239,7 +317,14 @@ export const scopeService = {
    * @param mapping - The channel mapping configuration
    */
   async registerMapping(mapping: ScopeChannelMapping): Promise<void> {
-    await invoke('scope_register_mapping', { mapping });
+    try {
+      await invoke('scope_register_mapping', { mapping });
+    } catch (error) {
+      toast.error('Failed to register scope mapping', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -248,7 +333,14 @@ export const scopeService = {
    * @param mappings - Array of channel mapping configurations
    */
   async registerMappings(mappings: ScopeChannelMapping[]): Promise<void> {
-    await invoke('scope_register_mappings', { newMappings: mappings });
+    try {
+      await invoke('scope_register_mappings', { newMappings: mappings });
+    } catch (error) {
+      toast.error('Failed to register scope mappings', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -258,7 +350,14 @@ export const scopeService = {
    * @param channel - The channel index to remove mapping for
    */
   async removeMapping(scopeId: string, channel: number): Promise<void> {
-    await invoke('scope_remove_mapping', { scopeId, channel });
+    try {
+      await invoke('scope_remove_mapping', { scopeId, channel });
+    } catch (error) {
+      toast.error('Failed to remove scope mapping', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -268,7 +367,14 @@ export const scopeService = {
    * @returns Number of mappings removed
    */
   async clearMappings(scopeId: string): Promise<number> {
-    return await invoke<number>('scope_clear_mappings', { scopeId });
+    try {
+      return await invoke<number>('scope_clear_mappings', { scopeId });
+    } catch (error) {
+      toast.error('Failed to clear scope mappings', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -278,7 +384,14 @@ export const scopeService = {
    * @returns Array of channel mappings
    */
   async getMappings(scopeId?: string): Promise<ScopeChannelMapping[]> {
-    return await invoke<ScopeChannelMapping[]>('scope_get_mappings', { scopeId });
+    try {
+      return await invoke<ScopeChannelMapping[]>('scope_get_mappings', { scopeId });
+    } catch (error) {
+      toast.error('Failed to get scope mappings', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -290,7 +403,14 @@ export const scopeService = {
    * @returns ScopeSampleResult with count of samples added and any errors
    */
   async tick(): Promise<ScopeSampleResult> {
-    return await invoke<ScopeSampleResult>('scope_tick');
+    try {
+      return await invoke<ScopeSampleResult>('scope_tick');
+    } catch (error) {
+      toast.error('Scope sampling failed', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -310,12 +430,19 @@ export const scopeService = {
     scale?: number,
     offset?: number
   ): Promise<number> {
-    return await invoke<number>('scope_read_device_voltage', {
-      deviceType,
-      address,
-      scale,
-      offset,
-    });
+    try {
+      return await invoke<number>('scope_read_device_voltage', {
+        deviceType,
+        address,
+        scale,
+        offset,
+      });
+    } catch (error) {
+      toast.error('Failed to read device voltage', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   // ==========================================================================

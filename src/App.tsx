@@ -13,6 +13,7 @@ import { FloatingWindowRenderer } from './components/floating/FloatingWindowRend
 import { CommandPalette, useCommandPalette, registerAllCommands } from './components/CommandPalette';
 import { ProjectDialogProvider } from './contexts/ProjectDialogContext';
 import { UnsavedChangesDialog } from './components/project/UnsavedChangesDialog';
+import { Toaster, toast } from 'sonner';
 import { useMacosNativeMenu } from "./hooks/useMacosNativeMenu";
 
 /**
@@ -72,8 +73,8 @@ function MainWindowContent() {
   useEffect(() => {
     const title = `ModOne${projectName ? ` - ${projectName}` : ''}${isModified ? ' *' : ''}`;
 
-    getCurrentWindow().setTitle(title).catch((error) => {
-      console.error('Failed to update window title:', error);
+    getCurrentWindow().setTitle(title).catch(() => {
+      toast.error('Failed to update window title');
     });
   }, [projectName, isModified]);
 
@@ -145,6 +146,7 @@ function App() {
   if (isFloating && windowId && panelId) {
     return (
       <ThemeProvider defaultTheme="dark">
+        <Toaster position="bottom-right" richColors theme="dark" />
         <FloatingWindowApp windowId={windowId} panelId={panelId} />
       </ThemeProvider>
     );
@@ -153,6 +155,7 @@ function App() {
   // Main window mode - render full application
   return (
     <ThemeProvider defaultTheme="dark">
+      <Toaster position="bottom-right" richColors theme="dark" />
       <MainWindowContent />
     </ThemeProvider>
   );

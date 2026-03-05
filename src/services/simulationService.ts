@@ -7,6 +7,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { toast } from 'sonner';
 import { useLayoutStore } from '../stores/layoutStore';
 
 /**
@@ -19,8 +20,15 @@ export const simulationService = {
    * Calls sim_run and updates layoutStore to 'running'
    */
   async start(): Promise<void> {
-    await invoke('sim_run');
-    useLayoutStore.getState().setSimulationStatus('running');
+    try {
+      await invoke('sim_run');
+      useLayoutStore.getState().setSimulationStatus('running');
+    } catch (error) {
+      toast.error('Failed to start simulation', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -28,8 +36,15 @@ export const simulationService = {
    * Calls sim_stop and updates layoutStore to 'stopped'
    */
   async stop(): Promise<void> {
-    await invoke('sim_stop');
-    useLayoutStore.getState().setSimulationStatus('stopped');
+    try {
+      await invoke('sim_stop');
+      useLayoutStore.getState().setSimulationStatus('stopped');
+    } catch (error) {
+      toast.error('Failed to stop simulation', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -37,8 +52,15 @@ export const simulationService = {
    * Calls sim_pause and updates layoutStore to 'paused'
    */
   async pause(): Promise<void> {
-    await invoke('sim_pause');
-    useLayoutStore.getState().setSimulationStatus('paused');
+    try {
+      await invoke('sim_pause');
+      useLayoutStore.getState().setSimulationStatus('paused');
+    } catch (error) {
+      toast.error('Failed to pause simulation', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -46,8 +68,15 @@ export const simulationService = {
    * Calls sim_resume and updates layoutStore to 'running'
    */
   async resume(): Promise<void> {
-    await invoke('sim_resume');
-    useLayoutStore.getState().setSimulationStatus('running');
+    try {
+      await invoke('sim_resume');
+      useLayoutStore.getState().setSimulationStatus('running');
+    } catch (error) {
+      toast.error('Failed to resume simulation', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -55,7 +84,14 @@ export const simulationService = {
    * Calls sim_step (only valid when paused)
    */
   async step(): Promise<void> {
-    await invoke('sim_step');
+    try {
+      await invoke('sim_step');
+    } catch (error) {
+      toast.error('Failed to step simulation', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -63,8 +99,15 @@ export const simulationService = {
    * Calls sim_reset and updates layoutStore to 'stopped'
    */
   async reset(): Promise<void> {
-    await invoke('sim_reset');
-    useLayoutStore.getState().setSimulationStatus('stopped');
+    try {
+      await invoke('sim_reset');
+      useLayoutStore.getState().setSimulationStatus('stopped');
+    } catch (error) {
+      toast.error('Failed to reset simulation', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -72,7 +115,14 @@ export const simulationService = {
    * Must be called before start() to provide the program to execute
    */
   async loadProgram(program: unknown): Promise<void> {
-    await invoke('sim_load_program', { program });
+    try {
+      await invoke('sim_load_program', { program });
+    } catch (error) {
+      toast.error('Failed to load simulation program', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**

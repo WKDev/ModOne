@@ -6,6 +6,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
+import { toast } from 'sonner';
 import type { Bounds, FloatingWindowInfo, WindowBounds } from '../types/window';
 
 /**
@@ -53,18 +54,32 @@ export const windowService = {
       width: bounds.width,
       height: bounds.height,
     };
-    return invoke<string>('window_create_floating', {
-      panelId,
-      panelType,
-      bounds: windowBounds,
-    });
+    try {
+      return await invoke<string>('window_create_floating', {
+        panelId,
+        panelType,
+        bounds: windowBounds,
+      });
+    } catch (error) {
+      toast.error('Failed to create floating window', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
    * Close a floating window
    */
   async closeFloatingWindow(windowId: string): Promise<void> {
-    return invoke('window_close_floating', { windowId });
+    try {
+      await invoke('window_close_floating', { windowId });
+    } catch (error) {
+      toast.error('Failed to close floating window', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -77,49 +92,98 @@ export const windowService = {
       width: bounds.width,
       height: bounds.height,
     };
-    return invoke('window_update_bounds', { windowId, bounds: windowBounds });
+    try {
+      await invoke('window_update_bounds', { windowId, bounds: windowBounds });
+    } catch (error) {
+      toast.error('Failed to update floating window bounds', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
    * Focus a floating window (bring to front)
    */
   async focusFloatingWindow(windowId: string): Promise<void> {
-    return invoke('window_focus_floating', { windowId });
+    try {
+      await invoke('window_focus_floating', { windowId });
+    } catch (error) {
+      toast.error('Failed to focus floating window', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
    * List all floating windows
    */
   async listFloatingWindows(): Promise<FloatingWindowInfo[]> {
-    return invoke<FloatingWindowInfo[]>('window_list_floating');
+    try {
+      return await invoke<FloatingWindowInfo[]>('window_list_floating');
+    } catch (error) {
+      toast.error('Failed to list floating windows', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
    * Get information about a specific floating window
    */
   async getFloatingWindowInfo(windowId: string): Promise<FloatingWindowInfo | null> {
-    return invoke<FloatingWindowInfo | null>('window_get_floating_info', { windowId });
+    try {
+      return await invoke<FloatingWindowInfo | null>('window_get_floating_info', { windowId });
+    } catch (error) {
+      toast.error('Failed to get floating window info', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
    * Minimize a floating window
    */
   async minimizeFloatingWindow(windowId: string): Promise<void> {
-    return invoke('window_minimize_floating', { windowId });
+    try {
+      await invoke('window_minimize_floating', { windowId });
+    } catch (error) {
+      toast.error('Failed to minimize floating window', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
    * Maximize/restore a floating window
    */
   async maximizeFloatingWindow(windowId: string): Promise<void> {
-    return invoke('window_maximize_floating', { windowId });
+    try {
+      await invoke('window_maximize_floating', { windowId });
+    } catch (error) {
+      toast.error('Failed to maximize floating window', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
    * Check if a floating window exists
    */
   async floatingWindowExists(windowId: string): Promise<boolean> {
-    return invoke<boolean>('window_floating_exists', { windowId });
+    try {
+      return await invoke<boolean>('window_floating_exists', { windowId });
+    } catch (error) {
+      toast.error('Failed to check floating window', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   // Event listeners

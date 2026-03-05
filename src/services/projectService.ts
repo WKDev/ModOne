@@ -6,6 +6,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { toast } from 'sonner';
 import type {
   ProjectInfo,
   ProjectData,
@@ -44,13 +45,20 @@ export const projectService = {
     plcModel: string,
     scanTimeMs?: number
   ): Promise<ProjectInfo> {
-    return invoke('create_project', {
-      name,
-      projectDir,
-      plcManufacturer,
-      plcModel,
-      scanTimeMs: scanTimeMs ?? null,
-    });
+    try {
+      return await invoke('create_project', {
+        name,
+        projectDir,
+        plcManufacturer,
+        plcModel,
+        scanTimeMs: scanTimeMs ?? null,
+      });
+    } catch (error) {
+      toast.error('Failed to create project', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -58,7 +66,14 @@ export const projectService = {
    * @param path - Path to the .mop file
    */
   async openProject(path: string): Promise<ProjectData> {
-    return invoke('open_project', { path });
+    try {
+      return await invoke('open_project', { path });
+    } catch (error) {
+      toast.error('Failed to open project', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -66,42 +81,84 @@ export const projectService = {
    * @param path - Optional path for "Save As" operation
    */
   async saveProject(path?: string): Promise<void> {
-    return invoke('save_project', { path: path ?? null });
+    try {
+      await invoke('save_project', { path: path ?? null });
+    } catch (error) {
+      toast.error('Failed to save project', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
    * Close the current project (fails if unsaved changes)
    */
   async closeProject(): Promise<void> {
-    return invoke('close_project');
+    try {
+      await invoke('close_project');
+    } catch (error) {
+      toast.error('Failed to close project', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
    * Close the current project without saving (discards changes)
    */
   async closeProjectForce(): Promise<void> {
-    return invoke('close_project_force');
+    try {
+      await invoke('close_project_force');
+    } catch (error) {
+      toast.error('Failed to force close project', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
    * Get the list of recently opened projects
    */
   async getRecentProjects(): Promise<RecentProject[]> {
-    return invoke('get_recent_projects');
+    try {
+      return await invoke('get_recent_projects');
+    } catch (error) {
+      toast.error('Failed to load recent projects', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
    * Get the current project status
    */
   async getProjectStatus(): Promise<ProjectStatus> {
-    return invoke('get_project_status');
+    try {
+      return await invoke('get_project_status');
+    } catch (error) {
+      toast.error('Failed to get project status', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
    * Mark the current project as modified
    */
   async markProjectModified(): Promise<void> {
-    return invoke('mark_project_modified');
+    try {
+      await invoke('mark_project_modified');
+    } catch (error) {
+      toast.error('Failed to mark project as modified', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -109,21 +166,42 @@ export const projectService = {
    * @param path - Path of the project to remove
    */
   async removeFromRecent(path: string): Promise<void> {
-    return invoke('remove_from_recent', { path });
+    try {
+      await invoke('remove_from_recent', { path });
+    } catch (error) {
+      toast.error('Failed to remove recent project', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
    * Clear all recent projects
    */
   async clearRecentProjects(): Promise<void> {
-    return invoke('clear_recent_projects');
+    try {
+      await invoke('clear_recent_projects');
+    } catch (error) {
+      toast.error('Failed to clear recent projects', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
    * Get the current auto-save settings
    */
   async getAutoSaveSettings(): Promise<AutoSaveSettings> {
-    return invoke('get_auto_save_settings');
+    try {
+      return await invoke('get_auto_save_settings');
+    } catch (error) {
+      toast.error('Failed to get auto-save settings', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -131,7 +209,14 @@ export const projectService = {
    * @param enabled - Whether auto-save should be enabled
    */
   async setAutoSaveEnabled(enabled: boolean): Promise<void> {
-    return invoke('set_auto_save_enabled', { enabled });
+    try {
+      await invoke('set_auto_save_enabled', { enabled });
+    } catch (error) {
+      toast.error('Failed to update auto-save setting', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -139,7 +224,14 @@ export const projectService = {
    * @param secs - Interval in seconds (minimum 30)
    */
   async setAutoSaveInterval(secs: number): Promise<void> {
-    return invoke('set_auto_save_interval', { secs });
+    try {
+      await invoke('set_auto_save_interval', { secs });
+    } catch (error) {
+      toast.error('Failed to set auto-save interval', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -147,21 +239,42 @@ export const projectService = {
    * @param count - Number of backups (1-10)
    */
   async setBackupCount(count: number): Promise<void> {
-    return invoke('set_backup_count', { count });
+    try {
+      await invoke('set_backup_count', { count });
+    } catch (error) {
+      toast.error('Failed to set backup count', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
    * Start the auto-save loop
    */
   async startAutoSave(): Promise<void> {
-    return invoke('start_auto_save');
+    try {
+      await invoke('start_auto_save');
+    } catch (error) {
+      toast.error('Failed to start auto-save', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
    * Stop the auto-save loop
    */
   async stopAutoSave(): Promise<void> {
-    return invoke('stop_auto_save');
+    try {
+      await invoke('stop_auto_save');
+    } catch (error) {
+      toast.error('Failed to stop auto-save', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 };
 

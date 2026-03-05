@@ -6,6 +6,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { toast } from 'sonner';
 import type {
   CsvRow,
   ModbusAddress,
@@ -20,14 +21,28 @@ import type {
  * Parse a CSV file from disk
  */
 export async function parseCsvFile(path: string): Promise<CsvRow[]> {
-  return await invoke<CsvRow[]>('parser_parse_csv_file', { path });
+  try {
+    return await invoke<CsvRow[]>('parser_parse_csv_file', { path });
+  } catch (error) {
+    toast.error('Failed to parse CSV', {
+      description: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 /**
  * Parse CSV content from string
  */
 export async function parseCsvContent(content: string): Promise<CsvRow[]> {
-  return await invoke<CsvRow[]>('parser_parse_csv_content', { content });
+  try {
+    return await invoke<CsvRow[]>('parser_parse_csv_content', { content });
+  } catch (error) {
+    toast.error('Failed to parse CSV', {
+      description: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 /**
@@ -36,9 +51,16 @@ export async function parseCsvContent(content: string): Promise<CsvRow[]> {
 export async function parseCsvGrouped(
   content: string
 ): Promise<Record<number, CsvRow[]>> {
-  return await invoke<Record<number, CsvRow[]>>('parser_parse_csv_grouped', {
-    content,
-  });
+  try {
+    return await invoke<Record<number, CsvRow[]>>('parser_parse_csv_grouped', {
+      content,
+    });
+  } catch (error) {
+    toast.error('Failed to parse grouped CSV', {
+      description: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 // ============================================================================
@@ -53,9 +75,16 @@ export async function parseCsvGrouped(
 export async function mapAddressToModbus(
   deviceAddress: string
 ): Promise<ModbusAddress | null> {
-  return await invoke<ModbusAddress | null>('parser_map_address_to_modbus', {
-    deviceAddress,
-  });
+  try {
+    return await invoke<ModbusAddress | null>('parser_map_address_to_modbus', {
+      deviceAddress,
+    });
+  } catch (error) {
+    toast.error('Failed to map device address', {
+      description: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 /**
@@ -66,9 +95,16 @@ export async function mapAddressToModbus(
 export async function mapModbusToAddress(
   modbusAddress: ModbusAddress
 ): Promise<string[]> {
-  return await invoke<string[]>('parser_map_modbus_to_address', {
-    modbusAddress,
-  });
+  try {
+    return await invoke<string[]>('parser_map_modbus_to_address', {
+      modbusAddress,
+    });
+  } catch (error) {
+    toast.error('Failed to map Modbus address', {
+      description: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 /**
@@ -77,7 +113,14 @@ export async function mapModbusToAddress(
  * @returns True if the device is read-only
  */
 export async function isReadOnly(deviceAddress: string): Promise<boolean> {
-  return await invoke<boolean>('parser_is_read_only', { deviceAddress });
+  try {
+    return await invoke<boolean>('parser_is_read_only', { deviceAddress });
+  } catch (error) {
+    toast.error('Failed to check read-only address', {
+      description: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 /**
@@ -88,7 +131,14 @@ export async function isReadOnly(deviceAddress: string): Promise<boolean> {
 export async function formatModbusAddress(
   modbusAddress: ModbusAddress
 ): Promise<string> {
-  return await invoke<string>('parser_format_modbus_address', { modbusAddress });
+  try {
+    return await invoke<string>('parser_format_modbus_address', { modbusAddress });
+  } catch (error) {
+    toast.error('Failed to format Modbus address', {
+      description: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 /**
@@ -99,9 +149,16 @@ export async function formatModbusAddress(
 export async function parseModbusAddress(
   addressStr: string
 ): Promise<ModbusAddress | null> {
-  return await invoke<ModbusAddress | null>('parser_parse_modbus_address', {
-    addressStr,
-  });
+  try {
+    return await invoke<ModbusAddress | null>('parser_parse_modbus_address', {
+      addressStr,
+    });
+  } catch (error) {
+    toast.error('Failed to parse Modbus address', {
+      description: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 // ============================================================================
@@ -117,7 +174,14 @@ export async function saveProgram(
   path: string,
   program: LadderProgram
 ): Promise<void> {
-  await invoke('parser_save_program', { path, program });
+  try {
+    await invoke('parser_save_program', { path, program });
+  } catch (error) {
+    toast.error('Failed to save program', {
+      description: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 /**
@@ -126,7 +190,14 @@ export async function saveProgram(
  * @returns Loaded ladder program
  */
 export async function loadProgram(path: string): Promise<LadderProgram> {
-  return await invoke<LadderProgram>('parser_load_program', { path });
+  try {
+    return await invoke<LadderProgram>('parser_load_program', { path });
+  } catch (error) {
+    toast.error('Failed to load program', {
+      description: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 /**
@@ -135,7 +206,14 @@ export async function loadProgram(path: string): Promise<LadderProgram> {
  * @returns True if the file exists
  */
 export async function programExists(path: string): Promise<boolean> {
-  return await invoke<boolean>('parser_program_exists', { path });
+  try {
+    return await invoke<boolean>('parser_program_exists', { path });
+  } catch (error) {
+    toast.error('Failed to check program existence', {
+      description: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 // ============================================================================

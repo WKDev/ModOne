@@ -6,6 +6,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { toast } from 'sonner';
 import type { LayoutConfig } from '../types/layout';
 
 /**
@@ -17,7 +18,14 @@ export const layoutService = {
    * @param config - The layout configuration to save
    */
   async saveLayout(config: LayoutConfig): Promise<void> {
-    return invoke('save_layout', { config });
+    try {
+      await invoke('save_layout', { config });
+    } catch (error) {
+      toast.error('Failed to save layout', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -25,14 +33,28 @@ export const layoutService = {
    * @param name - Name of the layout to load
    */
   async loadLayout(name: string): Promise<LayoutConfig> {
-    return invoke('load_layout', { name });
+    try {
+      return await invoke('load_layout', { name });
+    } catch (error) {
+      toast.error('Failed to load layout', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
    * List all saved layout names
    */
   async listLayouts(): Promise<string[]> {
-    return invoke('list_layouts');
+    try {
+      return await invoke('list_layouts');
+    } catch (error) {
+      toast.error('Failed to list layouts', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -40,7 +62,14 @@ export const layoutService = {
    * @param name - Name of the layout to delete
    */
   async deleteLayout(name: string): Promise<void> {
-    return invoke('delete_layout', { name });
+    try {
+      await invoke('delete_layout', { name });
+    } catch (error) {
+      toast.error('Failed to delete layout', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -48,14 +77,28 @@ export const layoutService = {
    * @param name - Name of the last active layout (or null to clear)
    */
   async setLastActiveLayout(name: string | null): Promise<void> {
-    return invoke('set_last_active_layout', { name });
+    try {
+      await invoke('set_last_active_layout', { name });
+    } catch (error) {
+      toast.error('Failed to set last active layout', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
    * Get the last active layout name
    */
   async getLastActiveLayout(): Promise<string | null> {
-    return invoke('get_last_active_layout');
+    try {
+      return await invoke('get_last_active_layout');
+    } catch (error) {
+      toast.error('Failed to get last active layout', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
@@ -63,14 +106,28 @@ export const layoutService = {
    * @param restore - Whether to restore last session
    */
   async setRestoreLastSession(restore: boolean): Promise<void> {
-    return invoke('set_restore_last_session', { restore });
+    try {
+      await invoke('set_restore_last_session', { restore });
+    } catch (error) {
+      toast.error('Failed to update restore session setting', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 
   /**
    * Get whether to restore last session on startup
    */
   async getRestoreLastSession(): Promise<boolean> {
-    return invoke('get_restore_last_session');
+    try {
+      return await invoke('get_restore_last_session');
+    } catch (error) {
+      toast.error('Failed to get restore session setting', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   },
 };
 

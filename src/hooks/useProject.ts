@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
 import { useProjectStore } from '../stores/projectStore';
 import { useExplorerStore } from '../stores/explorerStore';
 import { projectService } from '../services/projectService';
@@ -79,7 +80,7 @@ export function useProject() {
       setRecentProjects(projects);
     } catch (err) {
       // Don't throw, just log - recent projects failing shouldn't break the app
-      console.error('Failed to load recent projects:', err);
+      toast.error('Failed to load recent projects');
     }
   }, [setRecentProjects]);
 
@@ -92,7 +93,7 @@ export function useProject() {
         await projectService.removeFromRecent(path);
         removeRecentProject(path);
       } catch (err) {
-        console.error('Failed to remove from recent projects:', err);
+        toast.error('Failed to remove recent project');
       }
     },
     [removeRecentProject]
@@ -106,7 +107,7 @@ export function useProject() {
       await projectService.clearRecentProjects();
       setRecentProjects([]);
     } catch (err) {
-      console.error('Failed to clear recent projects:', err);
+      toast.error('Failed to clear recent projects');
     }
   }, [setRecentProjects]);
 
@@ -134,7 +135,7 @@ export function useProject() {
       } catch (err) {
         const message = formatError(err);
         setExplorerError(`Failed to load project files: ${message}`);
-        console.error('Failed to load project files:', err);
+        toast.error('Failed to load project files');
       }
     },
     [loadProjectStructure, setExplorerLoading, setExplorerError]
@@ -314,7 +315,7 @@ export function useProject() {
       await projectService.markProjectModified();
       setModified(true);
     } catch (err) {
-      console.error('Failed to mark project as modified:', err);
+      toast.error('Failed to mark project as modified');
       // Still update local state even if backend call fails
       setModified(true);
     }
