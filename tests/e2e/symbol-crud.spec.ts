@@ -1,29 +1,13 @@
 import { test, expect } from './fixtures/browser-test';
+import type { Page } from '@playwright/test';
 
-/**
- * Symbol-specific selectors (components use title/label/id — no data-testid):
- *
- * Symbol Editor:
- *   'text=Symbol Editor'                    — editor overlay header
- *   '#symbol-name'                          — name input (PropertiesPanel)
- *   '#symbol-category'                      — category input
- *   '#symbol-version'                       — version input
- *   'button:has-text("Save Symbol")'        — save to library (PropertiesPanel)
- *   '[title="Save"]'                        — quick-save in editor header
- *   '[title="Close"]'                       — close editor
- *
- * LibraryManager:
- *   'button:has-text("project Library")'    — project library tab
- *   'button:has-text("global Library")'     — global library tab
- *   '[title="Edit"]'                        — edit button (hover-revealed per row)
- *   '[title="Delete"]'                      — delete button (hover-revealed per row)
- *   'button:has-text("Delete")'             — confirm delete in dialog
- *   'button:has-text("Cancel")'             — cancel delete in dialog
- *   'text=Symbol saved successfully'        — save-success feedback in PropertiesPanel
- *
- * Entry-point to Symbol Editor and LibraryManager are not yet exposed via
- * data-testid. Tests that depend on navigation are marked test.fixme().
- */
+async function openSymbolEditor(page: Page) {
+  await page.keyboard.press('Control+Shift+P');
+  await page.waitForSelector('[data-testid="command-palette"]', { state: 'visible' });
+  await page.fill('[data-testid="command-palette-input"]', 'Symbol Editor');
+  await page.click('text=Open Symbol Editor');
+  await page.waitForSelector('[data-testid="symbol-editor"]', { state: 'visible' });
+}
 
 test.describe('Symbol CRUD Operations', () => {
   test.beforeEach(async ({ page }) => {
@@ -32,16 +16,10 @@ test.describe('Symbol CRUD Operations', () => {
   });
 
   test('creates a new symbol via Symbol Editor', async ({ page }) => {
-    test.fixme(
-      true,
-      'Needs data-testid on the "New Symbol" entry-point button/menu item'
-    );
-
-    // Open Symbol Editor (replace with real selector once exposed)
-    // await page.click('[data-testid="new-symbol-btn"]');
+    await openSymbolEditor(page);
 
     // Verify editor overlay is visible
-    await expect(page.locator('text=Symbol Editor')).toBeVisible();
+    await expect(page.locator('[data-testid="symbol-editor"]')).toBeVisible();
 
     // Fill symbol name
     await page.fill('#symbol-name', 'TestSymbol');
@@ -50,30 +28,28 @@ test.describe('Symbol CRUD Operations', () => {
     await page.fill('#symbol-category', 'TestCategory');
 
     // Save to project library
-    await page.click('button:has-text("Save Symbol")');
+    await page.click('[data-testid="save-symbol-btn"]');
 
     // Verify save-success feedback
     await expect(page.locator('text=Symbol saved successfully')).toBeVisible();
   });
 
   test('edits an existing symbol name', async ({ page }) => {
-    test.fixme(
-      true,
-      'Requires Library Manager visible and at least one symbol to exist'
-    );
+    await openSymbolEditor(page);
+    await page.click('[title="Close"]');
 
     // Navigate to Library Manager project tab
-    await page.click('button:has-text("project Library")');
+    await page.click('[data-testid="library-tab-project"]');
 
     // Hover the first row to reveal action buttons
     const firstRow = page.locator('.group').first();
     await firstRow.hover();
 
     // Click Edit
-    await firstRow.locator('[title="Edit"]').click();
+    await firstRow.locator('[data-testid="symbol-edit-btn"]').click();
 
     // Verify Symbol Editor opened
-    await expect(page.locator('text=Symbol Editor')).toBeVisible();
+    await expect(page.locator('[data-testid="symbol-editor"]')).toBeVisible();
 
     // Update name
     const nameInput = page.locator('#symbol-name');
@@ -81,7 +57,7 @@ test.describe('Symbol CRUD Operations', () => {
     await nameInput.fill('RenamedSymbol');
 
     // Save
-    await page.click('button:has-text("Save Symbol")');
+    await page.click('[data-testid="save-symbol-btn"]');
 
     // Verify success
     await expect(page.locator('text=Symbol saved successfully')).toBeVisible();
@@ -94,10 +70,7 @@ test.describe('Symbol CRUD Operations', () => {
   });
 
   test('edits symbol category', async ({ page }) => {
-    test.fixme(
-      true,
-      'Requires Symbol Editor to be open with an existing symbol'
-    );
+    await openSymbolEditor(page);
 
     // Update category field
     const categoryInput = page.locator('#symbol-category');
@@ -105,27 +78,25 @@ test.describe('Symbol CRUD Operations', () => {
     await categoryInput.fill('UpdatedCategory');
 
     // Save
-    await page.click('button:has-text("Save Symbol")');
+    await page.click('[data-testid="save-symbol-btn"]');
 
     // Verify success
     await expect(page.locator('text=Symbol saved successfully')).toBeVisible();
   });
 
   test('deletes a symbol from the library', async ({ page }) => {
-    test.fixme(
-      true,
-      'Requires Library Manager to be visible with at least one symbol'
-    );
+    await openSymbolEditor(page);
+    await page.click('[title="Close"]');
 
     // Switch to project library tab
-    await page.click('button:has-text("project Library")');
+    await page.click('[data-testid="library-tab-project"]');
 
     // Hover first row to reveal Delete button
     const firstRow = page.locator('.group').first();
     await firstRow.hover();
 
     // Click Delete (trash icon)
-    await firstRow.locator('[title="Delete"]').click();
+    await firstRow.locator('[data-testid="symbol-delete-btn"]').click();
 
     // Delete-confirmation dialog must appear
     await expect(page.locator('text=Delete Symbol')).toBeVisible();
@@ -139,18 +110,16 @@ test.describe('Symbol CRUD Operations', () => {
   });
 
   test('cancels symbol deletion and symbol remains', async ({ page }) => {
-    test.fixme(
-      true,
-      'Requires Library Manager to be visible with at least one symbol'
-    );
+    await openSymbolEditor(page);
+    await page.click('[title="Close"]');
 
     // Navigate to Library Manager
-    await page.click('button:has-text("project Library")');
+    await page.click('[data-testid="library-tab-project"]');
 
     // Hover first row, click Delete
     const firstRow = page.locator('.group').first();
     await firstRow.hover();
-    await firstRow.locator('[title="Delete"]').click();
+    await firstRow.locator('[data-testid="symbol-delete-btn"]').click();
 
     // Confirm dialog is visible
     await expect(page.locator('text=Delete Symbol')).toBeVisible();
@@ -163,17 +132,14 @@ test.describe('Symbol CRUD Operations', () => {
   });
 
   test('validates that symbol name is required before saving', async ({ page }) => {
-    test.fixme(
-      true,
-      'Requires Symbol Editor to be open with an empty name'
-    );
+    await openSymbolEditor(page);
 
     // Clear the name field
     const nameInput = page.locator('#symbol-name');
     await nameInput.clear();
 
     // Attempt to save
-    await page.click('button:has-text("Save Symbol")');
+    await page.click('[data-testid="save-symbol-btn"]');
 
     // Validation error must be shown
     await expect(page.locator('text=Name is required')).toBeVisible();

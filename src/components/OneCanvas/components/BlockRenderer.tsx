@@ -268,7 +268,12 @@ export const BlockRenderer = memo(function BlockRenderer({
   );
 
   return (
-    <div style={style} data-block-id={block.id} onMouseDown={handleMouseDown}>
+    <div
+      style={style}
+      data-block-id={block.id}
+      data-symbol-id={block.type === 'custom_symbol' ? (block as CustomSymbolBlock).symbolId : undefined}
+      onMouseDown={handleMouseDown}
+    >
       {renderBlock()}
     </div>
   );

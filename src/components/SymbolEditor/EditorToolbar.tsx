@@ -50,6 +50,7 @@ export const EditorToolbar = memo(function EditorToolbar({
       {TOOLS.map(({ tool, label, icon }) => (
         <button
           key={tool}
+          data-testid={`tool-${tool}`}
           type="button"
           title={label}
           onClick={() => onToolChange(tool)}

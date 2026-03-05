@@ -287,7 +287,7 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
   void historyVersion;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-neutral-900">
+    <div data-testid="symbol-editor" className="fixed inset-0 z-50 flex flex-col bg-neutral-900">
       <header className="flex items-center justify-between px-4 py-3 border-b border-neutral-700 bg-neutral-800">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-semibold text-white">Symbol Editor</h2>
@@ -367,16 +367,18 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
       )}
 
       <div className="flex flex-1 overflow-hidden">
-        <EditorToolbar
-          currentTool={state.currentTool}
-          onToolChange={(tool) => dispatch({ type: 'SET_TOOL', tool })}
-          canUndo={canUndo}
-          canRedo={canRedo}
-          onUndo={handleUndo}
-          onRedo={handleRedo}
-        />
+        <div data-testid="symbol-editor-toolbar">
+          <EditorToolbar
+            currentTool={state.currentTool}
+            onToolChange={(tool) => dispatch({ type: 'SET_TOOL', tool })}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+          />
+        </div>
 
-        <div className="flex-1">
+        <div data-testid="symbol-editor-canvas" className="flex-1">
           <EditorCanvas
             symbol={canvasSymbol}
             state={state}

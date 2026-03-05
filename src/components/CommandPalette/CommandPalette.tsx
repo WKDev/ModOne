@@ -221,6 +221,7 @@ export function CommandPalette({
 
   return (
     <div
+      data-testid="command-palette"
       className="
         fixed inset-0 z-50 flex items-start justify-center
         bg-black/50 backdrop-blur-sm pt-[15vh]
@@ -240,6 +241,7 @@ export function CommandPalette({
         <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--color-border)]">
           <Search className="w-5 h-5 text-[var(--color-text-muted)] flex-shrink-0" />
           <input
+            data-testid="command-palette-input"
             ref={inputRef}
             type="text"
             value={query}

@@ -53,12 +53,13 @@ export function LibraryManager({ projectDir, onOpenEditor }: LibraryManagerProps
   };
 
   return (
-    <div className="flex flex-col h-full bg-neutral-800 text-neutral-200">
+    <div data-testid="symbol-library" className="flex flex-col h-full bg-neutral-800 text-neutral-200">
       {/* Tab bar */}
       <div className="flex border-b border-neutral-700">
         {(['project', 'global'] as const).map((tab) => (
           <button
             key={tab}
+            data-testid={tab === 'project' ? 'library-tab-project' : 'library-tab-global'}
             type="button"
             onClick={() => setActiveTab(tab)}
             className={`flex-1 px-4 py-2.5 text-sm font-medium capitalize transition-colors ${
@@ -101,6 +102,7 @@ export function LibraryManager({ projectDir, onOpenEditor }: LibraryManagerProps
             {symbols.map((sym) => (
               <div
                 key={sym.id}
+                data-testid={`symbol-entry-${sym.id}`}
                 className="flex items-center gap-3 px-3 py-2 rounded hover:bg-neutral-700/50 group"
               >
                 {/* Scope badge */}
@@ -126,6 +128,7 @@ export function LibraryManager({ projectDir, onOpenEditor }: LibraryManagerProps
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   {onOpenEditor && (
                     <button
+                      data-testid="symbol-edit-btn"
                       type="button"
                       onClick={() => onOpenEditor(sym.id, sym.scope)}
                       className="p-1.5 rounded text-neutral-400 hover:text-white hover:bg-neutral-600"
@@ -144,6 +147,7 @@ export function LibraryManager({ projectDir, onOpenEditor }: LibraryManagerProps
                     {copyingId === sym.id ? <Loader2 size={14} className="animate-spin" /> : <Copy size={14} />}
                   </button>
                   <button
+                    data-testid="symbol-delete-btn"
                     type="button"
                     onClick={() => setDeleteConfirm({ symbol: sym })}
                     className="p-1.5 rounded text-neutral-400 hover:text-red-400 hover:bg-neutral-600"

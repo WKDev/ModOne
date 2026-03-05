@@ -8,6 +8,7 @@ import {
   StepForward,
   PanelLeft,
   PanelBottom,
+  Shapes,
 } from 'lucide-react';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { commandRegistry } from '../CommandPalette/commandRegistry';
@@ -18,11 +19,13 @@ interface ToolbarButtonProps {
   onClick?: () => void;
   disabled?: boolean;
   active?: boolean;
+  dataTestId?: string;
 }
 
-function ToolbarButton({ icon, tooltip, onClick, disabled, active }: ToolbarButtonProps) {
+function ToolbarButton({ icon, tooltip, onClick, disabled, active, dataTestId }: ToolbarButtonProps) {
   return (
     <button
+      data-testid={dataTestId}
       className={`w-8 h-8 flex items-center justify-center rounded ${
         disabled
           ? 'opacity-50 cursor-not-allowed text-[var(--color-text-muted)]'
@@ -73,6 +76,12 @@ export function Toolbar() {
         icon={<Save size={18} />}
         tooltip="Save (Ctrl+S)"
         onClick={() => commandRegistry.execute('file.save')}
+      />
+      <ToolbarButton
+        icon={<Shapes size={18} />}
+        tooltip="Open Symbol Editor"
+        dataTestId="open-symbol-editor"
+        onClick={() => commandRegistry.execute('canvas.openSymbolEditor')}
       />
 
       <ToolbarSeparator />

@@ -359,7 +359,12 @@ export const EditorCanvas = memo(function EditorCanvas({
           transform: `translate(${state.pan.x}px, ${state.pan.y}px) scale(${state.zoom})`,
         }}
       >
-        <svg width={0} height={0} style={{ position: 'absolute', top: 0, left: 0, overflow: 'visible' }}>
+        <svg
+          data-testid="editor-canvas-svg"
+          width={0}
+          height={0}
+          style={{ position: 'absolute', top: 0, left: 0, overflow: 'visible' }}
+        >
           <line x1={-10} y1={0} x2={10} y2={0} stroke="#444" strokeWidth={1} />
           <line x1={0} y1={-10} x2={0} y2={10} stroke="#444" strokeWidth={1} />
 

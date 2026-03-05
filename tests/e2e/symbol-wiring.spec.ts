@@ -18,9 +18,7 @@ import { selectors } from './utils/selectors';
  *   '[data-wire-id]'                           — a wire/connection segment in SVG
  *
  * Wiring requires: open project, at least one placed custom symbol with pins,
- * and at least one placed built-in block. Marked test.fixme() because pin
- * element selectors and drag-wire interaction need confirmation against the
- * running canvas implementation.
+ * and at least one placed built-in block.
  */
 
 test.describe('Symbol Wiring', () => {
@@ -30,11 +28,6 @@ test.describe('Symbol Wiring', () => {
   });
 
   test('connects a wire from a built-in block output to a custom symbol input pin', async ({ page }) => {
-    test.fixme(
-      true,
-      'Requires a placed built-in block and a placed custom symbol with at least one input pin'
-    );
-
     // Locate built-in block output pin
     const builtInBlock = page.locator('[data-block-id]').first();
     await expect(builtInBlock).toBeVisible();
@@ -72,11 +65,6 @@ test.describe('Symbol Wiring', () => {
   });
 
   test('connects a wire from custom symbol output to another block input', async ({ page }) => {
-    test.fixme(
-      true,
-      'Requires two placed blocks: one custom symbol (output pin) and one built-in block (input pin)'
-    );
-
     // Locate the custom symbol output pin
     const customSymbol = page.locator('[data-symbol-id]').first();
     const outputPin = customSymbol.locator('[data-pin-id][data-direction="output"]').first();
@@ -108,11 +96,6 @@ test.describe('Symbol Wiring', () => {
   });
 
   test('wire persists after project save and page reload', async ({ page }) => {
-    test.fixme(
-      true,
-      'Requires a wired canvas state to save, then reload and re-verify the wire'
-    );
-
     // Save project via Ctrl+S
     await page.keyboard.press('Control+s');
     await page.waitForTimeout(500);
@@ -127,11 +110,6 @@ test.describe('Symbol Wiring', () => {
   });
 
   test('cannot connect two output pins together', async ({ page }) => {
-    test.fixme(
-      true,
-      'Requires two placed blocks each with an output pin exposed'
-    );
-
     // Locate two output pins
     const firstOutputPin = page
       .locator('[data-pin-id][data-direction="output"]')
@@ -163,11 +141,6 @@ test.describe('Symbol Wiring', () => {
   });
 
   test('wired connection is visible in canvas after zoom', async ({ page }) => {
-    test.fixme(
-      true,
-      'Requires an existing wired connection on the canvas'
-    );
-
     // Verify the wire exists
     await expect(page.locator('[data-wire-id]').first()).toBeVisible();
 
@@ -186,11 +159,6 @@ test.describe('Symbol Wiring', () => {
   });
 
   test('status bar shows no errors after valid wiring', async ({ page }) => {
-    test.fixme(
-      true,
-      'Requires a valid wired connection to be present'
-    );
-
     // After a valid wire is placed, no error indicator should appear in the status bar
     const statusBar = page.locator(selectors.statusBar);
     await expect(statusBar).toBeVisible();

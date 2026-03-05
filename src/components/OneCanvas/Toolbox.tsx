@@ -270,7 +270,7 @@ const CategorySection = memo(function CategorySection({
   onToggle,
 }: CategorySectionProps) {
   return (
-    <div className="border-b border-neutral-700 last:border-b-0">
+    <div data-testid="toolbox-custom-symbols" className="border-b border-neutral-700 last:border-b-0">
       {/* Category header */}
       <button
         type="button"

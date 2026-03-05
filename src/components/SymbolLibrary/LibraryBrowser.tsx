@@ -63,7 +63,7 @@ export function LibraryBrowser({ projectDir, onOpenEditor }: LibraryBrowserProps
   };
 
   return (
-    <div className="flex flex-col h-full bg-neutral-800 text-neutral-200">
+    <div data-testid="symbol-library" className="flex flex-col h-full bg-neutral-800 text-neutral-200">
       {/* Search bar */}
       <div className="px-3 pt-3 pb-2">
         <div className="relative">
@@ -122,6 +122,7 @@ export function LibraryBrowser({ projectDir, onOpenEditor }: LibraryBrowserProps
             {filteredSymbols.map((sym) => (
               <div
                 key={`${sym.scope}-${sym.id}`}
+                data-testid={`symbol-entry-${sym.id}`}
                 draggable
                 onDragStart={(e) => handleDragStart(e, sym)}
                 onDoubleClick={() => onOpenEditor?.(sym.id, sym.scope)}

@@ -263,6 +263,7 @@ export function PropertiesPanel({
 
       <div className="p-4 border-t border-neutral-700 bg-neutral-800">
         <button
+          data-testid="save-symbol-btn"
           type="button"
           onClick={handleSave}
           disabled={isSaving}
