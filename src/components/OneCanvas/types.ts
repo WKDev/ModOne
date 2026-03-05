@@ -229,6 +229,8 @@ export interface Port {
   offset?: number;
   /** Maximum number of wire connections allowed. Undefined = unlimited. */
   maxConnections?: number;
+  /** Absolute position relative to block origin (center of port connection point) */
+  absolutePosition?: { x: number; y: number };
 }
 
 // ============================================================================

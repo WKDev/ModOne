@@ -30,12 +30,12 @@ import { getBlockSize, getPowerSourcePorts } from '../blockDefinitions';
  * Convert a Block to YAML format.
  */
 function blockToYaml(block: Block): YamlBlockDefinition {
-  const { id, type, position, label, ports, selected, size, ...properties } = block;
+  const { id, type, position, label, ports, size, ...properties } = block;
 
   // Filter out undefined/null properties and runtime state
   const cleanProperties: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(properties)) {
-    if (value !== undefined && value !== null) {
+    if (key !== 'selected' && value !== undefined && value !== null) {
       cleanProperties[key] = value;
     }
   }
@@ -53,6 +53,7 @@ function blockToYaml(block: Block): YamlBlockDefinition {
           label: p.label,
           position: p.position,
           ...(p.offset !== undefined ? { offset: p.offset } : {}),
+          ...(p.absolutePosition ? { absolutePosition: p.absolutePosition } : {}),
         }))
       : undefined,
   };
@@ -235,13 +236,14 @@ function validateCircuitYaml(data: unknown): YamlCircuitSchema {
 /**
  * Convert YAML port to Port type.
  */
-function yamlToPort(yamlPort: { id: string; type: string; label: string; position: string; offset?: number }): Port {
+function yamlToPort(yamlPort: { id: string; type: string; label: string; position: string; offset?: number; absolutePosition?: { x: number; y: number } }): Port {
   return {
     id: yamlPort.id,
     type: yamlPort.type as PortTypeEnum,
     label: yamlPort.label,
     position: yamlPort.position as PortPosition,
     offset: yamlPort.offset,
+    absolutePosition: yamlPort.absolutePosition,
   };
 }
 

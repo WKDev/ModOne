@@ -1,0 +1,441 @@
+{
+  "powersource": {
+    "size": {
+      "width": 40,
+      "height": 40
+    },
+    "ports": {
+      "out": {
+        "x": 20,
+        "y": 40
+      }
+    }
+  },
+  "plc_out": {
+    "size": {
+      "width": 80,
+      "height": 40
+    },
+    "ports": {
+      "in": {
+        "x": 0,
+        "y": 20
+      },
+      "out": {
+        "x": 80,
+        "y": 20
+      }
+    }
+  },
+  "plc_in": {
+    "size": {
+      "width": 80,
+      "height": 40
+    },
+    "ports": {
+      "in": {
+        "x": 0,
+        "y": 20
+      },
+      "out": {
+        "x": 80,
+        "y": 20
+      }
+    }
+  },
+  "led": {
+    "size": {
+      "width": 40,
+      "height": 60
+    },
+    "ports": {
+      "anode": {
+        "x": 20,
+        "y": 0
+      },
+      "cathode": {
+        "x": 20,
+        "y": 60
+      }
+    }
+  },
+  "button": {
+    "size": {
+      "width": 40,
+      "height": 40
+    },
+    "ports": {
+      "in": {
+        "x": 0,
+        "y": 20
+      },
+      "out": {
+        "x": 40,
+        "y": 20
+      }
+    }
+  },
+  "scope": {
+    "size": {
+      "width": 100,
+      "height": 80
+    },
+    "ports": {
+      "ch1": {
+        "x": 0,
+        "y": 20
+      },
+      "ch2": {
+        "x": 0,
+        "y": 40
+      },
+      "ch3": {
+        "x": 0,
+        "y": 60
+      },
+      "ch4": {
+        "x": 0,
+        "y": 80
+      }
+    }
+  },
+  "text": {
+    "size": {
+      "width": 160,
+      "height": 40
+    },
+    "ports": {}
+  },
+  "relay": {
+    "size": {
+      "width": 60,
+      "height": 60
+    },
+    "ports": {
+      "coil_in": {
+        "x": 30,
+        "y": 0
+      },
+      "coil_out": {
+        "x": 30,
+        "y": 60
+      },
+      "com": {
+        "x": 0,
+        "y": 30
+      },
+      "no": {
+        "x": 60,
+        "y": 21
+      },
+      "nc": {
+        "x": 60,
+        "y": 39
+      }
+    }
+  },
+  "fuse": {
+    "size": {
+      "width": 40,
+      "height": 50
+    },
+    "ports": {
+      "in": {
+        "x": 20,
+        "y": 0
+      },
+      "out": {
+        "x": 20,
+        "y": 50
+      }
+    }
+  },
+  "motor": {
+    "size": {
+      "width": 60,
+      "height": 60
+    },
+    "ports": {
+      "l1": {
+        "x": 15,
+        "y": 0
+      },
+      "l2": {
+        "x": 30,
+        "y": 0
+      },
+      "l3": {
+        "x": 45,
+        "y": 0
+      },
+      "pe": {
+        "x": 30,
+        "y": 60
+      }
+    }
+  },
+  "emergency_stop": {
+    "size": {
+      "width": 50,
+      "height": 50
+    },
+    "ports": {
+      "in": {
+        "x": 0,
+        "y": 25
+      },
+      "out": {
+        "x": 50,
+        "y": 25
+      }
+    }
+  },
+  "selector_switch": {
+    "size": {
+      "width": 50,
+      "height": 50
+    },
+    "ports": {
+      "com": {
+        "x": 0,
+        "y": 25
+      },
+      "pos1": {
+        "x": 50,
+        "y": 17.5
+      },
+      "pos2": {
+        "x": 50,
+        "y": 32.5
+      }
+    }
+  },
+  "solenoid_valve": {
+    "size": {
+      "width": 60,
+      "height": 50
+    },
+    "ports": {
+      "coil_in": {
+        "x": 30,
+        "y": 0
+      },
+      "coil_out": {
+        "x": 30,
+        "y": 50
+      }
+    }
+  },
+  "sensor": {
+    "size": {
+      "width": 60,
+      "height": 40
+    },
+    "ports": {
+      "vcc": {
+        "x": 30,
+        "y": 0
+      },
+      "out": {
+        "x": 60,
+        "y": 20
+      },
+      "gnd": {
+        "x": 30,
+        "y": 40
+      }
+    }
+  },
+  "pilot_lamp": {
+    "size": {
+      "width": 40,
+      "height": 40
+    },
+    "ports": {
+      "in": {
+        "x": 20,
+        "y": 0
+      },
+      "out": {
+        "x": 20,
+        "y": 40
+      }
+    }
+  },
+  "net_label": {
+    "size": {
+      "width": 80,
+      "height": 24
+    },
+    "ports": {
+      "conn": {
+        "x": 0,
+        "y": 12
+      }
+    }
+  },
+  "transformer": {
+    "size": {
+      "width": 70,
+      "height": 80
+    },
+    "ports": {
+      "pri_1": {
+        "x": 21,
+        "y": 0
+      },
+      "pri_2": {
+        "x": 49,
+        "y": 0
+      },
+      "sec_1": {
+        "x": 21,
+        "y": 80
+      },
+      "sec_2": {
+        "x": 49,
+        "y": 80
+      }
+    }
+  },
+  "terminal_block": {
+    "size": {
+      "width": 40,
+      "height": 50
+    },
+    "ports": {
+      "in": {
+        "x": 20,
+        "y": 0
+      },
+      "out": {
+        "x": 20,
+        "y": 50
+      }
+    }
+  },
+  "overload_relay": {
+    "size": {
+      "width": 60,
+      "height": 70
+    },
+    "ports": {
+      "l1_in": {
+        "x": 15,
+        "y": 0
+      },
+      "l2_in": {
+        "x": 30,
+        "y": 0
+      },
+      "l3_in": {
+        "x": 45,
+        "y": 0
+      },
+      "l1_out": {
+        "x": 15,
+        "y": 70
+      },
+      "l2_out": {
+        "x": 30,
+        "y": 70
+      },
+      "l3_out": {
+        "x": 45,
+        "y": 70
+      },
+      "nc": {
+        "x": 60,
+        "y": 24.5
+      },
+      "no": {
+        "x": 60,
+        "y": 45.5
+      }
+    }
+  },
+  "contactor": {
+    "size": {
+      "width": 70,
+      "height": 80
+    },
+    "ports": {
+      "coil_a1": {
+        "x": 0,
+        "y": 20
+      },
+      "coil_a2": {
+        "x": 0,
+        "y": 60
+      },
+      "l1_in": {
+        "x": 17.5,
+        "y": 0
+      },
+      "l2_in": {
+        "x": 35,
+        "y": 0
+      },
+      "l3_in": {
+        "x": 52.5,
+        "y": 0
+      },
+      "l1_out": {
+        "x": 17.5,
+        "y": 80
+      },
+      "l2_out": {
+        "x": 35,
+        "y": 80
+      },
+      "l3_out": {
+        "x": 52.5,
+        "y": 80
+      }
+    }
+  },
+  "disconnect_switch": {
+    "size": {
+      "width": 60,
+      "height": 70
+    },
+    "ports": {
+      "l1_in": {
+        "x": 15,
+        "y": 0
+      },
+      "l2_in": {
+        "x": 30,
+        "y": 0
+      },
+      "l3_in": {
+        "x": 45,
+        "y": 0
+      },
+      "l1_out": {
+        "x": 15,
+        "y": 70
+      },
+      "l2_out": {
+        "x": 30,
+        "y": 70
+      },
+      "l3_out": {
+        "x": 45,
+        "y": 70
+      }
+    }
+  },
+  "off_page_connector": {
+    "size": {
+      "width": 80,
+      "height": 32
+    },
+    "ports": {
+      "conn": {
+        "x": 0,
+        "y": 16
+      }
+    }
+  }
+}

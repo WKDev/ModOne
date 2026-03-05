@@ -91,8 +91,9 @@ export const Port = memo(function Port({
   const [isHovered, setIsHovered] = useState(false);
   const [isActive, setIsActive] = useState(false);
 
-  // Calculate position
-  const position = getPortPosition(port.position, port.offset, blockSize);
+  const position = port.absolutePosition
+    ? { x: port.absolutePosition.x + PORT_OFFSET, y: port.absolutePosition.y + PORT_OFFSET }
+    : getPortPosition(port.position, port.offset, blockSize);
 
   // Determine color based on state
   const getColor = () => {
