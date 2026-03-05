@@ -3,6 +3,8 @@ import { Save, X } from 'lucide-react';
 import type { GraphicPrimitive, SymbolDefinition, SymbolPin } from '../../types/symbol';
 import { EditorCanvas } from './EditorCanvas';
 import { EditorToolbar } from './EditorToolbar';
+import { PinConfigPopover } from './PinConfigPopover';
+import { PropertiesPanel } from './PropertiesPanel';
 
 export type EditorTool = 'select' | 'rect' | 'circle' | 'polyline' | 'arc' | 'text' | 'pin';
 
@@ -89,6 +91,12 @@ const INITIAL_STATE: EditorState = {
 export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEditorProps) {
   const [state, dispatch] = useReducer(editorReducer, INITIAL_STATE);
   const [localSymbol, setLocalSymbol] = useState<LocalSymbol>(() => symbol ?? createBlankSymbol());
+  const [pinPopover, setPinPopover] = useState<{
+    screenX: number;
+    screenY: number;
+    canvasX: number;
+    canvasY: number;
+  } | null>(null);
 
   const handleAddPrimitive = (prim: GraphicPrimitive) => {
     setLocalSymbol((prev) => ({
@@ -171,14 +179,34 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
             onAddPrimitive={handleAddPrimitive}
             onAddPin={handleAddPin}
             onDeleteSelected={handleDeleteSelected}
+            onOpenPinPopover={(screenX, screenY, canvasX, canvasY) => {
+              setPinPopover({ screenX, screenY, canvasX, canvasY });
+            }}
           />
         </div>
 
-        <aside className="w-[240px] shrink-0 border-l border-neutral-700 bg-neutral-800 p-4 text-sm text-neutral-300">
-          <div className="font-medium text-neutral-100">Properties (T15)</div>
-          <div className="mt-2 text-neutral-400">Project: {projectDir}</div>
-        </aside>
+        <PropertiesPanel
+          symbol={localSymbol}
+          onChange={setLocalSymbol}
+          projectDir={projectDir}
+          isDirty={state.isDirty}
+          onSaveSuccess={() => dispatch({ type: 'MARK_CLEAN' })}
+        />
       </div>
+
+      {pinPopover && (
+        <PinConfigPopover
+          screenX={pinPopover.screenX}
+          screenY={pinPopover.screenY}
+          canvasX={pinPopover.canvasX}
+          canvasY={pinPopover.canvasY}
+          onConfirm={(pin) => {
+            handleAddPin(pin);
+            setPinPopover(null);
+          }}
+          onCancel={() => setPinPopover(null)}
+        />
+      )}
     </div>
   );
 }

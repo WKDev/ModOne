@@ -5,3 +5,4 @@ export * from './PolylineTool';
 export * from './ArcTool';
 export * from './TextTool';
 export * from './SelectTool';
+export * from './PinTool';

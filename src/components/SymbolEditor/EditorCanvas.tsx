@@ -1,7 +1,9 @@
-import React, { memo, useEffect, useRef } from 'react';
+import React, { memo, useEffect, useRef, useState } from 'react';
 import { GridBackground } from '../../components/OneCanvas/GridBackground';
 import type { GraphicPrimitive, SymbolDefinition, SymbolPin } from '../../types/symbol';
 import type { EditorAction, EditorState } from './SymbolEditor';
+import { ArcTool, CircleTool, PinTool, PolylineTool, RectTool, SelectTool, TextTool, type BaseTool, type CanvasPoint, type ToolCallbacks } from './tools';
+import type { PinToolCallbacks } from './tools/PinTool';
 
 interface EditorCanvasProps {
   symbol: SymbolDefinition | null;
@@ -10,6 +12,7 @@ interface EditorCanvasProps {
   onAddPrimitive?: (prim: GraphicPrimitive) => void;
   onAddPin?: (pin: SymbolPin) => void;
   onDeleteSelected?: () => void;
+  onOpenPinPopover?: (screenX: number, screenY: number, canvasX: number, canvasY: number) => void;
 }
 
 const ZOOM_MIN = 0.1;
@@ -87,10 +90,60 @@ export const EditorCanvas = memo(function EditorCanvas({
   symbol,
   state,
   dispatch,
+  onAddPrimitive,
   onDeleteSelected,
+  onOpenPinPopover,
 }: EditorCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const panDragRef = useRef({ active: false, x: 0, y: 0 });
+  const toolRef = useRef<BaseTool>(new SelectTool());
+  const [ghostPreview, setGhostPreview] = useState<React.ReactNode | null>(null);
+
+  const snapToGrid = (pt: CanvasPoint): CanvasPoint => ({
+    x: Math.round(pt.x / 20) * 20,
+    y: Math.round(pt.y / 20) * 20,
+  });
+
+  const toCanvasPoint = (screenX: number, screenY: number): CanvasPoint | null => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return null;
+    }
+
+    const canvasX = (screenX - rect.left - state.pan.x) / state.zoom;
+    const canvasY = (screenY - rect.top - state.pan.y) / state.zoom;
+    return snapToGrid({ x: canvasX, y: canvasY });
+  };
+
+  useEffect(() => {
+    toolRef.current.cancel();
+    setGhostPreview(null);
+
+    switch (state.currentTool) {
+      case 'rect':
+        toolRef.current = new RectTool();
+        break;
+      case 'circle':
+        toolRef.current = new CircleTool();
+        break;
+      case 'polyline':
+        toolRef.current = new PolylineTool();
+        break;
+      case 'arc':
+        toolRef.current = new ArcTool();
+        break;
+      case 'text':
+        toolRef.current = new TextTool();
+        break;
+      case 'pin':
+        toolRef.current = new PinTool();
+        break;
+      case 'select':
+      default:
+        toolRef.current = new SelectTool();
+        break;
+    }
+  }, [state.currentTool]);
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
@@ -126,36 +179,132 @@ export const EditorCanvas = memo(function EditorCanvas({
       return;
     }
 
-    switch (state.currentTool) {
-      case 'select':
-      case 'rect':
-      case 'circle':
-      case 'polyline':
-      case 'arc':
-      case 'text':
-      case 'pin':
-        console.debug('canvas click', state.currentTool);
-        break;
-      default:
-        break;
-    }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!panDragRef.current.active) {
+    const point = toCanvasPoint(e.clientX, e.clientY);
+    if (!point) {
       return;
     }
 
-    const dx = e.clientX - panDragRef.current.x;
-    const dy = e.clientY - panDragRef.current.y;
-    panDragRef.current = { active: true, x: e.clientX, y: e.clientY };
-    dispatch({ type: 'PAN_BY', dx, dy });
+    if (toolRef.current instanceof PinTool) {
+      toolRef.current.setLastScreen(e.clientX, e.clientY);
+      const pinCallbacks: PinToolCallbacks = {
+        symbol,
+        onAddPrimitive: onAddPrimitive ?? (() => {}),
+        dispatch,
+        onOpenPinPopover: onOpenPinPopover ?? (() => {}),
+      };
+      toolRef.current.onMouseDown(point, pinCallbacks);
+      return;
+    }
+
+    const callbacks: ToolCallbacks = {
+      symbol,
+      onAddPrimitive: onAddPrimitive ?? (() => {}),
+      dispatch,
+    };
+    toolRef.current.onMouseDown(point, callbacks);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (panDragRef.current.active) {
+      const dx = e.clientX - panDragRef.current.x;
+      const dy = e.clientY - panDragRef.current.y;
+      panDragRef.current = { active: true, x: e.clientX, y: e.clientY };
+      dispatch({ type: 'PAN_BY', dx, dy });
+      return;
+    }
+
+    const point = toCanvasPoint(e.clientX, e.clientY);
+    if (!point) {
+      return;
+    }
+
+    if (toolRef.current instanceof PinTool) {
+      toolRef.current.setLastScreen(e.clientX, e.clientY);
+      const pinCallbacks: PinToolCallbacks = {
+        symbol,
+        onAddPrimitive: onAddPrimitive ?? (() => {}),
+        dispatch,
+        onOpenPinPopover: onOpenPinPopover ?? (() => {}),
+      };
+      setGhostPreview(toolRef.current.onMouseMove(point, pinCallbacks));
+      return;
+    }
+
+    const callbacks: ToolCallbacks = {
+      symbol,
+      onAddPrimitive: onAddPrimitive ?? (() => {}),
+      dispatch,
+    };
+    setGhostPreview(toolRef.current.onMouseMove(point, callbacks));
   };
 
   const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.button === 1) {
       panDragRef.current.active = false;
+      return;
     }
+
+    if (e.button !== 0) {
+      return;
+    }
+
+    const point = toCanvasPoint(e.clientX, e.clientY);
+    if (!point) {
+      return;
+    }
+
+    if (toolRef.current instanceof PinTool) {
+      toolRef.current.setLastScreen(e.clientX, e.clientY);
+      const pinCallbacks: PinToolCallbacks = {
+        symbol,
+        onAddPrimitive: onAddPrimitive ?? (() => {}),
+        dispatch,
+        onOpenPinPopover: onOpenPinPopover ?? (() => {}),
+      };
+      toolRef.current.onMouseUp(point, pinCallbacks);
+      setGhostPreview(null);
+      return;
+    }
+
+    const callbacks: ToolCallbacks = {
+      symbol,
+      onAddPrimitive: onAddPrimitive ?? (() => {}),
+      dispatch,
+    };
+    toolRef.current.onMouseUp(point, callbacks);
+    setGhostPreview(null);
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) {
+      return;
+    }
+
+    const point = toCanvasPoint(e.clientX, e.clientY);
+    if (!point) {
+      return;
+    }
+
+    if (toolRef.current instanceof PinTool) {
+      toolRef.current.setLastScreen(e.clientX, e.clientY);
+      const pinCallbacks: PinToolCallbacks = {
+        symbol,
+        onAddPrimitive: onAddPrimitive ?? (() => {}),
+        dispatch,
+        onOpenPinPopover: onOpenPinPopover ?? (() => {}),
+      };
+      toolRef.current.onDoubleClick?.(point, pinCallbacks);
+      setGhostPreview(null);
+      return;
+    }
+
+    const callbacks: ToolCallbacks = {
+      symbol,
+      onAddPrimitive: onAddPrimitive ?? (() => {}),
+      dispatch,
+    };
+    toolRef.current.onDoubleClick?.(point, callbacks);
+    setGhostPreview(null);
   };
 
   useEffect(() => {
@@ -163,11 +312,32 @@ export const EditorCanvas = memo(function EditorCanvas({
       if (event.key === 'Delete' || event.key === 'Backspace') {
         onDeleteSelected?.();
       }
+
+      if (toolRef.current instanceof PinTool) {
+        const pinCallbacks: PinToolCallbacks = {
+          symbol,
+          onAddPrimitive: onAddPrimitive ?? (() => {}),
+          dispatch,
+          onOpenPinPopover: onOpenPinPopover ?? (() => {}),
+        };
+        toolRef.current.onKeyDown?.(event, pinCallbacks);
+      } else {
+        const callbacks: ToolCallbacks = {
+          symbol,
+          onAddPrimitive: onAddPrimitive ?? (() => {}),
+          dispatch,
+        };
+        toolRef.current.onKeyDown?.(event, callbacks);
+      }
+
+      if (event.key === 'Escape') {
+        setGhostPreview(null);
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onDeleteSelected]);
+  }, [dispatch, onAddPrimitive, onDeleteSelected, onOpenPinPopover, symbol]);
 
   return (
     <div
@@ -178,6 +348,7 @@ export const EditorCanvas = memo(function EditorCanvas({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onDoubleClick={handleDoubleClick}
     >
       <GridBackground zoom={state.zoom} />
 
@@ -193,6 +364,7 @@ export const EditorCanvas = memo(function EditorCanvas({
           <line x1={0} y1={-10} x2={0} y2={10} stroke="#444" strokeWidth={1} />
 
           {symbol?.graphics.map((prim, index) => renderPrimitive(prim, `prim-${index}`))}
+          {ghostPreview}
           {symbol?.pins.map((pin) => renderPin(pin))}
         </svg>
       </div>
