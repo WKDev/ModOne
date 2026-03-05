@@ -11,6 +11,7 @@ pub mod parser;
 pub mod project;
 pub mod scenario;
 pub mod sim;
+pub mod symbols;
 
 // Re-export error types for convenience
 pub use error::{ModOneError, ModOneResult};
@@ -65,6 +66,8 @@ use commands::{
     CanvasSyncState,
     // Schematic commands
     schematic_save, schematic_load, schematic_list, schematic_exists, schematic_delete,
+    // Symbol commands
+    symbol_save, symbol_load, symbol_delete, symbol_list, symbol_list_all,
     // Scenario commands
     scenario_create, scenario_delete, scenario_exists, scenario_export_csv, scenario_import_csv,
     scenario_list, scenario_load, scenario_save,
@@ -407,6 +410,12 @@ pub fn run() {
             schematic_list,
             schematic_exists,
             schematic_delete,
+            // Symbol commands
+            symbol_save,
+            symbol_load,
+            symbol_delete,
+            symbol_list,
+            symbol_list_all,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

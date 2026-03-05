@@ -18,6 +18,7 @@ pub mod settings;
 pub mod sim;
 pub mod window;
 pub mod schematic;
+pub mod symbols;
 
 // Re-export all project commands for convenient registration in lib.rs
 pub use project::{
@@ -123,4 +124,10 @@ pub use window::{
 // Re-export schematic commands
 pub use schematic::{
     schematic_save, schematic_load, schematic_list, schematic_exists, schematic_delete,
+};
+
+
+// Re-export symbol commands
+pub use symbols::{
+    symbol_delete, symbol_list, symbol_list_all, symbol_load, symbol_save,
 };
