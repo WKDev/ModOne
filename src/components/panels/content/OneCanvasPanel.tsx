@@ -134,6 +134,7 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
     toggleSelection,
     clearSelection,
     setPan,
+    setZoom,
     alignSelected,
     distributeSelected,
     flipSelected,
@@ -679,6 +680,9 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
                 <Canvas
                   ref={canvasRef}
                   className="w-full h-full"
+                  documentId={documentId}
+                  setZoom={setZoom}
+                  setPan={setPan}
                   blocks={components}
                   wires={wires}
                   junctions={junctions}
