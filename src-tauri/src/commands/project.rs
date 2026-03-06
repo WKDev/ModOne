@@ -9,11 +9,24 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use crate::project::{
-    AutoSaveSettings, CanvasData, MemorySnapshot, PlcSettings, ProjectConfig, ProjectError,
-    RecentProject, ScenarioData, SharedAutoSaveManager, SharedProjectManager,
+    attempt_partial_recovery,
     // Recovery utilities
-    find_backups, validate_mop_integrity, attempt_partial_recovery, recover_from_backup,
-    BackupInfo, MopIntegrityResult, RecoveryResult,
+    find_backups,
+    recover_from_backup,
+    validate_mop_integrity,
+    AutoSaveSettings,
+    BackupInfo,
+    CanvasData,
+    MemorySnapshot,
+    MopIntegrityResult,
+    PlcSettings,
+    ProjectConfig,
+    ProjectError,
+    RecentProject,
+    RecoveryResult,
+    ScenarioData,
+    SharedAutoSaveManager,
+    SharedProjectManager,
 };
 
 // ============================================================================
@@ -106,21 +119,21 @@ fn format_error(error: ProjectError) -> String {
 pub async fn create_project(
     state: State<'_, SharedProjectManager>,
     name: String,
-    projectDir: PathBuf,
-    plcManufacturer: String,
-    plcModel: String,
-    scanTimeMs: Option<u32>,
+    project_dir: PathBuf,
+    plc_manufacturer: String,
+    plc_model: String,
+    scan_time_ms: Option<u32>,
 ) -> Result<ProjectInfo, String> {
     // Parse PLC manufacturer
-    let manufacturer = plcManufacturer
+    let manufacturer = plc_manufacturer
         .parse()
         .map_err(|e: String| format!("Invalid PLC manufacturer: {}", e))?;
 
     // Create PLC settings
     let plc_settings = PlcSettings {
         manufacturer,
-        model: plcModel,
-        scan_time_ms: scanTimeMs.unwrap_or(10),
+        model: plc_model,
+        scan_time_ms: scan_time_ms.unwrap_or(10),
     };
 
     // Acquire lock and create project
@@ -129,7 +142,7 @@ pub async fn create_project(
         .map_err(|e| format!("Internal error: failed to acquire lock: {}", e))?;
 
     let info = manager
-        .create_project(name, projectDir, plc_settings)
+        .create_project(name, project_dir, plc_settings)
         .map_err(format_error)?;
 
     Ok(ProjectInfo {
@@ -477,8 +490,7 @@ pub async fn recover_project_from_backup(
         return Err(format!("Backup file not found: {}", backup_path.display()));
     }
 
-    recover_from_backup(&backup_path, &target_path)
-        .map_err(|e| e.to_string())
+    recover_from_backup(&backup_path, &target_path).map_err(|e| e.to_string())
 }
 
 /// Attempt to recover data from a corrupted project file
@@ -496,6 +508,5 @@ pub async fn attempt_project_recovery(
         return Err(format!("File not found: {}", corrupted_path.display()));
     }
 
-    attempt_partial_recovery(&corrupted_path, &output_dir)
-        .map_err(|e| e.to_string())
+    attempt_partial_recovery(&corrupted_path, &output_dir).map_err(|e| e.to_string())
 }

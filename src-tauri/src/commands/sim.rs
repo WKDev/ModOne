@@ -6,23 +6,23 @@
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 
 use crate::commands::canvas_sync::CanvasSyncState;
 use crate::modbus::ModbusMemory;
 use crate::sim::{
-    debugger::{SimDebugger, StepResult, StepType},
     counter::CounterManager,
+    debugger::{SimDebugger, StepResult, StepType},
     engine::OneSimEngine,
     executor::LadderProgram,
     memory::DeviceMemory,
     modserver_sync::ModServerSync,
     timer::TimerManager,
     types::{
-        Breakpoint, MemorySnapshot, ScanCycleInfo, SimBitDeviceType,
-        SimWordDeviceType, SimulationConfig, SimulationStatus, WatchVariable,
+        Breakpoint, MemorySnapshot, ScanCycleInfo, SimBitDeviceType, SimWordDeviceType,
+        SimulationConfig, SimulationStatus, WatchVariable,
     },
 };
 
@@ -72,7 +72,10 @@ impl SimState {
     }
 
     /// Create with both DeviceMemory and ModbusMemory for ModServerSync
-    pub fn with_memory_and_modbus(memory: Arc<DeviceMemory>, modbus_memory: Arc<ModbusMemory>) -> Self {
+    pub fn with_memory_and_modbus(
+        memory: Arc<DeviceMemory>,
+        modbus_memory: Arc<ModbusMemory>,
+    ) -> Self {
         Self {
             engine: Arc::new(Mutex::new(None)),
             debugger: Arc::new(SimDebugger::default()),
@@ -136,7 +139,6 @@ pub struct SimRunParams {
 // ============================================================================
 
 const SIM_STATUS_UPDATE_EVENT: &str = "sim:status-update";
-const SIM_SCAN_COMPLETE_EVENT: &str = "sim:scan-complete";
 const SIM_DEVICE_CHANGE_EVENT: &str = "sim:device-change";
 const SIM_BREAKPOINT_HIT_EVENT: &str = "sim:breakpoint-hit";
 
@@ -212,10 +214,14 @@ pub async fn sim_run(
         }
     }
 
-    let program = state.program.lock().clone().unwrap_or_else(|| LadderProgram {
-        name: "Default Program".to_string(),
-        networks: vec![],
-    });
+    let program = state
+        .program
+        .lock()
+        .clone()
+        .unwrap_or_else(|| LadderProgram {
+            name: "Default Program".to_string(),
+            networks: vec![],
+        });
 
     // Start the engine
     engine.start(program).map_err(|e| e.to_string())?;
@@ -430,10 +436,7 @@ pub fn sim_get_scan_info(state: State<'_, SimState>) -> Result<ScanCycleInfo, St
 
 /// Load a ladder program for simulation
 #[tauri::command]
-pub fn sim_load_program(
-    state: State<'_, SimState>,
-    program: LadderProgram,
-) -> Result<(), String> {
+pub fn sim_load_program(state: State<'_, SimState>, program: LadderProgram) -> Result<(), String> {
     *state.program.lock() = Some(program);
     Ok(())
 }
@@ -476,15 +479,10 @@ fn parse_device_address(address: &str) -> Result<(String, u16), String> {
 
 /// Read a device value
 #[tauri::command]
-pub fn sim_read_device(
-    state: State<'_, SimState>,
-    address: String,
-) -> Result<DeviceValue, String> {
+pub fn sim_read_device(state: State<'_, SimState>, address: String) -> Result<DeviceValue, String> {
     let engine_guard = state.engine.lock();
 
-    let engine = engine_guard
-        .as_ref()
-        .ok_or("Simulation is not running")?;
+    let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
 
     let memory = engine.memory();
     let (device_type, addr) = parse_device_address(&address)?;
@@ -576,9 +574,7 @@ pub fn sim_write_device(
 ) -> Result<(), String> {
     let engine_guard = state.engine.lock();
 
-    let engine = engine_guard
-        .as_ref()
-        .ok_or("Simulation is not running")?;
+    let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
 
     let memory = engine.memory();
     let (device_type, addr) = parse_device_address(&address)?;
@@ -643,10 +639,7 @@ pub fn sim_write_device(
         serde_json::to_value(&value).unwrap_or_default(),
     ) {
         debugger.pause(hit.clone());
-        let _ = app.emit(
-            SIM_BREAKPOINT_HIT_EVENT,
-            serde_json::json!({ "hit": hit }),
-        );
+        let _ = app.emit(SIM_BREAKPOINT_HIT_EVENT, serde_json::json!({ "hit": hit }));
     }
 
     Ok(())
@@ -745,9 +738,7 @@ pub fn sim_read_memory_range(
 ) -> Result<Vec<DeviceValue>, String> {
     let engine_guard = state.engine.lock();
 
-    let engine = engine_guard
-        .as_ref()
-        .ok_or("Simulation is not running")?;
+    let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
 
     let memory = engine.memory();
     let mut values = Vec::with_capacity(count as usize);
@@ -766,9 +757,7 @@ pub fn sim_read_memory_range(
 pub fn sim_get_memory_snapshot(state: State<'_, SimState>) -> Result<MemorySnapshot, String> {
     let engine_guard = state.engine.lock();
 
-    let engine = engine_guard
-        .as_ref()
-        .ok_or("Simulation is not running")?;
+    let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
 
     let memory = engine.memory();
     Ok(memory.get_snapshot("sim"))
@@ -791,7 +780,10 @@ pub fn sim_add_breakpoint(
 /// Remove a breakpoint
 #[tauri::command]
 pub fn sim_remove_breakpoint(state: State<'_, SimState>, id: String) -> Result<(), String> {
-    state.debugger.remove_breakpoint(&id).map_err(|e| e.to_string())
+    state
+        .debugger
+        .remove_breakpoint(&id)
+        .map_err(|e| e.to_string())
 }
 
 /// Get all breakpoints
@@ -819,7 +811,10 @@ pub fn sim_add_watch(state: State<'_, SimState>, address: String) -> Result<(), 
 /// Remove a watch variable
 #[tauri::command]
 pub fn sim_remove_watch(state: State<'_, SimState>, address: String) -> Result<(), String> {
-    state.debugger.remove_watch(&address).map_err(|e| e.to_string())
+    state
+        .debugger
+        .remove_watch(&address)
+        .map_err(|e| e.to_string())
 }
 
 /// Get all watch variables
@@ -837,9 +832,7 @@ pub fn sim_step(
 ) -> Result<StepResult, String> {
     let engine_guard = state.engine.lock();
 
-    let engine = engine_guard
-        .as_ref()
-        .ok_or("Simulation is not running")?;
+    let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
 
     // Enable step mode
     state.debugger.enable_step_mode(step_type);
@@ -892,9 +885,7 @@ pub fn sim_continue(app: AppHandle, state: State<'_, SimState>) -> Result<(), St
 
 /// Get debugger state
 #[tauri::command]
-pub fn sim_get_debugger_state(
-    state: State<'_, SimState>,
-) -> Result<serde_json::Value, String> {
+pub fn sim_get_debugger_state(state: State<'_, SimState>) -> Result<serde_json::Value, String> {
     Ok(serde_json::json!({
         "stepMode": state.debugger.is_step_mode(),
         "stepType": state.debugger.get_step_type(),

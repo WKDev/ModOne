@@ -57,14 +57,16 @@ pub use config::{
     ModbusRtuSettings, ModbusSettings, ModbusTcpSettings, Parity, PlcManufacturer, PlcSettings,
     ProjectConfig, ProjectSettings,
 };
-pub use folder_project::{FolderProject, FolderProjectError, is_folder_project, is_legacy_project};
+pub use folder_project::{is_folder_project, is_legacy_project, FolderProject, FolderProjectError};
 pub use manifest::{DirectoryConfig, ProjectManifest, MANIFEST_VERSION};
-pub use migration::{migrate_project, is_legacy_zip_project, MigrationError, MigrationResult, MigrationPreview, get_migration_preview};
+pub use migration::{
+    get_migration_preview, is_legacy_zip_project, migrate_project, MigrationError,
+    MigrationPreview, MigrationResult,
+};
 pub use mop_file::{MopFile, MopFileError};
 pub use recovery::{
-    find_backups, validate_mop_integrity, attempt_partial_recovery,
-    recover_from_backup, get_most_recent_valid_backup,
-    BackupInfo, MopIntegrityResult, RecoveryResult,
+    attempt_partial_recovery, find_backups, get_most_recent_valid_backup, recover_from_backup,
+    validate_mop_integrity, BackupInfo, MopIntegrityResult, RecoveryResult,
 };
 pub use validation::{validate_project_config, ValidationResult};
 
@@ -263,12 +265,6 @@ pub struct ProjectManager {
 
     /// List of recently opened projects
     recent_projects: Vec<RecentProject>,
-
-    /// Whether auto-save is enabled
-    auto_save_enabled: bool,
-
-    /// Auto-save interval in seconds
-    auto_save_interval_secs: u64,
 }
 
 impl Default for ProjectManager {
@@ -285,8 +281,6 @@ impl ProjectManager {
         Self {
             current: None,
             recent_projects,
-            auto_save_enabled: true,
-            auto_save_interval_secs: 300, // 5 minutes
         }
     }
 
@@ -365,8 +359,13 @@ impl ProjectManager {
         }
 
         // Create folder-based project (v2.0)
-        let folder_project = FolderProject::create_new(&project_dir, &name, plc.clone())
-            .map_err(|e| ProjectError::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))?;
+        let folder_project =
+            FolderProject::create_new(&project_dir, &name, plc.clone()).map_err(|e| {
+                ProjectError::Io(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    e.to_string(),
+                ))
+            })?;
 
         // Get manifest path for recent projects
         let manifest_path = folder_project.manifest_path().to_path_buf();
@@ -420,8 +419,12 @@ impl ProjectManager {
         // Detect project format
         let (storage, config) = if is_folder_project(&path) {
             // v2.0 folder-based project
-            let folder_project = FolderProject::open(&path)
-                .map_err(|e| ProjectError::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))?;
+            let folder_project = FolderProject::open(&path).map_err(|e| {
+                ProjectError::Io(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    e.to_string(),
+                ))
+            })?;
 
             let config = folder_project.manifest().to_legacy_config();
             (ProjectStorage::Folder(folder_project), config)
@@ -438,7 +441,7 @@ impl ProjectManager {
             (ProjectStorage::LegacyZip(mop_file), config)
         } else {
             return Err(ProjectError::MopFile(MopFileError::InvalidStructure(
-                "Unknown project format".to_string()
+                "Unknown project format".to_string(),
             )));
         };
 
@@ -525,12 +528,20 @@ impl ProjectManager {
 
                 if let Some(new_dir) = path {
                     // Save As - to new directory
-                    folder_project.save_as(&new_dir, None)
-                        .map_err(|e| ProjectError::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))?;
+                    folder_project.save_as(&new_dir, None).map_err(|e| {
+                        ProjectError::Io(std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            e.to_string(),
+                        ))
+                    })?;
                 } else {
                     // Regular save
-                    folder_project.save()
-                        .map_err(|e| ProjectError::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))?;
+                    folder_project.save().map_err(|e| {
+                        ProjectError::Io(std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            e.to_string(),
+                        ))
+                    })?;
                 }
             }
             ProjectStorage::LegacyZip(mop_file) => {
@@ -560,7 +571,9 @@ impl ProjectManager {
         // If this was a "Save As", update recent projects
         if is_save_as {
             let project_name = project.config.project.name.clone();
-            let new_path = project.storage.source_path()
+            let new_path = project
+                .storage
+                .source_path()
                 .map(|p| p.to_path_buf())
                 .unwrap_or_default();
 
@@ -617,9 +630,8 @@ impl ProjectManager {
 
 /// Get the path to the recent projects JSON file
 fn get_recent_projects_path() -> Option<PathBuf> {
-    ProjectDirs::from("com", "modone", "ModOne").map(|dirs| {
-        dirs.config_dir().join(RECENT_PROJECTS_FILE)
-    })
+    ProjectDirs::from("com", "modone", "ModOne")
+        .map(|dirs| dirs.config_dir().join(RECENT_PROJECTS_FILE))
 }
 
 /// Load recent projects from disk
@@ -644,8 +656,12 @@ fn load_recent_projects() -> Vec<RecentProject> {
 
 /// Save recent projects to disk
 fn save_recent_projects(projects: &[RecentProject]) -> Result<(), std::io::Error> {
-    let path = get_recent_projects_path()
-        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "Could not determine config directory"))?;
+    let path = get_recent_projects_path().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Could not determine config directory",
+        )
+    })?;
 
     // Create parent directories if needed
     if let Some(parent) = path.parent() {
@@ -693,11 +709,8 @@ mod tests {
         let temp_dir = tempfile::tempdir().unwrap();
         let project_dir = temp_dir.path().join("TestProject");
 
-        let folder_project = FolderProject::create_new(
-            &project_dir,
-            "Test",
-            PlcSettings::default(),
-        ).unwrap();
+        let folder_project =
+            FolderProject::create_new(&project_dir, "Test", PlcSettings::default()).unwrap();
 
         let config = folder_project.manifest().to_legacy_config();
 

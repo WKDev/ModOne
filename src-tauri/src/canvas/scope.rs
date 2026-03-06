@@ -130,8 +130,6 @@ struct TriggerState {
     triggered: bool,
     /// Sample index where trigger occurred
     trigger_index: usize,
-    /// Holdoff time remaining in ms
-    hold_off_remaining: f32,
 }
 
 impl Default for TriggerState {
@@ -140,7 +138,6 @@ impl Default for TriggerState {
             armed: true,
             triggered: false,
             trigger_index: 0,
-            hold_off_remaining: 0.0,
         }
     }
 }
