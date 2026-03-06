@@ -5,7 +5,14 @@
 **Branch:** main
 
 ## OVERVIEW
-ModOne is a desktop engineering app built with Tauri (Rust backend) and React + TypeScript (frontend). The repo is local-first, uses pnpm, and has no configured CI workflow.
+ModOne is a **commercial-grade EDA (Electronic Design Automation) desktop application** targeting the level of KiCad, EPLAN, and OrCAD. It is built with Tauri (Rust backend) and React + TypeScript (frontend). The repo is local-first, uses pnpm, and has no configured CI workflow.
+
+### Product Vision
+- **Ambition**: Production-quality schematic editor for electrical/PLC engineering, competitive with KiCad's schematic editor and EPLAN's circuit design capabilities.
+- **Core differentiator**: Integrated PLC simulation engine with real-time Modbus communication — design, simulate, and commission in one tool.
+- **Scale targets**: Must handle large industrial projects (1,000+ rungs, 10,000+ I/O points, 50+ schematic pages) at 60fps interaction.
+- **Rendering strategy**: The current React DOM+SVG canvas (OneCanvas) is a stepping stone. The rendering layer MUST evolve to a GPU-accelerated solution (WebGL/WebGPU via Pixi.js or custom renderer) to meet commercial EDA performance requirements. Architecture decisions should keep the rendering layer decoupled and swappable.
+- **Non-negotiable**: All architectural decisions must be evaluated against "would this scale to KiCad/EPLAN level?" — if the answer is no, find an alternative.
 
 ## STRUCTURE
 ```text
