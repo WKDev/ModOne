@@ -8,7 +8,7 @@
  * This architecture prevents double transformation and coordinates offset issues.
  */
 
-import { useRef, forwardRef, useImperativeHandle, useMemo } from 'react';
+import { useRef, useCallback, forwardRef, useImperativeHandle, useMemo } from 'react';
 import { GridBackground } from './GridBackground';
 import { useCoordinateSystem } from './coordinate-system/useCoordinateSystem';
 import { CoordinateSystemProvider } from './coordinate-system/CoordinateSystemContext';
@@ -17,6 +17,9 @@ import { OverlayLayer } from './layers/OverlayLayer';
 import { CanvasContent } from './content/CanvasContent';
 import { CanvasOverlays } from './overlays/CanvasOverlays';
 import { useInteraction } from './contexts/InteractionContext';
+import { usePixiRenderer } from './pixi/usePixiRenderer';
+import { PixiCanvasHost, type PixiCanvasHostRef } from './pixi/PixiCanvasHost';
+import { usePixiSyncBridge } from './pixi/usePixiSyncBridge';
 import type { Block, Wire, Junction, Position } from './types';
 import type { SelectionBoxState } from './overlays/SelectionBox';
 import type { WirePreviewState } from './overlays/WirePreview';
@@ -34,6 +37,10 @@ interface CanvasProps {
   // Viewport (from facade — do NOT read from global store)
   zoom: number;
   pan: Position;
+
+  documentId?: string | null;
+  setZoom?: (zoom: number) => void;
+  setPan?: (pan: Position) => void;
 
   // Overlays (Screen/Container Space)
   selectionBox: SelectionBoxState | null;
@@ -111,6 +118,9 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
     onBlockDragStart,
     onWireContextMenu,
     onUpdateComponent,
+    documentId: propDocumentId,
+    setZoom: propSetZoom,
+    setPan: propSetPan,
     className = '',
     gridSize: propGridSize,
     showGrid: propShowGrid,
@@ -118,12 +128,21 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
   },
   ref
 ) {
-  // Refs
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<CanvasRef | null>(null);
+  const pixiRef = useRef<PixiCanvasHostRef>(null);
   const { cursor, send, wireDraftPolys } = useInteraction();
+  const { isPixiEnabled } = usePixiRenderer();
+
+  const noopSetZoom = useCallback((_z: number) => {}, []);
+  const noopSetPan = useCallback((_p: Position) => {}, []);
+  const { onPixiReady } = usePixiSyncBridge({
+    documentId: propDocumentId ?? null,
+    setZoom: propSetZoom ?? noopSetZoom,
+    setPan: propSetPan ?? noopSetPan,
+  });
 
   const gridSize = propGridSize ?? 20;
   const showGrid = propShowGrid ?? true;
@@ -200,53 +219,79 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(function Canvas(
         onDoubleClick={handleDoubleClick}
         onWheel={handleWheel}
       >
-        {/* Grid background */}
-        <GridBackground gridSize={gridSize} showGrid={showGrid} zoom={zoom} />
-
-        {/* Transformed Layer - Canvas Space */}
-        <TransformedLayer zoom={zoom} pan={pan}>
-          <div ref={contentRef}>
-            <CanvasContent
-              blocks={blocks}
-              wires={wires}
-              junctions={junctions}
-              onBlockClick={onBlockClick}
-              onWireClick={onWireClick}
-              onJunctionClick={onJunctionClick}
-              selectedBlockIds={selectedBlockIds}
-              selectedWireIds={selectedWireIds}
-              connectedPorts={connectedPorts}
-              portVoltages={portVoltages}
-              onButtonPress={onButtonPress}
-              onButtonRelease={onButtonRelease}
-              plcOutputStates={plcOutputStates}
-                onStartWire={onStartWire}
-                onEndWire={onEndWire}
-                onBlockDragStart={onBlockDragStart}
-                onWireContextMenu={onWireContextMenu}
-                onUpdateComponent={onUpdateComponent}
-                wireDraftPolys={wireDraftPolys}
+        {isPixiEnabled ? (
+          <>
+            <PixiCanvasHost
+              ref={pixiRef}
+              className="absolute inset-0"
+              onReady={onPixiReady}
             />
-          </div>
-        </TransformedLayer>
 
-        {/* Overlay Layer - Screen/Container Space */}
-        <OverlayLayer>
-          <div ref={overlayRef}>
-            <CanvasOverlays
-              selectionBox={selectionBox}
-              debugMode={debugMode}
-              canvasRef={canvasRef}
-              zoom={zoom}
-              pan={pan}
-              selectedIds={allSelectedIds}
-              components={blocks}
-              wires={wires}
-              junctions={junctions}
-              wirePreview={wirePreview}
-            />
-          </div>
-        </OverlayLayer>
+            <OverlayLayer>
+              <div ref={overlayRef}>
+                <CanvasOverlays
+                  selectionBox={selectionBox}
+                  debugMode={debugMode}
+                  canvasRef={canvasRef}
+                  zoom={zoom}
+                  pan={pan}
+                  selectedIds={allSelectedIds}
+                  components={blocks}
+                  wires={wires}
+                  junctions={junctions}
+                  wirePreview={wirePreview}
+                />
+              </div>
+            </OverlayLayer>
+          </>
+        ) : (
+          <>
+            <GridBackground gridSize={gridSize} showGrid={showGrid} zoom={zoom} />
+
+            <TransformedLayer zoom={zoom} pan={pan}>
+              <div ref={contentRef}>
+                <CanvasContent
+                  blocks={blocks}
+                  wires={wires}
+                  junctions={junctions}
+                  onBlockClick={onBlockClick}
+                  onWireClick={onWireClick}
+                  onJunctionClick={onJunctionClick}
+                  selectedBlockIds={selectedBlockIds}
+                  selectedWireIds={selectedWireIds}
+                  connectedPorts={connectedPorts}
+                  portVoltages={portVoltages}
+                  onButtonPress={onButtonPress}
+                  onButtonRelease={onButtonRelease}
+                  plcOutputStates={plcOutputStates}
+                  onStartWire={onStartWire}
+                  onEndWire={onEndWire}
+                  onBlockDragStart={onBlockDragStart}
+                  onWireContextMenu={onWireContextMenu}
+                  onUpdateComponent={onUpdateComponent}
+                  wireDraftPolys={wireDraftPolys}
+                />
+              </div>
+            </TransformedLayer>
+
+            <OverlayLayer>
+              <div ref={overlayRef}>
+                <CanvasOverlays
+                  selectionBox={selectionBox}
+                  debugMode={debugMode}
+                  canvasRef={canvasRef}
+                  zoom={zoom}
+                  pan={pan}
+                  selectedIds={allSelectedIds}
+                  components={blocks}
+                  wires={wires}
+                  junctions={junctions}
+                  wirePreview={wirePreview}
+                />
+              </div>
+            </OverlayLayer>
+          </>
+        )}
       </div>
     </CoordinateSystemProvider>
   );
