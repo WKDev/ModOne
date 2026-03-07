@@ -8,27 +8,18 @@
 export { LadderEditor } from './LadderEditor';
 export type { LadderEditorProps } from './LadderEditor';
 
-// Core grid components
-export { LadderGrid } from './LadderGrid';
-export type { LadderGridProps } from './LadderGrid';
-
-export { LadderCell } from './LadderCell';
-export type { LadderCellProps } from './LadderCell';
-
+// Power/Neutral rails
 export { PowerRail } from './PowerRail';
 export type { PowerRailProps } from './PowerRail';
 
 export { NeutralRail } from './NeutralRail';
 export type { NeutralRailProps } from './NeutralRail';
 
+// Pixi canvas host
+export { LadderPixiCanvasHost } from './pixi/LadderPixiCanvasHost';
+export type { LadderPixiCanvasHostRef } from './pixi/LadderPixiCanvasHost';
+
 // Toolbox
-export { LadderToolbox } from './LadderToolbox';
-export type { LadderToolboxProps, ToolboxItem } from './LadderToolbox';
-
-// Droppable cell (for advanced usage)
-export { DroppableCell } from './DroppableCell';
-export type { DroppableCellProps } from './DroppableCell';
-
 // Properties panel
 export {
   LadderPropertiesPanel,

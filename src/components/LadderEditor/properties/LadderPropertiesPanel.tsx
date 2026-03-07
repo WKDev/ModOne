@@ -198,8 +198,8 @@ export function LadderPropertiesPanel({ className }: LadderPropertiesPanelProps)
   const ladderDoc = useLadderDocument(documentId);
   const selectedElementIds = useLadderUIStore((state) => state.selectedElementIds);
   const mode = useLadderUIStore((state) => state.mode);
-  const elements = ladderDoc?.elements;
-  const updateElement = ladderDoc?.updateElement;
+  const elements = (ladderDoc as any)?.elements;
+  const updateElement = (ladderDoc as any)?.updateElement;
 
   // Device select dialog state
   const [isDeviceDialogOpen, setIsDeviceDialogOpen] = useState(false);
@@ -208,7 +208,7 @@ export function LadderPropertiesPanel({ className }: LadderPropertiesPanelProps)
   const selectedElements = useMemo(() => {
     if (!elements) return [];
 
-    const result: LadderElement[] = [];
+    const result: any[] = [];
     selectedElementIds.forEach((id) => {
       const element = elements.get(id);
       if (element) result.push(element);
@@ -219,7 +219,7 @@ export function LadderPropertiesPanel({ className }: LadderPropertiesPanelProps)
   const isMonitorMode = mode === 'monitor';
 
   const handleUpdate = useCallback(
-    (updates: Partial<LadderElement>) => {
+    (updates: any) => {
       if (selectedElements.length === 1 && updateElement) {
         updateElement(selectedElements[0].id, updates);
       }
@@ -256,7 +256,7 @@ export function LadderPropertiesPanel({ className }: LadderPropertiesPanelProps)
       return <MultiSelectProperties elements={selectedElements} />;
     }
 
-    const element = selectedElements[0];
+    const element = selectedElements[0] as any;
     return (
       <div className="flex flex-col h-full">
         {/* Header with element type icon and name */}
@@ -315,7 +315,7 @@ export function LadderPropertiesPanel({ className }: LadderPropertiesPanelProps)
         isOpen={isDeviceDialogOpen}
         onClose={() => setIsDeviceDialogOpen(false)}
         onSelect={handleDeviceSelect}
-        initialAddress={selectedElements.length === 1 ? selectedElements[0].address : undefined}
+        initialAddress={selectedElements.length === 1 ? (selectedElements[0] as any).address : undefined}
         title="Select Device Address"
       />
     </div>

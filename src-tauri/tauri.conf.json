@@ -5,7 +5,7 @@
   "identifier": "com.modone.app",
   "build": {
     "frontendDist": "../build",
-    "devUrl": "http://localhost:1420",
+    "devUrl": "http://localhost:7017",
     "beforeDevCommand": "pnpm run dev",
     "beforeBuildCommand": "pnpm run build"
   },

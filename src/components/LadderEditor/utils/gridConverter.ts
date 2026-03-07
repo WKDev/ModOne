@@ -97,8 +97,11 @@ function mapNodeTypeToElementType(nodeType: LadderNode['type']): LadderElementTy
     contact_n: 'contact_n',
     // Coils - AST uses different naming
     coil_out: 'coil',
+    coil_inv: 'coil_inverted',
     coil_set: 'coil_set',
     coil_rst: 'coil_reset',
+    coil_p: 'coil_p',
+    coil_n: 'coil_n',
     // Timers
     timer_ton: 'timer_ton',
     timer_tof: 'timer_tof',

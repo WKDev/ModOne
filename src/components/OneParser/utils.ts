@@ -95,7 +95,8 @@ export function isBlockInstruction(instruction: string): boolean {
 export function isOutputInstruction(instruction: string): boolean {
   const upper = instruction.toUpperCase();
   return (
-    upper === 'OUT' || upper === 'OUTN' || upper === 'SET' || upper === 'RST'
+    upper === 'OUT' || upper === 'OUTN' || upper === 'OUTP' || upper === 'OUTF' ||
+    upper === 'SET' || upper === 'RST'
   );
 }
 
@@ -183,15 +184,21 @@ export function getContactNodeType(
  */
 export function getCoilNodeType(
   instruction: string
-): 'coil_out' | 'coil_set' | 'coil_rst' {
+): 'coil_out' | 'coil_inv' | 'coil_set' | 'coil_rst' | 'coil_p' | 'coil_n' {
   const upper = instruction.toUpperCase();
 
   if (upper === 'SET') {
     return 'coil_set';
   } else if (upper === 'RST') {
     return 'coil_rst';
+  } else if (upper === 'OUTN') {
+    return 'coil_inv';
+  } else if (upper === 'OUTP') {
+    return 'coil_p';
+  } else if (upper === 'OUTF') {
+    return 'coil_n';
   } else {
-    // OUT, OUTN
+    // OUT
     return 'coil_out';
   }
 }
@@ -283,7 +290,14 @@ export function isContactType(type: LadderNodeType): boolean {
  * @returns True if coil type
  */
 export function isCoilType(type: LadderNodeType): boolean {
-  return type === 'coil_out' || type === 'coil_set' || type === 'coil_rst';
+  return (
+    type === 'coil_out' ||
+    type === 'coil_inv' ||
+    type === 'coil_set' ||
+    type === 'coil_rst' ||
+    type === 'coil_p' ||
+    type === 'coil_n'
+  );
 }
 
 /**

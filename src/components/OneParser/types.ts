@@ -77,7 +77,7 @@ export type ContactInstructionType =
 export type BlockInstructionType = 'ANDB' | 'ORB';
 
 /** Output instruction types */
-export type OutputInstructionType = 'OUT' | 'OUTN' | 'SET' | 'RST';
+export type OutputInstructionType = 'OUT' | 'OUTN' | 'OUTP' | 'OUTF' | 'SET' | 'RST';
 
 /** Timer instruction types */
 export type TimerInstructionType = 'TON' | 'TOF' | 'TMR';
@@ -114,7 +114,7 @@ export const CONTACT_INSTRUCTIONS: readonly ContactInstructionType[] = [
 export const BLOCK_INSTRUCTIONS: readonly BlockInstructionType[] = ['ANDB', 'ORB'] as const;
 
 export const OUTPUT_INSTRUCTIONS: readonly OutputInstructionType[] = [
-  'OUT', 'OUTN', 'SET', 'RST',
+  'OUT', 'OUTN', 'OUTP', 'OUTF', 'SET', 'RST',
 ] as const;
 
 export const TIMER_INSTRUCTIONS: readonly TimerInstructionType[] = ['TON', 'TOF', 'TMR'] as const;
@@ -162,7 +162,7 @@ export interface CsvRow {
 /** Ladder node types */
 export type LadderNodeType =
   | 'contact_no' | 'contact_nc' | 'contact_p' | 'contact_n'
-  | 'coil_out' | 'coil_set' | 'coil_rst'
+  | 'coil_out' | 'coil_inv' | 'coil_set' | 'coil_rst' | 'coil_p' | 'coil_n'
   | 'timer_ton' | 'timer_tof' | 'timer_tmr'
   | 'counter_ctu' | 'counter_ctd' | 'counter_ctud'
   | 'comparison' | 'math' | 'move'
@@ -198,7 +198,7 @@ export interface ContactNode extends BaseLadderNode {
 
 /** Coil node */
 export interface CoilNode extends BaseLadderNode {
-  type: 'coil_out' | 'coil_set' | 'coil_rst';
+  type: 'coil_out' | 'coil_inv' | 'coil_set' | 'coil_rst' | 'coil_p' | 'coil_n';
   address: DeviceAddress;
 }
 
@@ -284,6 +284,8 @@ export interface LadderNetwork {
   nodes: LadderNode[];
   /** Network comment (optional) */
   comment?: string;
+  /** Step/rung label for identification (e.g., XG5000 FF 41 record) */
+  label?: string;
 }
 
 /** Data type for symbol entries */
@@ -437,8 +439,11 @@ export function isContactNode(node: LadderNode): node is ContactNode {
 export function isCoilNode(node: LadderNode): node is CoilNode {
   return (
     node.type === 'coil_out' ||
+    node.type === 'coil_inv' ||
     node.type === 'coil_set' ||
-    node.type === 'coil_rst'
+    node.type === 'coil_rst' ||
+    node.type === 'coil_p' ||
+    node.type === 'coil_n'
   );
 }
 

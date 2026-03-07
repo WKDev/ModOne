@@ -131,7 +131,7 @@ export type LadderElementType =
   // Contact types
   | 'contact_no' | 'contact_nc' | 'contact_p' | 'contact_n'
   // Coil types
-  | 'coil' | 'coil_set' | 'coil_reset'
+  | 'coil' | 'coil_inverted' | 'coil_set' | 'coil_reset' | 'coil_p' | 'coil_n'
   // Timer types
   | 'timer_ton' | 'timer_tof' | 'timer_tmr'
   // Counter types
@@ -148,7 +148,7 @@ export type LadderElementType =
 export type ContactType = 'contact_no' | 'contact_nc' | 'contact_p' | 'contact_n';
 
 /** Coil element type subset */
-export type CoilType = 'coil' | 'coil_set' | 'coil_reset';
+export type CoilType = 'coil' | 'coil_inverted' | 'coil_set' | 'coil_reset' | 'coil_p' | 'coil_n';
 
 /** Timer element type subset */
 export type TimerType = 'timer_ton' | 'timer_tof' | 'timer_tmr';
@@ -173,7 +173,7 @@ export const CONTACT_TYPES: readonly ContactType[] = [
 ] as const;
 
 export const COIL_TYPES: readonly CoilType[] = [
-  'coil', 'coil_set', 'coil_reset',
+  'coil', 'coil_inverted', 'coil_set', 'coil_reset', 'coil_p', 'coil_n',
 ] as const;
 
 export const TIMER_TYPES: readonly TimerType[] = [
@@ -358,6 +358,8 @@ export interface WireProperties extends ElementProperties {
             | 'cross';
   /** Bit mask of connected directions (runtime computed via WireDirection) */
   connectedDirections?: number;
+  /** Wire creation origin: manual (user-placed, XG5000 FF 01) or auto (editor-generated, XG5000 FF 02) */
+  origin?: 'manual' | 'auto';
 }
 
 /** Wire element */
