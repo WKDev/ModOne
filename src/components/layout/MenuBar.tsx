@@ -3,6 +3,7 @@ import { Check, Minus, Square, Copy, X } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useLayoutPersistenceStore } from '../../stores/layoutPersistenceStore';
+import { useProjectStore } from '../../stores/projectStore';
 import { SaveLayoutDialog } from './SaveLayoutDialog';
 import { projectDialogService } from '../../services/projectDialogService';
 import { fileDialogService } from '../../services/fileDialogService';
@@ -313,6 +314,9 @@ export function MenuBar() {
     resetToDefault,
   } = useLayoutPersistenceStore();
 
+  const projectName = useProjectStore((state) => state.currentProject?.config.project.name);
+  const isModified = useProjectStore((state) => state.isModified);
+
   // ---- Window control handlers ----
 
   const handleMinimize = useCallback(async () => {
@@ -523,10 +527,14 @@ export function MenuBar() {
 
         {/* Drag region — fills remaining space, double-click to maximize */}
         <div
-          className="flex-1 h-full"
+          className="flex-1 h-full flex items-center justify-center text-[var(--color-text-secondary)] font-medium"
           data-tauri-drag-region
           onDoubleClick={IS_MAC ? undefined : handleDragRegionDoubleClick}
-        />
+        >
+          <span className="pointer-events-none">
+            {projectName ? `ModOne - ${projectName}${isModified ? ' *' : ''}` : 'ModOne'}
+          </span>
+        </div>
 
         {/* Windows/Linux: Controls on right */}
         {!IS_MAC && (

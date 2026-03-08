@@ -17,6 +17,7 @@
     "core:window:allow-is-maximized",
     "core:window:allow-set-focus",
     "core:window:allow-destroy",
+    "core:window:allow-set-title",
     "shell:allow-open",
     "dialog:default",
     "fs:default",
