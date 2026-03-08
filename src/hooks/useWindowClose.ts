@@ -60,6 +60,15 @@ export function useWindowClose(): UseWindowCloseResult {
     }
 
     try {
+      // Save window state (size, position, maximized, etc.) before destroying
+      // Dynamically import to prevent errors in non-Tauri environments
+      const { saveWindowState, StateFlags } = await import('@tauri-apps/plugin-window-state');
+      await saveWindowState(StateFlags.ALL);
+    } catch (error) {
+      console.error('Failed to save window state:', error);
+    }
+
+    try {
       // Grace period for any in-flight IPC responses to complete
       // Prevents WebView2 ERROR_INVALID_STATE (0x8007139F)
       await new Promise((resolve) => setTimeout(resolve, 150));
