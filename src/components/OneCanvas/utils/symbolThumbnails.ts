@@ -7,7 +7,7 @@
  */
 
 import { Application, Graphics } from 'pixi.js';
-import { getSymbolContext, getSymbolSize } from '../renderers/symbols/SymbolLibrary';
+import { getSymbolContextForBlockType, getSymbolSizeForBlockType } from '../renderers/symbols/symbolBridge';
 import type { BlockType } from '../../../types/circuit';
 
 // ---------------------------------------------------------------------------
@@ -66,8 +66,8 @@ export async function renderSymbolThumbnail(
   if (cached) return cached;
 
   const app = await ensureApp();
-  const symbolSize = getSymbolSize(type);
-  const ctx = getSymbolContext(type);
+  const symbolSize = getSymbolSizeForBlockType(type) ?? { width: 64, height: 64 };
+  const ctx = getSymbolContextForBlockType(type);
 
   // Fit symbol into requested dimensions with some breathing room
   const scaleX = width / symbolSize.width;
@@ -80,7 +80,7 @@ export async function renderSymbolThumbnail(
   app.renderer.resize(renderW, renderH);
   app.stage.removeChildren();
 
-  const graphics = new Graphics(ctx);
+  const graphics = ctx ? new Graphics(ctx) : new Graphics();
   graphics.scale.set(scale);
   // Center the scaled symbol
   graphics.x = (renderW - symbolSize.width * scale) / 2;
