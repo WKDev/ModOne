@@ -117,6 +117,23 @@ const BLOCK_TYPE_TO_SYMBOL_ID: ReadonlyMap<string, string> = new Map([
   ['counter_up', 'builtin:counter_up'],
   ['counter_down', 'builtin:counter_down'],
   ['junction_box', 'builtin:junction_box'],
+  ['motor', 'builtin:motor'],
+  ['transformer', 'builtin:transformer'],
+  ['led', 'builtin:led'],
+  ['pilot_lamp', 'builtin:pilot_lamp'],
+  ['overload_relay', 'builtin:overload_relay'],
+  ['contactor', 'builtin:contactor'],
+  ['solenoid_valve', 'builtin:solenoid_valve'],
+  ['sensor', 'builtin:sensor'],
+  ['button', 'builtin:button'],
+  ['emergency_stop', 'builtin:emergency_stop'],
+  ['selector_switch', 'builtin:selector_switch'],
+  ['net_label', 'builtin:net_label'],
+  ['disconnect_switch', 'builtin:disconnect_switch'],
+  ['terminal_block', 'builtin:terminal_block'],
+  ['scope', 'builtin:scope'],
+  ['off_page_connector', 'builtin:off_page_connector'],
+  ['text', 'builtin:text'],
 ]);
 
 export function getBuiltinSymbol(id: string): SymbolDefinition | undefined {

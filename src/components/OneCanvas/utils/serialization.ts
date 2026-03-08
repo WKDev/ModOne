@@ -22,6 +22,8 @@ import type { ComponentInstance, Port as CircuitPort } from '../../../types/circ
 import { isValidBlockType, isLegacyBlockType, isPortEndpoint, migrateLegacyBlockType } from '../types';
 import { createSelectionState } from '../types';
 import { getBlockSize, getPowerSourcePorts } from '../blockDefinitions';
+import { getBuiltinSymbolForBlockType } from '@/assets/builtin-symbols';
+import type { SymbolPin } from '@/types/symbol';
 
 // ============================================================================
 // Serialization (CircuitState -> YAML String)
@@ -248,48 +250,58 @@ function yamlToPort(yamlPort: { id: string; type: string; label: string; positio
   };
 }
 
+
+function orientationToPortPosition(orientation: SymbolPin['orientation']): PortPosition {
+  switch (orientation) {
+    case 'left': return 'left';
+    case 'right': return 'right';
+    case 'up': return 'top';
+    case 'down': return 'bottom';
+    default: return 'left';
+  }
+}
+
+function electricalTypeToPortType(type: SymbolPin['type'] | SymbolPin['electricalType']): PortTypeEnum {
+  switch (type) {
+    case 'input':
+    case 'power_in':
+    case 'open_collector':
+    case 'open_emitter':
+      return 'input';
+    case 'output':
+    case 'power_out':
+      return 'output';
+    default:
+      return 'bidirectional';
+  }
+}
+
+function pinToPort(pin: SymbolPin): Port {
+  return {
+    id: pin.id,
+    type: electricalTypeToPortType(pin.electricalType ?? pin.type),
+    label: pin.name,
+    position: orientationToPortPosition(pin.orientation),
+  };
+}
+
 /**
  * Get default ports for a block type.
  */
 function getDefaultPorts(type: string, properties?: Record<string, unknown>): Port[] {
-  switch (type) {
-    case 'powersource': {
-      const polarity = (properties?.polarity as string) || 'positive';
-      return getPowerSourcePorts(polarity as 'positive' | 'negative' | 'ground');
-    }
-    case 'plc_out':
-    case 'plc_in':
-      return [
-        { id: 'in', type: 'input', label: 'IN', position: 'left' },
-        { id: 'out', type: 'output', label: 'OUT', position: 'right' },
-      ];
-    case 'led':
-      return [
-        { id: 'anode', type: 'input', label: '+', position: 'top' },
-        { id: 'cathode', type: 'output', label: '-', position: 'bottom' },
-      ];
-    case 'button':
-      return [
-        { id: 'in', type: 'input', label: 'IN', position: 'left' },
-        { id: 'out', type: 'output', label: 'OUT', position: 'right' },
-      ];
-    case 'scope':
-      return [
-        { id: 'ch1', type: 'input', label: 'CH1', position: 'left', offset: 0.25 },
-        { id: 'ch2', type: 'input', label: 'CH2', position: 'left', offset: 0.5 },
-        { id: 'ch3', type: 'input', label: 'CH3', position: 'left', offset: 0.75 },
-        { id: 'ch4', type: 'input', label: 'CH4', position: 'left', offset: 1.0 },
-      ];
-    case 'off_page_connector':
-      return [
-        { id: 'conn', type: 'bidirectional', label: '', position: 'left' },
-      ];
-    case 'custom_symbol':
-      // Custom symbols have no default ports; ports come from symbol definition
-      return [];
-    default:
-      return [];
+  // Keep powersource special case (polarity-based ports)
+  if (type === 'powersource' || type === 'power_source') {
+    const polarity = (properties?.polarity as string) || 'positive';
+    return getPowerSourcePorts(polarity as 'positive' | 'negative' | 'ground');
   }
+  // All other types: look up in symbolBridge
+  const symbol = getBuiltinSymbolForBlockType(type);
+  if (symbol) {
+    const pins = symbol.units ? symbol.units[0]?.pins ?? [] : symbol.pins;
+    return pins.map(pinToPort);
+  }
+  // No symbol found → no default ports
+  return [];
 }
 
 /**

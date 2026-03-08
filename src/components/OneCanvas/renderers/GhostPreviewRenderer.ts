@@ -13,6 +13,7 @@
 
 import { Container, Graphics, Rectangle } from 'pixi.js';
 import type { BlockType } from '../types';
+import { getSymbolContextForBlockType, getSymbolSizeForBlockType } from './symbols/symbolBridge';
 import { getSymbolContext, getSymbolSize } from './symbols';
 
 // ============================================================================
@@ -129,14 +130,14 @@ export class GhostPreviewRenderer {
     container.alpha = GHOST_ALPHA;
     container.cullable = true;
 
-    const ctx = getSymbolContext(blockType as BlockType);
+    const ctx = getSymbolContextForBlockType(blockType) ?? getSymbolContext(blockType as BlockType);
     const symbol = new Graphics(ctx);
     symbol.label = 'ghost-symbol';
     symbol.tint = GHOST_TINT;
     container.addChild(symbol);
 
     // Set cull area for performance
-    const size = getSymbolSize(blockType as BlockType);
+    const size = getSymbolSizeForBlockType(blockType) ?? getSymbolSize(blockType as BlockType);
     container.cullArea = new Rectangle(
       -10,
       -20,
@@ -153,7 +154,7 @@ export class GhostPreviewRenderer {
     const symbol = this._symbol;
     if (!symbol) return;
 
-    const size = getSymbolSize(state.blockType as BlockType);
+    const size = getSymbolSizeForBlockType(state.blockType) ?? getSymbolSize(state.blockType as BlockType);
 
     // Reset transform
     symbol.position.set(0, 0);

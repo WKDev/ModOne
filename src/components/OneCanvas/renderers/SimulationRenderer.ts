@@ -8,12 +8,24 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { Container, Ticker } from 'pixi.js';
 import type { BlockRenderer } from './BlockRenderer';
 import type { WireRenderer } from './WireRenderer';
+import { getBuiltinSymbolForBlockType } from '@/assets/builtin-symbols';
 
 const COLOR_DEFAULT = 0xffffff;
 const COLOR_ACTIVE = 0x3b82f6;
 const COLOR_RUNNING = 0x22c55e;
 const COLOR_ERROR = 0xef4444;
 const COLOR_WARNING = 0xeab308;
+
+type TintBehavior = 'active' | 'running' | 'warning' | 'led' | 'static' | 'default';
+
+const TINT_BEHAVIOR_BY_CATEGORY: ReadonlyMap<string, TintBehavior> = new Map([
+  ['plc',       'active'],   // plc_in, plc_out, timers, counters → blue when on
+  ['control',   'warning'],  // button, emergency_stop → yellow when on
+  ['switching', 'running'],  // contacts, switches, relay_coil → green when on
+  ['actuator',  'running'],  // motor, solenoid_valve → green when on
+  ['indicator', 'led'],      // led, pilot_lamp → LED color when on
+  ['power',     'static'],   // powersource, transformer → always default
+]);
 
 interface PlcOutputUpdateRaw {
   block_id?: string;
@@ -199,41 +211,16 @@ export class SimulationRenderer {
   }
 
   private _resolveTint(blockType: string, state: boolean, blockId: string, _value: string | null): number {
-    switch (blockType) {
-      case 'relay_coil':
-        return state ? COLOR_ACTIVE : COLOR_DEFAULT;
-
-      case 'led':
-      case 'pilot_lamp':
-        return state ? this._resolveLedColor(blockId) : COLOR_DEFAULT;
-
-      case 'relay_contact_no':
-      case 'relay_contact_nc':
-      case 'switch_no':
-      case 'switch_nc':
-        return state ? COLOR_RUNNING : COLOR_DEFAULT;
-
-      case 'push_button_no':
-      case 'push_button_nc':
-      case 'button':
-      case 'emergency_stop':
-        return state ? COLOR_WARNING : COLOR_DEFAULT;
-
-      case 'plc_input':
-      case 'plc_output':
-      case 'plc_in':
-      case 'plc_out':
-        return state ? COLOR_ACTIVE : COLOR_DEFAULT;
-
-      case 'motor':
-        return state ? COLOR_RUNNING : COLOR_DEFAULT;
-
-      case 'power_source':
-      case 'powersource':
-        return COLOR_DEFAULT;
-
-      default:
-        return state ? COLOR_ACTIVE : COLOR_DEFAULT;
+    if (!state) return COLOR_DEFAULT;
+    const symbol = getBuiltinSymbolForBlockType(blockType);
+    const behavior: TintBehavior = TINT_BEHAVIOR_BY_CATEGORY.get(symbol?.category ?? '') ?? 'default';
+    switch (behavior) {
+      case 'active':  return COLOR_ACTIVE;
+      case 'running': return COLOR_RUNNING;
+      case 'warning': return COLOR_WARNING;
+      case 'led':     return this._resolveLedColor(blockId);
+      case 'static':  return COLOR_DEFAULT;
+      default:        return COLOR_ACTIVE;
     }
   }
 
