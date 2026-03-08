@@ -17,7 +17,7 @@ export const offPageConnectorSymbol: SymbolDefinition = {
     { kind: 'text', x: 42, y: 20, text: 'OPC', fontSize: 10, fontFamily: 'Arial', fill: '#888', anchor: 'middle' },
   ],
   pins: [
-    { id: 'conn', name: 'CONN', number: '1', type: 'bidirectional', shape: 'line', position: { x: 0, y: 16 }, orientation: 'left', length: 0 },
+    { id: 'conn', name: 'CONN', number: '1', type: 'bidirectional', electricalType: 'bidirectional', functionalRole: 'general', shape: 'line', position: { x: 0, y: 16 }, orientation: 'left', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
   ],
   properties: [
     { key: 'signalLabel', value: 'SIGNAL', type: 'string', visible: true, editorType: 'text' },

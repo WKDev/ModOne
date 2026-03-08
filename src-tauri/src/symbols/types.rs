@@ -233,6 +233,25 @@ pub struct SymbolDefinition {
     pub units: Option<Vec<SymbolUnit>>,
     /// Configurable properties
     pub properties: Vec<SymbolProperty>,
+    // === v2 fields (all optional for backward compat) ===
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extends_symbol: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spice: Option<SpiceModelRef>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub iec_section: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub iec_category: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ref_designator: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pin_numbers_hidden: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pin_names_hidden: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pin_name_offset: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclude_from_sim: Option<bool>,
 }
 
 // ============================================================================
@@ -266,4 +285,102 @@ pub struct SymbolSummary {
     pub scope: LibraryScope,
     /// Last modification timestamp (ISO 8601)
     pub updated_at: String,
+}
+
+// ============================================================================
+// V2 Pin Types (KiCad-compatible)
+// ============================================================================
+
+/// Electrical type of a pin — 12 KiCad-compatible variants (v2)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PinElectricalTypeV2 {
+    Input,
+    Output,
+    Bidirectional,
+    TriState,
+    Passive,
+    PowerIn,
+    PowerOut,
+    OpenCollector,
+    OpenEmitter,
+    Free,
+    Unspecified,
+    NoConnect,
+}
+
+/// Functional role of a pin for PLC usage (v2)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PinFunctionalRole {
+    General,
+    PlcInput,
+    PlcOutput,
+    Communication,
+}
+
+/// Visual shape of a pin — 9 KiCad-compatible variants (v2)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PinShapeV2 {
+    Line,
+    Inverted,
+    Clock,
+    InvertedClock,
+    InputLow,
+    ClockLow,
+    OutputLow,
+    EdgeClockHigh,
+    NonLogic,
+}
+
+/// A pin on a symbol — v2 with extended KiCad-compatible fields
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SymbolPinV2 {
+    pub id: String,
+    pub name: String,
+    pub number: String,
+    pub electrical_type: PinElectricalTypeV2,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub functional_role: Option<PinFunctionalRole>,
+    pub shape: PinShapeV2,
+    pub position: PinPosition,
+    pub orientation: PinOrientation,
+    pub length: f64,
+    pub sort_order: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name_visible: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub number_visible: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hidden: Option<bool>,
+}
+
+// ============================================================================
+// V2 SPICE Model Types
+// ============================================================================
+
+/// Maps a pin number to a SPICE node (v2)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpicePinMapping {
+    pub pin_number: String,
+    pub spice_node: String,
+}
+
+/// SPICE model reference attached to a symbol (v2)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpiceModelRef {
+    pub device: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub library: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    pub pin_mapping: Vec<SpicePinMapping>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub params: Option<std::collections::HashMap<String, serde_json::Value>>,
 }

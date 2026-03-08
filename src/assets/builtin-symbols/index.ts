@@ -1,9 +1,18 @@
 import type { SymbolDefinition } from '@/types/symbol';
 import { buttonSymbol } from './button';
+import { capacitorSymbol } from './capacitor';
+import { circuitBreakerSymbol } from './circuit_breaker';
 import { contactorSymbol } from './contactor';
+import { connectorSymbol } from './connector';
+import { counterDownSymbol } from './counter_down';
+import { counterUpSymbol } from './counter_up';
 import { disconnectSwitchSymbol } from './disconnect_switch';
+import { diodeSymbol } from './diode';
 import { emergencyStopSymbol } from './emergency_stop';
 import { fuseSymbol } from './fuse';
+import { groundSymbol } from './ground';
+import { inductorSymbol } from './inductor';
+import { junctionBoxSymbol } from './junction_box';
 import { ledSymbol } from './led';
 import { motorSymbol } from './motor';
 import { netLabelSymbol } from './net_label';
@@ -13,17 +22,48 @@ import { pilotLampSymbol } from './pilot_lamp';
 import { plcInSymbol } from './plc_in';
 import { plcOutSymbol } from './plc_out';
 import { powersourceSymbol } from './powersource';
+import { pushButtonNcSymbol } from './push_button_nc';
+import { pushButtonNoSymbol } from './push_button_no';
 import { relaySymbol } from './relay';
+import { relayContactNcSymbol } from './relay_contact_nc';
+import { relayContactNoSymbol } from './relay_contact_no';
+import { resistorSymbol } from './resistor';
 import { scopeSymbol } from './scope';
 import { selectorSwitchSymbol } from './selector_switch';
 import { sensorSymbol } from './sensor';
 import { solenoidValveSymbol } from './solenoid_valve';
+import { switchChangeoverSymbol } from './switch_changeover';
+import { switchNcSymbol } from './switch_nc';
+import { switchNoSymbol } from './switch_no';
+import { terminalSymbol } from './terminal';
 import { terminalBlockSymbol } from './terminal_block';
 import { textSymbol } from './text';
+import { timerOffDelaySymbol } from './timer_off_delay';
+import { timerOnDelaySymbol } from './timer_on_delay';
 import { transformerSymbol } from './transformer';
 
 export const BUILTIN_SYMBOLS: ReadonlyMap<string, SymbolDefinition> = new Map([
   ['builtin:fuse', fuseSymbol],
+  ['builtin:ground', groundSymbol],
+  ['builtin:relay_contact_no', relayContactNoSymbol],
+  ['builtin:relay_contact_nc', relayContactNcSymbol],
+  ['builtin:switch_no', switchNoSymbol],
+  ['builtin:switch_nc', switchNcSymbol],
+  ['builtin:switch_changeover', switchChangeoverSymbol],
+  ['builtin:circuit_breaker', circuitBreakerSymbol],
+  ['builtin:capacitor', capacitorSymbol],
+  ['builtin:resistor', resistorSymbol],
+  ['builtin:inductor', inductorSymbol],
+  ['builtin:diode', diodeSymbol],
+  ['builtin:terminal', terminalSymbol],
+  ['builtin:connector', connectorSymbol],
+  ['builtin:timer_on_delay', timerOnDelaySymbol],
+  ['builtin:timer_off_delay', timerOffDelaySymbol],
+  ['builtin:counter_up', counterUpSymbol],
+  ['builtin:counter_down', counterDownSymbol],
+  ['builtin:junction_box', junctionBoxSymbol],
+  ['builtin:push_button_no', pushButtonNoSymbol],
+  ['builtin:push_button_nc', pushButtonNcSymbol],
   ['builtin:terminal_block', terminalBlockSymbol],
   ['builtin:emergency_stop', emergencyStopSymbol],
   ['builtin:pilot_lamp', pilotLampSymbol],
@@ -47,10 +87,43 @@ export const BUILTIN_SYMBOLS: ReadonlyMap<string, SymbolDefinition> = new Map([
   ['builtin:off_page_connector', offPageConnectorSymbol],
 ]);
 
+const BLOCK_TYPE_TO_SYMBOL_ID: ReadonlyMap<string, string> = new Map([
+  ['powersource', 'builtin:powersource'],
+  ['power_source', 'builtin:powersource'],
+  ['ground', 'builtin:ground'],
+  ['plc_in', 'builtin:plc_in'],
+  ['plc_out', 'builtin:plc_out'],
+  ['plc_input', 'builtin:plc_in'],
+  ['plc_output', 'builtin:plc_out'],
+  ['relay', 'builtin:relay'],
+  ['relay_coil', 'builtin:relay'],
+  ['relay_contact_no', 'builtin:relay_contact_no'],
+  ['relay_contact_nc', 'builtin:relay_contact_nc'],
+  ['switch_no', 'builtin:switch_no'],
+  ['switch_nc', 'builtin:switch_nc'],
+  ['switch_changeover', 'builtin:switch_changeover'],
+  ['push_button_no', 'builtin:push_button_no'],
+  ['push_button_nc', 'builtin:push_button_nc'],
+  ['circuit_breaker', 'builtin:circuit_breaker'],
+  ['fuse', 'builtin:fuse'],
+  ['capacitor', 'builtin:capacitor'],
+  ['resistor', 'builtin:resistor'],
+  ['inductor', 'builtin:inductor'],
+  ['diode', 'builtin:diode'],
+  ['terminal', 'builtin:terminal'],
+  ['connector', 'builtin:connector'],
+  ['timer_on_delay', 'builtin:timer_on_delay'],
+  ['timer_off_delay', 'builtin:timer_off_delay'],
+  ['counter_up', 'builtin:counter_up'],
+  ['counter_down', 'builtin:counter_down'],
+  ['junction_box', 'builtin:junction_box'],
+]);
+
 export function getBuiltinSymbol(id: string): SymbolDefinition | undefined {
   return BUILTIN_SYMBOLS.get(id);
 }
 
 export function getBuiltinSymbolForBlockType(blockType: string): SymbolDefinition | undefined {
-  return BUILTIN_SYMBOLS.get(`builtin:${blockType}`);
+  const symbolId = BLOCK_TYPE_TO_SYMBOL_ID.get(blockType) ?? `builtin:${blockType}`;
+  return BUILTIN_SYMBOLS.get(symbolId);
 }

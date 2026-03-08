@@ -20,8 +20,8 @@ export const ledSymbol: SymbolDefinition = {
     { kind: 'polyline', points: [{ x: 20, y: 38 }, { x: 20, y: 60 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
   ],
   pins: [
-    { id: 'anode', name: '+', number: 'A', type: 'input', shape: 'line', position: { x: 20, y: 0 }, orientation: 'up', length: 0 },
-    { id: 'cathode', name: '-', number: 'K', type: 'output', shape: 'line', position: { x: 20, y: 60 }, orientation: 'down', length: 0 },
+    { id: 'anode', name: '+', number: 'A', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 20, y: 0 }, orientation: 'up', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
+    { id: 'cathode', name: '-', number: 'K', type: 'output', electricalType: 'output', functionalRole: 'general', shape: 'line', position: { x: 20, y: 60 }, orientation: 'down', length: 0, sortOrder: 2, nameVisible: true, numberVisible: true },
   ],
   properties: [
     { key: 'color', value: 'red', type: 'string', visible: true, editorType: 'text' },

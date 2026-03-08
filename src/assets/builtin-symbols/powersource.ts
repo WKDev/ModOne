@@ -18,7 +18,7 @@ export const powersourceSymbol: SymbolDefinition = {
     { kind: 'polyline', points: [{ x: 20, y: 26 }, { x: 20, y: 40 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
   ],
   pins: [
-    { id: 'out', name: '+', number: '1', type: 'output', shape: 'line', position: { x: 20, y: 40 }, orientation: 'down', length: 0 },
+    { id: 'out', name: '+', number: '1', type: 'output', electricalType: 'power_out', functionalRole: 'general', shape: 'line', position: { x: 20, y: 40 }, orientation: 'down', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
   ],
   properties: [
     { key: 'voltage', value: 24, type: 'number', visible: true, editorType: 'number' },

@@ -40,6 +40,16 @@ export interface SymbolPin {
   length: number;
   /** Whether pin is hidden from display */
   hidden?: boolean;
+  /** v2: KiCad-compatible electrical type */
+  electricalType?: PinElectricalTypeV2;
+  /** v2: PLC functional role */
+  functionalRole?: PinFunctionalRole;
+  /** v2: Sort order for pin numbering */
+  sortOrder?: number;
+  /** v2: Whether pin name is visible */
+  nameVisible?: boolean;
+  /** v2: Whether pin number is visible */
+  numberVisible?: boolean;
 }
 
 // ============================================================================
@@ -208,6 +218,72 @@ export interface SymbolSummary {
   scope: LibraryScope;
   /** Last modification timestamp (ISO 8601) */
   updatedAt: string;
+}
+
+// ============================================================================
+// V2 Type Definitions (KiCad-compatible extensions)
+// ============================================================================
+
+/** Electrical type of a pin — 12 KiCad-compatible values */
+export type PinElectricalTypeV2 =
+  | 'input' | 'output' | 'bidirectional' | 'tri_state'
+  | 'passive' | 'power_in' | 'power_out'
+  | 'open_collector' | 'open_emitter'
+  | 'free' | 'unspecified' | 'no_connect';
+
+/** Functional role of a pin for PLC design */
+export type PinFunctionalRole = 'general' | 'plc_input' | 'plc_output' | 'communication';
+
+/** Visual shape of a pin — 9 KiCad-compatible shapes */
+export type PinShapeV2 =
+  | 'line' | 'inverted' | 'clock' | 'inverted_clock'
+  | 'input_low' | 'clock_low' | 'output_low'
+  | 'edge_clock_high' | 'non_logic';
+
+/** Extended pin interface with dual type system */
+export interface SymbolPinV2 {
+  id: string;
+  name: string;
+  number: string;
+  electricalType: PinElectricalTypeV2;
+  functionalRole?: PinFunctionalRole;
+  shape: PinShapeV2;
+  position: { x: number; y: number };
+  orientation: PinOrientation;
+  length: number;
+  sortOrder: number;
+  nameVisible?: boolean;
+  numberVisible?: boolean;
+  hidden?: boolean;
+}
+
+/** Maps a pin number to a SPICE node name */
+export interface SpicePinMapping {
+  pinNumber: string;
+  spiceNode: string;
+}
+
+/** Reference to a SPICE model */
+export interface SpiceModelRef {
+  device: string;
+  type?: string;
+  library?: string;
+  name?: string;
+  pinMapping: SpicePinMapping[];
+  params?: Record<string, string | number>;
+}
+
+/** Extended symbol definition with KiCad/SPICE metadata */
+export interface SymbolDefinitionV2 extends SymbolDefinition {
+  extendsSymbol?: string;
+  spice?: SpiceModelRef;
+  iecSection?: string;
+  iecCategory?: string;
+  refDesignator?: string;
+  pinNumbersHidden?: boolean;
+  pinNamesHidden?: boolean;
+  pinNameOffset?: number;
+  excludeFromSim?: boolean;
 }
 
 // ============================================================================

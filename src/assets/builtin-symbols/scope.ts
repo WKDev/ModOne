@@ -17,10 +17,10 @@ export const scopeSymbol: SymbolDefinition = {
     { kind: 'text', x: 52, y: 22, text: 'SCOPE', fontSize: 9, fontFamily: 'Arial', fill: '#888', anchor: 'middle' },
   ],
   pins: [
-    { id: 'ch1', name: 'CH1', number: '1', type: 'input', shape: 'line', position: { x: 0, y: 20 }, orientation: 'left', length: 0 },
-    { id: 'ch2', name: 'CH2', number: '2', type: 'input', shape: 'line', position: { x: 0, y: 40 }, orientation: 'left', length: 0 },
-    { id: 'ch3', name: 'CH3', number: '3', type: 'input', shape: 'line', position: { x: 0, y: 60 }, orientation: 'left', length: 0 },
-    { id: 'ch4', name: 'CH4', number: '4', type: 'input', shape: 'line', position: { x: 0, y: 80 }, orientation: 'left', length: 0 },
+    { id: 'ch1', name: 'CH1', number: '1', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 0, y: 20 }, orientation: 'left', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
+    { id: 'ch2', name: 'CH2', number: '2', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 0, y: 40 }, orientation: 'left', length: 0, sortOrder: 2, nameVisible: true, numberVisible: true },
+    { id: 'ch3', name: 'CH3', number: '3', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 0, y: 60 }, orientation: 'left', length: 0, sortOrder: 3, nameVisible: true, numberVisible: true },
+    { id: 'ch4', name: 'CH4', number: '4', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 0, y: 80 }, orientation: 'left', length: 0, sortOrder: 4, nameVisible: true, numberVisible: true },
   ],
   properties: [
     { key: 'channels', value: 1, type: 'number', visible: true, editorType: 'number' },

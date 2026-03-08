@@ -49,7 +49,7 @@ export interface BomResult {
 // Display Names
 // ============================================================================
 
-const TYPE_DISPLAY_NAMES: Record<BlockType, string> = {
+const TYPE_DISPLAY_NAMES: Partial<Record<BlockType, string>> = {
   powersource: 'Power Source',
   plc_out: 'PLC Output (Coil)',
   plc_in: 'PLC Input (DI)',
@@ -73,6 +73,7 @@ const TYPE_DISPLAY_NAMES: Record<BlockType, string> = {
   disconnect_switch: 'Disconnect Switch',
   off_page_connector: 'Off-Page Connector',
   custom_symbol: 'Custom Symbol',
+  terminal: 'Terminal',
 };
 
 // ============================================================================

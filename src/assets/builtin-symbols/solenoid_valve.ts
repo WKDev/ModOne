@@ -19,8 +19,8 @@ export const solenoidValveSymbol: SymbolDefinition = {
     { kind: 'polyline', points: [{ x: 30, y: 30 }, { x: 30, y: 50 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
   ],
   pins: [
-    { id: 'coil_in', name: 'A1', number: 'A1', type: 'input', shape: 'line', position: { x: 30, y: 0 }, orientation: 'up', length: 0 },
-    { id: 'coil_out', name: 'A2', number: 'A2', type: 'output', shape: 'line', position: { x: 30, y: 50 }, orientation: 'down', length: 0 },
+    { id: 'coil_in', name: 'A1', number: 'A1', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 30, y: 0 }, orientation: 'up', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
+    { id: 'coil_out', name: 'A2', number: 'A2', type: 'output', electricalType: 'output', functionalRole: 'general', shape: 'line', position: { x: 30, y: 50 }, orientation: 'down', length: 0, sortOrder: 2, nameVisible: true, numberVisible: true },
   ],
   properties: [
     { key: 'designation', value: 'Y1', type: 'string', visible: true, editorType: 'text' },

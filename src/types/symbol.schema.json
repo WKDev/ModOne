@@ -94,9 +94,120 @@
     "runtimeStateSchema": {
       "type": "object",
       "description": "Optional runtime state schema (JSON Schema)"
+    },
+    "extendsSymbol": {
+      "type": "string",
+      "description": "ID of parent symbol for inheritance"
+    },
+    "spice": {
+      "$ref": "#/definitions/SpiceModelRef",
+      "description": "SPICE model reference"
+    },
+    "iecSection": {
+      "type": "string",
+      "description": "IEC 60617 section code"
+    },
+    "iecCategory": {
+      "type": "string",
+      "description": "IEC 60617 category"
+    },
+    "refDesignator": {
+      "type": "string",
+      "description": "Reference designator prefix (e.g., R, C, K)"
+    },
+    "pinNumbersHidden": {
+      "type": "boolean",
+      "description": "Hide pin numbers globally"
+    },
+    "pinNamesHidden": {
+      "type": "boolean",
+      "description": "Hide pin names globally"
+    },
+    "pinNameOffset": {
+      "type": "number",
+      "description": "Pin name offset in pixels"
+    },
+    "excludeFromSim": {
+      "type": "boolean",
+      "description": "Exclude from simulation"
     }
   },
   "definitions": {
+    "PinElectricalTypeV2": {
+      "type": "string",
+      "enum": [
+        "input", "output", "bidirectional", "tri_state",
+        "passive", "power_in", "power_out",
+        "open_collector", "open_emitter",
+        "free", "unspecified", "no_connect"
+      ],
+      "description": "KiCad-compatible electrical pin type (12 values)"
+    },
+    "PinFunctionalRole": {
+      "type": "string",
+      "enum": ["general", "plc_input", "plc_output", "communication"],
+      "description": "PLC functional role"
+    },
+    "PinShapeV2": {
+      "type": "string",
+      "enum": [
+        "line", "inverted", "clock", "inverted_clock",
+        "input_low", "clock_low", "output_low",
+        "edge_clock_high", "non_logic"
+      ],
+      "description": "KiCad-compatible pin shape (9 values)"
+    },
+    "SymbolPinV2": {
+      "type": "object",
+      "required": ["id", "name", "number", "electricalType", "shape", "position", "orientation", "length", "sortOrder"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "number": { "type": "string" },
+        "electricalType": { "$ref": "#/definitions/PinElectricalTypeV2" },
+        "functionalRole": { "$ref": "#/definitions/PinFunctionalRole" },
+        "shape": { "$ref": "#/definitions/PinShapeV2" },
+        "position": {
+          "type": "object",
+          "required": ["x", "y"],
+          "properties": { "x": { "type": "number" }, "y": { "type": "number" } }
+        },
+        "orientation": { "type": "string", "enum": ["right", "left", "up", "down"] },
+        "length": { "type": "number" },
+        "sortOrder": { "type": "integer" },
+        "nameVisible": { "type": "boolean" },
+        "numberVisible": { "type": "boolean" },
+        "hidden": { "type": "boolean" }
+      }
+    },
+    "SpicePinMapping": {
+      "type": "object",
+      "required": ["pinNumber", "spiceNode"],
+      "properties": {
+        "pinNumber": { "type": "string" },
+        "spiceNode": { "type": "string" }
+      }
+    },
+    "SpiceModelRef": {
+      "type": "object",
+      "required": ["device", "pinMapping"],
+      "properties": {
+        "device": { "type": "string" },
+        "type": { "type": "string" },
+        "library": { "type": "string" },
+        "name": { "type": "string" },
+        "pinMapping": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/SpicePinMapping" }
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [{ "type": "string" }, { "type": "number" }]
+          }
+        }
+      }
+    },
     "SymbolPin": {
       "type": "object",
       "required": [

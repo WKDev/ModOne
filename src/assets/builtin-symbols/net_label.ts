@@ -18,7 +18,7 @@ export const netLabelSymbol: SymbolDefinition = {
     { kind: 'text', x: 38, y: 16, text: 'NET', fontSize: 10, fontFamily: 'Arial', fill: '#888', anchor: 'middle' },
   ],
   pins: [
-    { id: 'conn', name: 'CONN', number: '1', type: 'input', shape: 'line', position: { x: 0, y: 12 }, orientation: 'left', length: 0 },
+    { id: 'conn', name: 'CONN', number: '1', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 0, y: 12 }, orientation: 'left', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
   ],
   properties: [
     { key: 'netName', value: '+24V', type: 'string', visible: true, editorType: 'text' },

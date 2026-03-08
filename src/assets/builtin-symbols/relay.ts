@@ -19,11 +19,11 @@ export const relaySymbol: SymbolDefinition = {
     { kind: 'polyline', points: [{ x: 40, y: 39 }, { x: 60, y: 39 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
   ],
   pins: [
-    { id: 'coil_in', name: 'A1', number: 'A1', type: 'input', shape: 'line', position: { x: 30, y: 0 }, orientation: 'up', length: 0 },
-    { id: 'coil_out', name: 'A2', number: 'A2', type: 'output', shape: 'line', position: { x: 30, y: 60 }, orientation: 'down', length: 0 },
-    { id: 'com', name: 'COM', number: '11', type: 'input', shape: 'line', position: { x: 0, y: 30 }, orientation: 'left', length: 0 },
-    { id: 'no', name: 'NO', number: '14', type: 'output', shape: 'line', position: { x: 60, y: 21 }, orientation: 'right', length: 0 },
-    { id: 'nc', name: 'NC', number: '12', type: 'output', shape: 'line', position: { x: 60, y: 39 }, orientation: 'right', length: 0 },
+    { id: 'coil_in', name: 'A1', number: 'A1', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 30, y: 0 }, orientation: 'up', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
+    { id: 'coil_out', name: 'A2', number: 'A2', type: 'output', electricalType: 'output', functionalRole: 'general', shape: 'line', position: { x: 30, y: 60 }, orientation: 'down', length: 0, sortOrder: 2, nameVisible: true, numberVisible: true },
+    { id: 'com', name: 'COM', number: '11', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 0, y: 30 }, orientation: 'left', length: 0, sortOrder: 3, nameVisible: true, numberVisible: true },
+    { id: 'no', name: 'NO', number: '14', type: 'output', electricalType: 'output', functionalRole: 'general', shape: 'line', position: { x: 60, y: 21 }, orientation: 'right', length: 0, sortOrder: 4, nameVisible: true, numberVisible: true },
+    { id: 'nc', name: 'NC', number: '12', type: 'output', electricalType: 'output', functionalRole: 'general', shape: 'line', position: { x: 60, y: 39 }, orientation: 'right', length: 0, sortOrder: 5, nameVisible: true, numberVisible: true },
   ],
   units: [
     {
@@ -36,8 +36,8 @@ export const relaySymbol: SymbolDefinition = {
         { kind: 'polyline', points: [{ x: 30, y: 34 }, { x: 30, y: 60 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
       ],
       pins: [
-        { id: 'coil_in', name: 'A1', number: 'A1', type: 'input', shape: 'line', position: { x: 30, y: 0 }, orientation: 'up', length: 0 },
-        { id: 'coil_out', name: 'A2', number: 'A2', type: 'output', shape: 'line', position: { x: 30, y: 60 }, orientation: 'down', length: 0 },
+        { id: 'coil_in', name: 'A1', number: 'A1', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 30, y: 0 }, orientation: 'up', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
+        { id: 'coil_out', name: 'A2', number: 'A2', type: 'output', electricalType: 'output', functionalRole: 'general', shape: 'line', position: { x: 30, y: 60 }, orientation: 'down', length: 0, sortOrder: 2, nameVisible: true, numberVisible: true },
       ],
     },
     {
@@ -49,9 +49,9 @@ export const relaySymbol: SymbolDefinition = {
         { kind: 'polyline', points: [{ x: 40, y: 39 }, { x: 60, y: 39 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
       ],
       pins: [
-        { id: 'com', name: 'COM', number: '11', type: 'input', shape: 'line', position: { x: 0, y: 30 }, orientation: 'left', length: 0 },
-        { id: 'no', name: 'NO', number: '14', type: 'output', shape: 'line', position: { x: 60, y: 21 }, orientation: 'right', length: 0 },
-        { id: 'nc', name: 'NC', number: '12', type: 'output', shape: 'line', position: { x: 60, y: 39 }, orientation: 'right', length: 0 },
+        { id: 'com', name: 'COM', number: '11', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 0, y: 30 }, orientation: 'left', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
+        { id: 'no', name: 'NO', number: '14', type: 'output', electricalType: 'output', functionalRole: 'general', shape: 'line', position: { x: 60, y: 21 }, orientation: 'right', length: 0, sortOrder: 2, nameVisible: true, numberVisible: true },
+        { id: 'nc', name: 'NC', number: '12', type: 'output', electricalType: 'output', functionalRole: 'general', shape: 'line', position: { x: 60, y: 39 }, orientation: 'right', length: 0, sortOrder: 3, nameVisible: true, numberVisible: true },
       ],
     },
   ],

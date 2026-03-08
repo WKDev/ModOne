@@ -7,7 +7,7 @@ interface BlockDragPreviewProps {
 }
 
 export const BlockDragPreview = memo(function BlockDragPreview({ type, presetLabel }: BlockDragPreviewProps) {
-  const labels: Record<BlockType, string> = {
+  const labels: Partial<Record<BlockType, string>> = {
     powersource: '+24V',
     plc_out: 'PLC Out',
     plc_in: 'PLC In',
@@ -31,6 +31,7 @@ export const BlockDragPreview = memo(function BlockDragPreview({ type, presetLab
     disconnect_switch: 'Disconnect',
     off_page_connector: 'Off-Page',
     custom_symbol: 'Custom',
+    terminal: 'Terminal',
   };
 
   return (

@@ -19,9 +19,9 @@ export const selectorSwitchSymbol: SymbolDefinition = {
     { kind: 'polyline', points: [{ x: 40, y: 32.5 }, { x: 50, y: 32.5 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
   ],
   pins: [
-    { id: 'com', name: 'COM', number: 'C', type: 'input', shape: 'line', position: { x: 0, y: 25 }, orientation: 'left', length: 0 },
-    { id: 'pos1', name: '1', number: '1', type: 'output', shape: 'line', position: { x: 50, y: 17.5 }, orientation: 'right', length: 0 },
-    { id: 'pos2', name: '2', number: '2', type: 'output', shape: 'line', position: { x: 50, y: 32.5 }, orientation: 'right', length: 0 },
+    { id: 'com', name: 'COM', number: 'C', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 0, y: 25 }, orientation: 'left', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
+    { id: 'pos1', name: '1', number: '1', type: 'output', electricalType: 'output', functionalRole: 'general', shape: 'line', position: { x: 50, y: 17.5 }, orientation: 'right', length: 0, sortOrder: 2, nameVisible: true, numberVisible: true },
+    { id: 'pos2', name: '2', number: '2', type: 'output', electricalType: 'output', functionalRole: 'general', shape: 'line', position: { x: 50, y: 32.5 }, orientation: 'right', length: 0, sortOrder: 3, nameVisible: true, numberVisible: true },
   ],
   properties: [
     { key: 'designation', value: 'S1', type: 'string', visible: true, editorType: 'text' },

@@ -19,9 +19,9 @@ export const sensorSymbol: SymbolDefinition = {
     { kind: 'polyline', points: [{ x: 30, y: 32 }, { x: 30, y: 40 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
   ],
   pins: [
-    { id: 'vcc', name: '+V', number: '1', type: 'input', shape: 'line', position: { x: 30, y: 0 }, orientation: 'up', length: 0 },
-    { id: 'out', name: 'OUT', number: '4', type: 'output', shape: 'line', position: { x: 60, y: 20 }, orientation: 'right', length: 0 },
-    { id: 'gnd', name: '0V', number: '3', type: 'output', shape: 'line', position: { x: 30, y: 40 }, orientation: 'down', length: 0 },
+    { id: 'vcc', name: '+V', number: '1', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 30, y: 0 }, orientation: 'up', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
+    { id: 'out', name: 'OUT', number: '4', type: 'output', electricalType: 'output', functionalRole: 'general', shape: 'line', position: { x: 60, y: 20 }, orientation: 'right', length: 0, sortOrder: 2, nameVisible: true, numberVisible: true },
+    { id: 'gnd', name: '0V', number: '3', type: 'output', electricalType: 'output', functionalRole: 'general', shape: 'line', position: { x: 30, y: 40 }, orientation: 'down', length: 0, sortOrder: 3, nameVisible: true, numberVisible: true },
   ],
   properties: [
     { key: 'designation', value: 'B1', type: 'string', visible: true, editorType: 'text' },

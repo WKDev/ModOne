@@ -18,8 +18,8 @@ export const plcInSymbol: SymbolDefinition = {
     { kind: 'polyline', points: [{ x: 70, y: 20 }, { x: 80, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
   ],
   pins: [
-    { id: 'in', name: 'IN', number: '1', type: 'input', shape: 'line', position: { x: 0, y: 20 }, orientation: 'left', length: 0 },
-    { id: 'out', name: 'OUT', number: '2', type: 'output', shape: 'line', position: { x: 80, y: 20 }, orientation: 'right', length: 0 },
+    { id: 'in', name: 'IN', number: '1', type: 'input', electricalType: 'input', functionalRole: 'plc_input', shape: 'line', position: { x: 0, y: 20 }, orientation: 'left', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
+    { id: 'out', name: 'OUT', number: '2', type: 'output', electricalType: 'output', functionalRole: 'plc_output', shape: 'line', position: { x: 80, y: 20 }, orientation: 'right', length: 0, sortOrder: 2, nameVisible: true, numberVisible: true },
   ],
   properties: [
     { key: 'address', value: 'DI:0x0000', type: 'string', visible: true, editorType: 'text' },

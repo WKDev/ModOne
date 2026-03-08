@@ -20,10 +20,10 @@ export const motorSymbol: SymbolDefinition = {
     { kind: 'polyline', points: [{ x: 30, y: 48 }, { x: 30, y: 60 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
   ],
   pins: [
-    { id: 'l1', name: 'U', number: 'U', type: 'input', shape: 'line', position: { x: 15, y: 0 }, orientation: 'up', length: 0 },
-    { id: 'l2', name: 'V', number: 'V', type: 'input', shape: 'line', position: { x: 30, y: 0 }, orientation: 'up', length: 0 },
-    { id: 'l3', name: 'W', number: 'W', type: 'input', shape: 'line', position: { x: 45, y: 0 }, orientation: 'up', length: 0 },
-    { id: 'pe', name: 'PE', number: 'PE', type: 'input', shape: 'line', position: { x: 30, y: 60 }, orientation: 'down', length: 0 },
+    { id: 'l1', name: 'U', number: 'U', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 15, y: 0 }, orientation: 'up', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
+    { id: 'l2', name: 'V', number: 'V', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 30, y: 0 }, orientation: 'up', length: 0, sortOrder: 2, nameVisible: true, numberVisible: true },
+    { id: 'l3', name: 'W', number: 'W', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 45, y: 0 }, orientation: 'up', length: 0, sortOrder: 3, nameVisible: true, numberVisible: true },
+    { id: 'pe', name: 'PE', number: 'PE', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 30, y: 60 }, orientation: 'down', length: 0, sortOrder: 4, nameVisible: true, numberVisible: true },
   ],
   properties: [
     { key: 'designation', value: 'M1', type: 'string', visible: true, editorType: 'text' },
