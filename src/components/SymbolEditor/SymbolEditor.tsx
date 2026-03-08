@@ -134,19 +134,22 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
     if (isMultiUnit && activeUnit !== null) {
       setLocalSymbol((prev) => {
         const units = [...(prev.units ?? [])];
-        const unit = { ...units[activeUnit], pins: [...units[activeUnit].pins, pin] };
+        const currentUnit = units[activeUnit];
+        const enrichedPin: SymbolPin = { ...pin, sortOrder: pin.sortOrder ?? currentUnit.pins.length };
+        const unit = { ...currentUnit, pins: [...currentUnit.pins, enrichedPin] };
         units[activeUnit] = unit;
         return { ...prev, units, updatedAt: new Date().toISOString() };
       });
     } else {
+      const enrichedPin: SymbolPin = { ...pin, sortOrder: pin.sortOrder ?? localSymbol.pins.length };
       history.execute(new AddPinCommand(
         (fn) => setLocalSymbol((prev) => fn(prev) as LocalSymbol),
-        pin,
+        enrichedPin,
       ));
       bumpHistory();
     }
     dispatch({ type: 'MARK_DIRTY' });
-  }, [isMultiUnit, activeUnit, bumpHistory]);
+  }, [isMultiUnit, activeUnit, bumpHistory, localSymbol]);
 
   const handleDeleteSelected = useCallback(() => {
     if (state.selectedIds.size === 0) return;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import type { SymbolPin } from '../../types/symbol';
+import type { SymbolPin, PinElectricalTypeV2, PinFunctionalRole } from '../../types/symbol';
 
 interface PinConfigPopoverProps {
   screenX: number;
@@ -53,6 +53,8 @@ export function PinConfigPopover({
       position: { x: canvasX, y: canvasY },
       orientation,
       length,
+      electricalType: 'passive' as PinElectricalTypeV2,
+      functionalRole: 'general' as PinFunctionalRole,
     });
   };
 
