@@ -7,6 +7,7 @@
 import { memo, useCallback, useState, useEffect } from 'react';
 import { Copy, Check } from 'lucide-react';
 import type { Block } from '../../../OneCanvas/types';
+import type { ComponentInstance } from '@/types/circuit';
 
 // ============================================================================
 // Types
@@ -14,7 +15,7 @@ import type { Block } from '../../../OneCanvas/types';
 
 interface CommonPropertiesProps {
   /** Component to display properties for */
-  component: Block;
+  component: Block | ComponentInstance;
   /** Callback when property changes */
   onChange: (updates: Partial<Block>) => void;
 }

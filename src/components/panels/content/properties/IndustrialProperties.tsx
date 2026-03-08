@@ -8,13 +8,14 @@
 import { memo, useCallback, useState, useEffect } from 'react';
 import { CommonProperties } from './CommonProperties';
 import type { Block } from '../../../OneCanvas/types';
+import type { ComponentInstance } from '@/types/circuit';
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface IndustrialPropertiesProps {
-  component: Block;
+  component: Block | ComponentInstance;
   onChange: (updates: Partial<Block>) => void;
 }
 
