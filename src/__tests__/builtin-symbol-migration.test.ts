@@ -44,8 +44,8 @@ function collectUniquePins(blockType: BlockType): Array<{ id: string; position: 
 }
 
 describe('builtin symbol migration', () => {
-  it('registry has exactly 22 symbols', () => {
-    expect(BUILTIN_SYMBOLS.size).toBe(22);
+  it('registry has exactly 42 symbols', () => {
+    expect(BUILTIN_SYMBOLS.size).toBe(42);
   });
 
   describe.each(ALL_BLOCK_TYPES)('%s', (blockType) => {
