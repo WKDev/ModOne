@@ -1,0 +1,44 @@
+TASK: Add v2 Symbol Type Definitions (TypeScript)
+DATE: 2026-03-08
+
+== CHANGES MADE ==
+1. src/types/symbol.ts — Added new v2 types AFTER SymbolSummary, BEFORE CustomSymbolBlock:
+   - PinElectricalTypeV2 (12 KiCad-compatible values)
+   - PinFunctionalRole (4 PLC roles)
+   - PinShapeV2 (9 KiCad-compatible shapes)
+   - SymbolPinV2 (extended pin interface)
+   - SpicePinMapping (SPICE pin mapping)
+   - SpiceModelRef (SPICE model reference)
+   - SymbolDefinitionV2 extends SymbolDefinition (all optional fields)
+
+2. src/types/circuit.ts — Added:
+   - import type { PinElectricalTypeV2, PinFunctionalRole } from './symbol' (relative, line 7)
+   - PortV2 interface after Port interface (uses PortPosition, PortType, Position, PinElectricalTypeV2, PinFunctionalRole)
+
+== BUILD STATUS ==
+pnpm run build: FAILS with pre-existing errors (confirmed by git stash test)
+Pre-existing errors:
+  - src/components/LadderEditor/utils/__tests__/gridConverter.test.ts(27,15): TS2724
+  - src/components/SymbolEditor/SymbolEditorHost.tsx: TS2353, TS2322 (multiple)
+  - src/hooks/useAppIntegration.ts: TS2307, TS7006
+
+My changes introduced ZERO new TypeScript errors.
+No errors in src/types/symbol.ts or src/types/circuit.ts.
+
+== TEST STATUS ==
+pnpm run test: 1 pre-existing failure (confirmed by git stash test)
+  - src/__tests__/port-positions.test.ts "covers all 22 block types": expected 23 to be 22
+    This test was already failing before my changes.
+
+My changes introduced ZERO new test failures.
+985 tests pass, 1 pre-existing failure.
+
+== VERIFICATION ==
+All existing types preserved and unchanged:
+  - PinElectricalType (5 values) — unchanged
+  - PinShape (3 values) — unchanged
+  - PinOrientation (4 values) — unchanged
+  - SymbolPin interface — unchanged
+  - SymbolDefinition interface — unchanged
+  - PortType, Port interface — unchanged
+  - All other types — unchanged

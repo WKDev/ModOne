@@ -22,6 +22,7 @@ export interface AppSettings {
   autoSaveInterval: number; // seconds, minimum 30
   startWithLastProject: boolean;
   telemetryEnabled: boolean;
+  showWelcomePageOnStartup: boolean;
 
   // Simulation settings
   defaultScanTimeMs: number; // 1-1000
@@ -59,6 +60,7 @@ export const defaultSettings: AppSettings = {
   autoSaveInterval: 60,
   startWithLastProject: true,
   telemetryEnabled: false,
+  showWelcomePageOnStartup: true,
 
   // Simulation
   defaultScanTimeMs: 10,

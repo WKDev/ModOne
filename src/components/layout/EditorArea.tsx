@@ -6,13 +6,12 @@
  */
 
 import { useRef, useState, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, FilePlus, FolderOpen } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEditorAreaStore } from '../../stores/editorAreaStore';
 import { Tab } from '../panels/Tab';
 import { TabContent } from '../panels/TabContent';
 import { useTabClose } from '../../hooks/useTabClose';
 import { UnsavedChangesDialog } from '../project/UnsavedChangesDialog';
-import { commandRegistry } from '../CommandPalette/commandRegistry';
 
 export function EditorArea() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -120,31 +119,13 @@ export function EditorArea() {
     setDragOverIndex(null);
   };
 
-  // Empty state
   if (tabs.length === 0) {
     return (
       <div className="flex flex-col h-full w-full bg-[var(--color-bg-primary)]">
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-lg mb-2 text-[var(--color-text-muted)]">No files open</p>
-            <p className="text-sm mb-6 text-[var(--color-text-secondary)]">Open a file from the Explorer to get started</p>
-            <div className="flex gap-3 justify-center">
-              <button
-                onClick={() => commandRegistry.execute('file.new')}
-                className="flex items-center gap-2 px-4 py-2 rounded bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white transition-colors"
-              >
-                <FilePlus size={16} />
-                New Canvas
-              </button>
-              <button
-                onClick={() => commandRegistry.execute('file.open')}
-                className="flex items-center gap-2 px-4 py-2 rounded border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] transition-colors"
-              >
-                <FolderOpen size={16} />
-                Open Project
-              </button>
-            </div>
-          </div>
+          <h1 className="text-5xl font-bold text-[var(--color-text-muted)] opacity-20 select-none">
+            ModOne
+          </h1>
         </div>
       </div>
     );

@@ -18,6 +18,7 @@ import { getAllSelectedIds } from '../../components/OneCanvas/types';
 import type { CanvasFacadeReturn } from '../../types/canvasFacade';
 import type { SerializableCircuitState } from '../../components/OneCanvas/types';
 
+import type { Block } from '../../types/circuit';
 // ============================================================================
 // Hook
 // ============================================================================
@@ -133,7 +134,7 @@ export function useGlobalCanvasAdapter(): CanvasFacadeReturn {
   return useMemo(
     (): CanvasFacadeReturn => ({
       // Selectors
-      components: globalComponents,
+      components: globalComponents as Map<string, Block>,
       junctions: globalJunctions,
       wires: globalWires,
       zoom: globalZoom,

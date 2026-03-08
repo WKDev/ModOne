@@ -53,6 +53,8 @@ interface EditorAreaActions {
   setTabs: (tabs: TabState[], activeTabId: string | null) => void;
   /** Open settings tab (creates if not exists, focuses if exists) */
   openSettingsTab: () => void;
+  /** Open welcome tab (creates if not exists, focuses if exists) */
+  openWelcomeTab: () => void;
 }
 
 type EditorAreaStore = EditorAreaState & EditorAreaActions;
@@ -262,6 +264,18 @@ export const useEditorAreaStore = create<EditorAreaStore>()(
 
         // Create new settings tab
         addTab('settings', 'Settings');
+      },
+
+      openWelcomeTab: () => {
+        const { tabs, addTab, setActiveTab } = get();
+
+        const existingTab = tabs.find((t) => t.panelType === 'welcome');
+        if (existingTab) {
+          setActiveTab(existingTab.id);
+          return;
+        }
+
+        addTab('welcome', 'Welcome');
       },
     }),
     { name: 'editor-area-store' }

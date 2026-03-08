@@ -5,6 +5,7 @@ import { useCanvasFacade } from '../../hooks/useCanvasFacade';
 import type { CanvasFacadeReturn } from '../../types/canvasFacade';
 import type { Block, SerializableCircuitState, WireEndpoint } from '../../components/OneCanvas/types';
 import { useDocumentRegistry } from '../documentRegistry';
+import { useCanvasStore } from '../canvasStore';
 
 function makeBlock(id: string, x: number, y: number, w: number, h: number): Block {
   return {
@@ -66,6 +67,12 @@ function connectableEndpoints(
 
 beforeEach(() => {
   useDocumentRegistry.getState().reset();
+  useCanvasStore.setState((state) => ({
+    ...state,
+    components: new Map(),
+    junctions: new Map(),
+    wires: [],
+  }));
 });
 
 const adapters: ReadonlyArray<readonly [string, () => string | null]> = [
@@ -414,5 +421,42 @@ describe.each(adapters)('CanvasFacade (%s)', (_adapterName, setupFn) => {
       expect(facade2.current.components.has('b')).toBe(true);
       expect(facade2.current.components.get('b')?.position).toEqual({ x: 20, y: 20 });
     });
+  });
+});
+
+describe('CanvasFacade (schematic documents)', () => {
+  it('binds edits to the active schematic page instead of the global canvas store', () => {
+    const registry = useDocumentRegistry.getState();
+    const schematicId = registry.createDocument('schematic');
+
+    const { result } = renderHook(() => useCanvasFacade(schematicId));
+    const { result: globalFacade } = renderHook(() => useCanvasFacade(null));
+
+    act(() => {
+      result.current.loadCircuit(emptyCircuit({ a: makeBlock('a', 10, 10, 10, 10) }));
+    });
+
+    expect(result.current.isDocumentMode).toBe(true);
+    expect(result.current.documentId).toBe(schematicId);
+    expect(result.current.components.has('a')).toBe(true);
+    expect(globalFacade.current.components.size).toBe(0);
+
+    act(() => {
+      result.current.moveComponent('a', { x: 100, y: 40 });
+    });
+
+    expect(result.current.components.get('a')?.position).toEqual({ x: 100, y: 40 });
+
+    const doc = useDocumentRegistry.getState().documents.get(schematicId);
+    expect(doc?.type).toBe('schematic');
+    if (doc?.type === 'schematic') {
+      const activePage = doc.data.schematic.pages.find(
+        (page) => page.id === doc.data.schematic.activePageId
+      );
+      expect(activePage?.circuit.components.a.position).toEqual({ x: 100, y: 40 });
+      expect(activePage?.circuit.viewport).toEqual({ zoom: 1, panX: 0, panY: 0 });
+    }
+
+    expect(globalFacade.current.components.size).toBe(0);
   });
 });

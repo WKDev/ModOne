@@ -1,0 +1,43 @@
+Task: Resolve Dual BlockType Definitions
+Date: 2026-03-08
+
+Changes made:
+- Updated src/components/OneCanvas/types.ts
+  - Removed local `export type BlockType = ...` union.
+  - Added `import type { BlockType } from '../../types/circuit';`.
+  - Added `export type { BlockType } from '../../types/circuit';`.
+
+Reference impact check:
+- LSP references for src/types/circuit.ts BlockType include:
+  - src/components/OneCanvas/types.ts (import + re-export + usages in BaseBlock/Yaml types)
+  - src/components/OneCanvas/renderers/GhostPreviewRenderer.ts
+  - src/components/OneCanvas/renderers/symbols/SymbolLibrary.ts
+
+Verification commands and results:
+1) grep -rn "type BlockType" src/ --include="*.ts"
+   Result:
+   src/types/circuit.ts:120:export type BlockType = CanonicalBlockType | (string & {});
+
+   Re-export check:
+   src/components/OneCanvas/types.ts:9:export type { BlockType } from '../../types/circuit';
+
+2) LEGACY_BLOCK_TYPE_MAP existence check
+   Found in src/types/circuit.ts:
+   - const LEGACY_BLOCK_TYPE_MAP: Readonly<Record<LegacyBlockType, BlockType>> = {
+   - return LEGACY_BLOCK_TYPE_MAP[blockType as LegacyBlockType] ?? blockType;
+
+3) pnpm run build
+   Result: FAILED (pre-existing repo-wide TypeScript errors outside this change)
+   Representative errors:
+   - src/components/LadderEditor/utils/__tests__/gridConverter.test.ts(27,15): TS2724
+   - src/components/SymbolEditor/SymbolEditorHost.tsx: TS2353/TS2322
+   - src/hooks/useAppIntegration.ts: TS2307/TS7006
+
+4) pnpm run test
+   Result: FAILED (1 failing test)
+   - src/__tests__/port-positions.test.ts > "covers all 22 block types"
+   - Assertion: expected 22, received 23
+
+Diagnostics:
+- lsp_diagnostics on changed file:
+  - src/components/OneCanvas/types.ts: clean (no diagnostics)

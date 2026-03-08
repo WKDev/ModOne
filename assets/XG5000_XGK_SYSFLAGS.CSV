@@ -1,0 +1,203 @@
+VARNAME,TYPE,ADDR,POINT,SIZE,DESCRIPTION
+_RUN,BIT,F00000,0,0,RUN
+_STOP,BIT,F00001,0,0,STOP
+_ERROR,BIT,F00002,0,0,ERROR
+_DEBUG,BIT,F00003,0,0,DEBUG
+_LOCAL_CON,BIT,F00004,0,0,로컬 컨트롤
+_RUN_EDIT_ST,BIT,F00008,0,0,런중 수정 중(프로그램 다운로드 중)
+_RUN_EDIT_CHK,BIT,F00009,0,0,런중 수정 중(내부 처리 중)
+_RUN_EDIT_DONE,BIT,F0000A,0,0,런중 수정 완료
+_RUN_EDIT_NG,BIT,F0000B,0,0,런중 수정 비정상 완료
+_CMOD_KEY,BIT,F0000C,0,0,키에 의한 운전모드 변경
+_CMOD_LPADT,BIT,F0000D,0,0,로컬 PADT에 의한 운전모드 변경
+_CMOD_RPADT,BIT,F0000E,0,0,리모트 PADT에 의한 운전모드 변경
+_CMOD_RLINK,BIT,F0000F,0,0,리모트 통신 모듈에 의한 운전 모드 변경
+_FORCE_IN,BIT,F00010,0,0,강제 입력
+_FORCE_OUT,BIT,F00011,0,0,강제 출력
+_MON_ON,BIT,F00014,0,0,모니터 실행 중
+_USTOP_ON,BIT,F00015,0,0,STOP 펑션에 의한 STOP
+_ESTOP_ON,BIT,F00016,0,0,ESTOP 펑션에 의한 STOP
+_COMPILE_MODE,BIT,F00017,0,0,컴파일 수행 중
+_INIT_RUN,BIT,F00018,0,0,초기화 태스크 수행 중
+_PB1,BIT,F0001C,0,0,프로그램 코드1
+_PB2,BIT,F0001D,0,0,프로그램 코드2
+_CB1,BIT,F0001E,0,0,컴파일 코드1
+_CB2,BIT,F0001F,0,0,컴파일 코드2
+_IO_TYER,BIT,F00021,0,0,모듈 타입 불일치 에러
+_IO_DEER,BIT,F00022,0,0,모듈 착탈 에러
+_IO_RWER,BIT,F00024,0,0,입출력 모듈 읽기/쓰기 에러(고장)
+_ANNUM_ER,BIT,F00026,0,0,외부기기의 중고장 검출 에러
+_CDOVER_ER,BIT,F00027,0,0,실행코드 영역 초과 에러
+_BPRM_ER,BIT,F00028,0,0,기본 파라미터 이상
+_IOPRM_ER,BIT,F00029,0,0,IO 구성 파라미터 이상
+_PGM_ER,BIT,F0002C,0,0,프로그램 에러
+_CODE_ER,BIT,F0002D,0,0,프로그램 코드 에러
+_SWDT_ER,BIT,F0002E,0,0,CPU 비정상 종료 또는 고장
+_WDT_ER,BIT,F00030,0,0,스캔 워치독 에러
+_TMRIDX_ER,BIT,F00032,0,0,타이머 인덱스 사용 에러
+_COMPILE_ER,BIT,F00033,0,0,컴파일 에러
+_INST_ER,BIT,F00034,0,0,연산에러
+_RTC_ER,BIT,F00040,0,0,RTC 데이터 이상
+_DBCK_ER,BIT,F00041,0,0,데이터 백업 이상
+_ABSD_ER,BIT,F00043,0,0,비정상 운전 정지
+_TASK_ER,BIT,F00044,0,0,태스크 충돌
+_BAT_ER,BIT,F00045,0,0,배터리 이상
+_ANNUM_WAR,BIT,F00046,0,0,외부 기기의 경고장 검출
+_HS_WAR1,BIT,F00048,0,0,고속링크 파라미터1 이상
+_HS_WAR2,BIT,F00049,0,0,고속링크 파라미터2 이상
+_HS_WAR3,BIT,F0004A,0,0,고속링크 파라미터3 이상
+_HS_WAR4,BIT,F0004B,0,0,고속링크 파라미터4 이상
+_HS_WAR5,BIT,F0004C,0,0,고속링크 파라미터5 이상
+_P2P_WAR1,BIT,F00054,0,0,P2P 파라미터1 이상
+_P2P_WAR2,BIT,F00055,0,0,P2P 파라미터2 이상
+_P2P_WAR3,BIT,F00056,0,0,P2P 파라미터3 이상
+_P2P_WAR4,BIT,F00057,0,0,P2P 파라미터4 이상
+_P2P_WAR5,BIT,F00058,0,0,P2P 파라미터5 이상
+_P2P_WAR6,BIT,F00059,0,0,P2P 파라미터6 이상
+_CONSTANT_RUN,BIT,F00080,0,0,고정주기 운전 실행중
+_CONSTANT_ER,BIT,F0005C,0,0,고정주기 오류
+_T20MS,BIT,F00090,0,0,20ms 주기 CLOCK
+_T100MS,BIT,F00091,0,0,100ms 주기 CLOCK
+_T200MS,BIT,F00092,0,0,200ms 주기 CLOCK
+_T1S,BIT,F00093,0,0,1s 주기 CLOCK
+_T2S,BIT,F00094,0,0,2s 주기 CLOCK
+_T10S,BIT,F00095,0,0,10s 주기 CLOCK
+_T20S,BIT,F00096,0,0,20s 주기 CLOCK
+_T60S,BIT,F00097,0,0,60s 주기 CLOCK
+_ON,BIT,F00099,0,0,상시 ON
+_OFF,BIT,F0009A,0,0,상시 OFF
+_1ON,BIT,F0009B,0,0,1 스캔 ON
+_1OFF,BIT,F0009C,0,0,1 스캔 OFF
+_STOG,BIT,F0009D,0,0,매 스캔 반전
+_USR_CLK0,BIT,F00100,0,0,DUTY 명령에서 지정된 스캔만큼 ON/OFF 0
+_USR_CLK1,BIT,F00101,0,0,DUTY 명령에서 지정된 스캔만큼 ON/OFF 1
+_USR_CLK2,BIT,F00102,0,0,DUTY 명령에서 지정된 스캔만큼 ON/OFF 2
+_USR_CLK3,BIT,F00103,0,0,DUTY 명령에서 지정된 스캔만큼 ON/OFF 3
+_USR_CLK4,BIT,F00104,0,0,DUTY 명령에서 지정된 스캔만큼 ON/OFF 4
+_USR_CLK5,BIT,F00105,0,0,DUTY 명령에서 지정된 스캔만큼 ON/OFF 5
+_USR_CLK6,BIT,F00106,0,0,DUTY 명령에서 지정된 스캔만큼 ON/OFF 6
+_USR_CLK7,BIT,F00107,0,0,DUTY 명령에서 지정된 스캔만큼 ON/OFF 7
+_LER,BIT,F00110,0,0,연산 에러 플래그
+_ZERO,BIT,F00111,0,0,제로 플래그
+_CARRY,BIT,F00112,0,0,캐리 플래그
+_ALL_OFF,BIT,F00113,0,0,전출력 OFF
+_LER_LATCH,BIT,F00115,0,0,연산 에러 플래그(래치)
+_LT,BIT,F00120,0,0,LT 플래그
+_LTE,BIT,F00121,0,0,LTE 플래그
+_EQU,BIT,F00122,0,0,EQU 플래그
+_GT,BIT,F00123,0,0,GT 플래그
+_GTE,BIT,F00124,0,0,GTE 플래그
+_NEQ,BIT,F00125,0,0,NEQ 플래그
+_FPU_LFLAG_Z,BIT,F00573,0,0,영나누기 에러 래치 플래그
+_FPU_FLAG_Z,BIT,F0057D,0,0,영나누기 에러 플래그
+_PLS_CATCH_0,BIT,F01730,0,0,입력 접점 0 펄스 캐치 결과
+_PLS_CATCH_1,BIT,F01731,0,0,입력 접점 1 펄스 캐치 결과
+_PLS_CATCH_2,BIT,F01732,0,0,입력 접점 2 펄스 캐치 결과
+_PLS_CATCH_3,BIT,F01733,0,0,입력 접점 3 펄스 캐치 결과
+_PLS_CATCH_4,BIT,F01734,0,0,입력 접점 4 펄스 캐치 결과
+_PLS_CATCH_5,BIT,F01735,0,0,입력 접점 5 펄스 캐치 결과
+_PLS_CATCH_6,BIT,F01736,0,0,입력 접점 6 펄스 캐치 결과
+_PLS_CATCH_7,BIT,F01737,0,0,입력 접점 7 펄스 캐치 결과
+_PLS_CATCH_8,BIT,F01738,0,0,입력 접점 8 펄스 캐치 결과
+_PLS_CATCH_9,BIT,F01739,0,0,입력 접점 9 펄스 캐치 결과
+_PLS_CATCH_A,BIT,F0173A,0,0,입력 접점 A 펄스 캐치 결과
+_PLS_CATCH_B,BIT,F0173B,0,0,입력 접점 B 펄스 캐치 결과
+_PLS_CATCH_C,BIT,F0173C,0,0,입력 접점 C 펄스 캐치 결과
+_PLS_CATCH_D,BIT,F0173D,0,0,입력 접점 D 펄스 캐치 결과
+_PLS_CATCH_E,BIT,F0173E,0,0,입력 접점 E 펄스 캐치 결과
+_PLS_CATCH_F,BIT,F0173F,0,0,입력 접점 F 펄스 캐치 결과
+_RTC_WR,BIT,F02000,0,0,RTC에 데이터 쓰기
+_SCAN_WR,BIT,F02001,0,0,스캔 값 초기화
+_CHK_ANC_ERR,BIT,F02002,0,0,외부 기기 중고장 검출 요청
+_CHK_ANC_WAR,BIT,F02003,0,0,외부 기기 경고장 검출 요청
+_INIT_DONE,BIT,F02010,0,0,초기화 태스크 수행 완료
+_HS1_ENABLE_STATE,BIT,F09600,0,0,고속링크1번 enable/disable 현재상태
+_HS2_ENABLE_STATE,BIT,F09601,0,0,고속링크2번 enable/disable 현재상태
+_HS3_ENABLE_STATE,BIT,F09602,0,0,고속링크3번 enable/disable 현재상태
+_HS4_ENABLE_STATE,BIT,F09603,0,0,고속링크4번 enable/disable 현재상태
+_HS5_ENABLE_STATE,BIT,F09604,0,0,고속링크5번 enable/disable 현재상태
+_HS1_REQ,BIT,F10300,0,0,고속링크1번 enable/disable 요청
+_HS2_REQ,BIT,F10301,0,0,고속링크2번 enable/disable 요청
+_HS3_REQ,BIT,F10302,0,0,고속링크3번 enable/disable 요청
+_HS4_REQ,BIT,F10303,0,0,고속링크4번 enable/disable 요청
+_HS5_REQ,BIT,F10304,0,0,고속링크5번 enable/disable 요청
+_HS1_REQ_NUM,BIT,F10310,0,0,고속링크1번 enable/disable 설정
+_HS2_REQ_NUM,BIT,F10311,0,0,고속링크2번 enable/disable 설정
+_HS3_REQ_NUM,BIT,F10312,0,0,고속링크3번 enable/disable 설정
+_HS4_REQ_NUM,BIT,F10313,0,0,고속링크4번 enable/disable 설정
+_HS5_REQ_NUM,BIT,F10314,0,0,고속링크5번 enable/disable 설정
+_P2P1_ENABLE_STATE,BIT,F09620,0,0,P2P1번 enable/disable 현재상태
+_P2P2_ENABLE_STATE,BIT,F09621,0,0,P2P2번 enable/disable 현재상태
+_P2P3_ENABLE_STATE,BIT,F09622,0,0,P2P3번 enable/disable 현재상태
+_P2P4_ENABLE_STATE,BIT,F09623,0,0,P2P4번 enable/disable 현재상태
+_P2P5_ENABLE_STATE,BIT,F09624,0,0,P2P5번 enable/disable 현재상태
+_P2P6_ENABLE_STATE,BIT,F09625,0,0,P2P6번 enable/disable 현재상태
+_P2P1_REQ,BIT,F10320,0,0,P2P1번 enable/disable 요청
+_P2P2_REQ,BIT,F10321,0,0,P2P2번 enable/disable 요청
+_P2P3_REQ,BIT,F10322,0,0,P2P3번 enable/disable 요청
+_P2P4_REQ,BIT,F10323,0,0,P2P4번 enable/disable 요청
+_P2P5_REQ,BIT,F10324,0,0,P2P5번 enable/disable 요청
+_P2P6_REQ,BIT,F10325,0,0,P2P6번 enable/disable 요청
+_P2P1_REQ_NUM,BIT,F10330,0,0,P2P1번 enable/disable 설정
+_P2P2_REQ_NUM,BIT,F10331,0,0,P2P2번 enable/disable 설정
+_P2P3_REQ_NUM,BIT,F10332,0,0,P2P3번 enable/disable 설정
+_P2P4_REQ_NUM,BIT,F10333,0,0,P2P4번 enable/disable 설정
+_P2P5_REQ_NUM,BIT,F10334,0,0,P2P5번 enable/disable 설정
+_P2P6_REQ_NUM,BIT,F10335,0,0,P2P6번 enable/disable 설정
+_SYS_STATE,DWORD,F0000,0,0,PLC 모드와 운전 상태
+_CNF_ER,DWORD,F0002,0,0,시스템의 에러(중고장)
+_CNF_WAR,DWORD,F0004,0,0,시스템의 경고(경고장)
+_OS_VER,DWORD,F0046,0,0,OS 버전 번호
+_OS_DATE,DWORD,F0048,0,0,OS 날짜
+_ERR_STEP,DWORD,F0058,0,0,에러 스텝 저장
+_KEY,DWORD,F0086,0,0,현재 로컬 KEY 상태
+_KEY_PREV,DWORD,F0088,0,0,이전 로컬 KEY 상태
+_RTC_TOD,DWORD,F0138,0,0,RTC의 현재 시간(ms단위)
+_AC_FAIL_CNT,DWORD,F0140,0,0,전원 차단 횟수
+_ERR_HIS_CNT,DWORD,F0142,0,0,에러 발생 횟수
+_MOD_HIS_CNT,DWORD,F0144,0,0,모드 전환 횟수
+_SYS_HIS_CNT,DWORD,F0146,0,0,시스템 이력 발생 횟수
+_LOG_ROTATE,DWORD,F0148,0,0,로그 로테이트 정보
+_RBLOCK_RD_FLAG,DWORD,F0160,0,0,플래시 N블록의 데이터를 읽을 때 ON
+_RBLOCK_WR_FLAG,DWORD,F0162,0,0,플래시 N블록의 데이터를 쓸 때 ON
+_RBLOCK_ER_FLAG,DWORD,F0164,0,0,플래시 N블록 서비스 중 에러 발생할 때 ON
+_OS_VER_PATCH,DWORD,F0178,0,0,OS 패치 버전
+_USER_F,WORD,F0009,0,0,유저 접점
+_USER_CLK,WORD,F0010,0,0,지정 스캔 만큼 ON/OFF
+_LOGIC_RESULT,WORD,F0011,0,0,로직 결과 표시
+_CMP_RESULT,WORD,F0012,0,0,비교 결과 표시
+_AC_F_CNT,WORD,F0013,0,0,순시 정전 발생 횟수
+_FALS_NUM,WORD,F0014,0,0,FALS 번호
+_CPU_TYPE,WORD,F0044,0,0,CPU 타입 정보
+_CPU_VER,WORD,F0045,0,0,CPU 버전 번호
+_SCAN_MAX,WORD,F0050,0,0,최대 스캔 시간
+_SCAN_MIN,WORD,F0051,0,0,최소 스캔 시간
+_SCAN_CUR,WORD,F0052,0,0,현재 스캔 시간
+_MON_YEAR,WORD,F0053,0,0,시계 데이터(월/년)
+_TIME_DAY,WORD,F0054,0,0,시계 데이터(시/일)
+_SEC_MIN,WORD,F0055,0,0,시계 데이터(초/분)
+_HUND_WK,WORD,F0056,0,0,시계 데이터(백년/요일)
+_IO_TYER_N,WORD,F0090,0,0,모듈 타입 불일치 슬롯 넘버
+_IO_DEER_N,WORD,F0091,0,0,모듈 착탈 슬롯 넘버
+_IO_RWER_N,WORD,F0093,0,0,입출력 모듈 읽기/쓰기 에러 슬롯 넘버
+_IO_TYER0,WORD,F0096,0,0,메인 베이스 모듈 타입 에러
+_IO_DEER0,WORD,F0104,0,0,메인 베이스 모듈 착탈 에러
+_IO_RWER0,WORD,F0120,0,0,메인 베이스 모듈 읽기/쓰기 에러
+_RTC_DATE,WORD,F0136,0,0,RTC의 현재 날짜
+_RTC_WEEK,WORD,F0137,0,0,RTC의 현재 요일
+_BASE_INFO0,WORD,F0150,0,0,메인 베이스 슬롯 정보
+_RBANK_NUM,WORD,F0158,0,0,현재 사용중인 블록 번호
+_RBLOCK_STATE,WORD,F0159,0,0,플래시 블록 상태
+_USER_WRITE_F,WORD,F0200,0,0,프로그램에서 사용 가능한 접점
+_USER_STAUS_F,WORD,F0201,0,0,유저 접점
+_ANC_ERR,WORD,F0202,0,0,외부 기기의 중고장 정보
+_ANC_WAR,WORD,F0203,0,0,외부 기기의 경고장 정보
+_MON_YEAR_DT,WORD,F0210,0,0,시계 정보 데이터(월/년)
+_TIME_DAY_DT,WORD,F0211,0,0,시계 정보 데이터(시/일)
+_SEC_MIN_DT,WORD,F0212,0,0,시계 정보 데이터(초/분)
+_HUND_WK_DT,WORD,F0213,0,0,시계 정보 데이터(백년/요일)
+_CONTROLER_ID0,BIT,F00340,0,0,컨트롤러 ID 입력 0
+_CONTROLER_ID1,BIT,F00341,0,0,컨트롤러 ID 입력 1
+_CONTROLER_ID2,BIT,F00342,0,0,컨트롤러 ID 입력 2
+_CONTROLER_ID3,BIT,F00343,0,0,컨트롤러 ID 입력 3
+_ON_BOARD_BTN,BIT,F00350,0,0,컨트롤러 내장버튼 입력

@@ -2,7 +2,7 @@
  * OneCanvasPanel Component
  *
  * Panel content for the OneCanvas circuit simulation canvas.
- * Integrates SimulationToolbar, Toolbox, Canvas with blocks/wires, and DnD support.
+ * Integrates SimulationToolbar, Toolbox, and CanvasHost with blocks/wires.
  *
  * Supports both:
  * 1. Document-based editing (multi-document via DocumentContext)
@@ -10,26 +10,17 @@
  */
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  DndContext,
-  DragOverlay,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-  type DragStartEvent,
-} from '@dnd-kit/core';
 import { useDocumentContext } from '../../../contexts/DocumentContext';
 import { PanelErrorBoundary } from '../../error/PanelErrorBoundary';
 import {
-  Canvas,
   SimulationToolbar,
   Toolbox,
-  screenToCanvas,
   type BlockType,
-  type CanvasRef,
   type Position,
 } from '../../OneCanvas';
+import { useSymbolStore } from '../../../stores/symbolStore';
+import { CanvasHost, type CanvasHostHandle } from '../../OneCanvas/CanvasHost';
+
 import type { Block, Junction, Wire } from '../../OneCanvas/types';
 import { CanvasMinimap } from '../../OneCanvas/components/CanvasMinimap';
 import { CanvasToolbar } from '../../OneCanvas/CanvasToolbar';
@@ -37,24 +28,13 @@ import { SchematicPageBar } from '../../OneCanvas/components/SchematicPageBar';
 import { WireContextMenu, type WireContextMenuAction } from '../../OneCanvas/overlays/WireContextMenu';
 import { generateWireNumbers, applyWireNumbers, type WireNumberingOptions } from '../../OneCanvas/utils/wireNumbering';
 import { openPrintDialog, type PrintLayoutConfig } from '../../OneCanvas/utils/printSupport';
-import { updatePageCircuitInDocument } from '../../OneCanvas/utils/schematicHelpers';
 import { isPortEndpoint } from '../../OneCanvas/types';
 import { useCanvasKeyboardShortcuts, useSimulation } from '../../OneCanvas';
-import { useDocumentRegistry } from '../../../stores/documentRegistry';
 import { useSchematicDocument } from '../../../stores/hooks/useSchematicDocument';
 import type { CanvasFacadeReturn } from '../../../types/canvasFacade';
 import { PropertiesPanel } from './PropertiesPanel';
-import { BlockDragPreview } from './canvas/BlockDragPreview';
-import { CanvasDropZone } from './canvas/CanvasDropZone';
 import { CanvasDialogs } from './canvas/CanvasDialogs';
 import { useCanvasFacade } from '../../../hooks/useCanvasFacade';
-import {
-  InteractionProvider,
-  extractModifiers,
-  resolvePointerTarget,
-  useInteraction,
-} from '../../OneCanvas/contexts/InteractionContext';
-
 import '../../OneCanvas/styles/simulation.css';
 
 interface OneCanvasPanelProps {
@@ -72,49 +52,12 @@ interface OneCanvasPanelContentProps {
   interactionRootRef: React.RefObject<HTMLDivElement | null>;
 }
 
-function getPortPosition(components: Map<string, Block>, blockId: string, portId: string): Position | null {
-  const block = components.get(blockId);
-  if (!block) {
-    return null;
-  }
-
-  const port = block.ports.find((p) => p.id === portId);
-  if (!port) {
-    return null;
-  }
-
-  const offset = port.offset ?? 0.5;
-  switch (port.position) {
-    case 'top':
-      return { x: block.position.x + block.size.width * offset, y: block.position.y };
-    case 'bottom':
-      return {
-        x: block.position.x + block.size.width * offset,
-        y: block.position.y + block.size.height,
-      };
-    case 'left':
-      return { x: block.position.x, y: block.position.y + block.size.height * offset };
-    case 'right':
-      return {
-        x: block.position.x + block.size.width,
-        y: block.position.y + block.size.height * offset,
-      };
-    default:
-      return {
-        x: block.position.x + block.size.width / 2,
-        y: block.position.y + block.size.height / 2,
-      };
-  }
-}
-
 const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
   facade,
   interactionRootRef,
 }: OneCanvasPanelContentProps) {
-  const canvasRef = useRef<CanvasRef>(null);
+  const canvasRef = useRef<CanvasHostHandle>(null);
   const containerRectRef = useRef<DOMRect | null>(null);
-  const activePointerIdRef = useRef<number | null>(null);
-  const interaction = useInteraction();
 
   const { documentId } = useDocumentContext();
 
@@ -129,17 +72,11 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
     removeWire,
     updateComponent,
     selectedIds,
-    setSelection,
-    addToSelection,
-    toggleSelection,
     clearSelection,
     setPan,
-    setZoom,
     alignSelected,
     distributeSelected,
     flipSelected,
-    getCircuitData,
-    loadCircuit,
     undo,
     redo,
   } = facade;
@@ -151,17 +88,10 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
       if (!schematicDoc || !documentId) return;
       const currentPageId = schematicDoc.schematic.activePageId;
       if (targetPageId === currentPageId) return;
-
-      const currentCircuit = getCircuitData();
-      updatePageCircuitInDocument(documentId, currentPageId, currentCircuit);
-      useDocumentRegistry.getState().pushHistory(documentId);
+      // TODO: V2 migration — re-implement circuit save/load for page switching
       schematicDoc.setActivePage(targetPageId);
-
-      const targetPage = schematicDoc.schematic.pages.find((p) => p.id === targetPageId);
-      if (!targetPage) return;
-      loadCircuit(targetPage.circuit);
     },
-    [schematicDoc, documentId, getCircuitData, loadCircuit]
+    [schematicDoc, documentId]
   );
 
   const [minimapCollapsed, setMinimapCollapsed] = useState(false);
@@ -187,7 +117,7 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
   }, []);
 
   useEffect(() => {
-    const container = canvasRef.current?.getContainer();
+    const container = interactionRootRef.current;
     if (!container) return;
 
     containerRectRef.current = container.getBoundingClientRect();
@@ -202,7 +132,36 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
     observer.observe(container);
 
     return () => observer.disconnect();
-  }, []);
+  }, [interactionRootRef]);
+
+  useEffect(() => {
+    const handle = canvasRef.current;
+    if (!handle) return;
+
+    const blockIds: string[] = [];
+    const wireIds: string[] = [];
+    const junctionIds: string[] = [];
+    const selectedBlocks: Block[] = [];
+
+    for (const id of selectedIds) {
+      const block = components.get(id);
+      if (block) {
+        blockIds.push(id);
+        selectedBlocks.push(block as Block);
+        continue;
+      }
+      if (junctions.has(id)) {
+        junctionIds.push(id);
+        continue;
+      }
+      const isWire = wires.some((w) => w.id === id);
+      if (isWire) {
+        wireIds.push(id);
+      }
+    }
+
+    handle.setSelection(blockIds, wireIds, junctionIds, selectedBlocks);
+  }, [selectedIds, components, junctions, wires]);
 
   const componentsArray = useMemo(() => Array.from(components.values()), [components]);
   const junctionsArray = useMemo(() => Array.from(junctions.values()), [junctions]);
@@ -218,253 +177,6 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
     undo,
     redo,
   });
-
-  const toCanvasPosition = useCallback(
-    (screenPos: Position): Position => {
-      const canvasPos = screenToCanvas(screenPos, pan, zoom);
-      return { x: canvasPos.x, y: canvasPos.y };
-    },
-    [pan, zoom]
-  );
-
-  const getScreenPosition = useCallback((clientX: number, clientY: number): Position | null => {
-    // Try canvas container first, fall back to interaction root div
-    const container = canvasRef.current?.getContainer() ?? interactionRootRef.current;
-    if (!container) {
-      console.warn('[OneCanvas] getScreenPosition: no container available');
-      return null;
-    }
-    const rect = container.getBoundingClientRect();
-    containerRectRef.current = rect;
-    return {
-      x: clientX - rect.left,
-      y: clientY - rect.top,
-    };
-  }, []);
-
-  const sendPointerDown = useCallback(
-    (event: React.MouseEvent, targetOverride?: ReturnType<typeof resolvePointerTarget>) => {
-      const screenPos = getScreenPosition(event.clientX, event.clientY);
-      if (!screenPos) {
-        return;
-      }
-      interaction.send({
-        type: 'POINTER_DOWN',
-        position: screenPos,
-        canvasPosition: toCanvasPosition(screenPos),
-        button: event.button,
-        target: targetOverride ?? resolvePointerTarget(event, components as Map<string, Block>),
-        modifiers: extractModifiers(event),
-      });
-    },
-    [components, getScreenPosition, interaction, toCanvasPosition]
-  );
-
-  const isGestureActive = !interaction.snapshot.matches('idle');
-
-  useEffect(() => {
-    if (!isGestureActive) {
-      return;
-    }
-
-    const handleWindowPointerMove = (event: PointerEvent) => {
-      if (activePointerIdRef.current !== null && event.pointerId !== activePointerIdRef.current) {
-        return;
-      }
-
-      const screenPos = getScreenPosition(event.clientX, event.clientY);
-      if (!screenPos) {
-        return;
-      }
-      interaction.send({
-        type: 'POINTER_MOVE',
-        position: screenPos,
-        canvasPosition: toCanvasPosition(screenPos),
-        modifiers: {
-          ctrl: event.ctrlKey,
-          shift: event.shiftKey,
-          alt: event.altKey,
-          meta: event.metaKey,
-        },
-      });
-    };
-
-    const handleWindowPointerUp = (event: PointerEvent) => {
-      if (activePointerIdRef.current !== null && event.pointerId !== activePointerIdRef.current) {
-        return;
-      }
-
-      activePointerIdRef.current = null;
-
-      const screenPos = getScreenPosition(event.clientX, event.clientY);
-      if (!screenPos) {
-        return;
-      }
-      interaction.send({
-        type: 'POINTER_UP',
-        position: screenPos,
-        canvasPosition: toCanvasPosition(screenPos),
-        button: event.button,
-        modifiers: {
-          ctrl: event.ctrlKey,
-          shift: event.shiftKey,
-          alt: event.altKey,
-          meta: event.metaKey,
-        },
-      });
-    };
-
-    const handleWindowPointerCancel = (event: PointerEvent) => {
-      if (activePointerIdRef.current !== null && event.pointerId !== activePointerIdRef.current) {
-        return;
-      }
-
-      activePointerIdRef.current = null;
-
-      const screenPos = getScreenPosition(event.clientX, event.clientY);
-      if (!screenPos) {
-        return;
-      }
-      interaction.send({
-        type: 'POINTER_UP',
-        position: screenPos,
-        canvasPosition: toCanvasPosition(screenPos),
-        button: event.button,
-        modifiers: {
-          ctrl: event.ctrlKey,
-          shift: event.shiftKey,
-          alt: event.altKey,
-          meta: event.metaKey,
-        },
-      });
-    };
-
-    window.addEventListener('pointermove', handleWindowPointerMove);
-    window.addEventListener('pointerup', handleWindowPointerUp);
-    window.addEventListener('pointercancel', handleWindowPointerCancel);
-
-    return () => {
-      window.removeEventListener('pointermove', handleWindowPointerMove);
-      window.removeEventListener('pointerup', handleWindowPointerUp);
-      window.removeEventListener('pointercancel', handleWindowPointerCancel);
-    };
-  }, [getScreenPosition, interaction, isGestureActive, toCanvasPosition]);
-
-  const handleMouseDown = useCallback(
-    (event: React.MouseEvent) => {
-      sendPointerDown(event);
-    },
-    [sendPointerDown]
-  );
-
-  const handlePointerDownCapture = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (!event.isPrimary) {
-      return;
-    }
-    activePointerIdRef.current = event.pointerId;
-  }, []);
-
-  const handlePointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (activePointerIdRef.current === event.pointerId) {
-      activePointerIdRef.current = null;
-    }
-  }, []);
-
-  const handlePointerCancel = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (activePointerIdRef.current === event.pointerId) {
-      activePointerIdRef.current = null;
-    }
-  }, []);
-
-  const handleLostPointerCapture = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (activePointerIdRef.current === event.pointerId) {
-      activePointerIdRef.current = null;
-    }
-  }, []);
-
-  const handleStartWire = useCallback(
-    (blockId: string, portId: string) => {
-      const portPosition = getPortPosition(components as Map<string, Block>, blockId, portId);
-      const block = components.get(blockId);
-      const port = block?.ports.find((p) => p.id === portId); // Safe: block is filtered by optional chaining, returns undefined if missing
-      if (!portPosition || !port) {
-        return;
-      }
-
-      const screenPos = {
-        x: portPosition.x * zoom + pan.x,
-        y: portPosition.y * zoom + pan.y,
-      };
-
-      interaction.send({
-        type: 'POINTER_DOWN',
-        position: screenPos,
-        canvasPosition: portPosition,
-        button: 0,
-        target: {
-          kind: 'port',
-          blockId,
-          portId,
-          portPosition: port.position,
-        },
-        modifiers: { ctrl: false, shift: false, alt: false, meta: false },
-      });
-    },
-    [components, interaction, pan, zoom]
-  );
-
-  const handleEndWire = useCallback(() => {
-    // Pointer up is handled by container/window handlers.
-  }, []);
-
-  const handleBlockDragStart = useCallback(
-    (blockId: string, event: React.MouseEvent) => {
-      sendPointerDown(event, { kind: 'block', blockId });
-    },
-    [sendPointerDown]
-  );
-
-
-
-  const handleBlockClick = useCallback(
-    (blockId: string, event: React.MouseEvent) => {
-      event.stopPropagation();
-      if (event.shiftKey) {
-        addToSelection(blockId);
-      }
-    },
-    [addToSelection]
-  );
-
-  const handleWireClick = useCallback(
-    (wireId: string, event: React.MouseEvent) => {
-      event.stopPropagation();
-
-      if (event.ctrlKey || event.metaKey) {
-        toggleSelection(wireId);
-      } else if (event.shiftKey) {
-        addToSelection(wireId);
-      } else {
-        setSelection([wireId]);
-      }
-    },
-    [addToSelection, setSelection, toggleSelection]
-  );
-
-  const handleJunctionClick = useCallback(
-    (junctionId: string, event: React.MouseEvent) => {
-      event.stopPropagation();
-
-      if (event.ctrlKey || event.metaKey) {
-        toggleSelection(junctionId);
-      } else if (event.shiftKey) {
-        addToSelection(junctionId);
-      } else {
-        setSelection([junctionId]);
-      }
-    },
-    [addToSelection, setSelection, toggleSelection]
-  );
 
   const handleWireContextMenu = useCallback((wireId: string, position: Position, screenPos: { x: number; y: number }) => {
     setWireContextMenu({ wireId, position, screenPosition: screenPos });
@@ -486,51 +198,21 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
     [removeWire, wireContextMenu]
   );
 
-  const [draggedType, setDraggedType] = useState<BlockType | null>(null);
-  const [draggedLabel, setDraggedLabel] = useState<string | undefined>(undefined);
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
+  const handleSelectSymbol = useCallback(
+    (blockType: string) => {
+      canvasRef.current?.startPlacing(blockType);
+    },
+    []
   );
 
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    const { active } = event;
-    const blockType = active.data.current?.blockType as BlockType | undefined;
-    if (blockType) {
-      setDraggedType(blockType);
-      setDraggedLabel(active.data.current?.presetLabel as string | undefined);
-    }
-  }, []);
-
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event;
-      setDraggedType(null);
-      setDraggedLabel(undefined);
-
-      if (over?.id === 'canvas-dropzone') {
-        const blockType = active.data.current?.blockType as BlockType | undefined;
-        if (blockType) {
-          const rect = containerRectRef.current;
-          if (!rect) return;
-
-          const activatorEvent = event.activatorEvent as PointerEvent;
-          const dropScreenX = activatorEvent.clientX + event.delta.x;
-          const dropScreenY = activatorEvent.clientY + event.delta.y;
-          const relativeX = dropScreenX - rect.left;
-          const relativeY = dropScreenY - rect.top;
-          const canvasPos = screenToCanvas({ x: relativeX, y: relativeY }, pan, zoom);
-          const position: Position = { x: canvasPos.x, y: canvasPos.y };
-          const presetProps = active.data.current?.presetProps as Partial<Block> | undefined;
-          addComponent(blockType, position, presetProps);
-        }
-      }
+  const handlePlaceBlock = useCallback(
+    (blockType: string, position: Position, rotation: number, flipH: boolean, flipV: boolean) => {
+      addComponent(blockType as BlockType, position, {
+        rotation: rotation as Block['rotation'],
+        flip: { horizontal: flipH, vertical: flipV },
+      });
     },
-    [addComponent, zoom, pan]
+    [addComponent]
   );
 
   const selectedComponentsForPanel = useMemo(() => {
@@ -550,8 +232,11 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
   );
 
   const portVoltages = useMemo(() => {
-    if (!simulation.result) return undefined;
-    return simulation.result.nodeVoltages;
+    const result = simulation.result as unknown;
+    if (!result || typeof result !== 'object' || !('nodeVoltages' in result)) {
+      return undefined;
+    }
+    return (result as { nodeVoltages?: unknown }).nodeVoltages;
   }, [simulation.result]);
 
   const getConnectedPorts = useCallback(
@@ -595,13 +280,13 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
   );
 
   const handlePrint = useCallback((config: PrintLayoutConfig) => {
-    const container = canvasRef.current?.getContainer();
+    const container = interactionRootRef.current;
     const svgElement = container?.querySelector('svg');
     if (svgElement) {
       const svgContent = svgElement.outerHTML;
       openPrintDialog(svgContent, config);
     }
-  }, []);
+  }, [interactionRootRef]);
 
   const handleLoadTemplate = useCallback(
     (
@@ -626,158 +311,122 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
     [addComponent, addWire]
   );
 
-  const machineWirePreview = useMemo(() => {
-    if (!interaction.wirePreview || !interaction.snapshot.context.wireFrom) {
-      return null;
-    }
-
-    return {
-      from: interaction.snapshot.context.wireFrom,
-      tempPosition: interaction.wirePreview.to,
-      startPosition: interaction.wirePreview.from,
-      exitDirection: interaction.snapshot.context.wireFromExitDirection ?? undefined,
-    };
-  }, [interaction.snapshot.context.wireFrom, interaction.snapshot.context.wireFromExitDirection, interaction.wirePreview]);
+  void [
+    debugMode,
+    handleWireContextMenu,
+    portVoltages,
+    getConnectedPorts,
+    handleButtonPress,
+    handleButtonRelease,
+  ];
 
   return (
     <PanelErrorBoundary panelName="Canvas">
-      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="h-full flex flex-col bg-neutral-950">
-          <SimulationToolbar
-            running={simulation.running}
-            onStart={simulation.start}
-            onStop={simulation.stop}
-            onReset={simulation.reset}
-            onStep={simulation.step}
-            measuredRate={simulation.measuredRate}
+      <div className="h-full flex flex-col bg-neutral-950">
+        <SimulationToolbar
+          running={simulation.running}
+          onStart={simulation.start}
+          onStop={simulation.stop}
+          onReset={simulation.reset}
+          onStep={simulation.step}
+          measuredRate={simulation.measuredRate}
+        />
+
+        <div className="flex items-center justify-center px-2 py-1 bg-neutral-900 border-b border-neutral-800">
+          <CanvasToolbar
+            onAlignSelected={alignSelected}
+            onDistributeSelected={distributeSelected}
+            onFlipSelected={flipSelected}
+            onOpenWireNumbering={() => setWireNumberingOpen(true)}
+            onOpenPrint={() => setPrintDialogOpen(true)}
+            hasSelection={selectedIds.size > 0}
+            selectionCount={selectedIds.size}
           />
-
-          <div className="flex items-center justify-center px-2 py-1 bg-neutral-900 border-b border-neutral-800">
-            <CanvasToolbar
-              onAlignSelected={alignSelected}
-              onDistributeSelected={distributeSelected}
-              onFlipSelected={flipSelected}
-              onOpenWireNumbering={() => setWireNumberingOpen(true)}
-              onOpenPrint={() => setPrintDialogOpen(true)}
-              hasSelection={selectedIds.size > 0}
-              selectionCount={selectedIds.size}
-            />
-          </div>
-
-          <div className="flex-1 flex overflow-hidden">
-            <Toolbox onOpenLibrary={() => setLibraryOpen(true)} />
-
-            <CanvasDropZone className="flex-1 relative overflow-hidden">
-              <div
-                ref={interactionRootRef}
-                className="w-full h-full"
-                onMouseDown={handleMouseDown}
-                onPointerDownCapture={handlePointerDownCapture}
-                onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerCancel}
-                onLostPointerCapture={handleLostPointerCapture}
-              >
-                <Canvas
-                  ref={canvasRef}
-                  className="w-full h-full"
-                  documentId={documentId}
-                  setZoom={setZoom}
-                  setPan={setPan}
-                  blocks={components}
-                  wires={wires}
-                  junctions={junctions}
-                  zoom={zoom}
-                  pan={pan}
-                  selectionBox={interaction.selectionBox}
-                  wirePreview={machineWirePreview}
-                  onBlockClick={handleBlockClick}
-                  onWireClick={handleWireClick}
-                  onJunctionClick={handleJunctionClick}
-                  selectedBlockIds={selectedIds}
-                  selectedWireIds={selectedIds}
-                  connectedPorts={Array.from(components.keys()).reduce((acc, blockId) => {
-                    const ports = getConnectedPorts(blockId);
-                    ports.forEach((portId) => acc.add(portId));
-                    return acc;
-                  }, new Set<string>())}
-                  portVoltages={portVoltages}
-                  plcOutputStates={new Map()}
-                  onButtonPress={handleButtonPress}
-                  onButtonRelease={handleButtonRelease}
-                  onStartWire={handleStartWire}
-                  onEndWire={handleEndWire}
-                   onBlockDragStart={handleBlockDragStart}
-                   onWireContextMenu={handleWireContextMenu}
-                   onUpdateComponent={handleUpdateComponent}
-                   debugMode={debugMode}
-                 />
-
-                <CanvasMinimap
-                  components={components}
-                  wires={wires}
-                  zoom={zoom}
-                  pan={pan}
-                  viewportWidth={viewportSize.width}
-                  viewportHeight={viewportSize.height}
-                  onNavigate={setPan}
-                  collapsed={minimapCollapsed}
-                  onToggleCollapse={() => setMinimapCollapsed(!minimapCollapsed)}
-                />
-              </div>
-
-              {schematicDoc && (
-                <SchematicPageBar
-                  pages={schematicDoc.schematic.pages}
-                  activePageId={schematicDoc.schematic.activePageId}
-                  onActivatePage={handleSchematicPageSwitch}
-                  onAddPage={() => schematicDoc.addPage()}
-                  onRemovePage={schematicDoc.removePage}
-                  onRenamePage={(pageId, newName) => schematicDoc.updatePage(pageId, { name: newName })}
-                  onDuplicatePage={schematicDoc.duplicatePage}
-                  hasNextPage={schematicDoc.navigationInfo.hasNext}
-                  hasPreviousPage={schematicDoc.navigationInfo.hasPrevious}
-                  onNextPage={schematicDoc.goToNextPage}
-                  onPreviousPage={schematicDoc.goToPreviousPage}
-                />
-              )}
-            </CanvasDropZone>
-
-            {selectedComponentsForPanel.length === 1 && (
-              <div className="w-64 min-h-0 border-l border-neutral-700 overflow-y-auto flex-shrink-0 bg-neutral-900">
-                <PropertiesPanel selectedComponents={selectedComponentsForPanel} onUpdateComponent={handleUpdateComponent} />
-              </div>
-            )}
-          </div>
         </div>
 
-        {wireContextMenu && (
-          <WireContextMenu
-            screenPosition={wireContextMenu.screenPosition}
-            wireId={wireContextMenu.wireId}
-            wireClickPosition={wireContextMenu.position}
-            onClose={handleCloseWireContextMenu}
-            onAction={handleWireContextMenuAction}
+        <div className="flex-1 flex overflow-hidden">
+          <Toolbox
+            onOpenLibrary={() => setLibraryOpen(true)}
+            onOpenSymbolEditor={() => useSymbolStore.getState().openEditor()}
+            onSelectSymbol={handleSelectSymbol}
           />
-        )}
 
-        <DragOverlay>{draggedType && <BlockDragPreview type={draggedType} presetLabel={draggedLabel} />}</DragOverlay>
+          <div className="flex-1 relative overflow-hidden">
+            <div
+              ref={interactionRootRef}
+              className="w-full h-full"
+            >
+              <CanvasHost
+                ref={canvasRef}
+                className="w-full h-full"
+                documentId={documentId}
+                facade={facade}
+                onPlaceBlock={handlePlaceBlock}
+              />
 
-        <CanvasDialogs
-          libraryOpen={libraryOpen}
-          onCloseLibrary={() => setLibraryOpen(false)}
-          selectedIds={selectedIds}
-          components={components}
-          wires={wires}
-          junctions={junctions}
-          onLoadTemplate={handleLoadTemplate}
-          wireNumberingOpen={wireNumberingOpen}
-          onCloseWireNumbering={() => setWireNumberingOpen(false)}
-          onApplyWireNumbering={handleApplyWireNumbering}
-          printDialogOpen={printDialogOpen}
-          onClosePrintDialog={() => setPrintDialogOpen(false)}
-          onPrint={handlePrint}
+              <CanvasMinimap
+                components={components}
+                wires={wires}
+                zoom={zoom}
+                pan={pan}
+                viewportWidth={viewportSize.width}
+                viewportHeight={viewportSize.height}
+                onNavigate={setPan}
+                collapsed={minimapCollapsed}
+                onToggleCollapse={() => setMinimapCollapsed(!minimapCollapsed)}
+              />
+            </div>
+
+            {schematicDoc && (
+              <SchematicPageBar
+                pages={schematicDoc.schematic.pages}
+                activePageId={schematicDoc.schematic.activePageId}
+                onActivatePage={handleSchematicPageSwitch}
+                onAddPage={() => schematicDoc.addPage()}
+                onRemovePage={schematicDoc.removePage}
+                onRenamePage={(pageId, newName) => schematicDoc.updatePage(pageId, { name: newName })}
+                onDuplicatePage={schematicDoc.duplicatePage}
+                hasNextPage={schematicDoc.navigationInfo.hasNext}
+                hasPreviousPage={schematicDoc.navigationInfo.hasPrevious}
+                onNextPage={schematicDoc.goToNextPage}
+                onPreviousPage={schematicDoc.goToPreviousPage}
+              />
+            )}
+          </div>
+
+          {selectedComponentsForPanel.length === 1 && (
+            <div className="w-64 min-h-0 border-l border-neutral-700 overflow-y-auto flex-shrink-0 bg-neutral-900">
+              <PropertiesPanel selectedComponents={selectedComponentsForPanel} onUpdateComponent={handleUpdateComponent} />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {wireContextMenu && (
+        <WireContextMenu
+          screenPosition={wireContextMenu.screenPosition}
+          wireId={wireContextMenu.wireId}
+          wireClickPosition={wireContextMenu.position}
+          onClose={handleCloseWireContextMenu}
+          onAction={handleWireContextMenuAction}
         />
-      </DndContext>
+      )}
+
+      <CanvasDialogs
+        libraryOpen={libraryOpen}
+        onCloseLibrary={() => setLibraryOpen(false)}
+        selectedIds={selectedIds}
+        components={components}
+        wires={wires}
+        junctions={junctions}
+        onLoadTemplate={handleLoadTemplate}
+        wireNumberingOpen={wireNumberingOpen}
+        onCloseWireNumbering={() => setWireNumberingOpen(false)}
+        onApplyWireNumbering={handleApplyWireNumbering}
+        printDialogOpen={printDialogOpen}
+        onClosePrintDialog={() => setPrintDialogOpen(false)}
+        onPrint={handlePrint}
+      />
     </PanelErrorBoundary>
   );
 });
@@ -787,11 +436,7 @@ export const OneCanvasPanel = memo(function OneCanvasPanel(_props: OneCanvasPane
   const facade = useCanvasFacade(documentId);
   const interactionRootRef = useRef<HTMLDivElement>(null);
 
-  return (
-    <InteractionProvider key={documentId ?? '__global__'} facade={facade} containerRef={interactionRootRef}>
-      <OneCanvasPanelContent facade={facade} interactionRootRef={interactionRootRef} />
-    </InteractionProvider>
-  );
+  return <OneCanvasPanelContent facade={facade} interactionRootRef={interactionRootRef} />;
 });
 
 export default OneCanvasPanel;

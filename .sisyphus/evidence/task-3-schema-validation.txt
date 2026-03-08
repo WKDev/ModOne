@@ -1,0 +1,81 @@
+# Symbol Schema v2 Update - Validation Report
+Generated: 2026-03-08
+
+## Task Completion Summary
+✓ Updated src/types/symbol.schema.json with v2 type definitions
+✓ Maintained full backward compatibility with v1 symbol JSON files
+✓ Schema is valid JSON Schema draft-07
+✓ All required definitions and properties added
+
+## File Changes
+- Original file: 493 lines
+- Updated file: 604 lines
+- Lines added: 111 (new definitions + new properties)
+
+## Schema Validation Results
+
+### JSON Validity
+✓ Schema is valid JSON
+✓ Schema title: SymbolDefinition
+✓ Schema version: http://json-schema.org/draft-07/schema#
+
+### New v2 Definitions Added (6 total)
+✓ PinElectricalTypeV2 - KiCad-compatible electrical pin type (12 values)
+  - Enum: input, output, bidirectional, tri_state, passive, power_in, power_out, open_collector, open_emitter, free, unspecified, no_connect
+
+✓ PinFunctionalRole - PLC functional role (4 values)
+  - Enum: general, plc_input, plc_output, communication
+
+✓ PinShapeV2 - KiCad-compatible pin shape (9 values)
+  - Enum: line, inverted, clock, inverted_clock, input_low, clock_low, output_low, edge_clock_high, non_logic
+
+✓ SymbolPinV2 - Complete v2 pin definition
+  - Required: id, name, number, electricalType, shape, position, orientation, length, sortOrder
+  - Optional: functionalRole, nameVisible, numberVisible, hidden
+
+✓ SpicePinMapping - SPICE pin to node mapping
+  - Required: pinNumber, spiceNode
+
+✓ SpiceModelRef - SPICE model reference
+  - Required: device, pinMapping
+  - Optional: type, library, name, params
+
+### New Root Properties Added (9 total - All Optional)
+✓ extendsSymbol - ID of parent symbol for inheritance
+✓ spice - SPICE model reference
+✓ iecSection - IEC 60617 section code
+✓ iecCategory - IEC 60617 category
+✓ refDesignator - Reference designator prefix (e.g., R, C, K)
+✓ pinNumbersHidden - Hide pin numbers globally
+✓ pinNamesHidden - Hide pin names globally
+✓ pinNameOffset - Pin name offset in pixels
+✓ excludeFromSim - Exclude from simulation
+
+### Backward Compatibility Verification
+✓ All v1 required fields unchanged: id, name, version, category, createdAt, updatedAt, width, height, graphics, pins, properties
+✓ All v1 field definitions preserved
+✓ All v2 fields are optional (not in required array)
+✓ Existing v1 symbol JSON files will validate against updated schema
+✓ No changes to existing enum values (SymbolPin.type, SymbolPin.shape remain v1)
+✓ No changes to $schema value (remains draft-07)
+
+### Schema Structure Summary
+- Total definitions: 15 (9 original + 6 new v2)
+- Total root properties: 24 (15 original + 9 new v2)
+- Required fields: 11 (unchanged)
+- Optional fields: 13 (4 original + 9 new v2)
+
+## Verification Tests Passed
+✓ Schema parses as valid JSON
+✓ All new definitions are present and correctly structured
+✓ All new root properties are present and correctly typed
+✓ Required array unchanged (11 fields)
+✓ V1 symbol test case validates successfully
+✓ No breaking changes to existing schema structure
+
+## Conclusion
+✓ Schema successfully updated with v2 definitions
+✓ Full backward compatibility maintained
+✓ All existing v1 symbol JSON files remain valid
+✓ Schema is valid JSON Schema draft-07
+✓ Ready for v2 symbol implementation

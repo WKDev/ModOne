@@ -1,12 +1,37 @@
+import { useEffect } from 'react';
 import { MenuBar } from './MenuBar';
 import { Toolbar } from './Toolbar';
 import { StatusBar } from './StatusBar';
 import { Sidebar } from './Sidebar';
 import { EditorArea } from './EditorArea';
 import { ToolPanel } from './ToolPanel';
+import { useProjectStore } from '../../stores/projectStore';
+import { useSidebarStore } from '../../stores/sidebarStore';
+import { useEditorAreaStore } from '../../stores/editorAreaStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 
 export function MainLayout() {
   const IS_MAC = navigator.userAgent.includes("Mac");
+
+  useEffect(() => {
+    const { currentProject } = useProjectStore.getState();
+    if (!currentProject) {
+      const { isVisible } = useSidebarStore.getState();
+      if (isVisible) {
+        useSidebarStore.getState().toggleVisibility();
+      }
+
+      const loadAndOpenWelcome = async () => {
+        await useSettingsStore.getState().loadSettings();
+        const { settings } = useSettingsStore.getState();
+        if (settings.showWelcomePageOnStartup) {
+          useEditorAreaStore.getState().openWelcomeTab();
+        }
+      };
+      loadAndOpenWelcome();
+    }
+  }, []);
+
   return (
     <div data-testid="main-layout" className="h-screen w-screen overflow-hidden flex flex-col bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
       {/* Header: Menu Bar + Toolbar */}

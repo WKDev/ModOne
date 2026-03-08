@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useGlobalCanvasAdapter } from '../stores/adapters/globalCanvasAdapter';
 import { useDocumentRegistry } from '../stores/documentRegistry';
 import { useCanvasDocument } from '../stores/hooks/useCanvasDocument';
+import { useSchematicCanvasDocument } from '../stores/hooks/useSchematicCanvasDocument';
 import type {
   Block,
   Junction,
@@ -22,6 +23,7 @@ import type {
   PortPosition,
   SerializableCircuitState,
 } from '../components/OneCanvas/types';
+import { isCanvasDocument, isSchematicDocument } from '../types/document';
 import {
   alignComponents,
   distributeComponents,
@@ -67,7 +69,11 @@ function detectExitDirection(start: Position, current: Position): PortPosition |
  *                     If null, falls back to GlobalCanvasAdapter (deprecated).
  */
 export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
-  const documentState = useCanvasDocument(documentId);
+  const document = useDocumentRegistry((state) =>
+    documentId ? state.documents.get(documentId) : undefined
+  );
+  const canvasDocumentState = useCanvasDocument(documentId);
+  const schematicDocumentState = useSchematicCanvasDocument(documentId);
 
   // Global fallback via adapter (all hook calls are unconditional)
   const globalFacade = useGlobalCanvasAdapter();
@@ -80,6 +86,17 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
   const [documentSelectedIds, setDocumentSelectedIds] = useState<Set<string>>(new Set());
   const pushHistory = useDocumentRegistry((state) => state.pushHistory);
   const updateCanvasData = useDocumentRegistry((state) => state.updateCanvasData);
+  const updateSchematicData = useDocumentRegistry((state) => state.updateSchematicData);
+
+  const activeDocumentState = useMemo(() => {
+    if (document && isCanvasDocument(document)) {
+      return canvasDocumentState;
+    }
+    if (document && isSchematicDocument(document)) {
+      return schematicDocumentState;
+    }
+    return null;
+  }, [document, canvasDocumentState, schematicDocumentState]);
 
   // Reset interaction state when document changes
   useEffect(() => {
@@ -163,35 +180,119 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
 
   const alignDocumentSelected = useCallback(
     (direction: 'left' | 'right' | 'top' | 'bottom' | 'centerH' | 'centerV') => {
-      if (!documentId || !documentState) return;
+      if (!documentId || !activeDocumentState) return;
       pushHistory(documentId);
-      updateCanvasData(documentId, (docData) => {
-        docData.components = alignComponents(docData.components, documentSelectedIds, direction);
-      });
+      if (document && isCanvasDocument(document)) {
+        updateCanvasData(documentId, (docData) => {
+          docData.components = alignComponents(docData.components, documentSelectedIds, direction);
+        });
+        return;
+      }
+      if (document && isSchematicDocument(document)) {
+        updateSchematicData(documentId, (docData) => {
+          const page =
+            docData.schematic.pages.find(
+              (candidate) => candidate.id === docData.schematic.activePageId
+            ) ?? null;
+          if (!page) return;
+          const components = alignComponents(
+            new Map(Object.entries(page.circuit.components)) as Map<string, Block>,
+            documentSelectedIds,
+            direction
+          );
+          page.circuit.components = Object.fromEntries(components);
+          page.updatedAt = new Date().toISOString();
+          docData.schematic.updatedAt = new Date().toISOString();
+        });
+      }
     },
-    [documentId, documentState, documentSelectedIds, pushHistory, updateCanvasData]
+    [
+      documentId,
+      activeDocumentState,
+      documentSelectedIds,
+      pushHistory,
+      document,
+      updateCanvasData,
+      updateSchematicData,
+    ]
   );
 
   const distributeDocumentSelected = useCallback(
     (direction: 'horizontal' | 'vertical') => {
-      if (!documentId || !documentState) return;
+      if (!documentId || !activeDocumentState) return;
       pushHistory(documentId);
-      updateCanvasData(documentId, (docData) => {
-        docData.components = distributeComponents(docData.components, documentSelectedIds, direction);
-      });
+      if (document && isCanvasDocument(document)) {
+        updateCanvasData(documentId, (docData) => {
+          docData.components = distributeComponents(docData.components, documentSelectedIds, direction);
+        });
+        return;
+      }
+      if (document && isSchematicDocument(document)) {
+        updateSchematicData(documentId, (docData) => {
+          const page =
+            docData.schematic.pages.find(
+              (candidate) => candidate.id === docData.schematic.activePageId
+            ) ?? null;
+          if (!page) return;
+          const components = distributeComponents(
+            new Map(Object.entries(page.circuit.components)) as Map<string, Block>,
+            documentSelectedIds,
+            direction
+          );
+          page.circuit.components = Object.fromEntries(components);
+          page.updatedAt = new Date().toISOString();
+          docData.schematic.updatedAt = new Date().toISOString();
+        });
+      }
     },
-    [documentId, documentState, documentSelectedIds, pushHistory, updateCanvasData]
+    [
+      documentId,
+      activeDocumentState,
+      documentSelectedIds,
+      pushHistory,
+      document,
+      updateCanvasData,
+      updateSchematicData,
+    ]
   );
 
   const flipDocumentSelected = useCallback(
     (axis: 'horizontal' | 'vertical') => {
-      if (!documentId || !documentState) return;
+      if (!documentId || !activeDocumentState) return;
       pushHistory(documentId);
-      updateCanvasData(documentId, (docData) => {
-        docData.components = flipComponents(docData.components, documentSelectedIds, axis);
-      });
+      if (document && isCanvasDocument(document)) {
+        updateCanvasData(documentId, (docData) => {
+          docData.components = flipComponents(docData.components, documentSelectedIds, axis);
+        });
+        return;
+      }
+      if (document && isSchematicDocument(document)) {
+        updateSchematicData(documentId, (docData) => {
+          const page =
+            docData.schematic.pages.find(
+              (candidate) => candidate.id === docData.schematic.activePageId
+            ) ?? null;
+          if (!page) return;
+          const components = flipComponents(
+            new Map(Object.entries(page.circuit.components)) as Map<string, Block>,
+            documentSelectedIds,
+            axis
+          );
+          page.circuit.components = Object.fromEntries(components);
+          page.updatedAt = new Date().toISOString();
+          docData.schematic.updatedAt = new Date().toISOString();
+        });
+      }
     },
-    [documentId, documentState, documentSelectedIds, pushHistory, updateCanvasData]
+    [
+      documentId,
+      activeDocumentState,
+      documentSelectedIds,
+      pushHistory,
+      document,
+      updateCanvasData,
+      updateSchematicData,
+    ]
   );
 
   // --------------------------------------------------------------------------
@@ -199,7 +300,7 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
   // --------------------------------------------------------------------------
 
   const getDocumentCircuitData = useCallback((): SerializableCircuitState => {
-    if (!documentState) {
+    if (!activeDocumentState) {
       return {
         components: {},
         wires: [],
@@ -207,36 +308,75 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
       };
     }
     return {
-      components: Object.fromEntries(documentState.components),
-      junctions: documentState.junctions.size > 0 ? Object.fromEntries(documentState.junctions) : undefined,
-      wires: documentState.wires,
-      metadata: documentState.metadata,
+      components: Object.fromEntries(activeDocumentState.components),
+      junctions:
+        activeDocumentState.junctions.size > 0
+          ? Object.fromEntries(activeDocumentState.junctions)
+          : undefined,
+      wires: activeDocumentState.wires,
+      metadata: activeDocumentState.metadata,
       viewport: {
-        zoom: documentState.zoom,
-        panX: documentState.pan.x,
-        panY: documentState.pan.y,
+        zoom: activeDocumentState.zoom,
+        panX: activeDocumentState.pan.x,
+        panY: activeDocumentState.pan.y,
       },
     };
-  }, [documentState]);
+  }, [activeDocumentState]);
 
   const loadDocumentCircuit = useCallback(
     (data: SerializableCircuitState) => {
       if (!documentId) return;
-      // Load into document registry via updateCanvasData
-      updateCanvasData(documentId, (docData) => {
-        docData.components = new Map(Object.entries(data.components)) as Map<string, Block>;
-        docData.junctions = data.junctions
-          ? new Map(Object.entries(data.junctions)) as Map<string, Junction>
-          : new Map();
-        docData.wires = [...data.wires];
-        docData.metadata = { ...data.metadata };
-        if (data.viewport) {
-          docData.zoom = data.viewport.zoom;
-          docData.pan = { x: data.viewport.panX, y: data.viewport.panY };
-        }
-      });
+      if (document && isCanvasDocument(document)) {
+        updateCanvasData(documentId, (docData) => {
+          docData.components = new Map(Object.entries(data.components)) as Map<string, Block>;
+          docData.junctions = data.junctions
+            ? (new Map(Object.entries(data.junctions)) as Map<string, Junction>)
+            : new Map();
+          docData.wires = [...data.wires];
+          docData.metadata = { ...data.metadata };
+          if (data.viewport) {
+            docData.zoom = data.viewport.zoom;
+            docData.pan = { x: data.viewport.panX, y: data.viewport.panY };
+          }
+        });
+        return;
+      }
+      if (document && isSchematicDocument(document)) {
+        updateSchematicData(documentId, (docData) => {
+          const page =
+            docData.schematic.pages.find(
+              (candidate) => candidate.id === docData.schematic.activePageId
+            ) ?? null;
+          if (!page) return;
+          page.circuit = {
+            components: { ...data.components },
+            junctions: data.junctions ? { ...data.junctions } : undefined,
+            wires: data.wires.map((wire) => ({
+              ...wire,
+              from: { ...wire.from },
+              to: { ...wire.to },
+              handles: wire.handles
+                ? wire.handles.map((handle) => ({
+                    ...handle,
+                    position: { ...handle.position },
+                  }))
+                : undefined,
+            })),
+            metadata: { ...data.metadata },
+            viewport: data.viewport
+              ? {
+                  zoom: data.viewport.zoom,
+                  panX: data.viewport.panX,
+                  panY: data.viewport.panY,
+                }
+              : { zoom: 1, panX: 0, panY: 0 },
+          };
+          page.updatedAt = new Date().toISOString();
+          docData.schematic.updatedAt = new Date().toISOString();
+        });
+      }
     },
-    [documentId, updateCanvasData]
+    [documentId, document, updateCanvasData, updateSchematicData]
   );
 
   // --------------------------------------------------------------------------
@@ -264,33 +404,33 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
   // --------------------------------------------------------------------------
 
   return useMemo((): CanvasFacadeReturn => {
-    if (documentState) {
+    if (activeDocumentState) {
       return {
         // Selectors
-        components: documentState.components,
-        junctions: documentState.junctions,
-        wires: documentState.wires,
-        zoom: documentState.zoom,
-        pan: documentState.pan,
+        components: activeDocumentState.components,
+        junctions: activeDocumentState.junctions,
+        wires: activeDocumentState.wires,
+        zoom: activeDocumentState.zoom,
+        pan: activeDocumentState.pan,
         // Component Commands
-        addComponent: documentState.addComponent,
+        addComponent: activeDocumentState.addComponent,
         moveComponent: (id, position, skipHistory, skipWireRecalc) =>
-          documentState.moveComponent(id, position, skipHistory, skipWireRecalc),
-        updateComponent: documentState.updateComponent,
+          activeDocumentState.moveComponent(id, position, skipHistory, skipWireRecalc),
+        updateComponent: activeDocumentState.updateComponent,
         // Junction Commands
         moveJunction: (id, position, skipHistory, skipWireRecalc) =>
-          documentState.moveJunction(id, position, skipHistory, skipWireRecalc),
+          activeDocumentState.moveJunction(id, position, skipHistory, skipWireRecalc),
         // Wire Commands
-        addWire: documentState.addWire,
-        removeWire: documentState.removeWire,
-        createJunctionOnWire: documentState.createJunctionOnWire,
-        recalculateWireHandles: documentState.recalculateWireHandles,
-        updateWireHandle: documentState.updateWireHandle,
-        removeWireHandle: documentState.removeWireHandle,
-        moveWireSegment: documentState.moveWireSegment,
-        insertEndpointHandle: documentState.insertEndpointHandle,
-        cleanupOverlappingHandles: documentState.cleanupOverlappingHandles,
-        commitWirePolyline: documentState.commitWirePolyline,
+        addWire: activeDocumentState.addWire,
+        removeWire: activeDocumentState.removeWire,
+        createJunctionOnWire: activeDocumentState.createJunctionOnWire,
+        recalculateWireHandles: activeDocumentState.recalculateWireHandles,
+        updateWireHandle: activeDocumentState.updateWireHandle,
+        removeWireHandle: activeDocumentState.removeWireHandle,
+        moveWireSegment: activeDocumentState.moveWireSegment,
+        insertEndpointHandle: activeDocumentState.insertEndpointHandle,
+        cleanupOverlappingHandles: activeDocumentState.cleanupOverlappingHandles,
+        commitWirePolyline: activeDocumentState.commitWirePolyline,
         // Alignment
         alignSelected: alignDocumentSelected,
         distributeSelected: distributeDocumentSelected,
@@ -310,10 +450,10 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
         toggleSelection: toggleDocumentSelection,
         clearSelection: clearDocumentSelection,
         // Viewport
-        setPan: documentState.setPan,
-        setZoom: documentState.setZoom,
-        gridSize: documentState.gridSize,
-        snapToGrid: documentState.snapToGrid,
+        setPan: activeDocumentState.setPan,
+        setZoom: activeDocumentState.setZoom,
+        gridSize: activeDocumentState.gridSize,
+        snapToGrid: activeDocumentState.snapToGrid,
         // History
         undo: documentUndo,
         redo: documentRedo,
@@ -325,14 +465,74 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
       };
     }
 
-    // Global fallback — all values come from GlobalCanvasAdapter
+    if (documentId && import.meta.env.DEV) {
+      console.warn('[useCanvasFacade] document-bound canvas facade unavailable; returning inert facade instead of global fallback', {
+        documentId,
+        documentType: document?.type ?? 'missing',
+      });
+    }
+
+    if (documentId) {
+      return {
+        components: new Map(),
+        junctions: new Map(),
+        wires: [],
+        zoom: 1,
+        pan: { x: 0, y: 0 },
+        addComponent: () => '',
+        moveComponent: () => {},
+        updateComponent: () => {},
+        moveJunction: () => {},
+        addWire: () => null,
+        removeWire: () => {},
+        createJunctionOnWire: () => null,
+        updateWireHandle: () => {},
+        recalculateWireHandles: () => {},
+        removeWireHandle: () => {},
+        moveWireSegment: () => {},
+        insertEndpointHandle: () => {},
+        cleanupOverlappingHandles: () => {},
+        commitWirePolyline: () => {},
+        alignSelected: () => {},
+        distributeSelected: () => {},
+        flipSelected: () => {},
+        getCircuitData: () => ({
+          components: {},
+          wires: [],
+          metadata: { name: 'Untitled Circuit', description: '', tags: [] },
+          viewport: { zoom: 1, panX: 0, panY: 0 },
+        }),
+        loadCircuit: () => {},
+        wireDrawing: documentWireDrawing,
+        startWireDrawing: startDocumentWireDrawing,
+        updateWireDrawing: updateDocumentWireDrawing,
+        cancelWireDrawing: cancelDocumentWireDrawing,
+        selectedIds: documentSelectedIds,
+        setSelection: setDocumentSelection,
+        addToSelection: addDocumentSelection,
+        toggleSelection: toggleDocumentSelection,
+        clearSelection: clearDocumentSelection,
+        setPan: () => {},
+        setZoom: () => {},
+        gridSize: 20,
+        snapToGrid: true,
+        undo: documentUndo,
+        redo: documentRedo,
+        canUndo: documentCanUndo,
+        canRedo: documentCanRedo,
+        isDocumentMode: true,
+        documentId,
+      };
+    }
+
     return globalFacade;
   }, [
     // Document state
-    documentState,
+    activeDocumentState,
     documentWireDrawing,
     documentSelectedIds,
     documentId,
+    document,
     // Document callbacks
     setDocumentSelection,
     addDocumentSelection,

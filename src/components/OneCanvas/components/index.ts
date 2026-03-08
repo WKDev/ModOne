@@ -1,16 +1,6 @@
-/**
- * OneCanvas Components Index
- *
- * Export all canvas components.
- */
-
-export { Port } from './Port';
-export { BlockRenderer } from './BlockRenderer';
-export { DraggableBlock } from './DraggableBlock';
-export * from './blocks';
-export { SelectionBox, type SelectionBoxState, isPointInBox, doesRectIntersectBox } from './SelectionBox';
-
 export { CanvasMinimap } from './CanvasMinimap';
 export { CircuitLibraryPanel } from './CircuitLibraryPanel';
 export { WireNumberingDialog } from './WireNumberingDialog';
 export { PrintDialog } from './PrintDialog';
+export { SymbolRenderer } from './SymbolRenderer';
+export { SchematicPageBar } from './SchematicPageBar';

@@ -17,7 +17,8 @@ import type {
   YamlCircuitSchema,
   YamlBlockDefinition,
   YamlWireDefinition,
-} from '../types';
+  } from '../types';
+import type { ComponentInstance } from '../../../types/circuit';
 import { isValidBlockType, isLegacyBlockType, isPortEndpoint, migrateLegacyBlockType } from '../types';
 import { createSelectionState } from '../types';
 import { getBlockSize, getPowerSourcePorts } from '../blockDefinitions';
@@ -328,6 +329,24 @@ function yamlToBlock(yamlBlock: YamlBlockDefinition): Block {
   };
 
   return { ...baseBlock, ...properties } as Block;
+}
+
+/**
+ * Migrate a legacy Block to ComponentInstance format.
+ * Used when loading old .yaml project files.
+ */
+export function migrateBlockToComponentInstance(block: Block): ComponentInstance {
+  return {
+    id: block.id,
+    symbolId: block.type,  // type string maps to symbolId via BLOCK_TYPE_TO_SYMBOL_ID
+    type: block.type,
+    position: block.position,
+    rotation: block.rotation ?? 0,
+    instanceProperties: { ...(block as unknown as Record<string, unknown>) },
+    ports: (block.ports ?? []) as unknown as import('../../../types/circuit').Port[],
+    label: (block as unknown as Record<string, unknown>).label as string | undefined,
+    designation: (block as unknown as Record<string, unknown>).designation as string | undefined,
+  };
 }
 
 /**

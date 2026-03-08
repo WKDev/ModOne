@@ -21,7 +21,17 @@ pub use logging::{ErrorLogger, SharedErrorLogger, LogEntry};
 
 use project::{AutoSaveManager, ProjectManager};
 use sim::DeviceMemory;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+
+/// Holds the `--project` CLI argument value (consumed once by the frontend on startup).
+struct CliProjectPath(Mutex<Option<String>>);
+
+/// Return (and consume) the project path passed via `--project` CLI argument.
+/// Returns `None` if no argument was provided or it was already consumed.
+#[tauri::command]
+fn get_cli_project_path(state: tauri::State<'_, CliProjectPath>) -> Option<String> {
+    state.0.lock().unwrap_or_else(|e| e.into_inner()).take()
+}
 
 // Re-export commands for registration
 use commands::{
@@ -105,6 +115,17 @@ fn greet(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let cli_project_path = {
+        let args: Vec<String> = std::env::args().collect();
+        args.windows(2)
+            .find(|pair| pair[0] == "--project")
+            .map(|pair| pair[1].clone())
+    };
+
+    if let Some(ref path) = cli_project_path {
+        log::info!("CLI --project argument: {}", path);
+    }
+
     // Initialize the shared project manager
     let project_manager = ProjectManager::new_shared();
 
@@ -152,6 +173,7 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_webdriver::init());
 
     builder
+        .manage(CliProjectPath(Mutex::new(cli_project_path)))
         .manage(project_manager)
         .manage(auto_save_manager)
         .manage(modbus_state)
@@ -230,6 +252,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             greet,
+            get_cli_project_path,
             // Project management commands
             create_project,
             open_project,

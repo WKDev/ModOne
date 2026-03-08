@@ -98,6 +98,30 @@ export function GeneralSettings({ searchFilter = '' }: GeneralSettingsProps) {
         </div>
       )}
 
+      {/* Show welcome page on startup */}
+      {isVisible(['welcome', '환영', 'startup', '시작', '시작 페이지']) && (
+        <div className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            id="showWelcomePageOnStartup"
+            checked={settings.showWelcomePageOnStartup}
+            onChange={(e) => updatePending('showWelcomePageOnStartup', e.target.checked)}
+            className="mt-1 w-4 h-4 text-[var(--accent-color)] bg-[var(--bg-secondary)] border-[var(--border-color)] rounded focus:ring-[var(--accent-color)]"
+          />
+          <div>
+            <label
+              htmlFor="showWelcomePageOnStartup"
+              className="block text-sm font-medium text-[var(--text-primary)] cursor-pointer"
+            >
+              시작 시 환영 페이지 표시
+            </label>
+            <p className="text-xs text-[var(--text-muted)]">
+              앱 시작 시 프로젝트가 열려있지 않으면 환영 페이지를 표시합니다.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Telemetry */}
       {isVisible(['telemetry', '원격 측정', '분석', 'analytics', '데이터 수집']) && (
         <div className="flex items-start gap-3">

@@ -30,6 +30,7 @@ import {
 import { commandRegistry } from '../commandRegistry';
 import { useDocumentRegistry } from '../../../stores/documentRegistry';
 import { useEditorAreaStore } from '../../../stores/editorAreaStore';
+import { useSymbolStore } from '../../../stores/symbolStore';
 import { isCanvasDocument } from '../../../types/document';
 import type { CanvasDocumentData } from '../../../types/document';
 import type { BlockType, Block } from '../../OneCanvas/types';
@@ -179,16 +180,10 @@ export function registerCanvasCommands(): void {
       id: 'canvas.openSymbolEditor',
       category: 'canvas',
       label: 'Open Symbol Editor',
-      description: 'Open the Symbol Editor in a new tab',
+      description: 'Open the Symbol Editor as a popup',
       keywords: ['symbol', 'editor', 'custom'],
       execute: () => {
-        const { tabs, addTab, setActiveTab } = useEditorAreaStore.getState();
-        const existingTab = tabs.find((tab) => tab.panelType === 'symbol-editor');
-        if (existingTab) {
-          setActiveTab(existingTab.id);
-          return;
-        }
-        addTab('symbol-editor', 'Symbol Editor');
+        useSymbolStore.getState().openEditor();
       },
     },
     {

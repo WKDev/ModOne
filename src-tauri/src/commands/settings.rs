@@ -25,6 +25,8 @@ pub struct AppSettings {
     pub auto_save_interval: u32,
     pub start_with_last_project: bool,
     pub telemetry_enabled: bool,
+    #[serde(default = "default_true")]
+    pub show_welcome_page_on_startup: bool,
 
     // Simulation settings
     pub default_scan_time_ms: u32,
@@ -102,6 +104,7 @@ impl Default for AppSettings {
             auto_save_interval: 60,
             start_with_last_project: true,
             telemetry_enabled: false,
+            show_welcome_page_on_startup: true,
 
             // Simulation
             default_scan_time_ms: 10,
@@ -135,6 +138,11 @@ impl Default for AppSettings {
 // ============================================================================
 
 const SETTINGS_FILE: &str = "settings.json";
+
+/// Helper for serde default that returns true
+fn default_true() -> bool {
+    true
+}
 
 /// Get the path to the settings file in the app data directory
 fn get_settings_path(app_handle: &AppHandle) -> Result<PathBuf, String> {

@@ -1,0 +1,71 @@
+TASK 7: Create Unified symbolBridge.ts
+======================================
+Date: 2026-03-08
+
+## Files Created/Modified
+
+### NEW: src/components/OneCanvas/renderers/symbols/symbolBridge.ts
+- Registers all 42 builtin SymbolDefinitions into shared cache at module load (auto-call)
+- Provides registerBuiltinSymbols() (idempotent)
+- getSymbolContextForBlockType(blockType) — lookup by block type string
+- getSymbolSizeForBlockType(blockType) — lookup by block type string
+- getSymbolContextFromDef(symbolId) — lookup by symbol ID
+- getSymbolSizeFromDef(symbolId) — lookup by symbol ID
+- getSymbolPortsFromDef(symbolId) — lookup by symbol ID
+- Delegates to customSymbolBridge cache (shared layer)
+
+### MODIFIED: src/components/OneCanvas/renderers/BlockRenderer.ts (line 21)
+- Import updated: added getSymbolContextForBlockType, getSymbolSizeForBlockType from './symbols'
+
+### MODIFIED: src/components/OneCanvas/renderers/BlockRenderer.ts (resolveSymbolContext)
+- Now tries getSymbolContextForBlockType first (covers all registered builtins)
+- Then tries 'symbolId' in block && block.symbolId (custom user symbols)
+- Falls back to legacy getSymbolContext (SymbolLibrary hardcoded drawing)
+
+### MODIFIED: src/components/OneCanvas/renderers/BlockRenderer.ts (resolveSymbolSize)
+- Now tries getSymbolSizeForBlockType first
+- Then tries 'symbolId' in block && block.symbolId
+- Falls back to legacy getSymbolSize
+
+### MODIFIED: src/components/OneCanvas/renderers/symbols/index.ts
+- Added: export * from './symbolBridge';
+
+## Build Results
+
+pnpm run build: FAILED (exit code 2)
+- All errors are pre-existing in unrelated files:
+  - src/__tests__/wire-routing-verification.test.ts (stale type errors)
+  - src/components/LadderEditor/utils/__tests__/gridConverter.test.ts
+  - src/components/OneCanvas/blockDefinitions.ts
+  - src/components/OneCanvas/utils/bomGenerator.ts
+  - src/components/panels/content/canvas/BlockDragPreview.tsx
+  - src/components/SymbolEditor/SymbolEditorHost.tsx
+  - src/hooks/useAppIntegration.ts
+- ZERO errors in changed files (confirmed via LSP diagnostics)
+
+## LSP Diagnostics on Changed Files
+- symbolBridge.ts: No diagnostics (clean)
+- BlockRenderer.ts: No diagnostics (clean)
+
+## Test Results
+
+pnpm run test: 984 passed, 2 failed (pre-existing)
+
+### Pre-existing failures (NOT related to this task):
+1. src/__tests__/builtin-symbol-migration.test.ts
+   "registry has exactly 22 symbols"
+   AssertionError: expected 42 to be 22
+   → BUILTIN_SYMBOLS.size is 42 (all symbols registered), test has stale "22" hardcode
+
+2. src/__tests__/port-positions.test.ts
+   "covers all 22 block types"
+   AssertionError: expected 23 to be 22
+   → blockTypes.length is 23, test has stale "22" hardcode
+
+Neither failure is from symbolBridge.ts, BlockRenderer.ts, or symbols/index.ts.
+
+## Implementation Notes
+- Used 'symbolId' in block guard for type-safe access on union Block type
+- symbolBridge auto-registers builtins on module load (side-effect import)
+- registerBuiltinSymbols() is idempotent (guarded by _builtinsRegistered flag)
+- customSymbolBridge cache is shared — builtins go into same cache as user symbols

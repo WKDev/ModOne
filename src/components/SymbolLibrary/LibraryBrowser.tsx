@@ -1,30 +1,20 @@
 import { useMemo, useState } from 'react';
-import { Search } from 'lucide-react';
+import { Search, Shapes } from 'lucide-react';
 import { useSymbolLibrary } from '../../hooks/useSymbolLibrary';
-import { SymbolRenderer } from '../OneCanvas/components/SymbolRenderer';
-import type { LibraryScope, SymbolSummary, SymbolDefinition } from '../../types/symbol';
+import type { LibraryScope, SymbolSummary } from '../../types/symbol';
 
 interface LibraryBrowserProps {
   projectDir: string;
   onOpenEditor?: (symbolId: string, scope: LibraryScope) => void;
 }
 
-/** Minimal SymbolDefinition from summary for thumbnail rendering */
-function summaryToMinimalDef(sym: SymbolSummary): SymbolDefinition {
-  return {
-    id: sym.id,
-    name: sym.name,
-    version: sym.version,
-    category: sym.category,
-    description: sym.description,
-    width: 80,
-    height: 60,
-    graphics: [],
-    pins: [],
-    properties: [],
-    createdAt: sym.updatedAt,
-    updatedAt: sym.updatedAt,
-  };
+function SymbolThumbnailPlaceholder({ name }: { name: string }) {
+  return (
+    <div className="w-12 h-12 rounded bg-neutral-800 border border-neutral-700 flex items-center justify-center">
+      <Shapes size={20} className="text-neutral-500" />
+      <span className="sr-only">{name}</span>
+    </div>
+  );
 }
 
 export function LibraryBrowser({ projectDir, onOpenEditor }: LibraryBrowserProps) {
@@ -141,7 +131,7 @@ export function LibraryBrowser({ projectDir, onOpenEditor }: LibraryBrowserProps
 
                 {/* Thumbnail */}
                 <div className="w-full h-16 flex items-center justify-center overflow-hidden">
-                  <SymbolRenderer symbol={summaryToMinimalDef(sym)} scale={0.3} />
+                  <SymbolThumbnailPlaceholder name={sym.name} />
                 </div>
 
                 {/* Name */}

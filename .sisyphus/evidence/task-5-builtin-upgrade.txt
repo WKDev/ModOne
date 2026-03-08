@@ -1,0 +1,84 @@
+# Task 5: Upgrade 22 Builtin Symbols to v2 Pin Schema
+# Date: 2026-03-08
+
+## SUMMARY
+Upgraded all 22 builtin symbol files with v2 pin fields (electricalType, functionalRole, 
+sortOrder, nameVisible, numberVisible). Added optional fields to SymbolPin interface.
+
+## STEP 0: SymbolPin Interface Update
+File: src/types/symbol.ts
+Added 5 optional fields after `hidden?: boolean`:
+- electricalType?: PinElectricalTypeV2
+- functionalRole?: PinFunctionalRole
+- sortOrder?: number
+- nameVisible?: boolean
+- numberVisible?: boolean
+
+## STEP 1-2: Symbol Files Updated (22 files)
+
+Files with pins updated (21 files - all have electricalType, sortOrder):
+  button.ts          - 2 pins (in: input, out: output)
+  contactor.ts       - 8 top-level pins + 2 unit1 pins + 6 unit2 pins
+  disconnect_switch.ts - 6 pins
+  emergency_stop.ts  - 2 pins
+  fuse.ts            - 2 pins
+  led.ts             - 2 pins
+  motor.ts           - 4 pins
+  net_label.ts       - 1 pin
+  off_page_connector.ts - 1 pin (bidirectional)
+  overload_relay.ts  - 8 pins
+  pilot_lamp.ts      - 2 pins
+  plc_in.ts          - 2 pins (functionalRole: plc_input/plc_output)
+  plc_out.ts         - 2 pins (functionalRole: plc_input/plc_output)
+  powersource.ts     - 1 pin (SPECIAL: electricalType='power_out')
+  relay.ts           - 5 top-level pins + 2 unit1 pins + 3 unit2 pins
+  scope.ts           - 4 pins
+  selector_switch.ts - 3 pins
+  sensor.ts          - 3 pins
+  solenoid_valve.ts  - 2 pins
+  terminal_block.ts  - 2 pins
+  transformer.ts     - 4 pins
+
+File with NO pins (no changes needed):
+  text.ts            - pins: [] (empty array)
+
+## SPECIAL CASES HANDLED
+- powersource.ts: output pin uses electricalType='power_out' (not 'power_out' default power_in)
+- relay.ts: multi-unit - BOTH top-level pins AND all unit pins upgraded
+- plc_in.ts: functionalRole='plc_input' for input pin, 'plc_output' for output pin
+- plc_out.ts: functionalRole='plc_input' for input pin, 'plc_output' for output pin
+- All other symbols: functionalRole='general'
+
+## COVERAGE VERIFICATION
+- electricalType: grep found 21 files with matches (all files with pins) ✓
+- sortOrder: grep found 21 files with matches (all files with pins) ✓
+- text.ts has no pins, correctly has neither field ✓
+
+## BUILD RESULTS
+- pnpm run build: Errors in OTHER files (pre-existing, unrelated to our changes)
+  - None of the errors are in src/types/symbol.ts or src/assets/builtin-symbols/*.ts
+  - Confirmed: "No errors in our modified files"
+
+## TEST RESULTS
+- pnpm run test: 985 tests passing, 1 pre-existing failure
+  - PASSING: src/__tests__/builtin-symbol-migration.test.ts (138 tests) ✓
+  - PASSING: src/__tests__/symbol-model.test.ts (6 tests) ✓
+  - PASSING: src/__tests__/symbol-validation.test.ts (9 tests) ✓
+  - PASSING: src/__tests__/symbol-serialization.test.ts (6 tests) ✓
+  - FAILING: src/__tests__/port-positions.test.ts (1 test) - PRE-EXISTING failure
+    - port-positions.json was already modified (23 entries) before this task
+    - Test hardcodes "covers all 22 block types" with toBe(22)
+    - This file was NOT modified by this task
+    - Confirmed pre-existing: test passed with git stash (reverting to original JSON)
+
+## PIN POSITION INTEGRITY
+All original position values preserved exactly:
+- No x, y coordinates changed
+- No pin id, name, or number values changed
+- Existing 'type' field kept on every pin (dual-field migration)
+
+## TYPE SAFETY
+- No `as any` or @ts-ignore used
+- All electricalType values correctly typed as PinElectricalTypeV2
+- All functionalRole values correctly typed as PinFunctionalRole
+- SymbolDefinition type annotation unchanged on all symbol exports

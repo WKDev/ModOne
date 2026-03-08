@@ -1,0 +1,37 @@
+## Task 2: Mirror v2 Symbol Type Definitions in Rust — Evidence
+
+### Changes Made
+File: src-tauri/src/symbols/types.rs (269 → 386 lines)
+
+New types added:
+- PinElectricalTypeV2 enum (12 variants, snake_case)
+- PinFunctionalRole enum (4 variants, snake_case)
+- PinShapeV2 enum (9 variants, snake_case)
+- SymbolPinV2 struct (camelCase, optional fields with skip_serializing_if)
+- SpicePinMapping struct (camelCase)
+- SpiceModelRef struct (camelCase, optional fields with skip_serializing_if)
+
+Existing struct modified:
+- SymbolDefinition: added 9 optional v2 fields (extends_symbol, spice, iec_section,
+  iec_category, ref_designator, pin_numbers_hidden, pin_names_hidden,
+  pin_name_offset, exclude_from_sim) — all Option<T> with skip_serializing_if
+
+### cargo check output (src-tauri/)
+    Checking modone v0.1.0
+warning: unused variable: `app`
+   --> src\lib.rs:246:25
+warning: unused variable: `event`
+   --> src\lib.rs:246:30
+    (pre-existing warnings, unrelated to types.rs changes)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 04s
+
+EXIT CODE: 0 ✅
+
+### cargo test output (src-tauri/)
+Compilation: SUCCESS (same warnings as above, unrelated)
+Test execution: FAILED with STATUS_ENTRYPOINT_NOT_FOUND (0xc0000139)
+
+NOTE: This is a pre-existing Windows DLL/runtime issue unrelated to the types.rs changes.
+Confirmed by running cargo test on the stashed (pre-change) codebase — identical failure.
+The test binary cannot launch due to a missing DLL entry point in the Windows environment.
+All Rust code compiles correctly (cargo check passes, cargo build succeeds).

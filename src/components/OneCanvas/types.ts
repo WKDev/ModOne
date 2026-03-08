@@ -4,37 +4,13 @@
  * Types for circuit simulation canvas including blocks, wires, ports,
  * simulation state, and YAML serialization schema.
  */
- import type { CustomSymbolBlock } from '../../types/symbol';
+import type { CustomSymbolBlock } from '../../types/symbol';
+import type { BlockType } from '../../types/circuit';
+export type { BlockType } from '../../types/circuit';
 
 // ============================================================================
 // Block Types
 // ============================================================================
-
-/** Available block types in the canvas */
-export type BlockType =
-  | 'powersource'
-  | 'plc_out'
-  | 'plc_in'
-  | 'led'
-  | 'button'
-  | 'scope'
-  | 'text'
-  | 'relay'
-  | 'fuse'
-  | 'motor'
-  | 'emergency_stop'
-  | 'selector_switch'
-  | 'solenoid_valve'
-  | 'sensor'
-  | 'pilot_lamp'
-  | 'net_label'
-  | 'transformer'
-  | 'terminal_block'
-  | 'overload_relay'
-  | 'contactor'
-  | 'disconnect_switch'
-   | 'off_page_connector'
-   | 'custom_symbol';
 
 /** Legacy block types (for migration) */
 export type LegacyBlockType = 'power_24v' | 'power_12v' | 'gnd';
@@ -261,6 +237,9 @@ export interface BaseBlock<T extends BlockType = BlockType> {
   label?: string;
   /** Block rotation in degrees (0, 90, 180, 270) */
   rotation?: number;
+  visible?: boolean;
+  flip?: { horizontal: boolean; vertical: boolean };
+  designation?: string;
 }
 
 // ============================================================================
@@ -661,6 +640,11 @@ export interface JunctionEndpoint {
   junctionId: string;
 }
 
+/** Wire endpoint at a free position (not connected to any port or junction) */
+export interface FloatingEndpoint {
+  position: Position;
+}
+
 /** Endpoint of a wire connection (discriminated union) */
 export type WireEndpoint = PortEndpoint | JunctionEndpoint;
 
@@ -672,6 +656,10 @@ export function isPortEndpoint(ep: WireEndpoint): ep is PortEndpoint {
 /** Type guard: check if endpoint connects to a junction */
 export function isJunctionEndpoint(ep: WireEndpoint): ep is JunctionEndpoint {
   return 'junctionId' in ep;
+}
+
+export function isFloatingEndpoint(ep: WireEndpoint | FloatingEndpoint): ep is FloatingEndpoint {
+  return 'position' in ep && !('componentId' in ep) && !('junctionId' in ep);
 }
 
 /** Legacy endpoint format (for backward compatibility during migration) */
@@ -908,13 +896,26 @@ export interface YamlCircuitSchema {
 
 /** Check if a string is a valid BlockType */
 export function isValidBlockType(type: string): type is BlockType {
-  return [
+  // Old 22 types (backward compat)
+  const legacyTypes = [
     'powersource', 'plc_out', 'plc_in', 'led', 'button', 'scope', 'text',
     'relay', 'fuse', 'motor', 'emergency_stop', 'selector_switch',
     'solenoid_valve', 'sensor', 'pilot_lamp', 'net_label',
     'transformer', 'terminal_block', 'overload_relay', 'contactor',
-    'disconnect_switch', 'off_page_connector',
-  ].includes(type);
+    'disconnect_switch', 'off_page_connector', 'terminal',
+  ];
+  // New canonical types (from circuit.ts CanonicalBlockType)
+  const canonicalTypes = [
+    'power_source', 'motor', 'relay_coil', 'relay_contact_no', 'relay_contact_nc',
+    'switch_no', 'switch_nc', 'switch_changeover', 'fuse', 'led', 'button',
+    'circuit_breaker', 'pilot_lamp', 'emergency_stop', 'selector_switch',
+    'solenoid_valve', 'sensor', 'overload_relay', 'contactor', 'disconnect_switch',
+    'transformer', 'net_label', 'terminal_block', 'off_page_connector', 'terminal',
+    'scope', 'text', 'custom_symbol', 'capacitor', 'resistor', 'inductor', 'diode',
+    'ground', 'connector', 'plc_input', 'plc_output', 'timer_on_delay', 'timer_off_delay',
+    'counter_up', 'counter_down', 'junction_box', 'push_button_no', 'push_button_nc',
+  ];
+  return legacyTypes.includes(type) || canonicalTypes.includes(type);
 }
 
 /** Check if a string is a legacy block type that can be migrated */
@@ -960,6 +961,108 @@ export function isInteractiveBlock(
 export function isAnnotationBlock(block: Block): block is TextBlock {
   return block.type === 'text';
 }
+
+// ============================================================================
+// V2 Canvas Infrastructure Types
+// ============================================================================
+
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface ViewportBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+export interface GridConfig {
+  size: number;
+  visible?: boolean;
+  color?: string;
+  alpha?: number;
+  majorInterval?: number;
+  majorColor?: string;
+  majorAlpha?: number;
+  subdivisions?: number;
+}
+
+export const DEFAULT_GRID: GridConfig = {
+  size: 20,
+  visible: true,
+  color: '#cccccc',
+  alpha: 0.3,
+  majorInterval: 5,
+  majorColor: '#999999',
+  majorAlpha: 0.5,
+  subdivisions: 5,
+};
+
+export interface CanvasConfig {
+  grid: GridConfig;
+  minZoom?: number;
+  maxZoom?: number;
+  backgroundColor?: number;
+}
+
+export const DEFAULT_CANVAS_CONFIG: CanvasConfig = {
+  grid: DEFAULT_GRID,
+  minZoom: 0.05,
+  maxZoom: 10,
+  backgroundColor: 0xffffff,
+};
+
+export type LayerName =
+  | 'grid'
+  | 'wires'
+  | 'junctions'
+  | 'blocks'
+  | 'ports'
+  | 'selection'
+  | 'overlay'
+  | 'debug';
+
+export interface LayerConfig {
+  name: LayerName;
+  zIndex: number;
+  visible?: boolean;
+  interactive?: boolean;
+}
+
+export const DEFAULT_LAYERS: LayerConfig[] = [
+  { name: 'grid', zIndex: 0 },
+  { name: 'wires', zIndex: 10 },
+  { name: 'junctions', zIndex: 20 },
+  { name: 'blocks', zIndex: 30 },
+  { name: 'ports', zIndex: 40 },
+  { name: 'selection', zIndex: 50 },
+  { name: 'overlay', zIndex: 60 },
+  { name: 'debug', zIndex: 100 },
+];
+
+export interface HitTestResult {
+  type: 'block' | 'wire' | 'junction' | 'port' | 'handle' | 'segment' | 'none';
+  id: string;
+  position: Position;
+  distance: number;
+  blockId?: string;
+  portId?: string;
+  parentId?: string;
+  subIndex?: number;
+}
+
+export type DirtyFlag =
+  | 'blocks'
+  | 'wires'
+  | 'junctions'
+  | 'selection'
+  | 'viewport'
+  | 'grid'
+  | 'all';
 
 // ============================================================================
 // Default Values

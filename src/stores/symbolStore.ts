@@ -9,12 +9,21 @@ interface SymbolStoreState {
   isLoading: boolean;
   error: string | null;
 
+  /** Symbol Editor popup state */
+  editorOpen: boolean;
+  editorSymbol: SymbolDefinition | null;
+
   loadLibrary: (projectDir: string) => Promise<void>;
   loadSymbol: (projectDir: string, id: string, scope: LibraryScope) => Promise<void>;
   saveSymbol: (projectDir: string, symbol: SymbolDefinition, scope: LibraryScope) => Promise<void>;
   deleteSymbol: (projectDir: string, id: string, scope: LibraryScope) => Promise<void>;
   setCurrentSymbol: (symbol: SymbolDefinition | null) => void;
   clearError: () => void;
+
+  /** Open the Symbol Editor popup, optionally with a symbol to edit */
+  openEditor: (symbol?: SymbolDefinition | null) => void;
+  /** Close the Symbol Editor popup */
+  closeEditor: () => void;
 }
 
 export const useSymbolStore = create<SymbolStoreState>((set) => ({
@@ -80,4 +89,9 @@ export const useSymbolStore = create<SymbolStoreState>((set) => ({
 
   setCurrentSymbol: (symbol) => set({ currentSymbol: symbol }),
   clearError: () => set({ error: null }),
+
+  editorOpen: false,
+  editorSymbol: null,
+  openEditor: (symbol) => set({ editorOpen: true, editorSymbol: symbol ?? null }),
+  closeEditor: () => set({ editorOpen: false, editorSymbol: null }),
 }));

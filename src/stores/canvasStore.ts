@@ -27,6 +27,7 @@ import type {
   Selection,
   SelectionState,
 } from '../components/OneCanvas/types';
+import type { ComponentInstance } from '../types/circuit';
 import {
   isPortEndpoint,
   createSelectionState,
@@ -93,7 +94,7 @@ interface HistorySnapshot {
 interface CanvasState {
   // Circuit data
   /** All component blocks by ID */
-  components: Map<string, Block>;
+  components: Map<string, Block | ComponentInstance>;
   /** All junction points by ID */
   junctions: Map<string, Junction>;
   /** All wire connections */
@@ -347,7 +348,7 @@ function createSnapshot(
  */
 function pushHistorySnapshot(state: CanvasState): void {
   const snapshot = createSnapshot(
-    state.components,
+    state.components as Map<string, Block>,
     state.wires,
     state.junctions,
     state.selection
@@ -392,6 +393,11 @@ function restoreSnapshot(snapshot: HistorySnapshot): {
 /** Wrapper to get default block props from blockDefinitions */
 function getDefaultBlockProps(type: BlockType): Partial<Block> {
   return getDefaultBlockPropsFromDefs(type) as Partial<Block>;
+}
+
+/** Type guard: returns true when a canvas component is a legacy Block (has `size`). */
+function isBlock(component: Block | ComponentInstance): component is Block {
+  return 'size' in component;
 }
 
 /** Threshold in pixels before direction is detected */
@@ -545,8 +551,8 @@ export const useCanvasStore = create<CanvasStore>()(
               for (const wire of connectedWires) {
                 const target = state.wires.find((w) => w.id === wire.id);
                 if (target) {
-                  target.handles = recalculateAutoHandles(target, state.components, state.junctions);
-                  const geom = { components: state.components, junctions: state.junctions };
+                  target.handles = recalculateAutoHandles(target, state.components as Map<string, Block>, state.junctions);
+                  const geom = { components: state.components as Map<string, Block>, junctions: state.junctions };
                   const simplified = simplifyWireHandles(target, geom);
                   // Use reference identity: simplifyWireHandles returns wire.handles
                   // unchanged when polyline can't be built (skip), or a new value
@@ -628,7 +634,7 @@ export const useCanvasStore = create<CanvasStore>()(
            (state) => {
              pushHistorySnapshot(state);
              const result = alignComponents(
-               state.components,
+               state.components as Map<string, Block>,
                new Set(getAllSelectedIds(state.selection)),
                direction
              );
@@ -645,7 +651,7 @@ export const useCanvasStore = create<CanvasStore>()(
            (state) => {
              pushHistorySnapshot(state);
              const result = distributeComponents(
-               state.components,
+               state.components as Map<string, Block>,
                new Set(getAllSelectedIds(state.selection)),
                direction
              );
@@ -662,7 +668,7 @@ export const useCanvasStore = create<CanvasStore>()(
            (state) => {
              pushHistorySnapshot(state);
              const result = flipComponents(
-               state.components,
+               state.components as Map<string, Block>,
                new Set(getAllSelectedIds(state.selection)),
                axis
              );
@@ -697,8 +703,8 @@ export const useCanvasStore = create<CanvasStore>()(
               for (const wire of connectedWires) {
                 const target = state.wires.find((w) => w.id === wire.id);
                 if (target) {
-                  target.handles = recalculateAutoHandles(target, state.components, state.junctions);
-                  const geom = { components: state.components, junctions: state.junctions };
+                  target.handles = recalculateAutoHandles(target, state.components as Map<string, Block>, state.junctions);
+                  const geom = { components: state.components as Map<string, Block>, junctions: state.junctions };
                   const simplified = simplifyWireHandles(target, geom);
                   if (simplified !== target.handles) {
                     target.handles = simplified;
@@ -724,7 +730,7 @@ export const useCanvasStore = create<CanvasStore>()(
         // Use centralized validator for comprehensive checks:
         // endpoint existence, self-connection, same component, port type
         // compatibility, port capacity limits, duplicate wire, and cycle detection
-        const validation = isValidConnection(from, to, state.components, state.wires, state.junctions);
+        const validation = isValidConnection(from, to, state.components as Map<string, Block>, state.wires, state.junctions);
         if (!validation.valid) {
           console.warn('Invalid wire connection:', validation.reason);
           return null;
@@ -746,7 +752,7 @@ export const useCanvasStore = create<CanvasStore>()(
 
             // Auto-generate bend points
             const handles = computeWireBendPoints(
-              from, to, state.components,
+              from, to, state.components as Map<string, Block>,
               options?.fromExitDirection, options?.toExitDirection,
               state.junctions
             );
@@ -851,7 +857,7 @@ export const useCanvasStore = create<CanvasStore>()(
       startWireDrawing: (from, options) => {
         const state = get();
         // Skip validation if caller already validated against their own components
-        if (!options?.skipValidation && !isValidEndpoint(from, state.components)) {
+        if (!options?.skipValidation && !isValidEndpoint(from, state.components as Map<string, Block>)) {
           console.warn('Invalid wire start endpoint:', from);
           return;
         }
@@ -949,7 +955,7 @@ export const useCanvasStore = create<CanvasStore>()(
             wire.handles = wire.handles || [];
 
             // Insert handle at correct position
-            const insertIndex = findHandleInsertIndex(wire, position, state.components);
+            const insertIndex = findHandleInsertIndex(wire, position, state.components as Map<string, Block>);
 
             const newHandle: WireHandle = {
               position,
@@ -1006,8 +1012,8 @@ export const useCanvasStore = create<CanvasStore>()(
             const wire = state.wires.find((w) => w.id === wireId);
             if (!wire) return;
 
-            wire.handles = recalculateAutoHandles(wire, state.components, state.junctions);
-            const geom = { components: state.components, junctions: state.junctions };
+            wire.handles = recalculateAutoHandles(wire, state.components as Map<string, Block>, state.junctions);
+            const geom = { components: state.components as Map<string, Block>, junctions: state.junctions };
             const simplified = simplifyWireHandles(wire, geom, 'auto');
             if (simplified !== wire.handles) {
               wire.handles = simplified;
@@ -1104,7 +1110,7 @@ export const useCanvasStore = create<CanvasStore>()(
             const wire = state.wires.find((w) => w.id === wireId);
             if (!wire) return;
 
-            const geom = { components: state.components, junctions: state.junctions };
+            const geom = { components: state.components as Map<string, Block>, junctions: state.junctions };
             const simplified = simplifyWireHandles(wire, geom);
             if (simplified !== wire.handles) {
               wire.handles = simplified;
@@ -1266,10 +1272,12 @@ export const useCanvasStore = create<CanvasStore>()(
         let maxY = -Infinity;
 
         state.components.forEach((component) => {
-          minX = Math.min(minX, component.position.x);
-          minY = Math.min(minY, component.position.y);
-          maxX = Math.max(maxX, component.position.x + component.size.width);
-          maxY = Math.max(maxY, component.position.y + component.size.height);
+          if (isBlock(component)) {
+            minX = Math.min(minX, component.position.x);
+            minY = Math.min(minY, component.position.y);
+            maxX = Math.max(maxX, component.position.x + component.size.width);
+            maxY = Math.max(maxY, component.position.y + component.size.height);
+          }
         });
 
         const contentWidth = maxX - minX + padding * 2;
@@ -1464,7 +1472,7 @@ export const useCanvasStore = create<CanvasStore>()(
                 blockAny.ports = getPowerSourcePorts(legacyMigration.polarity);
                 state.components.set(id, blockAny as unknown as Block);
               }
-              if (!block.size) {
+              if (isBlock(block) && !block.size) {
                 block.size = getBlockSize(block.type);
               }
             }
@@ -1535,7 +1543,7 @@ export const useCanvasStore = create<CanvasStore>()(
       getCircuitData: () => {
         const state = get();
         return {
-          components: Object.fromEntries(state.components),
+          components: Object.fromEntries(state.components) as Record<string, Block>,
           junctions: state.junctions.size > 0 ? Object.fromEntries(state.junctions) : undefined,
           wires: state.wires,
           metadata: state.metadata,
@@ -1668,7 +1676,7 @@ export const selectComponent = (id: string) => (state: CanvasStore) =>
 /** Select selected components */
 export const selectSelectedComponents = (state: CanvasStore) => {
   const selectedIds = new Set(getAllSelectedIds(state.selection));
-  const selected: Block[] = [];
+  const selected: (Block | ComponentInstance)[] = [];
   selectedIds.forEach((id) => {
     const component = state.components.get(id);
     if (component) selected.push(component);
@@ -1690,10 +1698,12 @@ export const selectBoundingBox = (state: CanvasStore) => {
   let maxY = -Infinity;
 
   state.components.forEach((component) => {
-    minX = Math.min(minX, component.position.x);
-    minY = Math.min(minY, component.position.y);
-    maxX = Math.max(maxX, component.position.x + component.size.width);
-    maxY = Math.max(maxY, component.position.y + component.size.height);
+    if (isBlock(component)) {
+      minX = Math.min(minX, component.position.x);
+      minY = Math.min(minY, component.position.y);
+      maxX = Math.max(maxX, component.position.x + component.size.width);
+      maxY = Math.max(maxY, component.position.y + component.size.height);
+    }
   });
 
   return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
