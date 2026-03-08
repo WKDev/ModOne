@@ -18,7 +18,7 @@ import type {
   YamlBlockDefinition,
   YamlWireDefinition,
   } from '../types';
-import type { ComponentInstance } from '../../../types/circuit';
+import type { ComponentInstance, Port as CircuitPort } from '../../../types/circuit';
 import { isValidBlockType, isLegacyBlockType, isPortEndpoint, migrateLegacyBlockType } from '../types';
 import { createSelectionState } from '../types';
 import { getBlockSize, getPowerSourcePorts } from '../blockDefinitions';
@@ -343,7 +343,7 @@ export function migrateBlockToComponentInstance(block: Block): ComponentInstance
     position: block.position,
     rotation: block.rotation ?? 0,
     instanceProperties: { ...(block as unknown as Record<string, unknown>) },
-    ports: (block.ports ?? []) as unknown as import('../../../types/circuit').Port[],
+    ports: (block.ports ?? []) as unknown as CircuitPort[],
     label: (block as unknown as Record<string, unknown>).label as string | undefined,
     designation: (block as unknown as Record<string, unknown>).designation as string | undefined,
   };

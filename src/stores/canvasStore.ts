@@ -1380,7 +1380,7 @@ export const useCanvasStore = create<CanvasStore>()(
             // Save current state for redo if at the end
             if (state.historyIndex === state.history.length - 1) {
               const snapshot = createSnapshot(
-                state.components,
+                state.components as Map<string, Block>,
                 state.wires,
                 state.junctions,
                 state.selection
