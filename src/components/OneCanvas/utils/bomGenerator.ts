@@ -6,6 +6,7 @@
  */
 
 import type { Block, BlockType } from '../types';
+import type { ComponentInstance } from '@/types/circuit';
 
 // ============================================================================
 // Types
@@ -86,12 +87,13 @@ const TYPE_DISPLAY_NAMES: Partial<Record<BlockType, string>> = {
  * @param excludeAnnotations - Whether to exclude text/annotation blocks (default: true)
  */
 export function generateBom(
-  components: Map<string, Block>,
+  components: Map<string, Block | ComponentInstance>,
   excludeAnnotations = true
 ): BomResult {
   const grouped = new Map<BlockType, BomItem[]>();
 
   for (const [, block] of components) {
+    if (!('size' in block)) continue;
     // Skip annotation blocks if requested
     if (excludeAnnotations && block.type === 'text') continue;
 
@@ -138,7 +140,8 @@ export function generateBom(
 /**
  * Get human-readable details for a block.
  */
-function getBlockDetails(block: Block): string {
+function getBlockDetails(block: Block | ComponentInstance): string {
+  if (!('size' in block)) return '';
   switch (block.type) {
     case 'powersource':
       return `${block.voltage}V ${block.polarity}`;

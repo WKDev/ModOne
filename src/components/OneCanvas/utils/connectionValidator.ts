@@ -12,6 +12,7 @@ import type {
   PortEndpoint,
   PortType,
 } from '../types';
+import type { ComponentInstance } from '@/types/circuit';
 import { isJunctionEndpoint, isPortEndpoint } from '../types';
 import {
   endpointKey,
@@ -38,9 +39,10 @@ export interface ValidationResult {
  * Get port direction from a block
  */
 export function getPortType(
-  block: Block,
+  block: Block | ComponentInstance,
   portId: string
 ): PortType | undefined {
+  if (!('size' in block)) return undefined;
   const port = block.ports.find((p) => p.id === portId);
   return port?.type;
 }
@@ -147,16 +149,16 @@ export function detectCycle(
 export function isValidConnection(
   from: WireEndpoint,
   to: WireEndpoint,
-  blocks: Map<string, Block>,
+  blocks: Map<string, Block | ComponentInstance>,
   existingWires: Wire[] = [],
   junctions?: Map<string, Junction>
 ): ValidationResult {
   // Check 1: Endpoints must exist
-  if (!isValidEndpoint(from, blocks, junctions)) {
+  if (!isValidEndpoint(from, blocks as Map<string, Block>, junctions)) {
     return { valid: false, reason: 'Source endpoint not found' };
   }
 
-  if (!isValidEndpoint(to, blocks, junctions)) {
+  if (!isValidEndpoint(to, blocks as Map<string, Block>, junctions)) {
     return { valid: false, reason: 'Target endpoint not found' };
   }
 
@@ -236,7 +238,7 @@ export function isValidConnection(
     const fromPort = fromBlock.ports.find(p => p.id === from.portId);
     const toPort = toBlock.ports.find(p => p.id === to.portId);
 
-    if (fromPort?.maxConnections !== undefined) {
+    if (fromPort && 'maxConnections' in fromPort && fromPort.maxConnections !== undefined) {
       const fromConnectionCount = existingWires.filter(w =>
         (isPortEndpoint(w.from) && w.from.componentId === from.componentId && w.from.portId === from.portId) ||
         (isPortEndpoint(w.to) && w.to.componentId === from.componentId && w.to.portId === from.portId)
@@ -249,7 +251,7 @@ export function isValidConnection(
       }
     }
 
-    if (toPort?.maxConnections !== undefined) {
+    if (toPort && 'maxConnections' in toPort && toPort.maxConnections !== undefined) {
       const toConnectionCount = existingWires.filter(w =>
         (isPortEndpoint(w.from) && w.from.componentId === to.componentId && w.from.portId === to.portId) ||
         (isPortEndpoint(w.to) && w.to.componentId === to.componentId && w.to.portId === to.portId)
@@ -287,7 +289,7 @@ export function isValidConnection(
  */
 export function getValidTargets(
   from: WireEndpoint,
-  blocks: Map<string, Block>,
+  blocks: Map<string, Block | ComponentInstance>,
   existingWires: Wire[],
   junctions?: Map<string, Junction>
 ): WireEndpoint[] {
