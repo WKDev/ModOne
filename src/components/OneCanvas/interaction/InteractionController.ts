@@ -135,7 +135,6 @@ export class InteractionController {
   private _segmentHandleA = -1;
   private _segmentHandleB = -1;
   private _segmentOrientation: 'horizontal' | 'vertical' | null = null;
-  private _segmentAppliedDelta: Position = { x: 0, y: 0 };
   private _segmentPrevDelta: Position = { x: 0, y: 0 };
   private _segmentIsFirstMove = true;
 
@@ -829,7 +828,6 @@ export class InteractionController {
     this._segmentHandleA = segHandleA;
     this._segmentHandleB = segHandleA + 1;
     this._segmentOrientation = inferSegmentOrientation(target);
-    this._segmentAppliedDelta = { x: 0, y: 0 };
     this._segmentPrevDelta = { x: 0, y: 0 };
     this._segmentIsFirstMove = true;
   }
@@ -846,7 +844,6 @@ export class InteractionController {
       x: constrained.x - this._segmentPrevDelta.x,
       y: constrained.y - this._segmentPrevDelta.y,
     };
-    this._segmentAppliedDelta = constrained;
     this._segmentPrevDelta = constrained;
 
     if (incrementalDelta.x !== 0 || incrementalDelta.y !== 0) {
@@ -869,7 +866,6 @@ export class InteractionController {
     this._segmentHandleA = -1;
     this._segmentHandleB = -1;
     this._segmentOrientation = null;
-    this._segmentAppliedDelta = { x: 0, y: 0 };
     this._segmentPrevDelta = { x: 0, y: 0 };
     this._segmentIsFirstMove = true;
     this._state = 'idle';
@@ -1016,7 +1012,6 @@ export class InteractionController {
     this._segmentHandleA = -1;
     this._segmentHandleB = -1;
     this._segmentOrientation = null;
-    this._segmentAppliedDelta = { x: 0, y: 0 };
     this._segmentPrevDelta = { x: 0, y: 0 };
     this._segmentIsFirstMove = true;
     this._handleWireId = null;
