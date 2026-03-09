@@ -1,0 +1,46 @@
+ [32m✓[39m src/components/LadderEditor/utils/__tests__/gridConverter.test.ts [2m([22m[2m58 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/ladderStore.undo-redo.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 210[2mms[22m[39m
+ [32m✓[39m src/components/LadderEditor/dialogs/__tests__/DeviceSelectDialog.test.tsx [2m([22m[2m20 tests[22m[2m)[22m[33m 468[2mms[22m[39m
+ [32m✓[39m src/components/OneParser/__tests__/InstructionParser.test.ts [2m([22m[2m53 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m src/components/OneParser/__tests__/ModbusMapper.test.ts [2m([22m[2m58 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m src/components/CommandPalette/__tests__/commandRegistry.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m src/components/OneParser/__tests__/AstBuilder.test.ts [2m([22m[2m27 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m src/components/LadderEditor/properties/__tests__/PropertyField.test.tsx [2m([22m[2m13 tests[22m[2m)[22m[32m 144[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/stateSync.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 90[2mms[22m[39m
+ [32m✓[39m src/services/__tests__/simulationService.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/components/OneParser/__tests__/OneParser.test.ts [2m([22m[2m42 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/documentSync.integration.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/panelStore.floating.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m src/components/LadderEditor/__tests__/LadderContextMenu.test.tsx [2m([22m[2m20 tests[22m[2m)[22m[33m 440[2mms[22m[39m
+ [32m✓[39m src/components/LadderEditor/hooks/__tests__/useLadderKeyboardShortcuts.test.tsx [2m([22m[2m18 tests[22m[2m)[22m[32m 55[2mms[22m[39m
+ [32m✓[39m src/components/OneCanvas/interaction/__tests__/wireSegmentDrag.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m src/components/floating/__tests__/FloatingWindowHeader.test.tsx [2m([22m[2m20 tests[22m[2m)[22m[33m 457[2mms[22m[39m
+[90mstderr[2m | src/stores/__tests__/canvasFacade.contract.test.ts[2m > [22m[2mCanvasFacade (DocumentAdapter)[2m > [22m[2maddWire creates a wire between two component ports
+ [32m✓[39m src/components/LadderEditor/__tests__/NetworkCommentHeader.test.tsx [2m([22m[2m16 tests[22m[2m)[22m[33m 1284[2mms[22m[39m
+     [33m[2m✓[22m[39m trims whitespace from comment before saving [33m 348[2mms[22m[39m
+[90mstderr[2m | src/stores/__tests__/canvasFacade.contract.test.ts[2m > [22m[2mCanvasFacade (DocumentAdapter)[2m > [22m[2mremoveWire removes an existing wire
+ [32m✓[39m src/stores/__tests__/canvasFacade.contract.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 224[2mms[22m[39m
+ [32m✓[39m src/components/LadderEditor/__tests__/InlineEditPopover.test.tsx [2m([22m[2m15 tests[22m[2m)[22m[33m 1083[2mms[22m[39m
+     [33m[2m✓[22m[39m calls onApply with updated address when Apply button is clicked [33m 327[2mms[22m[39m
+ [32m✓[39m src/__tests__/pin-grid-alignment.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32m✓[39m src/components/LadderEditor/properties/__tests__/LadderPropertiesPanel.test.tsx [2m([22m[2m13 tests[22m[2m)[22m[32m 215[2mms[22m[39m
+ [32m✓[39m src/__tests__/builtin-symbol-migration.test.ts [2m([22m[2m138 tests[22m[2m)[22m[32m 67[2mms[22m[39m
+ [32m✓[39m src/components/OneParser/__tests__/Validator.test.ts [2m([22m[2m37 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/components/OneParser/__tests__/AddressParser.test.ts [2m([22m[2m42 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/services/__tests__/projectService.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/__tests__/port-positions.test.ts [2m([22m[2m70 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/windowStore.test.ts [2m([22m[2m34 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/components/OneCanvas/utils/__tests__/wireGeometryRoundtrip.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/components/LadderEditor/utils/__tests__/validation.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/__tests__/wire-routing-verification.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/services/__tests__/modbusService.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/components/OneCanvas/utils/__tests__/buildCanonicalWirePolyline.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/components/OneCanvas/utils/__tests__/canvas-commands.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/components/OneCanvas/utils/__tests__/wirePreviewPath.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/__tests__/symbol-model.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/components/OneCanvas/utils/__tests__/coordinate-system-integration.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/__tests__/symbol-validation.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/documentSync.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/components/OneCanvas/utils/__tests__/canvasCoordinates.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/__tests__/symbol-serialization.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/canvasStore.redo.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 9[2mms[22m[39m
