@@ -9,6 +9,7 @@ import type {
   Block,
   BlockType,
   Wire,
+  WireEndpoint,
   Port,
   PortType as PortTypeEnum,
   PortPosition,
@@ -17,9 +18,10 @@ import type {
   YamlCircuitSchema,
   YamlBlockDefinition,
   YamlWireDefinition,
+  YamlWireEndpoint,
   } from '../types';
 import type { ComponentInstance, Port as CircuitPort } from '../../../types/circuit';
-import { isValidBlockType, isLegacyBlockType, isPortEndpoint, migrateLegacyBlockType } from '../types';
+import { isValidBlockType, isLegacyBlockType, isPortEndpoint, isJunctionEndpoint, isFloatingEndpoint, migrateLegacyBlockType } from '../types';
 import { createSelectionState } from '../types';
 import { getBlockSize, getPowerSourcePorts } from '../blockDefinitions';
 import { getBuiltinSymbolForBlockType } from '@/assets/builtin-symbols';
@@ -62,16 +64,34 @@ function blockToYaml(block: Block): YamlBlockDefinition {
   };
 }
 
+
+/**
+ * Convert a WireEndpoint to YAML format.
+ */
+function endpointToYaml(endpoint: WireEndpoint): YamlWireEndpoint | null {
+  if (isPortEndpoint(endpoint)) {
+    return { component: endpoint.componentId, port: endpoint.portId };
+  }
+  if (isJunctionEndpoint(endpoint)) {
+    return { junction: endpoint.junctionId };
+  }
+  if (isFloatingEndpoint(endpoint)) {
+    return { position: { x: endpoint.position.x, y: endpoint.position.y } };
+  }
+  return null;
+}
+
 /**
  * Convert a Wire to YAML format.
  */
 function wireToYaml(wire: Wire): YamlWireDefinition | null {
-  // Only serialize port-to-port wires (junction wires handled separately in future)
-  if (!isPortEndpoint(wire.from) || !isPortEndpoint(wire.to)) return null;
+  const from = endpointToYaml(wire.from);
+  const to = endpointToYaml(wire.to);
+  if (!from || !to) return null;
   return {
     id: wire.id,
-    from: { component: wire.from.componentId, port: wire.from.portId },
-    to: { component: wire.to.componentId, port: wire.to.portId },
+    from,
+    to,
     ...(wire.color ? { color: wire.color } : {}),
   };
 }
@@ -206,28 +226,28 @@ function validateCircuitYaml(data: unknown): YamlCircuitSchema {
       throw new CircuitValidationError(`Missing or invalid wire id`, `wires[${i}]`);
     }
 
-    if (!isObject(wire.from) || typeof (wire.from as Record<string, unknown>).component !== 'string') {
+    if (!isObject(wire.from)) {
       throw new CircuitValidationError(`Invalid wire 'from' endpoint`, `wires[${i}]`);
     }
 
-    if (!isObject(wire.to) || typeof (wire.to as Record<string, unknown>).component !== 'string') {
+    if (!isObject(wire.to)) {
       throw new CircuitValidationError(`Invalid wire 'to' endpoint`, `wires[${i}]`);
     }
 
-    // Validate wire endpoints reference existing components
-    const fromComponent = (wire.from as Record<string, unknown>).component as string;
-    const toComponent = (wire.to as Record<string, unknown>).component as string;
+    // Validate port endpoints reference existing components (floating/junction endpoints are always valid)
+    const fromEp = wire.from as Record<string, unknown>;
+    const toEp = wire.to as Record<string, unknown>;
 
-    if (!componentIds.has(fromComponent)) {
+    if (typeof fromEp.component === 'string' && !componentIds.has(fromEp.component)) {
       throw new CircuitValidationError(
-        `Wire references non-existent component: ${fromComponent}`,
+        `Wire references non-existent component: ${fromEp.component}`,
         `wires[${i}].from`
       );
     }
 
-    if (!componentIds.has(toComponent)) {
+    if (typeof toEp.component === 'string' && !componentIds.has(toEp.component)) {
       throw new CircuitValidationError(
-        `Wire references non-existent component: ${toComponent}`,
+        `Wire references non-existent component: ${toEp.component}`,
         `wires[${i}].to`
       );
     }
@@ -362,19 +382,32 @@ export function migrateBlockToComponentInstance(block: Block): ComponentInstance
 }
 
 /**
+ * Convert a YAML wire endpoint to a WireEndpoint.
+ */
+function yamlEndpointToWireEndpoint(ep: YamlWireEndpoint): WireEndpoint | null {
+  if (ep.component && ep.port) {
+    return { componentId: ep.component, portId: ep.port };
+  }
+  if (ep.junction) {
+    return { junctionId: ep.junction };
+  }
+  if (ep.position) {
+    return { position: { x: ep.position.x, y: ep.position.y } };
+  }
+  return null;
+}
+
+/**
  * Convert YAML wire to Wire.
  */
-function yamlToWire(yamlWire: YamlWireDefinition): Wire {
+function yamlToWire(yamlWire: YamlWireDefinition): Wire | null {
+  const from = yamlEndpointToWireEndpoint(yamlWire.from);
+  const to = yamlEndpointToWireEndpoint(yamlWire.to);
+  if (!from || !to) return null;
   return {
     id: yamlWire.id,
-    from: {
-      componentId: yamlWire.from.component,
-      portId: yamlWire.from.port,
-    },
-    to: {
-      componentId: yamlWire.to.component,
-      portId: yamlWire.to.port,
-    },
+    from,
+    to,
     color: yamlWire.color,
   };
 }
@@ -402,7 +435,7 @@ export function yamlToCircuit(yamlString: string): CircuitState {
     components.set(block.id, block);
   }
 
-  const wires: Wire[] = validatedData.wires.map(yamlToWire);
+  const wires: Wire[] = validatedData.wires.map(yamlToWire).filter((w): w is Wire => w !== null);
 
   const metadata: CircuitMetadata = {
     name: validatedData.metadata.name,

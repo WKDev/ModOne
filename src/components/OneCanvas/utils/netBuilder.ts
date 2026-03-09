@@ -6,8 +6,9 @@
  */
 
 import type { Wire, Block, Junction } from '../types';
-import { isPortEndpoint } from '../types';
+import { isPortEndpoint, isJunctionEndpoint, isFloatingEndpoint } from '../types';
 import { endpointKey } from './canvasHelpers';
+import { ConnectivityGraph } from './connectivityGraph';
 
 // ============================================================================
 // Types
@@ -119,16 +120,22 @@ export function buildNets(
 
   // Union wire endpoints
   for (const wire of wires) {
+    // Skip wires with floating endpoints — ref-based nets can't include position-only endpoints
+    // Use buildNetsWithPositions() for coordinate-based net resolution that includes floating endpoints
+    if (isFloatingEndpoint(wire.from) || isFloatingEndpoint(wire.to)) {
+      continue;
+    }
+
     const fromKey = endpointKey(wire.from);
     const toKey = endpointKey(wire.to);
 
     // Validate endpoints exist
     const fromValid = isPortEndpoint(wire.from)
       ? components.has(wire.from.componentId)
-      : junctions.has(wire.from.junctionId);
+      : isJunctionEndpoint(wire.from) && junctions.has(wire.from.junctionId);
     const toValid = isPortEndpoint(wire.to)
       ? components.has(wire.to.componentId)
-      : junctions.has(wire.to.junctionId);
+      : isJunctionEndpoint(wire.to) && junctions.has(wire.to.junctionId);
 
     if (fromValid && toValid) {
       uf.union(fromKey, toKey);
@@ -154,4 +161,27 @@ export function buildNets(
   }
 
   return nets;
+}
+
+/**
+ * Build nets using coordinate-based connectivity resolution.
+ *
+ * Unlike buildNets() which uses reference-based keys, this function uses
+ * ConnectivityGraph to determine connectivity by endpoint positions on a grid.
+ * This supports FloatingEndpoint wires — endpoints at the same grid position
+ * belong to the same net regardless of whether they reference a port or junction.
+ *
+ * @param wires - All wire connections
+ * @param components - Component map
+ * @param junctions - Junction map
+ * @returns Array of nets (coordinate-based)
+ */
+export function buildNetsWithPositions(
+  wires: Wire[],
+  components: Map<string, Block>,
+  junctions: Map<string, Junction>
+): Net[] {
+  const graph = new ConnectivityGraph();
+  graph.rebuild(wires, components, junctions);
+  return graph.getAllNets();
 }

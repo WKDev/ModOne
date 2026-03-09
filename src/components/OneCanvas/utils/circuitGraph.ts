@@ -6,7 +6,7 @@
  */
 
 import type { Block, Wire, Port, Junction } from '../types';
-import { isPortEndpoint, isJunctionEndpoint } from '../types';
+import { isPortEndpoint, isJunctionEndpoint, isFloatingEndpoint } from '../types';
 
 // ============================================================================
 // Types
@@ -270,6 +270,12 @@ export function buildCircuitGraph(components: Block[], wires: Wire[], junctions:
 
   // Create edges from wires (handles both port and junction endpoints)
   for (const wire of wires) {
+    // Skip wires with floating endpoints — they have no simulation node
+    // (floating wires are visual/routing aids, not electrical connections)
+    if (isFloatingEndpoint(wire.from) || isFloatingEndpoint(wire.to)) {
+      continue;
+    }
+
     // Resolve from endpoint node ID
     let fromId: string | null = null;
     if (isPortEndpoint(wire.from)) {

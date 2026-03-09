@@ -419,11 +419,15 @@ export function prepareTemplateForInsertion(
 
     const newFrom = 'componentId' in wire.from
       ? { componentId: idMap.get(wire.from.componentId) || wire.from.componentId, portId: wire.from.portId }
-      : { junctionId: idMap.get(wire.from.junctionId) || wire.from.junctionId };
+      : 'junctionId' in wire.from
+        ? { junctionId: idMap.get(wire.from.junctionId) || wire.from.junctionId }
+        : wire.from;
 
     const newTo = 'componentId' in wire.to
       ? { componentId: idMap.get(wire.to.componentId) || wire.to.componentId, portId: wire.to.portId }
-      : { junctionId: idMap.get(wire.to.junctionId) || wire.to.junctionId };
+      : 'junctionId' in wire.to
+        ? { junctionId: idMap.get(wire.to.junctionId) || wire.to.junctionId }
+        : wire.to;
 
     return {
       ...wire,

@@ -13,7 +13,7 @@ import type {
   PortType,
 } from '../types';
 import type { ComponentInstance } from '@/types/circuit';
-import { isJunctionEndpoint, isPortEndpoint } from '../types';
+import { isJunctionEndpoint, isPortEndpoint, isFloatingEndpoint } from '../types';
 import {
   endpointKey,
   isValidEndpoint,
@@ -178,6 +178,12 @@ export function isValidConnection(
         valid: false,
         reason: 'Cannot connect a junction to itself',
       };
+    }
+  }
+
+  if (isFloatingEndpoint(from) && isFloatingEndpoint(to)) {
+    if (from.position.x === to.position.x && from.position.y === to.position.y) {
+      return { valid: false, reason: 'Cannot connect a floating endpoint to itself at the same position' };
     }
   }
 

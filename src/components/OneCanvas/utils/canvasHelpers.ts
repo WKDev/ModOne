@@ -14,7 +14,7 @@ import type {
   Position,
   PortPosition,
 } from '../types';
-import { isPortEndpoint } from '../types';
+import { isPortEndpoint, isJunctionEndpoint, isFloatingEndpoint } from '../types';
 import {
   getPortRelativePosition,
   calculateWireBendPoints,
@@ -50,7 +50,10 @@ export function endpointKey(ep: WireEndpoint): string {
   if (isPortEndpoint(ep)) {
     return `port:${ep.componentId}:${ep.portId}`;
   }
-  return `junction:${ep.junctionId}`;
+  if (isJunctionEndpoint(ep)) {
+    return `junction:${ep.junctionId}`;
+  }
+  return `floating:${ep.position.x}:${ep.position.y}`;
 }
 
 /** Validate wire endpoint exists in the given maps */
@@ -63,9 +66,12 @@ export function isValidEndpoint(
     const component = components.get(endpoint.componentId);
     if (!component) return false;
     return component.ports.some((port) => port.id === endpoint.portId);
-  } else {
+  }
+  if (isJunctionEndpoint(endpoint)) {
     return junctions ? junctions.has(endpoint.junctionId) : false;
   }
+  // FloatingEndpoint is always valid (it's just a position)
+  return true;
 }
 
 /** Check if wire already exists between two endpoints (in either direction) */
@@ -100,8 +106,8 @@ export function getWiresConnectedToComponent(wires: Wire[], componentId: string)
 export function getWiresConnectedToJunction(wires: Wire[], junctionId: string): Wire[] {
   return wires.filter(
     (wire) =>
-      (!isPortEndpoint(wire.from) && wire.from.junctionId === junctionId) ||
-      (!isPortEndpoint(wire.to) && wire.to.junctionId === junctionId)
+      (isJunctionEndpoint(wire.from) && wire.from.junctionId === junctionId) ||
+      (isJunctionEndpoint(wire.to) && wire.to.junctionId === junctionId)
   );
 }
 
@@ -324,7 +330,11 @@ function resolveEndpoint(
       pos: { x: block.position.x + relPos.x, y: block.position.y + relPos.y },
       dir: exitDirection || port.position,
     };
-  } else {
+  } else if (isFloatingEndpoint(endpoint)) {
+    const pos = endpoint.position;
+    const dir = exitDirection || (otherPos ? inferJunctionDirection(pos, otherPos) : 'right');
+    return { pos, dir };
+  } else if (isJunctionEndpoint(endpoint)) {
     const junction = junctions?.get(endpoint.junctionId);
     if (!junction) return undefined;
     const pos = junction.position;

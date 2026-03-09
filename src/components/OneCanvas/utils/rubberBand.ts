@@ -7,7 +7,7 @@
  */
 
 import type { GeomApi, Position, Wire, WireEndpoint } from '../types';
-import { isPortEndpoint } from '../types';
+import { isPortEndpoint, isJunctionEndpoint } from '../types';
 import { buildWirePolyline, simplifyOrthogonal } from './wireSimplifier';
 
 const LOCAL_ATTACH_LEN = 64;
@@ -32,8 +32,11 @@ function endpointMoves(endpoint: WireEndpoint, dragIds: Set<string>): boolean {
   if (isPortEndpoint(endpoint)) {
     return dragIds.has(endpoint.componentId);
   }
-
-  return dragIds.has(endpoint.junctionId);
+  if (isJunctionEndpoint(endpoint)) {
+    return dragIds.has(endpoint.junctionId);
+  }
+  // FloatingEndpoint doesn't move with any block/junction
+  return false;
 }
 
 function manhattan(a: Position, b: Position): number {

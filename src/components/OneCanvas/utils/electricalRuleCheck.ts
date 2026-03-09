@@ -11,7 +11,7 @@
  */
 
 import type { Block, Wire, Junction } from '../types';
-import { isPortEndpoint, isAnnotationBlock } from '../types';
+import { isPortEndpoint, isAnnotationBlock, isFloatingEndpoint } from '../types';
 import { buildCircuitGraph } from './circuitGraph';
 import { findAllCircuitPaths, findShortCircuits } from './pathFinder';
 import { evaluateSwitchStates, applySwitchStatesToGraph, createEmptyRuntimeState } from './switchEvaluator';
@@ -33,7 +33,8 @@ export type ErcCategory =
   | 'short_circuit'
   | 'isolated_component'
   | 'duplicate_designation'
-  | 'missing_load';
+  | 'missing_load'
+  | 'dangling_wire';
 
 /** A single ERC violation */
 export interface ErcViolation {
@@ -200,6 +201,60 @@ export function runErc(
         message: `Duplicate designation "${designation}" used by ${ids.length} components`,
         componentIds: ids,
       });
+    }
+  }
+
+  // ========================================================================
+  // Check 5.5: Dangling wires (floating endpoints not at any port)
+  // ========================================================================
+  const GRID_SNAP_PX = 20;
+  const snapToGrid = (v: number) => Math.round(v / GRID_SNAP_PX) * GRID_SNAP_PX;
+
+  // Build set of all port absolute positions (grid-snapped)
+  const portPositionKeys = new Set<string>();
+  for (const [, block] of electricalComponents) {
+    for (const port of block.ports) {
+      // Compute absolute port position
+      const offset = port.offset ?? 0.5;
+      const { width, height } = block.size;
+      let relX: number, relY: number;
+      switch (port.position) {
+        case 'left':   relX = 0;     relY = height * offset; break;
+        case 'right':  relX = width;  relY = height * offset; break;
+        case 'top':    relX = width * offset; relY = 0;       break;
+        case 'bottom': relX = width * offset; relY = height;  break;
+        default:       relX = width / 2;      relY = height / 2;
+      }
+      const absX = snapToGrid(block.position.x + relX);
+      const absY = snapToGrid(block.position.y + relY);
+      portPositionKeys.add(`${absX}:${absY}`);
+    }
+  }
+
+  // Check each wire for dangling floating endpoints
+  for (const wire of wires) {
+    const endpoints = [
+      { ep: wire.from, label: 'from' },
+      { ep: wire.to, label: 'to' },
+    ];
+
+    for (const { ep, label } of endpoints) {
+      if (isFloatingEndpoint(ep)) {
+        const sx = snapToGrid(ep.position.x);
+        const sy = snapToGrid(ep.position.y);
+        const key = `${sx}:${sy}`;
+
+        if (!portPositionKeys.has(key)) {
+          violations.push({
+            id: nextId(),
+            severity: 'warning',
+            category: 'dangling_wire',
+            message: `Wire "${wire.id.substring(0, 8)}" has a dangling ${label} endpoint at (${sx}, ${sy}) — not connected to any port`,
+            componentIds: [],
+            wireIds: [wire.id],
+          });
+        }
+      }
     }
   }
 

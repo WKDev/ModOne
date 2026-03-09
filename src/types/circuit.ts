@@ -355,6 +355,8 @@ export declare function getBlockDefaults(type: BlockType, id?: string, size?: Si
 // Wires
 // ============================================================================
 
+/** @deprecated Use PortEndpoint from '@/components/OneCanvas/types' instead */
+
 export interface PortEndpoint {
   type: 'port';
   blockId?: string;
@@ -362,24 +364,34 @@ export interface PortEndpoint {
   portId: string;
 }
 
+/** @deprecated Use PortEndpoint from '@/components/OneCanvas/types' instead */
+
 export interface LegacyPortEndpoint {
   componentId: string;
   portId: string;
 }
+
+/** @deprecated Use JunctionEndpoint from '@/components/OneCanvas/types' instead */
 
 export interface JunctionEndpoint {
   type: 'junction';
   junctionId: string;
 }
 
+/** @deprecated Use JunctionEndpoint from '@/components/OneCanvas/types' instead */
+
 export interface LegacyJunctionEndpoint {
   junctionId: string;
 }
+
+/** @deprecated Use FloatingEndpoint from '@/components/OneCanvas/types' instead */
 
 export interface FloatingEndpoint {
   type: 'floating';
   position: Position;
 }
+
+/** @deprecated Use WireEndpoint from '@/components/OneCanvas/types' instead */
 
 export type WireEndpoint =
   | PortEndpoint
@@ -407,17 +419,25 @@ export interface Wire {
   toExitDirection?: PortPosition;
 }
 
+/** @deprecated Use isPortEndpoint from '@/components/OneCanvas/types' instead */
+
 export function isPortEndpoint(endpoint: WireEndpoint): endpoint is PortEndpoint {
   return 'portId' in endpoint && ('type' in endpoint ? endpoint.type === 'port' : true);
 }
+
+/** @deprecated Use isJunctionEndpoint from '@/components/OneCanvas/types' instead */
 
 export function isJunctionEndpoint(endpoint: WireEndpoint): endpoint is JunctionEndpoint {
   return 'junctionId' in endpoint && !('position' in endpoint);
 }
 
+/** @deprecated Use isFloatingEndpoint from '@/components/OneCanvas/types' instead */
+
 export function isFloatingEndpoint(endpoint: WireEndpoint): endpoint is FloatingEndpoint {
   return 'position' in endpoint;
 }
+
+/** @deprecated Use endpointKey from '@/components/OneCanvas/utils/canvasHelpers' instead */
 
 export function endpointKey(endpoint: WireEndpoint): string {
   if (isPortEndpoint(endpoint)) {

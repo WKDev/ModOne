@@ -96,9 +96,11 @@ export function calculateOrthogonalPath(
   toDirection?: PortPosition,
   cornerRadius: number = 8
 ): string {
-  // If no direction info, fall back to simple straight path
+  // If no direction info, infer from geometry
   if (!fromDirection || !toDirection) {
-    return calculateStraightPath(from, to, cornerRadius);
+    const inferredFrom = fromDirection ?? inferExitDirection(from, to);
+    const inferredTo = toDirection ?? inferExitDirection(to, from);
+    return calculateOrthogonalPath(from, to, inferredFrom, inferredTo, cornerRadius);
   }
 
   // Calculate exit points based on port directions
@@ -116,6 +118,19 @@ export function calculateOrthogonalPath(
 
   // Convert segments to SVG path with rounded corners
   return segmentsToPath(segments, cornerRadius);
+}
+
+/**
+ * Infer exit direction from geometry when no port direction is available.
+ * Used for FloatingEndpoint and JunctionEndpoint routing.
+ */
+function inferExitDirection(from: Position, to: Position): PortPosition {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0 ? 'right' : 'left';
+  }
+  return dy >= 0 ? 'bottom' : 'top';
 }
 
 /**
@@ -459,7 +474,10 @@ export function calculateWireBendPoints(
   toDirection?: PortPosition
 ): { points: Position[]; constraints: HandleConstraint[] } {
   if (!fromDirection || !toDirection) {
-    return { points: [], constraints: [] };
+    const inferredFrom = fromDirection ?? inferExitDirection(from, to);
+    const inferredTo = toDirection ?? inferExitDirection(to, from);
+    fromDirection = inferredFrom;
+    toDirection = inferredTo;
   }
 
   const fromExit = getExitPoint(from, fromDirection, PORT_EXIT_DISTANCE);

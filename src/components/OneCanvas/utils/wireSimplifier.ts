@@ -6,7 +6,7 @@
  */
 
 import type { GeomApi, Poly, Position, Wire, WireEndpoint, WireHandle } from '../types';
-import { isPortEndpoint } from '../types';
+import { isPortEndpoint, isJunctionEndpoint } from '../types';
 import { generateId } from './canvasHelpers';
 import { getPortAbsolutePosition, PORT_EXIT_DISTANCE } from './wirePathCalculator';
 
@@ -25,9 +25,12 @@ function resolveEndpointPosition(endpoint: WireEndpoint, geom: GeomApi): Positio
     const portPos = getPortAbsolutePosition(block, endpoint.portId);
     return portPos ? clonePosition(portPos) : null;
   }
-
-  const junction = geom.junctions.get(endpoint.junctionId);
-  return junction ? clonePosition(junction.position) : null;
+  if (isJunctionEndpoint(endpoint)) {
+    const junction = geom.junctions.get(endpoint.junctionId);
+    return junction ? clonePosition(junction.position) : null;
+  }
+  // FloatingEndpoint — position is stored directly
+  return clonePosition(endpoint.position);
 }
 
 function resolvePortDirection(endpoint: WireEndpoint, geom: GeomApi): 'top' | 'bottom' | 'left' | 'right' | null {

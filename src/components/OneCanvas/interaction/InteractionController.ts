@@ -129,6 +129,7 @@ export class InteractionController {
   private _wireSnapTarget: WireSnapTarget | null = null;
   private _wireDrawingReturnState: 'idle' | 'wire_mode' = 'idle';
   private _wireDrawingFromPos: Position = { x: 0, y: 0 };
+  private _wireBendPoints: Position[] = [];
 
   // Wire segment dragging
   private _segmentWireId: string | null = null;
@@ -209,6 +210,7 @@ export class InteractionController {
       this._visuals.clearWirePreview();
       this._visuals.hidePortSnap();
 
+    this._wireBendPoints = [];
     }
     if (this._state === 'box_selecting' || this._state === 'box_pending') {
       this._visuals.clearMarquee();
@@ -365,6 +367,15 @@ export class InteractionController {
     }
 
     if (key === 'Escape') {
+      if (this._state === 'wire_drawing') {
+        if (this._wireBendPoints.length > 0) {
+          const lastBend = this._wireBendPoints[this._wireBendPoints.length - 1];
+          this._completeWire(lastBend);
+        } else {
+          this._resetWireDrawing();
+        }
+        return;
+      }
       this.cancel();
       return;
     }
@@ -690,6 +701,7 @@ export class InteractionController {
     this._wireDrawingFromPos = worldPos;
     this._lastMoveWorld = worldPos;
     this._wireSnapTarget = null;
+    this._wireBendPoints = [];
 
   }
 
@@ -710,10 +722,7 @@ export class InteractionController {
         this._wireFrom && isPortEndpoint(this._wireFrom)
           ? this._wireFrom.componentId
           : undefined;
-      const portHit = this._hitTester.findNearestPort(
-        worldPos,
-        fromBlockId
-      );
+      const portHit = this._hitTester.findNearestPort(worldPos, fromBlockId);
       if (portHit) {
         this._wireSnapTarget = {
           type: 'port',
@@ -724,15 +733,32 @@ export class InteractionController {
       }
     }
 
-    // Visual feedback
-    if (this._wireFrom && isPortEndpoint(this._wireFrom)) {
-      const fromPos = this._wireDrawingFromPos;
-      const exitDir = this._wireFromExitDirection;
-      const mid = !exitDir || exitDir === 'left' || exitDir === 'right'
-        ? { x: worldPos.x, y: fromPos.y }
-        : { x: fromPos.x, y: worldPos.y };
-      this._visuals.renderWirePreview([fromPos, mid, worldPos]);
+    // Visual feedback — orthogonal preview through bend points
+    const fromPos = this._wireDrawingFromPos;
+    const currentTarget = this._wireSnapTarget?.position ?? this._snapToGrid(worldPos);
+
+    // Build preview path: fromPos → bendPoints → currentTarget
+    const previewPoints: Position[] = [fromPos, ...this._wireBendPoints];
+
+    // Add orthogonal routing from last point to current position
+    const lastPoint = previewPoints[previewPoints.length - 1];
+    const exitDir = this._wireFromExitDirection;
+
+    if (previewPoints.length === 1 && exitDir) {
+      // First segment: use exit direction for L-shape
+      const mid = (exitDir === 'left' || exitDir === 'right')
+        ? { x: currentTarget.x, y: lastPoint.y }
+        : { x: lastPoint.x, y: currentTarget.y };
+      previewPoints.push(mid);
+    } else {
+      // Subsequent segments: prefer horizontal-first routing
+      if (lastPoint.x !== currentTarget.x && lastPoint.y !== currentTarget.y) {
+        previewPoints.push({ x: currentTarget.x, y: lastPoint.y });
+      }
     }
+    previewPoints.push(currentTarget);
+
+    this._visuals.renderWirePreview(previewPoints);
 
     if (this._wireSnapTarget) {
       this._visuals.showPortSnap(this._wireSnapTarget.position);
@@ -743,35 +769,9 @@ export class InteractionController {
 
   private _handleWireDrawingUp(_worldPos: Position, button: number): void {
     if (button !== 0) return;
-
-    // Try to complete wire
-    if (this._wireFrom && this._wireSnapTarget) {
-      const from = this._wireFrom;
-      const snapTarget = this._wireSnapTarget;
-
-      let to: WireEndpoint | null = null;
-      if (snapTarget.type === 'port' && snapTarget.parentId) {
-        to = { componentId: snapTarget.parentId, portId: snapTarget.id };
-      } else if (snapTarget.type === 'junction') {
-        to = { junctionId: snapTarget.id } as WireEndpoint;
-      }
-
-      if (to) {
-        this._facade?.addWire(from, to, {
-          fromExitDirection: this._wireFromExitDirection ?? undefined,
-        });
-      }
-    }
-
-    this._visuals.clearWirePreview();
-    this._visuals.hidePortSnap();
-
-    this._wireFrom = null;
-    this._wireFromExitDirection = null;
-    this._lastMoveWorld = null;
-    this._wireSnapTarget = null;
-    this._wireDrawingFromPos = { x: 0, y: 0 };
-    this._state = this._wireDrawingReturnState;
+    // Wire completion is now handled by _handleWireDrawingPointerDown
+    // (port click / snap target) and ESC key. Mouse up is a no-op
+    // during multi-click wire drawing.
   }
 
   private _handleWireModePointerDown(
@@ -782,9 +782,21 @@ export class InteractionController {
 
     const target = this._hitTester.hitTest(worldPos);
     if (target.type === 'port') {
+      // Start from port (existing behavior)
       this._pointerStartWorld = worldPos;
       this._pointerStartScreen = worldPos;
       this._startWireDrawing(worldPos, target);
+    } else {
+      // Start from empty canvas — FloatingEndpoint
+      const snappedPos = this._snapToGrid(worldPos);
+      this._wireDrawingReturnState = 'wire_mode';
+      this._state = 'wire_drawing';
+      this._wireFrom = { position: snappedPos };
+      this._wireFromExitDirection = null;
+      this._wireDrawingFromPos = snappedPos;
+      this._lastMoveWorld = snappedPos;
+      this._wireSnapTarget = null;
+      this._wireBendPoints = [];
     }
   }
 
@@ -796,7 +808,7 @@ export class InteractionController {
 
     // If there's a snap target, complete the wire
     if (this._wireSnapTarget) {
-      this._handleWireDrawingUp(worldPos, 0);
+      this._completeWire();
       return;
     }
 
@@ -809,8 +821,60 @@ export class InteractionController {
         parentId: target.parentId,
         position: target.position,
       };
-      this._handleWireDrawingUp(worldPos, 0);
+      this._completeWire();
+      return;
     }
+
+    // Click on empty canvas — add bend point (grid-snapped)
+    const snappedPos = this._snapToGrid(worldPos);
+    this._wireBendPoints.push(snappedPos);
+  }
+
+  private _completeWire(endPosition?: Position): void {
+    if (!this._wireFrom) {
+      this._resetWireDrawing();
+      return;
+    }
+
+    let to: WireEndpoint | null = null;
+
+    if (this._wireSnapTarget) {
+      const snapTarget = this._wireSnapTarget;
+      if (snapTarget.type === 'port' && snapTarget.parentId) {
+        to = { componentId: snapTarget.parentId, portId: snapTarget.id };
+      } else if (snapTarget.type === 'junction') {
+        to = { junctionId: snapTarget.id } as WireEndpoint;
+      }
+    } else if (endPosition) {
+      to = { position: this._snapToGrid(endPosition) };
+    }
+
+    if (to && this._facade) {
+      this._facade.addWire(this._wireFrom, to, {
+        fromExitDirection: this._wireFromExitDirection ?? undefined,
+      });
+    }
+
+    this._resetWireDrawing();
+  }
+
+  private _resetWireDrawing(): void {
+    this._visuals.clearWirePreview();
+    this._visuals.hidePortSnap();
+    this._wireFrom = null;
+    this._wireFromExitDirection = null;
+    this._lastMoveWorld = null;
+    this._wireSnapTarget = null;
+    this._wireDrawingFromPos = { x: 0, y: 0 };
+    this._wireBendPoints = [];
+    this._state = this._wireDrawingReturnState;
+  }
+
+  private _snapToGrid(pos: Position): Position {
+    return {
+      x: Math.round(pos.x / GRID_SNAP_PX) * GRID_SNAP_PX,
+      y: Math.round(pos.y / GRID_SNAP_PX) * GRID_SNAP_PX,
+    };
   }
 
   // ==========================================================================

@@ -646,7 +646,7 @@ export interface FloatingEndpoint {
 }
 
 /** Endpoint of a wire connection (discriminated union) */
-export type WireEndpoint = PortEndpoint | JunctionEndpoint;
+export type WireEndpoint = PortEndpoint | JunctionEndpoint | FloatingEndpoint;
 
 /** Type guard: check if endpoint connects to a block port */
 export function isPortEndpoint(ep: WireEndpoint): ep is PortEndpoint {
@@ -658,7 +658,7 @@ export function isJunctionEndpoint(ep: WireEndpoint): ep is JunctionEndpoint {
   return 'junctionId' in ep;
 }
 
-export function isFloatingEndpoint(ep: WireEndpoint | FloatingEndpoint): ep is FloatingEndpoint {
+export function isFloatingEndpoint(ep: WireEndpoint): ep is FloatingEndpoint {
   return 'position' in ep && !('componentId' in ep) && !('junctionId' in ep);
 }
 
@@ -701,6 +701,8 @@ export interface Wire {
   selected?: boolean;
   /** Optional wire color */
   color?: string;
+  /** Cached net ID from connectivity graph */
+  netId?: string;
   /** Control points for wire routing */
   handles?: WireHandle[];
   /** Direction wire exits from source port (user-specified via drag direction) */
@@ -864,11 +866,19 @@ export interface YamlBlockDefinition {
   }>;
 }
 
+/** YAML wire endpoint (port, junction, or floating position) */
+export interface YamlWireEndpoint {
+  component?: string;
+  port?: string;
+  junction?: string;
+  position?: { x: number; y: number };
+}
+
 /** YAML wire definition */
 export interface YamlWireDefinition {
   id: string;
-  from: { component: string; port: string };
-  to: { component: string; port: string };
+  from: YamlWireEndpoint;
+  to: YamlWireEndpoint;
   color?: string;
 }
 
@@ -1151,13 +1161,19 @@ export function circuitStateToYaml(state: CircuitState): YamlCircuitSchema {
       modified: state.metadata.modifiedAt,
     },
     components,
-    wires: state.wires
-      .filter((wire) => isPortEndpoint(wire.from) && isPortEndpoint(wire.to))
-      .map((wire) => ({
-        id: wire.id,
-        from: { component: (wire.from as PortEndpoint).componentId, port: (wire.from as PortEndpoint).portId },
-        to: { component: (wire.to as PortEndpoint).componentId, port: (wire.to as PortEndpoint).portId },
-        color: wire.color,
-      })),
+    wires: state.wires.map((wire) => ({
+      id: wire.id,
+      from: isPortEndpoint(wire.from)
+        ? { component: (wire.from as PortEndpoint).componentId, port: (wire.from as PortEndpoint).portId }
+        : isJunctionEndpoint(wire.from)
+          ? { junction: (wire.from as JunctionEndpoint).junctionId }
+          : { position: { x: (wire.from as FloatingEndpoint).position.x, y: (wire.from as FloatingEndpoint).position.y } },
+      to: isPortEndpoint(wire.to)
+        ? { component: (wire.to as PortEndpoint).componentId, port: (wire.to as PortEndpoint).portId }
+        : isJunctionEndpoint(wire.to)
+          ? { junction: (wire.to as JunctionEndpoint).junctionId }
+          : { position: { x: (wire.to as FloatingEndpoint).position.x, y: (wire.to as FloatingEndpoint).position.y } },
+      color: wire.color,
+    })),
   };
 }
