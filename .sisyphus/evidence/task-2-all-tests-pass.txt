@@ -1,0 +1,306 @@
+
+> modone@0.1.0 test C:\Users\chanh\Projects\ModOne
+> vitest run
+
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/Users/chanh/Projects/ModOne[39m
+
+[90mstderr[2m | src/components/CommandPalette/__tests__/commandRegistry.test.ts[2m > [22m[2mCommandRegistry[2m > [22m[2mexecute[2m > [22m[2mshould not execute command when when() returns false
+[22m[39mCommand not available: test.disabled
+
+ [32m✓[39m src/components/CommandPalette/__tests__/commandRegistry.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m src/components/LadderEditor/__tests__/LadderContextMenu.test.tsx [2m([22m[2m20 tests[22m[2m)[22m[33m 366[2mms[22m[39m
+ [32m✓[39m src/components/LadderEditor/dialogs/__tests__/DeviceSelectDialog.test.tsx [2m([22m[2m20 tests[22m[2m)[22m[33m 398[2mms[22m[39m
+ [32m✓[39m src/components/OneParser/__tests__/InstructionParser.test.ts [2m([22m[2m53 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m src/components/LadderEditor/properties/__tests__/PropertyField.test.tsx [2m([22m[2m13 tests[22m[2m)[22m[32m 96[2mms[22m[39m
+ [32m✓[39m src/components/OneParser/__tests__/AddressParser.test.ts [2m([22m[2m42 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/services/__tests__/modbusService.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/components/OneParser/__tests__/ModbusMapper.test.ts [2m([22m[2m58 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/components/OneParser/__tests__/Validator.test.ts [2m([22m[2m37 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/components/LadderEditor/utils/__tests__/gridConverter.test.ts [2m([22m[2m58 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/stateSync.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 81[2mms[22m[39m
+[90mstderr[2m | src/stores/__tests__/documentSync.integration.test.ts
+[22m[39mFailed to initialize document sync listener: TypeError: Cannot read properties of undefined (reading 'transformCallback')
+    at transformCallback [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:72:39[90m)[39m
+    at Module.listen [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:77:18[90m)[39m
+    at listenDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:87:19)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+
+[90mstderr[2m | src/stores/__tests__/documentSync.integration.test.ts[2m > [22m[2mDocument Sync Integration[2m > [22m[2mTest 2: Remote update with lower revision is rejected
+[22m[39mFailed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+
+[90mstderr[2m | src/stores/__tests__/documentSync.integration.test.ts[2m > [22m[2mDocument Sync Integration[2m > [22m[2mTest 5: updateCanvasData increments revision
+[22m[39mFailed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+
+ [32m✓[39m src/stores/__tests__/documentSync.integration.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/components/OneParser/__tests__/OneParser.test.ts [2m([22m[2m42 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m src/components/LadderEditor/hooks/__tests__/useLadderKeyboardShortcuts.test.tsx [2m([22m[2m18 tests[22m[2m)[22m[32m 54[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/panelStore.floating.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/ladderStore.undo-redo.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 189[2mms[22m[39m
+[90mstderr[2m | src/stores/__tests__/canvasFacade.contract.test.ts
+[22m[39mFailed to initialize document sync listener: TypeError: Cannot read properties of undefined (reading 'transformCallback')
+    at transformCallback [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:72:39[90m)[39m
+    at Module.listen [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:77:18[90m)[39m
+    at listenDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:87:19)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+
+ [32m✓[39m src/components/floating/__tests__/FloatingWindowHeader.test.tsx [2m([22m[2m20 tests[22m[2m)[22m[33m 364[2mms[22m[39m
+[90mstderr[2m | src/stores/__tests__/canvasFacade.contract.test.ts[2m > [22m[2mCanvasFacade (DocumentAdapter)[2m > [22m[2maddComponent adds a component with snapped position
+[22m[39m[DEPRECATED] useGlobalCanvasAdapter: global canvasStore fallback is active. All canvas access should use document-mode (documentId). See PRD_OneCanvas_Stabilization.md — Task 3.4
+
+[90mstderr[2m | src/stores/__tests__/canvasFacade.contract.test.ts[2m > [22m[2mCanvasFacade (DocumentAdapter)[2m > [22m[2maddComponent adds a component with snapped position
+[22m[39mFailed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+
+[90mstderr[2m | src/stores/__tests__/canvasFacade.contract.test.ts[2m > [22m[2mCanvasFacade (DocumentAdapter)[2m > [22m[2mmoveComponent updates component position
+[22m[39mFailed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+
+[90mstderr[2m | src/stores/__tests__/canvasFacade.contract.test.ts[2m > [22m[2mCanvasFacade (DocumentAdapter)[2m > [22m[2mupdateComponent updates properties while preserving shape
+[22m[39mFailed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+
+ [32m✓[39m src/components/LadderEditor/__tests__/NetworkCommentHeader.test.tsx [2m([22m[2m16 tests[22m[2m)[22m[33m 1221[2mms[22m[39m
+[90mstderr[2m | src/stores/__tests__/canvasFacade.contract.test.ts[2m > [22m[2mCanvasFacade (DocumentAdapter)[2m > [22m[2maddWire creates a wire between two component ports
+[22m[39mFailed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+
+[90mstderr[2m | src/stores/__tests__/canvasFacade.contract.test.ts[2m > [22m[2mCanvasFacade (DocumentAdapter)[2m > [22m[2mremoveWire removes an existing wire
+[22m[39mFailed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+
+[90mstderr[2m | src/stores/__tests__/canvasFacade.contract.test.ts[2m > [22m[2mCanvasFacade (DocumentAdapter)[2m > [22m[2msetSelection/addToSelection/toggleSelection/clearSelection behave consistently
+[22m[39mFailed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+
+[90mstderr[2m | src/stores/__tests__/canvasFacade.contract.test.ts[2m > [22m[2mCanvasFacade (DocumentAdapter)[2m > [22m[2malignSelected aligns selected blocks to left edge
+[22m[39mFailed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+
+[90mstderr[2m | src/stores/__tests__/canvasFacade.contract.test.ts[2m > [22m[2mCanvasFacade (DocumentAdapter)[2m > [22m[2mdistributeSelected horizontally creates even spacing
+[22m[39mFailed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+
+[90mstderr[2m | src/stores/__tests__/canvasFacade.contract.test.ts[2m > [22m[2mCanvasFacade (DocumentAdapter)[2m > [22m[2mflipSelected horizontally mirrors selected blocks around center
+[22m[39mFailed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+
+[90mstderr[2m | src/stores/__tests__/canvasFacade.contract.test.ts[2m > [22m[2mCanvasFacade (DocumentAdapter)[2m > [22m[2mundo/redo restores and reapplies canvas changes
+[22m[39mFailed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+
+[90mstderr[2m | src/stores/__tests__/canvasFacade.contract.test.ts[2m > [22m[2mCanvasFacade (DocumentAdapter)[2m > [22m[2mpage/document switching contract[2m > [22m[2mswitching documents preserves each document state independently
+[22m[39mFailed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+
+[90mstderr[2m | src/stores/__tests__/canvasFacade.contract.test.ts[2m > [22m[2mCanvasFacade (DocumentAdapter)[2m > [22m[2mpage/document switching contract[2m > [22m[2mmodifying one document does not affect another
+[22m[39mFailed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+
+[90mstderr[2m | src/stores/__tests__/canvasFacade.contract.test.ts[2m > [22m[2mCanvasFacade (DocumentAdapter)[2m > [22m[2mpage/document switching contract[2m > [22m[2mundo/redo are scoped to individual documents
+[22m[39mFailed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+
+[90mstderr[2m | src/stores/__tests__/canvasFacade.contract.test.ts[2m > [22m[2mCanvasFacade (DocumentAdapter)[2m > [22m[2mpage/document switching contract[2m > [22m[2mclosing a document does not affect other open documents
+[22m[39m[useCanvasFacade] document-bound canvas facade unavailable; returning inert facade instead of global fallback { documentId: [32m'doc-1773027775888-tmnqzxrsw'[39m, documentType: [32m'missing'[39m }
+
+[90mstderr[2m | src/stores/__tests__/canvasFacade.contract.test.ts[2m > [22m[2mCanvasFacade (DocumentAdapter)[2m > [22m[2mpage/document switching contract[2m > [22m[2mclosing a document does not affect other open documents
+[22m[39mFailed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+Failed to broadcast canvas document sync update: TypeError: Cannot read properties of undefined (reading 'invoke')
+    at invoke [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/core.js:202:39[90m)[39m
+    at Module.emit [90m(file:///C:/Users/chanh/Projects/ModOne/[39mnode_modules/[4m.pnpm[24m/@tauri-apps+api@2.9.1/node_modules/[4m@tauri-apps/api[24m/event.js:129:11[90m)[39m
+    at broadcastDocumentSync (C:/Users/chanh/Projects/ModOne/src/utils/documentSync.ts:74:18)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+
+ [32m✓[39m src/stores/__tests__/canvasFacade.contract.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 165[2mms[22m[39m
+ [32m✓[39m src/__tests__/pin-grid-alignment.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+(node:104984) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+ [32m✓[39m src/components/LadderEditor/properties/__tests__/LadderPropertiesPanel.test.tsx [2m([22m[2m13 tests[22m[2m)[22m[32m 192[2mms[22m[39m
+ [32m✓[39m src/__tests__/builtin-symbol-migration.test.ts [2m([22m[2m138 tests[22m[2m)[22m[32m 50[2mms[22m[39m
+ [32m✓[39m src/components/LadderEditor/__tests__/InlineEditPopover.test.tsx [2m([22m[2m15 tests[22m[2m)[22m[33m 1037[2mms[22m[39m
+     [33m[2m✓[22m[39m calls onApply with updated address when Apply button is clicked [33m 346[2mms[22m[39m
+ [32m✓[39m src/components/OneParser/__tests__/AstBuilder.test.ts [2m([22m[2m27 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/__tests__/port-positions.test.ts [2m([22m[2m70 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/windowStore.test.ts [2m([22m[2m34 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/components/LadderEditor/utils/__tests__/validation.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/services/__tests__/projectService.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/services/__tests__/simulationService.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/components/OneCanvas/utils/__tests__/wireGeometryRoundtrip.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/components/OneCanvas/utils/__tests__/canvas-commands.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/__tests__/wire-routing-verification.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/__tests__/symbol-validation.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/components/OneCanvas/utils/__tests__/buildCanonicalWirePolyline.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/__tests__/symbol-model.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/components/OneCanvas/utils/__tests__/coordinate-system-integration.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/__tests__/symbol-serialization.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/documentSync.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/components/OneCanvas/utils/__tests__/canvasCoordinates.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/canvasStore.redo.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 8[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m40 passed[39m[22m[90m (40)[39m
+[2m      Tests [22m [1m[32m986 passed[39m[22m[90m (986)[39m
+[2m   Start at [22m 12:42:51
+[2m   Duration [22m 7.06s[2m (transform 7.23s, setup 9.86s, import 12.82s, tests 4.54s, environment 104.14s)[22m
+
