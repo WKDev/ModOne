@@ -380,7 +380,8 @@ export class InteractionController {
     if (key === 'Escape') {
       if (this._state === 'wire_drawing') {
         if (this._wireBendPoints.length > 0) {
-          const lastBend = this._wireBendPoints[this._wireBendPoints.length - 1];
+          // Last bend becomes the endpoint; remove it from handles to avoid duplication
+          const lastBend = this._wireBendPoints.pop()!;
           this._completeWire(lastBend);
         } else {
           this._resetWireDrawing();
@@ -829,8 +830,19 @@ export class InteractionController {
       return;
     }
 
-    // Click on empty canvas — add bend point (grid-snapped)
+    // Click on empty canvas — add bend point(s) (grid-snapped)
+    // Must include the L-shape corner point that the preview shows,
+    // otherwise the next segment starts from the wrong position
+    // and creates a diagonal instead of orthogonal routing.
     const snappedPos = this._snapToGrid(worldPos);
+    const lastPoint = this._wireBendPoints.length > 0
+      ? this._wireBendPoints[this._wireBendPoints.length - 1]
+      : this._wireDrawingFromPos;
+
+    if (lastPoint.x !== snappedPos.x && lastPoint.y !== snappedPos.y) {
+      // Insert the L-shape corner (horizontal-first, matching preview)
+      this._wireBendPoints.push({ x: snappedPos.x, y: lastPoint.y });
+    }
     this._wireBendPoints.push(snappedPos);
   }
 
