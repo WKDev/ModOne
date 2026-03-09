@@ -101,6 +101,7 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
   const [wireContextMenu, setWireContextMenu] = useState<WireContextMenuState | null>(null);
+  const [isWireMode, setIsWireMode] = useState(false);
 
   useEffect(() => {
     const toggle = () => {
@@ -197,6 +198,14 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
     },
     [removeWire, wireContextMenu]
   );
+
+  const handleStartWireMode = useCallback(() => {
+    canvasRef.current?.startWireMode();
+  }, []);
+
+  const handleInteractionStateChange = useCallback((state: string) => {
+    setIsWireMode(state === 'wire_mode' || state === 'wire_drawing');
+  }, []);
 
   const handleSelectSymbol = useCallback(
     (blockType: string) => {
@@ -349,6 +358,8 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
             onOpenLibrary={() => setLibraryOpen(true)}
             onOpenSymbolEditor={() => useSymbolStore.getState().openEditor()}
             onSelectSymbol={handleSelectSymbol}
+            onStartWireMode={handleStartWireMode}
+            isWireMode={isWireMode}
           />
 
           <div className="flex-1 relative overflow-hidden">
@@ -358,10 +369,11 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
             >
               <CanvasHost
                 ref={canvasRef}
-                className="w-full h-full"
+                className={`w-full h-full ${isWireMode ? 'cursor-crosshair' : ''}`}
                 documentId={documentId}
                 facade={facade}
                 onPlaceBlock={handlePlaceBlock}
+                onInteractionStateChange={handleInteractionStateChange}
               />
 
               <CanvasMinimap

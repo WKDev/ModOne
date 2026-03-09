@@ -22,7 +22,7 @@ export interface Modifiers {
   space: boolean;
 }
 
-type InteractionState =
+export type InteractionState =
   | 'idle'
   | 'panning'
   | 'item_pending'
@@ -77,6 +77,7 @@ export interface InteractionControllerConfig {
     flipH: boolean,
     flipV: boolean
   ) => void;
+  onStateChange?: (state: InteractionState) => void;
 }
 
 // ============================================================================
@@ -103,6 +104,7 @@ export class InteractionController {
   private _spatialIndex: SpatialIndex;
   private _visuals: InteractionVisuals;
   private _onPlaceBlock: InteractionControllerConfig['onPlaceBlock'];
+  private _onStateChange: InteractionControllerConfig['onStateChange'];
   private _destroyed = false;
 
   // Facade ref — updated externally on every React render
@@ -160,6 +162,7 @@ export class InteractionController {
     this._spatialIndex = config.spatialIndex;
     this._visuals = config.visuals;
     this._onPlaceBlock = config.onPlaceBlock;
+    this._onStateChange = config.onStateChange;
   }
 
   get state(): InteractionState {
@@ -182,6 +185,10 @@ export class InteractionController {
     this._onPlaceBlock = cb;
   }
 
+  setOnStateChange(cb: InteractionControllerConfig['onStateChange']): void {
+    this._onStateChange = cb;
+  }
+
   // ==========================================================================
   // Public Commands
   // ==========================================================================
@@ -195,28 +202,32 @@ export class InteractionController {
     this._placingFlipH = false;
     this._placingFlipV = false;
     this._visuals.showGhost(blockType);
+    this._onStateChange?.(this._state);
   }
 
   startWireMode(): void {
     this._resetTransient();
     this._state = 'wire_mode';
+    this._visuals.setPortsVisible(true);
+    this._onStateChange?.(this._state);
   }
 
   cancel(): void {
     if (this._state === 'placing') {
       this._visuals.hideGhost();
     }
-    if (this._state === 'wire_drawing') {
+    if (this._state === 'wire_drawing' || this._state === 'wire_mode') {
       this._visuals.clearWirePreview();
       this._visuals.hidePortSnap();
-
-    this._wireBendPoints = [];
+      this._visuals.setPortsVisible(false);
+      this._wireBendPoints = [];
     }
     if (this._state === 'box_selecting' || this._state === 'box_pending') {
       this._visuals.clearMarquee();
     }
     this._resetTransient();
     this._state = 'idle';
+    this._onStateChange?.(this._state);
   }
 
   destroy(): void {
@@ -871,6 +882,7 @@ export class InteractionController {
     this._wireDrawingFromPos = { x: 0, y: 0 };
     this._wireBendPoints = [];
     this._state = this._wireDrawingReturnState;
+    this._onStateChange?.(this._state);
   }
 
   private _snapToGrid(pos: Position): Position {

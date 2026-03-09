@@ -160,7 +160,10 @@ export interface CanvasHostHandle {
   /** Start click-to-place mode for a block type */
   startPlacing(blockType: string): void;
 
-  /** Cancel placement mode */
+  /** Start wire drawing mode */
+  startWireMode(): void;
+
+  /** Cancel placement/wire mode */
   cancelPlacing(): void;
 
   /** Get the underlying Pixi Application (for advanced use) */
@@ -180,6 +183,7 @@ export interface CanvasHostProps {
   style?: CSSProperties;
   className?: string;
   onPlaceBlock?: (blockType: string, position: Position, rotation: number, flipH: boolean, flipV: boolean) => void;
+  onInteractionStateChange?: (state: string) => void;
 }
 
 // ============================================================================
@@ -198,7 +202,7 @@ const CONTAINER_STYLE: CSSProperties = {
  * It exposes an imperative handle for the parent to drive rendering.
  */
 export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
-  function CanvasHost({ documentId, config, facade, onViewportChange, shortcutCallbacks, onPlaceBlock, style, className }, ref) {
+  function CanvasHost({ documentId, config, facade, onViewportChange, shortcutCallbacks, onPlaceBlock, onInteractionStateChange, style, className }, ref) {
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasConfig = config ?? DEFAULT_CANVAS_CONFIG;
 
@@ -238,6 +242,8 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
     onViewportChangeRef.current = onViewportChange;
     const onPlaceBlockRef = useRef(onPlaceBlock);
     onPlaceBlockRef.current = onPlaceBlock;
+    const onInteractionStateChangeRef = useRef(onInteractionStateChange);
+    onInteractionStateChangeRef.current = onInteractionStateChange;
     const documentIdRef = useRef<string | null>(documentId ?? null);
 
     const getActiveCanvasData = () => {
@@ -407,6 +413,7 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
           spatialIndex: spatial,
           visuals,
           onPlaceBlock: (...args) => onPlaceBlockRef.current?.(...args),
+          onStateChange: (state) => onInteractionStateChangeRef.current?.(state),
         });
         controller.setFacade(facadeRef.current);
         controllerRef.current = controller;
@@ -422,7 +429,10 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
         const shortcuts = new KeyboardShortcuts();
         shortcuts.init({
           domElement: container,
-          callbacks: shortcutCallbacks ?? {},
+          callbacks: {
+            ...shortcutCallbacks,
+            startWireMode: shortcutCallbacks?.startWireMode ?? (() => controller.startWireMode()),
+          },
           gridSize: canvasConfig.grid.size,
         });
         keyboardShortcutsRef.current = shortcuts;
@@ -805,6 +815,10 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
 
       startPlacing(blockType: string) {
         controllerRef.current?.startPlacing(blockType);
+      },
+
+      startWireMode() {
+        controllerRef.current?.startWireMode();
       },
 
       cancelPlacing() {
