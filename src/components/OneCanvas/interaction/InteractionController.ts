@@ -208,7 +208,7 @@ export class InteractionController {
     if (this._state === 'wire_drawing') {
       this._visuals.clearWirePreview();
       this._visuals.hidePortSnap();
-      this._visuals.setPortsVisible(false);
+
     }
     if (this._state === 'box_selecting' || this._state === 'box_pending') {
       this._visuals.clearMarquee();
@@ -690,7 +690,7 @@ export class InteractionController {
     this._wireDrawingFromPos = worldPos;
     this._lastMoveWorld = worldPos;
     this._wireSnapTarget = null;
-    this._visuals.setPortsVisible(true);
+
   }
 
   private _handleWireDrawingMove(worldPos: Position): void {
@@ -765,7 +765,7 @@ export class InteractionController {
 
     this._visuals.clearWirePreview();
     this._visuals.hidePortSnap();
-    this._visuals.setPortsVisible(false);
+
     this._wireFrom = null;
     this._wireFromExitDirection = null;
     this._lastMoveWorld = null;
@@ -821,15 +821,59 @@ export class InteractionController {
     _worldPos: Position,
     target: HitTestResult
   ): void {
+    const facade = this._facade;
+    const wireId = target.id || null;
     this._state = 'wire_segment_dragging';
     const segHandleA =
       typeof target.subIndex === 'number' ? target.subIndex : 0;
-    this._segmentWireId = target.id || null;
+    this._segmentWireId = wireId;
     this._segmentHandleA = segHandleA;
     this._segmentHandleB = segHandleA + 1;
     this._segmentOrientation = inferSegmentOrientation(target);
     this._segmentPrevDelta = { x: 0, y: 0 };
     this._segmentIsFirstMove = true;
+
+    if (!facade || !wireId) return;
+
+    const wire = facade.wires.find((candidate) => candidate.id === wireId);
+    if (!wire) return;
+
+    const handleCount = wire.handles?.length ?? 0;
+    const isFromConnectedSegment = segHandleA === 0;
+    const isToConnectedSegment = segHandleA >= handleCount;
+
+    if (isFromConnectedSegment && isPortEndpoint(wire.from)) {
+      const fromPos = resolvePortEndpointPosition(wire.from, facade);
+      if (fromPos) {
+        facade.insertEndpointHandle(wireId, 'from', [
+          { position: fromPos, constraint: 'free' },
+        ]);
+      }
+    }
+
+    if (isToConnectedSegment && isPortEndpoint(wire.to)) {
+      const toPos = resolvePortEndpointPosition(wire.to, facade);
+      if (toPos) {
+        facade.insertEndpointHandle(wireId, 'to', [
+          { position: toPos, constraint: 'free' },
+        ]);
+      }
+    }
+
+    const wireAfterInsertion = facade.wires.find((candidate) => candidate.id === wireId);
+    if (!wireAfterInsertion) return;
+
+    if (isFromConnectedSegment) {
+      this._segmentHandleA = 0;
+      this._segmentHandleB = 1;
+      return;
+    }
+
+    if (isToConnectedSegment) {
+      const lastIndex = Math.max(0, (wireAfterInsertion.handles?.length ?? 0) - 1);
+      this._segmentHandleA = Math.max(0, lastIndex - 1);
+      this._segmentHandleB = lastIndex;
+    }
   }
 
   private _handleSegmentDraggingMove(worldPos: Position): void {
@@ -862,6 +906,9 @@ export class InteractionController {
   private _handleSegmentDraggingUp(): void {
     // Handles are already at the correct final position from incremental move handler.
     // No duplicate delta application needed.
+    if (this._segmentWireId) {
+      this._facade?.cleanupOverlappingHandles(this._segmentWireId);
+    }
     this._segmentWireId = null;
     this._segmentHandleA = -1;
     this._segmentHandleB = -1;
@@ -1087,6 +1134,24 @@ function inferSegmentOrientation(
 ): 'horizontal' | 'vertical' | null {
   if (typeof target.subIndex !== 'number') return null;
   return target.subIndex % 2 === 0 ? 'horizontal' : 'vertical';
+}
+
+function resolvePortEndpointPosition(
+  endpoint: WireEndpoint,
+  facade: CanvasFacadeReturn
+): Position | null {
+  if (!isPortEndpoint(endpoint)) return null;
+
+  const block = facade.components.get(endpoint.componentId);
+  if (!block) return null;
+
+  const port = block.ports.find((candidate) => candidate.id === endpoint.portId);
+  if (!port) return null;
+
+  return {
+    x: block.position.x + (port.absolutePosition?.x ?? 0),
+    y: block.position.y + (port.absolutePosition?.y ?? 0),
+  };
 }
 
 function rectFromTwoPoints(a: Position, b: Position) {

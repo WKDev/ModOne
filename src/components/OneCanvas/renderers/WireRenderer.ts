@@ -46,7 +46,7 @@ export interface WireStyle {
 }
 
 const DEFAULT_WIRE_STYLE: WireStyle = {
-  color: 0xd0d4da,
+  color: 0x4a4f57,
   width: 2,
   selectedColor: 0x4dabf7,
   selectedWidth: 2.5,

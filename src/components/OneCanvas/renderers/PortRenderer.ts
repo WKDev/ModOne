@@ -97,7 +97,7 @@ export class PortRenderer {
   private _snapGraphics: Graphics | null = null;
   private _portContexts: Record<string, GraphicsContext>;
   private _snapContext: GraphicsContext;
-  private _showAll = false; // toggled via setShowAll()
+  private _showAll = true; // toggled via setShowAll()
   private _destroyed = false;
 
   constructor(options: PortRendererOptions) {
@@ -114,6 +114,8 @@ export class PortRenderer {
       bidirectional: createPortContext(s.defaultColor, s.radius, s.strokeWidth, s.strokeColor),
     };
     this._snapContext = createSnapContext(s.snapHighlightColor, s.snapHighlightRadius);
+
+    this._layer.visible = true;
   }
 
   // --------------------------------------------------------------------------
