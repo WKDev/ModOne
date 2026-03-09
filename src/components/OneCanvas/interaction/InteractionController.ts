@@ -863,11 +863,8 @@ export class InteractionController {
   }
 
   private _handleSegmentDraggingUp(): void {
-    const finalDelta = this._segmentAppliedDelta;
-    if (finalDelta.x !== 0 || finalDelta.y !== 0) {
-      this._segmentPrevDelta = finalDelta;
-    }
-
+    // Handles are already at the correct final position from incremental move handler.
+    // No duplicate delta application needed.
     this._segmentWireId = null;
     this._segmentHandleA = -1;
     this._segmentHandleB = -1;
