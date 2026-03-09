@@ -702,7 +702,7 @@ export class InteractionController {
   // ==========================================================================
 
   private _startWireDrawing(
-    worldPos: Position,
+    _worldPos: Position,
     target: HitTestResult
   ): void {
     this._wireDrawingReturnState = this._state === 'wire_mode' ? 'wire_mode' : 'idle';
@@ -712,11 +712,13 @@ export class InteractionController {
       portId: target.id,
     };
     this._wireFromExitDirection = getPortDirection(target);
-    this._wireDrawingFromPos = worldPos;
-    this._lastMoveWorld = worldPos;
+    // Use the exact port center position (from hit test), not the raw mouse position.
+    // This ensures preview matches the final rendered wire, which resolves
+    // endpoints from block.position + port.absolutePosition.
+    this._wireDrawingFromPos = target.position;
+    this._lastMoveWorld = target.position;
     this._wireSnapTarget = null;
     this._wireBendPoints = [];
-
   }
 
   private _handleWireDrawingMove(worldPos: Position): void {
