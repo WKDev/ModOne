@@ -127,6 +127,8 @@ export class InteractionController {
   private _wireFrom: WireEndpoint | null = null;
   private _wireFromExitDirection: PortPosition | null = null;
   private _wireSnapTarget: WireSnapTarget | null = null;
+  private _wireDrawingReturnState: 'idle' | 'wire_mode' = 'idle';
+  private _wireDrawingFromPos: Position = { x: 0, y: 0 };
 
   // Wire segment dragging
   private _segmentWireId: string | null = null;
@@ -134,6 +136,8 @@ export class InteractionController {
   private _segmentHandleB = -1;
   private _segmentOrientation: 'horizontal' | 'vertical' | null = null;
   private _segmentAppliedDelta: Position = { x: 0, y: 0 };
+  private _segmentPrevDelta: Position = { x: 0, y: 0 };
+  private _segmentIsFirstMove = true;
 
   // Wire handle dragging
   private _handleWireId: string | null = null;
@@ -677,12 +681,14 @@ export class InteractionController {
     worldPos: Position,
     target: HitTestResult
   ): void {
+    this._wireDrawingReturnState = this._state === 'wire_mode' ? 'wire_mode' : 'idle';
     this._state = 'wire_drawing';
     this._wireFrom = {
       componentId: target.parentId ?? '',
       portId: target.id,
     };
     this._wireFromExitDirection = getPortDirection(target);
+    this._wireDrawingFromPos = worldPos;
     this._lastMoveWorld = worldPos;
     this._wireSnapTarget = null;
     this._visuals.setPortsVisible(true);
@@ -721,7 +727,12 @@ export class InteractionController {
 
     // Visual feedback
     if (this._wireFrom && isPortEndpoint(this._wireFrom)) {
-      this._visuals.renderWirePreview([worldPos]);
+      const fromPos = this._wireDrawingFromPos;
+      const exitDir = this._wireFromExitDirection;
+      const mid = !exitDir || exitDir === 'left' || exitDir === 'right'
+        ? { x: worldPos.x, y: fromPos.y }
+        : { x: fromPos.x, y: worldPos.y };
+      this._visuals.renderWirePreview([fromPos, mid, worldPos]);
     }
 
     if (this._wireSnapTarget) {
@@ -760,7 +771,8 @@ export class InteractionController {
     this._wireFromExitDirection = null;
     this._lastMoveWorld = null;
     this._wireSnapTarget = null;
-    this._state = 'wire_mode';
+    this._wireDrawingFromPos = { x: 0, y: 0 };
+    this._state = this._wireDrawingReturnState;
   }
 
   private _handleWireModePointerDown(
@@ -818,44 +830,42 @@ export class InteractionController {
     this._segmentHandleB = segHandleA + 1;
     this._segmentOrientation = inferSegmentOrientation(target);
     this._segmentAppliedDelta = { x: 0, y: 0 };
+    this._segmentPrevDelta = { x: 0, y: 0 };
+    this._segmentIsFirstMove = true;
   }
 
   private _handleSegmentDraggingMove(worldPos: Position): void {
     if (!this._pointerStartWorld || !this._segmentWireId) return;
-
     const facade = this._facade;
     if (!facade) return;
 
     const snapped = snapDelta(subtract(worldPos, this._pointerStartWorld));
-    const constrained = constrainSegmentDelta(
-      snapped,
-      this._segmentOrientation
-    );
-    this._segmentAppliedDelta = constrained;
+    const constrained = constrainSegmentDelta(snapped, this._segmentOrientation);
 
-    if (constrained.x !== 0 || constrained.y !== 0) {
+    const incrementalDelta = {
+      x: constrained.x - this._segmentPrevDelta.x,
+      y: constrained.y - this._segmentPrevDelta.y,
+    };
+    this._segmentAppliedDelta = constrained;
+    this._segmentPrevDelta = constrained;
+
+    if (incrementalDelta.x !== 0 || incrementalDelta.y !== 0) {
+      const isFirstMove = this._segmentIsFirstMove;
+      this._segmentIsFirstMove = false;
       facade.moveWireSegment(
         this._segmentWireId,
         this._segmentHandleA,
         this._segmentHandleB,
-        constrained,
-        true
+        incrementalDelta,
+        isFirstMove
       );
     }
   }
 
   private _handleSegmentDraggingUp(): void {
-    if (this._segmentWireId) {
-      const delta = this._segmentAppliedDelta;
-      if (delta.x !== 0 || delta.y !== 0) {
-        this._facade?.moveWireSegment(
-          this._segmentWireId,
-          this._segmentHandleA,
-          this._segmentHandleB,
-          delta,
-          false
-        );
-      }
+    const finalDelta = this._segmentAppliedDelta;
+    if (finalDelta.x !== 0 || finalDelta.y !== 0) {
+      this._segmentPrevDelta = finalDelta;
     }
 
     this._segmentWireId = null;
@@ -863,6 +873,8 @@ export class InteractionController {
     this._segmentHandleB = -1;
     this._segmentOrientation = null;
     this._segmentAppliedDelta = { x: 0, y: 0 };
+    this._segmentPrevDelta = { x: 0, y: 0 };
+    this._segmentIsFirstMove = true;
     this._state = 'idle';
     this._clearPointerTracking();
   }
@@ -1001,11 +1013,15 @@ export class InteractionController {
     this._wireFromExitDirection = null;
     this._lastMoveWorld = null;
     this._wireSnapTarget = null;
+    this._wireDrawingReturnState = 'idle';
+    this._wireDrawingFromPos = { x: 0, y: 0 };
     this._segmentWireId = null;
     this._segmentHandleA = -1;
     this._segmentHandleB = -1;
     this._segmentOrientation = null;
     this._segmentAppliedDelta = { x: 0, y: 0 };
+    this._segmentPrevDelta = { x: 0, y: 0 };
+    this._segmentIsFirstMove = true;
     this._handleWireId = null;
     this._handleIndex = -1;
     this._handleConstraint = 'free';

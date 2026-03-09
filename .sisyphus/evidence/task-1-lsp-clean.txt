@@ -1,0 +1,2 @@
+LSP diagnostics for src/components/OneCanvas/interaction/InteractionController.ts
+Result: No diagnostics found
