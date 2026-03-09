@@ -4,9 +4,10 @@ import type {
   HitTestResult,
   Position,
   PortPosition,
+  Wire,
   WireEndpoint,
 } from '../types';
-import { isPortEndpoint } from '../types';
+import { isPortEndpoint, isFloatingEndpoint } from '../types';
 import type { HitTester } from '../core/HitTester';
 import type { SpatialIndex } from '../core/SpatialIndex';
 
@@ -749,9 +750,12 @@ export class InteractionController {
       }
     }
 
-    // Visual feedback — straight lines through bend points, grid-snap only
+    // Visual feedback — orthogonal lines through bend points
     const fromPos = this._wireDrawingFromPos;
-    const currentTarget = this._wireSnapTarget?.position ?? this._snapToGrid(worldPos);
+    const rawTarget = this._wireSnapTarget?.position ?? this._snapToGrid(worldPos);
+    const currentTarget = this._wireSnapTarget
+      ? rawTarget
+      : this._snapToOrthogonal(rawTarget);
     const previewPoints: Position[] = [fromPos, ...this._wireBendPoints, currentTarget];
 
     this._visuals.renderWirePreview(previewPoints);
@@ -821,13 +825,19 @@ export class InteractionController {
       return;
     }
 
-    // Click on empty canvas — record bend point exactly where clicked (grid-snapped)
-    const snappedPos = this._snapToGrid(worldPos);
+    // Click on empty canvas — record bend point orthogonally constrained
+    const snappedPos = this._snapToOrthogonal(this._snapToGrid(worldPos));
     this._wireBendPoints.push(snappedPos);
   }
 
-  private _completeWire(endPosition?: Position): void {
+  private _completeWire(_endPosition?: Position): void {
     if (!this._wireFrom) {
+      this._resetWireDrawing();
+      return;
+    }
+
+    // Cancel if starting from a floating endpoint (not connected to anything)
+    if (isFloatingEndpoint(this._wireFrom)) {
       this._resetWireDrawing();
       return;
     }
@@ -841,9 +851,8 @@ export class InteractionController {
       } else if (snapTarget.type === 'junction') {
         to = { junctionId: snapTarget.id } as WireEndpoint;
       }
-    } else if (endPosition) {
-      to = { position: this._snapToGrid(endPosition) };
     }
+    // No floating endpoint creation — wire must end at a port or junction
 
     if (to && this._facade) {
       // Convert user bend points to WireHandle format
@@ -884,10 +893,33 @@ export class InteractionController {
     };
   }
 
+  /** Constrain position to 90-degree (horizontal/vertical) from last anchor point */
+  private _snapToOrthogonal(pos: Position): Position {
+    const anchor =
+      this._wireBendPoints.length > 0
+        ? this._wireBendPoints[this._wireBendPoints.length - 1]
+        : this._wireDrawingFromPos;
+    if (!anchor) return pos;
+    const dx = Math.abs(pos.x - anchor.x);
+    const dy = Math.abs(pos.y - anchor.y);
+    // Snap to whichever axis has more displacement
+    if (dx >= dy) {
+      return { x: pos.x, y: anchor.y }; // horizontal
+    } else {
+      return { x: anchor.x, y: pos.y }; // vertical
+    }
+  }
+
   // ==========================================================================
   // Wire Segment Dragging
   // ==========================================================================
 
+  /**
+   * Start dragging a wire segment.
+   * target.subIndex is the polyline segment index (0 = endpoint→first handle).
+   * For endpoint-adjacent segments, inserts handles at the endpoint position
+   * so that dragging creates perpendicular connecting segments automatically.
+   */
   private _startWireSegmentDragging(
     _worldPos: Position,
     target: HitTestResult
@@ -895,26 +927,32 @@ export class InteractionController {
     const facade = this._facade;
     const wireId = target.id || null;
     this._state = 'wire_segment_dragging';
-    const segHandleA =
-      typeof target.subIndex === 'number' ? target.subIndex : 0;
     this._segmentWireId = wireId;
-    this._segmentHandleA = segHandleA;
-    this._segmentHandleB = segHandleA + 1;
-    this._segmentOrientation = inferSegmentOrientation(target);
+    this._segmentOrientation = null;
     this._segmentPrevDelta = { x: 0, y: 0 };
     this._segmentIsFirstMove = true;
+    this._segmentHandleA = 0;
+    this._segmentHandleB = 1;
 
     if (!facade || !wireId) return;
 
     const wire = facade.wires.find((candidate) => candidate.id === wireId);
     if (!wire) return;
 
+    const polySegIndex =
+      typeof target.subIndex === 'number' ? target.subIndex : 0;
     const handleCount = wire.handles?.length ?? 0;
-    const isFromConnectedSegment = segHandleA === 0;
-    const isToConnectedSegment = segHandleA >= handleCount;
 
-    if (isFromConnectedSegment && isPortEndpoint(wire.from)) {
-      const fromPos = resolvePortEndpointPosition(wire.from, facade);
+    // Polyline: [fromPos, H0, H1, ..., H(N-1), toPos]
+    // Segment 0: fromPos → H0 (or fromPos → toPos if no handles)
+    // Segment i (1..N-1): H(i-1) → Hi
+    // Segment N: H(N-1) → toPos
+    const isFromSegment = polySegIndex === 0;
+    const isToSegment = polySegIndex === handleCount; // last polyline segment
+
+    // Insert endpoint handles for endpoint-adjacent segments
+    if (isFromSegment) {
+      const fromPos = resolveEndpointPosition(wire.from, facade);
       if (fromPos) {
         facade.insertEndpointHandle(wireId, 'from', [
           { position: fromPos, constraint: 'free' },
@@ -922,8 +960,8 @@ export class InteractionController {
       }
     }
 
-    if (isToConnectedSegment && isPortEndpoint(wire.to)) {
-      const toPos = resolvePortEndpointPosition(wire.to, facade);
+    if (isToSegment) {
+      const toPos = resolveEndpointPosition(wire.to, facade);
       if (toPos) {
         facade.insertEndpointHandle(wireId, 'to', [
           { position: toPos, constraint: 'free' },
@@ -931,20 +969,39 @@ export class InteractionController {
       }
     }
 
-    const wireAfterInsertion = facade.wires.find((candidate) => candidate.id === wireId);
+    const wireAfterInsertion = facade.wires.find(
+      (candidate) => candidate.id === wireId
+    );
     if (!wireAfterInsertion) return;
 
-    if (isFromConnectedSegment) {
+    const newHandleCount = wireAfterInsertion.handles?.length ?? 0;
+
+    // Calculate handle indices after insertions
+    if (isFromSegment && isToSegment) {
+      // Single-segment wire (had no handles, now has 2 after both insertions)
+      this._segmentHandleA = 0;
+      this._segmentHandleB = Math.min(1, newHandleCount - 1);
+    } else if (isFromSegment) {
+      // From-endpoint segment: after insertion, drag handles 0-1
       this._segmentHandleA = 0;
       this._segmentHandleB = 1;
-      return;
+    } else if (isToSegment) {
+      // To-endpoint segment: after insertion, drag last two handles
+      this._segmentHandleA = Math.max(0, newHandleCount - 2);
+      this._segmentHandleB = newHandleCount - 1;
+    } else {
+      // Middle segment: polyline index i → handle indices (i-1, i)
+      // (shift by -1 because polyline[0] is the from endpoint, not a handle)
+      this._segmentHandleA = polySegIndex - 1;
+      this._segmentHandleB = polySegIndex;
     }
 
-    if (isToConnectedSegment) {
-      const lastIndex = Math.max(0, (wireAfterInsertion.handles?.length ?? 0) - 1);
-      this._segmentHandleA = Math.max(0, lastIndex - 1);
-      this._segmentHandleB = lastIndex;
-    }
+    // Compute orientation from actual handle geometry
+    this._segmentOrientation = inferOrientationFromHandles(
+      wireAfterInsertion,
+      this._segmentHandleA,
+      this._segmentHandleB
+    );
   }
 
   private _handleSegmentDraggingMove(worldPos: Position): void {
@@ -1200,29 +1257,65 @@ function getPortDirection(target: HitTestResult): PortPosition | null {
   return PORT_DIRECTIONS[target.subIndex] ?? null;
 }
 
-function inferSegmentOrientation(
-  target: HitTestResult
+/**
+ * Infer segment orientation from the actual handle positions.
+ * A segment between two handles is horizontal if dy ≈ 0, vertical if dx ≈ 0.
+ * For diagonal segments, the dominant axis determines constraint direction.
+ */
+function inferOrientationFromHandles(
+  wire: Wire,
+  handleIndexA: number,
+  handleIndexB: number
 ): 'horizontal' | 'vertical' | null {
-  if (typeof target.subIndex !== 'number') return null;
-  return target.subIndex % 2 === 0 ? 'horizontal' : 'vertical';
+  const handles = wire.handles;
+  if (!handles || handleIndexA < 0 || handleIndexB >= handles.length) return null;
+
+  const a = handles[handleIndexA].position;
+  const b = handles[handleIndexB].position;
+  const dx = Math.abs(b.x - a.x);
+  const dy = Math.abs(b.y - a.y);
+
+  // Threshold to treat near-zero differences as zero (grid snap tolerance)
+  const EPS = 1;
+  if (dy <= EPS && dx > EPS) return 'horizontal';
+  if (dx <= EPS && dy > EPS) return 'vertical';
+  // Diagonal or zero-length: use dominant axis
+  if (dx > dy) return 'horizontal';
+  if (dy > dx) return 'vertical';
+  return null;
 }
 
-function resolvePortEndpointPosition(
+/**
+ * Resolve any wire endpoint type to its world position.
+ */
+function resolveEndpointPosition(
   endpoint: WireEndpoint,
   facade: CanvasFacadeReturn
 ): Position | null {
-  if (!isPortEndpoint(endpoint)) return null;
-
-  const block = facade.components.get(endpoint.componentId);
-  if (!block) return null;
-
-  const port = block.ports.find((candidate) => candidate.id === endpoint.portId);
-  if (!port) return null;
-
-  return {
-    x: block.position.x + (port.absolutePosition?.x ?? 0),
-    y: block.position.y + (port.absolutePosition?.y ?? 0),
-  };
+  if (isFloatingEndpoint(endpoint)) {
+    return endpoint.position;
+  }
+  if (isPortEndpoint(endpoint)) {
+    const block = facade.components.get(endpoint.componentId);
+    if (!block) return null;
+    const port = block.ports.find(
+      (candidate) => candidate.id === endpoint.portId
+    );
+    if (!port) return null;
+    return {
+      x: block.position.x + (port.absolutePosition?.x ?? 0),
+      y: block.position.y + (port.absolutePosition?.y ?? 0),
+    };
+  }
+  // JunctionEndpoint
+  if ('junctionId' in endpoint) {
+    const junction = facade.junctions.get(
+      (endpoint as { junctionId: string }).junctionId
+    );
+    if (!junction) return null;
+    return junction.position;
+  }
+  return null;
 }
 
 function rectFromTwoPoints(a: Position, b: Position) {

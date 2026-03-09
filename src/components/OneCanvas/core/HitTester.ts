@@ -9,8 +9,9 @@
  *   port > handle > junction > block > wire segment > none
  */
 
-import type { Position, Block, Wire, Junction } from '../types';
+import type { Position, Block, Wire, Junction, WireEndpoint } from '../types';
 import type { HitTestResult } from '../types';
+import { isPortEndpoint, isFloatingEndpoint, isJunctionEndpoint } from '../types';
 import { SpatialIndex } from './SpatialIndex';
 import type { SpatialItem } from './SpatialIndex';
 
@@ -57,7 +58,9 @@ const NO_HIT: HitTestResult = {
 export class HitTester {
   private _spatialIndex: SpatialIndex;
   private _config: HitTestConfig;
+  private _blocks: Record<string, Block> = {};
   private _wires: Record<string, Wire> = {};
+  private _junctions: Record<string, Junction> = {};
 
   constructor(spatialIndex: SpatialIndex, config?: Partial<HitTestConfig>) {
     this._spatialIndex = spatialIndex;
@@ -69,11 +72,13 @@ export class HitTester {
    * Call this when the circuit state changes.
    */
   updateData(
-    _blocks: Record<string, Block>,
+    blocks: Record<string, Block>,
     wires: Record<string, Wire>,
-    _junctions: Record<string, Junction>
+    junctions: Record<string, Junction>
   ): void {
+    this._blocks = blocks;
     this._wires = wires;
+    this._junctions = junctions;
   }
 
   /**
@@ -287,6 +292,11 @@ export class HitTester {
     };
   }
 
+  /**
+   * Test wire segments including endpoint-to-handle segments.
+   * Builds full polyline [fromPos, ...handles, toPos] and tests all segments.
+   * subIndex = polyline segment index (0 = from→first handle, etc.)
+   */
   private _testWireSegments(
     pos: Position,
     candidates: SpatialItem[]
@@ -299,12 +309,15 @@ export class HitTester {
 
     for (const wc of wireCandidates) {
       const wire = this._wires[wc.id];
-      if (!wire || !wire.handles || wire.handles.length < 2) continue;
+      if (!wire) continue;
 
-      // Test each segment between consecutive handles
-      for (let i = 0; i < wire.handles!.length - 1; i++) {
-        const a = wire.handles![i].position;
-        const b = wire.handles![i + 1].position;
+      // Build full polyline: [fromPos, ...handles, toPos]
+      const polyline = this._buildWirePolyline(wire);
+      if (!polyline || polyline.length < 2) continue;
+
+      for (let i = 0; i < polyline.length - 1; i++) {
+        const a = polyline[i];
+        const b = polyline[i + 1];
         const { distance, point } = pointToSegmentDistance(pos, a, b);
 
         if (distance < nearestDist) {
@@ -327,8 +340,54 @@ export class HitTester {
     };
   }
 
+  /**
+   * Build the full polyline for a wire: [fromPos, ...handles, toPos]
+   */
+  private _buildWirePolyline(wire: Wire): Position[] | null {
+    const fromPos = this._resolveEndpoint(wire.from);
+    if (!fromPos) return null;
+
+    const toPos = this._resolveEndpoint(wire.to);
+    if (!toPos) return null;
+
+    const points: Position[] = [fromPos];
+    for (const handle of wire.handles ?? []) {
+      points.push(handle.position);
+    }
+    points.push(toPos);
+
+    return points;
+  }
+
+  /**
+   * Resolve a wire endpoint to a world position.
+   */
+  private _resolveEndpoint(ep: WireEndpoint): Position | null {
+    if (isFloatingEndpoint(ep)) {
+      return ep.position;
+    }
+    if (isPortEndpoint(ep)) {
+      const block = this._blocks[ep.componentId];
+      if (!block) return null;
+      const port = block.ports.find((p) => p.id === ep.portId);
+      if (!port) return null;
+      return {
+        x: block.position.x + (port.absolutePosition?.x ?? 0),
+        y: block.position.y + (port.absolutePosition?.y ?? 0),
+      };
+    }
+    if (isJunctionEndpoint(ep)) {
+      const junction = this._junctions[ep.junctionId];
+      if (!junction) return null;
+      return junction.position;
+    }
+    return null;
+  }
+
   destroy(): void {
+    this._blocks = {};
     this._wires = {};
+    this._junctions = {};
   }
 }
 
