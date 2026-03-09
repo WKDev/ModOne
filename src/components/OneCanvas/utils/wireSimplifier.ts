@@ -179,6 +179,9 @@ export function buildWirePolyline(wire: Wire, geom: GeomApi): Position[] | null 
   return [fromPos, ...handlePositions, toPos];
 }
 
+/**
+ * @deprecated Handles are now the canonical wire representation. Use buildWirePolyline() instead.
+ */
 export function buildCanonicalWirePolyline(wire: Wire, geom: GeomApi): Position[] | null {
   const fromPos = resolveEndpointPosition(wire.from, geom);
   const toPos = resolveEndpointPosition(wire.to, geom);
@@ -221,6 +224,9 @@ export function buildCanonicalWirePolyline(wire: Wire, geom: GeomApi): Position[
   return orthogonalizePairs(withRequiredExitPoints);
 }
 
+/**
+ * @deprecated Constraint auto-assignment is being phased out. Handles should carry their own constraints.
+ */
 export function polylineToHandles(
   poly: readonly Position[],
   prevHandles: WireHandle[] | undefined,

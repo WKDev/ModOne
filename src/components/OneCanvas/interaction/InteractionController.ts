@@ -457,6 +457,8 @@ export class InteractionController {
 
       case 'none':
       default:
+        // In wire_mode-like behavior: if wire_mode is active, start wire from empty canvas
+        // Otherwise, start box selection
         this._state = 'box_pending';
         this._boxSelectStart = worldPos;
         this._boxSelectCurrent = worldPos;
@@ -741,20 +743,11 @@ export class InteractionController {
     const previewPoints: Position[] = [fromPos, ...this._wireBendPoints];
 
     // Add orthogonal routing from last point to current position
+    // Uniform horizontal-first L-shape for all segments (no exit direction dependency)
     const lastPoint = previewPoints[previewPoints.length - 1];
-    const exitDir = this._wireFromExitDirection;
 
-    if (previewPoints.length === 1 && exitDir) {
-      // First segment: use exit direction for L-shape
-      const mid = (exitDir === 'left' || exitDir === 'right')
-        ? { x: currentTarget.x, y: lastPoint.y }
-        : { x: lastPoint.x, y: currentTarget.y };
-      previewPoints.push(mid);
-    } else {
-      // Subsequent segments: prefer horizontal-first routing
-      if (lastPoint.x !== currentTarget.x && lastPoint.y !== currentTarget.y) {
-        previewPoints.push({ x: currentTarget.x, y: lastPoint.y });
-      }
+    if (lastPoint.x !== currentTarget.x && lastPoint.y !== currentTarget.y) {
+      previewPoints.push({ x: currentTarget.x, y: lastPoint.y });
     }
     previewPoints.push(currentTarget);
 
@@ -850,8 +843,18 @@ export class InteractionController {
     }
 
     if (to && this._facade) {
+      // Convert user bend points to WireHandle format
+      const handles = this._wireBendPoints.length > 0
+        ? this._wireBendPoints.map(pos => ({
+            position: pos,
+            constraint: 'free' as const,
+            source: 'user' as const,
+          }))
+        : undefined;
+
       this._facade.addWire(this._wireFrom, to, {
         fromExitDirection: this._wireFromExitDirection ?? undefined,
+        handles,
       });
     }
 

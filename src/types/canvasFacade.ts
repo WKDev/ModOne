@@ -91,7 +91,12 @@ export interface CanvasFacadeReturn {
   addWire: (
     from: WireEndpoint,
     to: WireEndpoint,
-    options?: { fromExitDirection?: PortPosition; toExitDirection?: PortPosition }
+    options?: {
+      fromExitDirection?: PortPosition;
+      toExitDirection?: PortPosition;
+      /** User-placed handles — when provided, skip auto bend point calculation */
+      handles?: Array<{ position: Position; constraint: 'horizontal' | 'vertical' | 'free'; source?: 'auto' | 'user' }>;
+    }
   ) => string | null;
   /** Remove a wire by ID */
   removeWire: (id: string) => void;

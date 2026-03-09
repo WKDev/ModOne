@@ -387,6 +387,39 @@ export function computeWireBendPoints(
 }
 
 // ============================================================================
+// Port Detection at Position
+// ============================================================================
+
+/**
+ * Detect if a port exists at a given position (within grid snap tolerance).
+ * Inverse of `getPortAbsolutePosition()` — given a position, find the port there.
+ */
+export function detectPortAtPosition(
+  position: Position,
+  components: Map<string, Block>,
+  gridSnap: number = 20
+): { componentId: string; portId: string } | null {
+  const tolerance = gridSnap / 2;
+
+  for (const [componentId, block] of components) {
+    for (const port of block.ports) {
+      const relPos = getPortRelativePosition(port.position, port.offset ?? 0.5, block.size);
+      const absX = block.position.x + relPos.x;
+      const absY = block.position.y + relPos.y;
+
+      if (
+        Math.abs(position.x - absX) <= tolerance &&
+        Math.abs(position.y - absY) <= tolerance
+      ) {
+        return { componentId, portId: port.id };
+      }
+    }
+  }
+
+  return null;
+}
+
+// ============================================================================
 // Block Rotation
 // ============================================================================
 

@@ -30,6 +30,7 @@ import type {
 import type { ComponentInstance } from '../types/circuit';
 import {
   isPortEndpoint,
+  isFloatingEndpoint,
   createSelectionState,
   addToSelectionState,
   removeFromSelectionState,
@@ -52,6 +53,7 @@ import {
   isValidEndpoint,
   findHandleInsertIndex,
   computeWireBendPoints,
+  detectPortAtPosition,
   getWiresConnectedToComponent,
   getWiresConnectedToJunction,
   recalculateAutoHandles,
@@ -59,6 +61,26 @@ import {
 import { polylineToHandles, simplifyWireHandles, enforceOrthogonalPolyline } from '../components/OneCanvas/utils/wireSimplifier';
 import { alignComponents, distributeComponents, flipComponents } from '../components/OneCanvas/utils/canvas-commands';
 import { isValidConnection } from '../components/OneCanvas/utils/connectionValidator';
+
+// ============================================================================
+// Wire Endpoint Promotion
+// ============================================================================
+
+/**
+ * If endpoint is a FloatingEndpoint and its position coincides with a port,
+ * promote it to a PortEndpoint. Otherwise return as-is.
+ */
+function detectAndPromoteEndpoint(
+  endpoint: WireEndpoint,
+  components: Map<string, Block>
+): WireEndpoint {
+  if (!isFloatingEndpoint(endpoint)) return endpoint;
+  const detected = detectPortAtPosition(endpoint.position, components);
+  if (detected) {
+    return { componentId: detected.componentId, portId: detected.portId };
+  }
+  return endpoint;
+}
 
 // ============================================================================
 // Types
@@ -160,8 +182,12 @@ interface CanvasActions {
   moveJunction: (id: string, position: Position, skipHistory?: boolean, skipWireRecalc?: boolean) => void;
 
   // Wire operations
-  /** Add a wire connection between two ports */
-  addWire: (from: WireEndpoint, to: WireEndpoint, options?: { fromExitDirection?: PortPosition; toExitDirection?: PortPosition }) => string | null;
+  /** Add a wire connection between two endpoints */
+  addWire: (from: WireEndpoint, to: WireEndpoint, options?: {
+    fromExitDirection?: PortPosition;
+    toExitDirection?: PortPosition;
+    handles?: Array<{ position: Position; constraint: 'horizontal' | 'vertical' | 'free'; source?: 'auto' | 'user' }>;
+  }) => string | null;
   /** Remove a wire by ID */
   removeWire: (id: string) => void;
   /** Create a junction on an existing wire, splitting it into two wires */
@@ -727,13 +753,22 @@ export const useCanvasStore = create<CanvasStore>()(
       addWire: (from, to, options) => {
         const state = get();
 
-        // Use centralized validator for comprehensive checks:
-        // endpoint existence, self-connection, same component, port type
-        // compatibility, port capacity limits, duplicate wire, and cycle detection
-        const validation = isValidConnection(from, to, state.components as Map<string, Block>, state.wires, state.junctions);
-        if (!validation.valid) {
-          console.warn('Invalid wire connection:', validation.reason);
+        // Phase 4: Auto-promote FloatingEndpoint → PortEndpoint if on a port
+        const promotedFrom = detectAndPromoteEndpoint(from, state.components as Map<string, Block>);
+        const promotedTo = detectAndPromoteEndpoint(to, state.components as Map<string, Block>);
+
+        // Self-connection check (only blocking validation)
+        const fromKey = endpointKey(promotedFrom);
+        const toKey = endpointKey(promotedTo);
+        if (fromKey === toKey) {
+          console.warn('Invalid wire connection: Cannot connect an endpoint to itself');
           return null;
+        }
+
+        // Advisory validation — warn but don't block wire creation
+        const validation = isValidConnection(promotedFrom, promotedTo, state.components as Map<string, Block>, state.wires, state.junctions);
+        if (!validation.valid) {
+          console.warn('Wire connection advisory:', validation.reason);
         }
 
         const id = generateId('wire');
@@ -742,7 +777,7 @@ export const useCanvasStore = create<CanvasStore>()(
           (state) => {
             pushHistorySnapshot(state);
 
-            const newWire: Wire = { id, from, to };
+            const newWire: Wire = { id, from: promotedFrom, to: promotedTo };
             if (options?.fromExitDirection) {
               newWire.fromExitDirection = options.fromExitDirection;
             }
@@ -750,21 +785,29 @@ export const useCanvasStore = create<CanvasStore>()(
               newWire.toExitDirection = options.toExitDirection;
             }
 
-            // Auto-generate bend points
-            const handles = computeWireBendPoints(
-              from, to, state.components as Map<string, Block>,
-              options?.fromExitDirection, options?.toExitDirection,
-              state.junctions
-            );
-            if (handles) {
-              newWire.handles = handles;
+            // Use user-provided handles if available, otherwise auto-generate
+            if (options?.handles && options.handles.length > 0) {
+              newWire.handles = options.handles.map(h => ({
+                position: h.position,
+                constraint: h.constraint,
+                source: h.source ?? 'user',
+              }));
+            } else {
+              const autoHandles = computeWireBendPoints(
+                promotedFrom, promotedTo, state.components as Map<string, Block>,
+                options?.fromExitDirection, options?.toExitDirection,
+                state.junctions
+              );
+              if (autoHandles) {
+                newWire.handles = autoHandles;
+              }
             }
 
             state.wires.push(newWire);
             state.isDirty = true;
           },
           false,
-          `addWire/${endpointKey(from)}-${endpointKey(to)}`
+          `addWire/${endpointKey(promotedFrom)}-${endpointKey(promotedTo)}`
         );
 
         return id;

@@ -82,12 +82,18 @@ export function getWireEndpoints(
 // Path Generation
 // ============================================================================
 
-/** Exit distance from port before routing */
+/**
+ * Exit distance from port before routing.
+ * @deprecated Port exit stubs are being phased out in favor of direct handle placement.
+ */
 export const PORT_EXIT_DISTANCE = 20;
 
 /**
  * Generate a port-direction aware orthogonal wire path with rounded corners.
  * Routes wire to exit in the direction the port faces, then routes to target.
+ *
+ * @deprecated Use handle-based wire rendering instead. Auto-routing from port
+ * exit directions is being phased out in favor of user-placed handles.
  */
 export function calculateOrthogonalPath(
   from: Position,
