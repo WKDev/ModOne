@@ -747,21 +747,10 @@ export class InteractionController {
       }
     }
 
-    // Visual feedback — orthogonal preview through bend points
+    // Visual feedback — straight lines through bend points, grid-snap only
     const fromPos = this._wireDrawingFromPos;
     const currentTarget = this._wireSnapTarget?.position ?? this._snapToGrid(worldPos);
-
-    // Build preview path: fromPos → bendPoints → currentTarget
-    const previewPoints: Position[] = [fromPos, ...this._wireBendPoints];
-
-    // Add orthogonal routing from last point to current position
-    // Uniform horizontal-first L-shape for all segments (no exit direction dependency)
-    const lastPoint = previewPoints[previewPoints.length - 1];
-
-    if (lastPoint.x !== currentTarget.x && lastPoint.y !== currentTarget.y) {
-      previewPoints.push({ x: currentTarget.x, y: lastPoint.y });
-    }
-    previewPoints.push(currentTarget);
+    const previewPoints: Position[] = [fromPos, ...this._wireBendPoints, currentTarget];
 
     this._visuals.renderWirePreview(previewPoints);
 
@@ -830,19 +819,8 @@ export class InteractionController {
       return;
     }
 
-    // Click on empty canvas — add bend point(s) (grid-snapped)
-    // Must include the L-shape corner point that the preview shows,
-    // otherwise the next segment starts from the wrong position
-    // and creates a diagonal instead of orthogonal routing.
+    // Click on empty canvas — record bend point exactly where clicked (grid-snapped)
     const snappedPos = this._snapToGrid(worldPos);
-    const lastPoint = this._wireBendPoints.length > 0
-      ? this._wireBendPoints[this._wireBendPoints.length - 1]
-      : this._wireDrawingFromPos;
-
-    if (lastPoint.x !== snappedPos.x && lastPoint.y !== snappedPos.y) {
-      // Insert the L-shape corner (horizontal-first, matching preview)
-      this._wireBendPoints.push({ x: snappedPos.x, y: lastPoint.y });
-    }
     this._wireBendPoints.push(snappedPos);
   }
 
