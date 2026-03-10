@@ -1,10 +1,8 @@
 import type { CanvasFacadeReturn } from '@/types/canvasFacade';
 import type {
-  HandleConstraint,
   HitTestResult,
   Position,
   PortPosition,
-  Wire,
   WireEndpoint,
 } from '../types';
 import { isPortEndpoint, isFloatingEndpoint } from '../types';
@@ -32,7 +30,6 @@ export type InteractionState =
   | 'box_selecting'
   | 'wire_drawing'
   | 'wire_segment_dragging'
-  | 'wire_handle_dragging'
   | 'placing'
   | 'wire_mode';
 
@@ -136,17 +133,14 @@ export class InteractionController {
 
   // Wire segment dragging
   private _segmentWireId: string | null = null;
+  private _segmentPolyIndex = 0;
   private _segmentHandleA = -1;
   private _segmentHandleB = -1;
   private _segmentOrientation: 'horizontal' | 'vertical' | null = null;
   private _segmentPrevDelta: Position = { x: 0, y: 0 };
   private _segmentIsFirstMove = true;
 
-  // Wire handle dragging
-  private _handleWireId: string | null = null;
-  private _handleIndex = -1;
-  private _handleConstraint: HandleConstraint = 'free';
-  private _handleStartPosition: Position | null = null;
+  // Wire segment dragging (polyline index for first move)
 
   // Placing state
   private _placingBlockType: string | null = null;
@@ -304,10 +298,6 @@ export class InteractionController {
         this._handleSegmentDraggingMove(worldPos);
         break;
 
-      case 'wire_handle_dragging':
-        this._handleHandleDraggingMove(worldPos);
-        break;
-
       case 'placing':
         this._handlePlacingMove(worldPos);
         break;
@@ -359,10 +349,6 @@ export class InteractionController {
 
       case 'wire_segment_dragging':
         this._handleSegmentDraggingUp();
-        break;
-
-      case 'wire_handle_dragging':
-        this._handleHandleDraggingUp();
         break;
 
       default:
@@ -452,10 +438,6 @@ export class InteractionController {
     switch (target.type) {
       case 'port':
         this._startWireDrawing(worldPos, target);
-        break;
-
-      case 'handle':
-        this._startWireHandleDragging(target);
         break;
 
       case 'segment':
@@ -916,92 +898,21 @@ export class InteractionController {
 
   /**
    * Start dragging a wire segment.
-   * target.subIndex is the polyline segment index (0 = endpoint→first handle).
-   * For endpoint-adjacent segments, inserts handles at the endpoint position
-   * so that dragging creates perpendicular connecting segments automatically.
+   * Stores the polyline segment index; actual endpoint handle insertion
+   * happens atomically inside dragWireSegment on first move.
    */
   private _startWireSegmentDragging(
     _worldPos: Position,
     target: HitTestResult
   ): void {
-    const facade = this._facade;
-    const wireId = target.id || null;
     this._state = 'wire_segment_dragging';
-    this._segmentWireId = wireId;
+    this._segmentWireId = target.id || null;
     this._segmentOrientation = null;
     this._segmentPrevDelta = { x: 0, y: 0 };
     this._segmentIsFirstMove = true;
-    this._segmentHandleA = 0;
-    this._segmentHandleB = 1;
-
-    if (!facade || !wireId) return;
-
-    const wire = facade.wires.find((candidate) => candidate.id === wireId);
-    if (!wire) return;
-
-    const polySegIndex =
-      typeof target.subIndex === 'number' ? target.subIndex : 0;
-    const handleCount = wire.handles?.length ?? 0;
-
-    // Polyline: [fromPos, H0, H1, ..., H(N-1), toPos]
-    // Segment 0: fromPos → H0 (or fromPos → toPos if no handles)
-    // Segment i (1..N-1): H(i-1) → Hi
-    // Segment N: H(N-1) → toPos
-    const isFromSegment = polySegIndex === 0;
-    const isToSegment = polySegIndex === handleCount; // last polyline segment
-
-    // Insert endpoint handles for endpoint-adjacent segments
-    if (isFromSegment) {
-      const fromPos = resolveEndpointPosition(wire.from, facade);
-      if (fromPos) {
-        facade.insertEndpointHandle(wireId, 'from', [
-          { position: fromPos, constraint: 'free' },
-        ]);
-      }
-    }
-
-    if (isToSegment) {
-      const toPos = resolveEndpointPosition(wire.to, facade);
-      if (toPos) {
-        facade.insertEndpointHandle(wireId, 'to', [
-          { position: toPos, constraint: 'free' },
-        ]);
-      }
-    }
-
-    const wireAfterInsertion = facade.wires.find(
-      (candidate) => candidate.id === wireId
-    );
-    if (!wireAfterInsertion) return;
-
-    const newHandleCount = wireAfterInsertion.handles?.length ?? 0;
-
-    // Calculate handle indices after insertions
-    if (isFromSegment && isToSegment) {
-      // Single-segment wire (had no handles, now has 2 after both insertions)
-      this._segmentHandleA = 0;
-      this._segmentHandleB = Math.min(1, newHandleCount - 1);
-    } else if (isFromSegment) {
-      // From-endpoint segment: after insertion, drag handles 0-1
-      this._segmentHandleA = 0;
-      this._segmentHandleB = 1;
-    } else if (isToSegment) {
-      // To-endpoint segment: after insertion, drag last two handles
-      this._segmentHandleA = Math.max(0, newHandleCount - 2);
-      this._segmentHandleB = newHandleCount - 1;
-    } else {
-      // Middle segment: polyline index i → handle indices (i-1, i)
-      // (shift by -1 because polyline[0] is the from endpoint, not a handle)
-      this._segmentHandleA = polySegIndex - 1;
-      this._segmentHandleB = polySegIndex;
-    }
-
-    // Compute orientation from actual handle geometry
-    this._segmentOrientation = inferOrientationFromHandles(
-      wireAfterInsertion,
-      this._segmentHandleA,
-      this._segmentHandleB
-    );
+    this._segmentHandleA = -1;
+    this._segmentHandleB = -1;
+    this._segmentPolyIndex = typeof target.subIndex === 'number' ? target.subIndex : 0;
   }
 
   private _handleSegmentDraggingMove(worldPos: Position): void {
@@ -1021,13 +932,31 @@ export class InteractionController {
     if (incrementalDelta.x !== 0 || incrementalDelta.y !== 0) {
       const isFirstMove = this._segmentIsFirstMove;
       this._segmentIsFirstMove = false;
-      facade.moveWireSegment(
-        this._segmentWireId,
-        this._segmentHandleA,
-        this._segmentHandleB,
-        incrementalDelta,
-        isFirstMove
-      );
+
+      if (isFirstMove) {
+        // First move: use dragWireSegment which atomically inserts endpoint
+        // handles + applies delta + returns resolved handle indices & orientation.
+        const result = facade.dragWireSegment(
+          this._segmentWireId,
+          this._segmentPolyIndex,
+          incrementalDelta,
+          true
+        );
+        if (result) {
+          this._segmentHandleA = result.handleA;
+          this._segmentHandleB = result.handleB;
+          this._segmentOrientation = result.orientation;
+        }
+      } else {
+        // Subsequent moves: handles already resolved, use direct moveWireSegment.
+        facade.moveWireSegment(
+          this._segmentWireId,
+          this._segmentHandleA,
+          this._segmentHandleB,
+          incrementalDelta,
+          false
+        );
+      }
     }
   }
 
@@ -1038,88 +967,12 @@ export class InteractionController {
       this._facade?.cleanupOverlappingHandles(this._segmentWireId);
     }
     this._segmentWireId = null;
+    this._segmentPolyIndex = 0;
     this._segmentHandleA = -1;
     this._segmentHandleB = -1;
     this._segmentOrientation = null;
     this._segmentPrevDelta = { x: 0, y: 0 };
     this._segmentIsFirstMove = true;
-    this._state = 'idle';
-    this._clearPointerTracking();
-  }
-
-  // ==========================================================================
-  // Wire Handle Dragging
-  // ==========================================================================
-
-  private _startWireHandleDragging(target: HitTestResult): void {
-    this._state = 'wire_handle_dragging';
-    this._handleWireId = target.id || null;
-    this._handleIndex =
-      typeof target.subIndex === 'number' ? target.subIndex : -1;
-    this._handleConstraint =
-      target.subIndex === 0
-        ? 'horizontal'
-        : target.subIndex === 1
-          ? 'vertical'
-          : 'free';
-    this._handleStartPosition = target.position;
-  }
-
-  private _handleHandleDraggingMove(worldPos: Position): void {
-    if (
-      !this._pointerStartWorld ||
-      !this._handleWireId ||
-      !this._handleStartPosition
-    )
-      return;
-    this._lastMoveWorld = worldPos;
-
-    const facade = this._facade;
-    if (!facade) return;
-
-    const snapped = snapDelta(subtract(worldPos, this._pointerStartWorld));
-    const constrained = constrainDelta(snapped, this._handleConstraint);
-    const newPos = add(this._handleStartPosition, constrained);
-    facade.updateWireHandle(
-      this._handleWireId,
-      this._handleIndex,
-      newPos,
-      true
-    );
-  }
-
-  private _handleHandleDraggingUp(): void {
-    if (
-      this._handleWireId &&
-      this._handleStartPosition &&
-      this._pointerStartWorld
-    ) {
-      const facade = this._facade;
-      if (facade) {
-        const lastMove = this._lastMoveWorld;
-        if (lastMove) {
-          const snapped = snapDelta(
-            subtract(lastMove, this._pointerStartWorld)
-          );
-          const constrained = constrainDelta(
-            snapped,
-            this._handleConstraint
-          );
-          const newPos = add(this._handleStartPosition, constrained);
-          facade.updateWireHandle(
-            this._handleWireId,
-            this._handleIndex,
-            newPos,
-            false
-          );
-        }
-      }
-    }
-
-    this._handleWireId = null;
-    this._handleIndex = -1;
-    this._handleConstraint = 'free';
-    this._handleStartPosition = null;
     this._state = 'idle';
     this._clearPointerTracking();
   }
@@ -1184,15 +1037,12 @@ export class InteractionController {
     this._wireDrawingReturnState = 'idle';
     this._wireDrawingFromPos = { x: 0, y: 0 };
     this._segmentWireId = null;
+    this._segmentPolyIndex = 0;
     this._segmentHandleA = -1;
     this._segmentHandleB = -1;
     this._segmentOrientation = null;
     this._segmentPrevDelta = { x: 0, y: 0 };
     this._segmentIsFirstMove = true;
-    this._handleWireId = null;
-    this._handleIndex = -1;
-    this._handleConstraint = 'free';
-    this._handleStartPosition = null;
     this._placingBlockType = null;
     this._placingPosition = null;
     this._placingRotation = 0;
@@ -1234,15 +1084,6 @@ function snapToGrid(pos: Position): Position {
   };
 }
 
-function constrainDelta(
-  delta: Position,
-  constraint: HandleConstraint
-): Position {
-  if (constraint === 'horizontal') return { x: delta.x, y: 0 };
-  if (constraint === 'vertical') return { x: 0, y: delta.y };
-  return delta;
-}
-
 function constrainSegmentDelta(
   delta: Position,
   orientation: 'horizontal' | 'vertical' | null
@@ -1255,67 +1096,6 @@ function constrainSegmentDelta(
 function getPortDirection(target: HitTestResult): PortPosition | null {
   if (typeof target.subIndex !== 'number') return null;
   return PORT_DIRECTIONS[target.subIndex] ?? null;
-}
-
-/**
- * Infer segment orientation from the actual handle positions.
- * A segment between two handles is horizontal if dy ≈ 0, vertical if dx ≈ 0.
- * For diagonal segments, the dominant axis determines constraint direction.
- */
-function inferOrientationFromHandles(
-  wire: Wire,
-  handleIndexA: number,
-  handleIndexB: number
-): 'horizontal' | 'vertical' | null {
-  const handles = wire.handles;
-  if (!handles || handleIndexA < 0 || handleIndexB >= handles.length) return null;
-
-  const a = handles[handleIndexA].position;
-  const b = handles[handleIndexB].position;
-  const dx = Math.abs(b.x - a.x);
-  const dy = Math.abs(b.y - a.y);
-
-  // Threshold to treat near-zero differences as zero (grid snap tolerance)
-  const EPS = 1;
-  if (dy <= EPS && dx > EPS) return 'horizontal';
-  if (dx <= EPS && dy > EPS) return 'vertical';
-  // Diagonal or zero-length: use dominant axis
-  if (dx > dy) return 'horizontal';
-  if (dy > dx) return 'vertical';
-  return null;
-}
-
-/**
- * Resolve any wire endpoint type to its world position.
- */
-function resolveEndpointPosition(
-  endpoint: WireEndpoint,
-  facade: CanvasFacadeReturn
-): Position | null {
-  if (isFloatingEndpoint(endpoint)) {
-    return endpoint.position;
-  }
-  if (isPortEndpoint(endpoint)) {
-    const block = facade.components.get(endpoint.componentId);
-    if (!block) return null;
-    const port = block.ports.find(
-      (candidate) => candidate.id === endpoint.portId
-    );
-    if (!port) return null;
-    return {
-      x: block.position.x + (port.absolutePosition?.x ?? 0),
-      y: block.position.y + (port.absolutePosition?.y ?? 0),
-    };
-  }
-  // JunctionEndpoint
-  if ('junctionId' in endpoint) {
-    const junction = facade.junctions.get(
-      (endpoint as { junctionId: string }).junctionId
-    );
-    if (!junction) return null;
-    return junction.position;
-  }
-  return null;
 }
 
 function rectFromTwoPoints(a: Position, b: Position) {

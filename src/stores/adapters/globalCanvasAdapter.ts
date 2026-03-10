@@ -158,6 +158,7 @@ export function useGlobalCanvasAdapter(): CanvasFacadeReturn {
       updateWireHandle: globalUpdateWireHandle,
       removeWireHandle: globalRemoveWireHandle,
       moveWireSegment: globalMoveWireSegment,
+      dragWireSegment: () => null,
       insertEndpointHandle: globalInsertEndpointHandle,
       cleanupOverlappingHandles: globalCleanupOverlappingHandles,
       commitWirePolyline: globalCommitWirePolyline,

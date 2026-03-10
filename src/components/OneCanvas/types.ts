@@ -1055,7 +1055,7 @@ export const DEFAULT_LAYERS: LayerConfig[] = [
 ];
 
 export interface HitTestResult {
-  type: 'block' | 'wire' | 'junction' | 'port' | 'handle' | 'segment' | 'none';
+  type: 'block' | 'wire' | 'junction' | 'port' | 'segment' | 'none';
   id: string;
   position: Position;
   distance: number;

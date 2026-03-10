@@ -17,6 +17,7 @@ import type {
 import { isPortEndpoint, isJunctionEndpoint, isFloatingEndpoint } from '../types';
 import {
   getPortRelativePosition,
+  getPortAbsolutePosition,
   calculateWireBendPoints,
 } from './wirePathCalculator';
 
@@ -112,8 +113,32 @@ export function getWiresConnectedToJunction(wires: Wire[], junctionId: string): 
 }
 
 /**
+ * Resolve a wire endpoint to its current world position.
+ */
+function resolveEndpointPosition(
+  endpoint: WireEndpoint,
+  components: Map<string, Block>,
+  junctions?: Map<string, Junction>
+): Position | null {
+  if (isPortEndpoint(endpoint)) {
+    const block = components.get(endpoint.componentId);
+    if (!block) return null;
+    return getPortAbsolutePosition(block, endpoint.portId);
+  }
+  if (isJunctionEndpoint(endpoint)) {
+    const junction = junctions?.get(endpoint.junctionId);
+    return junction ? { x: junction.position.x, y: junction.position.y } : null;
+  }
+  if (isFloatingEndpoint(endpoint)) {
+    return { x: endpoint.position.x, y: endpoint.position.y };
+  }
+  return null;
+}
+
+/**
  * Recalculate auto-generated handles for a wire.
- * - If any user handle exists, remove all auto handles (user is manually controlling routing).
+ * - If any user handle exists, remove all auto handles and adjust
+ *   port-adjacent handles to track endpoint movement (rubber-band).
  * - Otherwise, recompute auto handles via computeWireBendPoints.
  * Returns the new handles array, or undefined if no handles needed.
  */
@@ -127,7 +152,54 @@ export function recalculateAutoHandles(
   if (hasUserHandles) {
     // Preserve only user handles; discard auto handles
     const userHandles = wire.handles?.filter((h) => h.source === 'user') ?? [];
-    return userHandles.length > 0 ? userHandles : undefined;
+    if (userHandles.length === 0) return undefined;
+
+    // Adjust first handle to track 'from' endpoint position
+    const fromPos = resolveEndpointPosition(wire.from, components, junctions);
+    if (fromPos && userHandles.length > 0) {
+      const first = userHandles[0];
+      const dx = Math.abs(first.position.x - fromPos.x);
+      const dy = Math.abs(first.position.y - fromPos.y);
+      if (dx < 1) {
+        // Same X axis (vertical segment from port) → track port X
+        first.position = { x: fromPos.x, y: first.position.y };
+      } else if (dy < 1) {
+        // Same Y axis (horizontal segment from port) → track port Y
+        first.position = { x: first.position.x, y: fromPos.y };
+      } else {
+        // Off-axis: insert bridge handle to maintain Manhattan routing
+        // Bridge at (first.x, fromPos.y) → creates horizontal from port, then vertical to first
+        const bridge: WireHandle = {
+          position: { x: first.position.x, y: fromPos.y },
+          constraint: 'free',
+          source: 'user',
+        };
+        userHandles.unshift(bridge);
+      }
+    }
+
+    // Adjust last handle to track 'to' endpoint position
+    const toPos = resolveEndpointPosition(wire.to, components, junctions);
+    if (toPos && userHandles.length > 0) {
+      const last = userHandles[userHandles.length - 1];
+      const dx = Math.abs(last.position.x - toPos.x);
+      const dy = Math.abs(last.position.y - toPos.y);
+      if (dx < 1) {
+        last.position = { x: toPos.x, y: last.position.y };
+      } else if (dy < 1) {
+        last.position = { x: last.position.x, y: toPos.y };
+      } else {
+        // Off-axis: insert bridge handle to maintain Manhattan routing
+        const bridge: WireHandle = {
+          position: { x: last.position.x, y: toPos.y },
+          constraint: 'free',
+          source: 'user',
+        };
+        userHandles.push(bridge);
+      }
+    }
+
+    return userHandles;
   }
 
   // Recompute auto handles from scratch

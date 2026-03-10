@@ -6,7 +6,7 @@
  * precise geometric tests for accurate hit detection.
  *
  * Priority order for overlapping hits:
- *   port > handle > junction > block > wire segment > none
+ *   port > junction > block > wire segment > none
  */
 
 import type { Position, Block, Wire, Junction, WireEndpoint } from '../types';
@@ -21,8 +21,6 @@ export interface HitTestConfig {
   portSnapRadius: number;
   /** Maximum distance for wire segment hit (world units) */
   wireHitRadius: number;
-  /** Maximum distance for handle hit (world units) */
-  handleHitRadius: number;
   /** Maximum distance for junction hit (world units) */
   junctionHitRadius: number;
   /** Maximum distance for block hit (world units) */
@@ -32,7 +30,6 @@ export interface HitTestConfig {
 const DEFAULT_HIT_CONFIG: HitTestConfig = {
   portSnapRadius: 12,
   wireHitRadius: 8,
-  handleHitRadius: 10,
   junctionHitRadius: 8,
   blockHitRadius: 0, // Blocks use bounds check, not radius
 };
@@ -50,10 +47,12 @@ const NO_HIT: HitTestResult = {
  *
  * Hit priority (highest to lowest):
  * 1. Ports — for wire connection
- * 2. Wire handles — for handle dragging
- * 3. Junctions — for junction selection
- * 4. Blocks — for block selection/dragging
- * 5. Wire segments — for wire selection/segment dragging
+ * 2. Junctions — for junction selection
+ * 3. Blocks — for block selection/dragging
+ * 4. Wire segments — for wire selection/segment dragging
+ *
+ * Note: Wire handles (corners) are not directly draggable.
+ * Users drag wire segments instead, preserving Manhattan routing.
  */
 export class HitTester {
   private _spatialIndex: SpatialIndex;
@@ -90,7 +89,6 @@ export class HitTester {
     const searchRadius = Math.max(
       this._config.portSnapRadius,
       this._config.wireHitRadius,
-      this._config.handleHitRadius,
       this._config.junctionHitRadius,
       20 // minimum search radius
     );
@@ -104,19 +102,15 @@ export class HitTester {
     const portHit = this._testPorts(worldPos, candidates);
     if (portHit) return portHit;
 
-    // 2. Wire handles
-    const handleHit = this._testWireHandles(worldPos);
-    if (handleHit) return handleHit;
-
-    // 3. Junctions
+    // 2. Junctions
     const junctionHit = this._testJunctions(worldPos, candidates);
     if (junctionHit) return junctionHit;
 
-    // 4. Blocks
+    // 3. Blocks
     const blockHit = this._testBlocks(worldPos, candidates);
     if (blockHit) return blockHit;
 
-    // 5. Wire segments
+    // 4. Wire segments (handles are not directly draggable — drag segments instead)
     const wireHit = this._testWireSegments(worldPos, candidates);
     if (wireHit) return wireHit;
 
@@ -195,36 +189,6 @@ export class HitTester {
         x: (nearest.minX + nearest.maxX) / 2,
         y: (nearest.minY + nearest.maxY) / 2,
       },
-      distance: nearestDist,
-    };
-  }
-
-  private _testWireHandles(pos: Position): HitTestResult | null {
-    let nearestWireId = '';
-    let nearestIndex = -1;
-    let nearestDist = this._config.handleHitRadius;
-    let nearestPos: Position = { x: 0, y: 0 };
-
-    for (const wire of Object.values(this._wires)) {
-      for (let i = 0; i < (wire.handles ?? []).length; i++) {
-        const h = (wire.handles ?? [])[i];
-        const dist = Math.hypot(pos.x - h.position.x, pos.y - h.position.y);
-        if (dist < nearestDist) {
-          nearestDist = dist;
-          nearestWireId = wire.id;
-          nearestIndex = i;
-          nearestPos = h.position;
-        }
-      }
-    }
-
-    if (nearestIndex < 0) return null;
-
-    return {
-      type: 'handle',
-      id: nearestWireId,
-      subIndex: nearestIndex,
-      position: nearestPos,
       distance: nearestDist,
     };
   }

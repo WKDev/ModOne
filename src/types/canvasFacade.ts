@@ -116,6 +116,17 @@ export interface CanvasFacadeReturn {
     delta: Position,
     isFirstMove?: boolean
   ) => void;
+  /**
+   * Drag a wire segment by polyline segment index.
+   * Handles endpoint-adjacent stub insertion + delta application in a single atomic update.
+   * Returns the resolved { handleA, handleB, orientation } for subsequent incremental moves.
+   */
+  dragWireSegment: (
+    wireId: string,
+    polySegIndex: number,
+    delta: Position,
+    isFirstMove: boolean,
+  ) => { handleA: number; handleB: number; orientation: 'horizontal' | 'vertical' | null } | null;
   /** Insert handles at the endpoint of a wire */
   insertEndpointHandle: (
     wireId: string,

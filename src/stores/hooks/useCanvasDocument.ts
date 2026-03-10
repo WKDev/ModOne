@@ -21,7 +21,7 @@ import type {
   HandleConstraint,
   CircuitMetadata,
 } from '../../components/OneCanvas/types';
-import { isPortEndpoint } from '../../components/OneCanvas/types';
+import { isPortEndpoint, isFloatingEndpoint, isJunctionEndpoint } from '../../components/OneCanvas/types';
 import {
   getBlockSize,
   getDefaultPorts as getDefaultPortsFromDefs,
@@ -32,15 +32,40 @@ import {
   generateId,
   snapToGridPosition,
   endpointKey,
-  isValidEndpoint,
   wireExists,
   findHandleInsertIndex,
   computeWireBendPoints,
   getWiresConnectedToComponent,
   getWiresConnectedToJunction,
   recalculateAutoHandles,
+  detectPortAtPosition,
 } from '../../components/OneCanvas/utils/canvasHelpers';
 import { polylineToHandles, simplifyWireHandles, enforceOrthogonalPolyline } from '../../components/OneCanvas/utils/wireSimplifier';
+import { getPortAbsolutePosition } from '../../components/OneCanvas/utils/wirePathCalculator';
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function resolveEndpointPos(
+  endpoint: WireEndpoint,
+  components: Map<string, Block>,
+  junctions: Map<string, Junction>,
+): Position | null {
+  if (isPortEndpoint(endpoint)) {
+    const block = components.get(endpoint.componentId);
+    if (!block) return null;
+    return getPortAbsolutePosition(block, endpoint.portId);
+  }
+  if (isJunctionEndpoint(endpoint)) {
+    const junction = junctions.get(endpoint.junctionId);
+    return junction ? { x: junction.position.x, y: junction.position.y } : null;
+  }
+  if (isFloatingEndpoint(endpoint)) {
+    return { x: endpoint.position.x, y: endpoint.position.y };
+  }
+  return null;
+}
 
 // ============================================================================
 // Types
@@ -87,6 +112,7 @@ export interface UseCanvasDocumentReturn {
   recalculateWireHandles: (wireId: string) => void;
   removeWireHandle: (wireId: string, handleIndex: number) => void;
   moveWireSegment: (wireId: string, handleIndexA: number, handleIndexB: number, delta: Position, isFirstMove?: boolean) => void;
+  dragWireSegment: (wireId: string, polySegIndex: number, delta: Position, isFirstMove: boolean) => { handleA: number; handleB: number; orientation: 'horizontal' | 'vertical' | null } | null;
   insertEndpointHandle: (wireId: string, end: 'from' | 'to', newHandles: Array<{position: Position, constraint: HandleConstraint}>) => void;
   cleanupOverlappingHandles: (wireId: string) => void;
   commitWirePolyline: (wireId: string, poly: readonly Position[], routingMode: 'auto' | 'manual', skipHistory?: boolean) => void;
@@ -321,25 +347,43 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
 
   // Wire operations
   const addWire = useCallback(
-    (from: WireEndpoint, to: WireEndpoint, options?: { fromExitDirection?: PortPosition; toExitDirection?: PortPosition }): string | null => {
+    (from: WireEndpoint, to: WireEndpoint, options?: { fromExitDirection?: PortPosition; toExitDirection?: PortPosition; handles?: WireHandle[] }): string | null => {
       if (!documentId || !data) return null;
 
-      // Validate endpoints
-      if (!isValidEndpoint(from, data.components)) return null;
-      if (!isValidEndpoint(to, data.components)) return null;
+      // Auto-promote FloatingEndpoint → PortEndpoint if on a port
+      const promotedFrom = isFloatingEndpoint(from)
+        ? (() => {
+            const detected = detectPortAtPosition(from.position, data.components);
+            if (detected) return { type: 'port' as const, componentId: detected.componentId, portId: detected.portId };
+            return from;
+          })()
+        : from;
+      const promotedTo = isFloatingEndpoint(to)
+        ? (() => {
+            const detected = detectPortAtPosition(to.position, data.components);
+            if (detected) return { type: 'port' as const, componentId: detected.componentId, portId: detected.portId };
+            return to;
+          })()
+        : to;
 
-      // Prevent self-connection
-      if (isPortEndpoint(from) && isPortEndpoint(to) && from.componentId === to.componentId) return null;
-      if (endpointKey(from) === endpointKey(to)) return null;
+      // Block self-connection and duplicates
+      if (endpointKey(promotedFrom) === endpointKey(promotedTo)) return null;
+      if (wireExists(data.wires, promotedFrom, promotedTo)) return null;
 
-      // Prevent duplicate wires
-      if (wireExists(data.wires, from, to)) return null;
+      // Advisory validation — warn but don't block
+      if (
+        isPortEndpoint(promotedFrom) &&
+        isPortEndpoint(promotedTo) &&
+        promotedFrom.componentId === promotedTo.componentId
+      ) {
+        console.warn('[addWire] Self-connection detected, wire will still be created');
+      }
 
       const id = generateId('wire');
 
       pushHistory(documentId);
       updateCanvasData(documentId, (docData) => {
-        const newWire: Wire = { id, from, to };
+        const newWire: Wire = { id, from: promotedFrom, to: promotedTo };
         if (options?.fromExitDirection) {
           newWire.fromExitDirection = options.fromExitDirection;
         }
@@ -347,14 +391,18 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
           newWire.toExitDirection = options.toExitDirection;
         }
 
-        // Auto-generate bend points
-        const handles = computeWireBendPoints(
-          from, to, docData.components,
-          options?.fromExitDirection, options?.toExitDirection,
-          docData.junctions
-        );
-        if (handles) {
-          newWire.handles = handles;
+        // Use user-provided handles if available; otherwise auto-compute
+        if (options?.handles && options.handles.length > 0) {
+          newWire.handles = options.handles;
+        } else {
+          const handles = computeWireBendPoints(
+            promotedFrom, promotedTo, docData.components,
+            options?.fromExitDirection, options?.toExitDirection,
+            docData.junctions
+          );
+          if (handles) {
+            newWire.handles = handles;
+          }
         }
 
         docData.wires.push(newWire);
@@ -554,6 +602,90 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
         handleA.source = 'user';
         handleB.source = 'user';
       });
+    },
+    [documentId, pushHistory, updateCanvasData]
+  );
+
+  const dragWireSegment = useCallback(
+    (wireId: string, polySegIndex: number, delta: Position, isFirstMove: boolean): { handleA: number; handleB: number; orientation: 'horizontal' | 'vertical' | null } | null => {
+      if (!documentId) return null;
+
+      if (isFirstMove) {
+        pushHistory(documentId);
+      }
+
+      let result: { handleA: number; handleB: number; orientation: 'horizontal' | 'vertical' | null } | null = null;
+
+      updateCanvasData(documentId, (docData) => {
+        const wire = docData.wires.find((w: Wire) => w.id === wireId);
+        if (!wire) return;
+
+        const handleCount = wire.handles?.length ?? 0;
+        const isFromSegment = polySegIndex === 0;
+        const isToSegment = polySegIndex === handleCount;
+
+        // --- Resolve endpoint positions and insert stub handles ---
+        if (isFromSegment) {
+          const fromPos = resolveEndpointPos(wire.from, docData.components, docData.junctions);
+          if (fromPos) {
+            wire.handles = wire.handles || [];
+            wire.handles.unshift({ position: { ...fromPos }, constraint: 'free' as HandleConstraint, source: 'user' as const });
+          }
+        }
+
+        if (isToSegment) {
+          const toPos = resolveEndpointPos(wire.to, docData.components, docData.junctions);
+          if (toPos) {
+            wire.handles = wire.handles || [];
+            wire.handles.push({ position: { ...toPos }, constraint: 'free' as HandleConstraint, source: 'user' as const });
+          }
+        }
+
+        // --- Determine handle indices ---
+        const newHandleCount = wire.handles?.length ?? 0;
+        let hA: number, hB: number;
+
+        if (isFromSegment && isToSegment) {
+          hA = 0;
+          hB = Math.min(1, newHandleCount - 1);
+        } else if (isFromSegment) {
+          hA = 0;
+          hB = 1;
+        } else if (isToSegment) {
+          hA = Math.max(0, newHandleCount - 2);
+          hB = newHandleCount - 1;
+        } else {
+          hA = polySegIndex - 1;
+          hB = polySegIndex;
+        }
+
+        // --- Infer orientation ---
+        let orientation: 'horizontal' | 'vertical' | null = null;
+        const handles = wire.handles;
+        if (handles && hA >= 0 && hB < handles.length) {
+          const a = handles[hA].position;
+          const b = handles[hB].position;
+          const dx = Math.abs(b.x - a.x);
+          const dy = Math.abs(b.y - a.y);
+          const EPS = 1;
+          if (dy <= EPS && dx > EPS) orientation = 'horizontal';
+          else if (dx <= EPS && dy > EPS) orientation = 'vertical';
+          else if (dx > dy) orientation = 'horizontal';
+          else if (dy > dx) orientation = 'vertical';
+        }
+
+        // --- Apply delta ---
+        if (handles && handles[hA] && handles[hB]) {
+          handles[hA].position = { x: handles[hA].position.x + delta.x, y: handles[hA].position.y + delta.y };
+          handles[hB].position = { x: handles[hB].position.x + delta.x, y: handles[hB].position.y + delta.y };
+          handles[hA].source = 'user';
+          handles[hB].source = 'user';
+        }
+
+        result = { handleA: hA, handleB: hB, orientation };
+      });
+
+      return result;
     },
     [documentId, pushHistory, updateCanvasData]
   );
@@ -763,6 +895,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       recalculateWireHandles,
       removeWireHandle,
       moveWireSegment,
+      dragWireSegment,
       insertEndpointHandle,
       cleanupOverlappingHandles,
       commitWirePolyline,
@@ -804,6 +937,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
     recalculateWireHandles,
     removeWireHandle,
     moveWireSegment,
+    dragWireSegment,
     insertEndpointHandle,
     cleanupOverlappingHandles,
     commitWirePolyline,

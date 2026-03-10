@@ -15,7 +15,7 @@ import type {
   CircuitMetadata,
   SerializableCircuitState,
 } from '../../components/OneCanvas/types';
-import { isPortEndpoint } from '../../components/OneCanvas/types';
+import { isPortEndpoint, isFloatingEndpoint, isJunctionEndpoint } from '../../components/OneCanvas/types';
 import {
   getBlockSize,
   getDefaultPorts as getDefaultPortsFromDefs,
@@ -26,21 +26,42 @@ import {
   generateId,
   snapToGridPosition,
   endpointKey,
-  isValidEndpoint,
   wireExists,
   findHandleInsertIndex,
   computeWireBendPoints,
   getWiresConnectedToComponent,
   getWiresConnectedToJunction,
   recalculateAutoHandles,
+  detectPortAtPosition,
 } from '../../components/OneCanvas/utils/canvasHelpers';
 import {
   polylineToHandles,
   simplifyWireHandles,
   enforceOrthogonalPolyline,
 } from '../../components/OneCanvas/utils/wireSimplifier';
+import { getPortAbsolutePosition } from '../../components/OneCanvas/utils/wirePathCalculator';
 
 import type { UseCanvasDocumentReturn } from './useCanvasDocument';
+
+function resolveEndpointPos(
+  endpoint: WireEndpoint,
+  components: Map<string, Block>,
+  junctions: Map<string, Junction>,
+): Position | null {
+  if (isPortEndpoint(endpoint)) {
+    const block = components.get(endpoint.componentId);
+    if (!block) return null;
+    return getPortAbsolutePosition(block, endpoint.portId);
+  }
+  if (isJunctionEndpoint(endpoint)) {
+    const junction = junctions.get(endpoint.junctionId);
+    return junction ? { x: junction.position.x, y: junction.position.y } : null;
+  }
+  if (isFloatingEndpoint(endpoint)) {
+    return { x: endpoint.position.x, y: endpoint.position.y };
+  }
+  return null;
+}
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 4.0;
@@ -344,25 +365,45 @@ export function useSchematicCanvasDocument(
       options?: {
         fromExitDirection?: PortPosition;
         toExitDirection?: PortPosition;
+        handles?: WireHandle[];
       }
     ): string | null => {
       if (!documentId || !data) return null;
-      if (!isValidEndpoint(from, data.components)) return null;
-      if (!isValidEndpoint(to, data.components)) return null;
+
+      // Auto-promote FloatingEndpoint → PortEndpoint if on a port
+      const promotedFrom = isFloatingEndpoint(from)
+        ? (() => {
+            const detected = detectPortAtPosition(from.position, data.components);
+            if (detected) return { type: 'port' as const, componentId: detected.componentId, portId: detected.portId };
+            return from;
+          })()
+        : from;
+      const promotedTo = isFloatingEndpoint(to)
+        ? (() => {
+            const detected = detectPortAtPosition(to.position, data.components);
+            if (detected) return { type: 'port' as const, componentId: detected.componentId, portId: detected.portId };
+            return to;
+          })()
+        : to;
+
+      // Block self-connection and duplicates
+      if (endpointKey(promotedFrom) === endpointKey(promotedTo)) return null;
+      if (wireExists(data.wires, promotedFrom, promotedTo)) return null;
+
+      // Advisory validation — warn but don't block
       if (
-        isPortEndpoint(from) &&
-        isPortEndpoint(to) &&
-        from.componentId === to.componentId
-      )
-        return null;
-      if (endpointKey(from) === endpointKey(to)) return null;
-      if (wireExists(data.wires, from, to)) return null;
+        isPortEndpoint(promotedFrom) &&
+        isPortEndpoint(promotedTo) &&
+        promotedFrom.componentId === promotedTo.componentId
+      ) {
+        console.warn('[addWire] Self-connection detected, wire will still be created');
+      }
 
       const id = generateId('wire');
 
       pushHistory(documentId);
       updateActivePageCircuit((working) => {
-        const newWire: Wire = { id, from, to };
+        const newWire: Wire = { id, from: promotedFrom, to: promotedTo };
         if (options?.fromExitDirection) {
           newWire.fromExitDirection = options.fromExitDirection;
         }
@@ -370,16 +411,21 @@ export function useSchematicCanvasDocument(
           newWire.toExitDirection = options.toExitDirection;
         }
 
-        const handles = computeWireBendPoints(
-          from,
-          to,
-          working.components,
-          options?.fromExitDirection,
-          options?.toExitDirection,
-          working.junctions
-        );
-        if (handles) {
-          newWire.handles = handles;
+        // Use user-provided handles if available; otherwise auto-compute
+        if (options?.handles && options.handles.length > 0) {
+          newWire.handles = options.handles;
+        } else {
+          const handles = computeWireBendPoints(
+            promotedFrom,
+            promotedTo,
+            working.components,
+            options?.fromExitDirection,
+            options?.toExitDirection,
+            working.junctions
+          );
+          if (handles) {
+            newWire.handles = handles;
+          }
         }
 
         working.wires.push(newWire);
@@ -589,6 +635,86 @@ export function useSchematicCanvasDocument(
     [documentId, pushHistory, updateActivePageCircuit]
   );
 
+  const dragWireSegment = useCallback(
+    (wireId: string, polySegIndex: number, delta: Position, isFirstMove: boolean): { handleA: number; handleB: number; orientation: 'horizontal' | 'vertical' | null } | null => {
+      if (!documentId) return null;
+
+      if (isFirstMove) {
+        pushHistory(documentId);
+      }
+
+      let result: { handleA: number; handleB: number; orientation: 'horizontal' | 'vertical' | null } | null = null;
+
+      updateActivePageCircuit((working) => {
+        const wire = working.wires.find((w: Wire) => w.id === wireId);
+        if (!wire) return;
+
+        const handleCount = wire.handles?.length ?? 0;
+        const isFromSegment = polySegIndex === 0;
+        const isToSegment = polySegIndex === handleCount;
+
+        if (isFromSegment) {
+          const fromPos = resolveEndpointPos(wire.from, working.components, working.junctions);
+          if (fromPos) {
+            wire.handles = wire.handles || [];
+            wire.handles.unshift({ position: { ...fromPos }, constraint: 'free' as HandleConstraint, source: 'user' as const });
+          }
+        }
+
+        if (isToSegment) {
+          const toPos = resolveEndpointPos(wire.to, working.components, working.junctions);
+          if (toPos) {
+            wire.handles = wire.handles || [];
+            wire.handles.push({ position: { ...toPos }, constraint: 'free' as HandleConstraint, source: 'user' as const });
+          }
+        }
+
+        const newHandleCount = wire.handles?.length ?? 0;
+        let hA: number, hB: number;
+
+        if (isFromSegment && isToSegment) {
+          hA = 0;
+          hB = Math.min(1, newHandleCount - 1);
+        } else if (isFromSegment) {
+          hA = 0;
+          hB = 1;
+        } else if (isToSegment) {
+          hA = Math.max(0, newHandleCount - 2);
+          hB = newHandleCount - 1;
+        } else {
+          hA = polySegIndex - 1;
+          hB = polySegIndex;
+        }
+
+        let orientation: 'horizontal' | 'vertical' | null = null;
+        const handles = wire.handles;
+        if (handles && hA >= 0 && hB < handles.length) {
+          const a = handles[hA].position;
+          const b = handles[hB].position;
+          const dx = Math.abs(b.x - a.x);
+          const dy = Math.abs(b.y - a.y);
+          const EPS = 1;
+          if (dy <= EPS && dx > EPS) orientation = 'horizontal';
+          else if (dx <= EPS && dy > EPS) orientation = 'vertical';
+          else if (dx > dy) orientation = 'horizontal';
+          else if (dy > dx) orientation = 'vertical';
+        }
+
+        if (handles && handles[hA] && handles[hB]) {
+          handles[hA].position = { x: handles[hA].position.x + delta.x, y: handles[hA].position.y + delta.y };
+          handles[hB].position = { x: handles[hB].position.x + delta.x, y: handles[hB].position.y + delta.y };
+          handles[hA].source = 'user';
+          handles[hB].source = 'user';
+        }
+
+        result = { handleA: hA, handleB: hB, orientation };
+      });
+
+      return result;
+    },
+    [documentId, pushHistory, updateActivePageCircuit]
+  );
+
   const insertEndpointHandle = useCallback(
     (
       wireId: string,
@@ -794,6 +920,7 @@ export function useSchematicCanvasDocument(
       recalculateWireHandles,
       removeWireHandle,
       moveWireSegment,
+      dragWireSegment,
       insertEndpointHandle,
       cleanupOverlappingHandles,
       commitWirePolyline,
@@ -827,6 +954,7 @@ export function useSchematicCanvasDocument(
     recalculateWireHandles,
     removeWireHandle,
     moveWireSegment,
+    dragWireSegment,
     insertEndpointHandle,
     cleanupOverlappingHandles,
     commitWirePolyline,
