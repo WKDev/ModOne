@@ -12,13 +12,12 @@
 
 import { describe, it, expect } from 'vitest';
 import type {
-  Wire,
   Block,
-  Junction,
   PortEndpoint,
   JunctionEndpoint,
   FloatingEndpoint,
   WireEndpoint,
+  Wire,
 } from '../../types';
 
 // ============================================================================
@@ -28,7 +27,7 @@ import type {
 function makeBlock(id: string, x: number, y: number): Block {
   return {
     id,
-    type: 'resistor',
+    type: 'relay',
     label: id,
     position: { x, y },
     size: { width: 60, height: 40 },
@@ -37,8 +36,7 @@ function makeBlock(id: string, x: number, y: number): Block {
       { id: 'out', label: 'Out', type: 'output', position: 'right', offset: 0.5 },
     ],
     rotation: 0,
-    flipH: false,
-    flipV: false,
+    flip: { horizontal: false, vertical: false },
   } as Block;
 }
 
@@ -46,9 +44,7 @@ function makeWire(id: string, from: WireEndpoint, to: WireEndpoint): Wire {
   return { id, from, to, handles: [] } as Wire;
 }
 
-function makeJunction(id: string, x: number, y: number): Junction {
-  return { id, position: { x, y } } as Junction;
-}
+
 
 // ============================================================================
 // GROUP 1: endpointKey (from canvasHelpers)

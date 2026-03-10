@@ -59,6 +59,7 @@ export function useGlobalCanvasAdapter(): CanvasFacadeReturn {
   const globalAddComponent = useCanvasStore((s) => s.addComponent);
   const globalMoveComponent = useCanvasStore((s) => s.moveComponent);
   const globalUpdateComponent = useCanvasStore((s) => s.updateComponent);
+  const globalRemoveComponent = useCanvasStore((s) => s.removeComponent);
 
   // Junction commands
   const globalMoveJunction = useCanvasStore((s) => s.moveJunction);
@@ -97,6 +98,13 @@ export function useGlobalCanvasAdapter(): CanvasFacadeReturn {
   const globalSetZoom = useCanvasStore((s) => s.setZoom);
   const globalGridSize = useCanvasStore((s) => s.gridSize);
   const globalSnapToGrid = useCanvasStore((s) => s.snapToGrid);
+  const globalShowGrid = useCanvasStore((s) => s.showGrid);
+  const globalGridStyle = useCanvasStore((s) => s.gridStyle);
+
+  const globalToggleGrid = useCanvasStore((s) => s.toggleGrid);
+  const globalToggleSnap = useCanvasStore((s) => s.toggleSnap);
+  const globalSetGridSize = useCanvasStore((s) => s.setGridSize);
+  const globalSetGridStyle = useCanvasStore((s) => s.setGridStyle);
 
   // Alignment
   const alignSelected = useCanvasStore((s) => s.alignSelected);
@@ -145,6 +153,7 @@ export function useGlobalCanvasAdapter(): CanvasFacadeReturn {
       moveComponent: (id, position, skipHistory, skipWireRecalc) =>
         globalMoveComponent(id, position, skipHistory, skipWireRecalc),
       updateComponent: globalUpdateComponent,
+      removeComponent: globalRemoveComponent,
 
       // Junction Commands
       moveJunction: (id, position, skipHistory, skipWireRecalc) =>
@@ -190,6 +199,13 @@ export function useGlobalCanvasAdapter(): CanvasFacadeReturn {
       setZoom: globalSetZoom,
       gridSize: globalGridSize,
       snapToGrid: globalSnapToGrid,
+      showGrid: globalShowGrid,
+      gridStyle: globalGridStyle,
+
+      toggleGrid: globalToggleGrid,
+      toggleSnap: globalToggleSnap,
+      setGridSize: globalSetGridSize,
+      setGridStyle: globalSetGridStyle,
 
       // History
       undo: globalUndo,
@@ -212,6 +228,7 @@ export function useGlobalCanvasAdapter(): CanvasFacadeReturn {
       globalAddComponent,
       globalMoveComponent,
       globalUpdateComponent,
+      globalRemoveComponent,
       // Junction commands
       globalMoveJunction,
       // Wire commands
@@ -248,6 +265,12 @@ export function useGlobalCanvasAdapter(): CanvasFacadeReturn {
       globalSetZoom,
       globalGridSize,
       globalSnapToGrid,
+      globalShowGrid,
+      globalGridStyle,
+      globalToggleGrid,
+      globalToggleSnap,
+      globalSetGridSize,
+      globalSetGridStyle,
       // History
       globalUndo,
       globalRedo,
