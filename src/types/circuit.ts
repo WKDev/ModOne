@@ -69,6 +69,9 @@ export interface PortV2 {
 
 export type CanonicalBlockType =
   | 'power_source'
+  | 'power_source_dc_2p'
+  | 'power_source_ac_1p'
+  | 'power_source_ac_2p'
   | 'motor'
   | 'relay_coil'
   | 'relay_contact_no'
@@ -144,7 +147,7 @@ export type ContactConfig = '1a' | '1b' | '1a1b' | '2a' | '2b' | '2a2b' | '3a3b'
 export type TriggerMode = 'auto' | 'normal' | 'single';
 export type TextStyle = 'label' | 'title' | 'note' | 'section';
 
-export interface PowerSourceBlock extends BaseBlock<'power_source' | 'powersource'> {
+export interface PowerSourceBlock extends BaseBlock<'power_source' | 'powersource' | 'power_source_dc_2p' | 'power_source_ac_1p' | 'power_source_ac_2p'> {
   voltage?: number;
   frequency?: number;
   polarity?: PowerPolarity;
@@ -289,6 +292,9 @@ export interface ComponentInstance {
 
 const BLOCK_TYPE_SET: Readonly<Record<CanonicalBlockType, true>> = {
   power_source: true,
+  power_source_dc_2p: true,
+  power_source_ac_1p: true,
+  power_source_ac_2p: true,
   motor: true,
   relay_coil: true,
   relay_contact_no: true,
@@ -346,7 +352,7 @@ export function isBlockOfType<T extends BlockType>(block: Block, type: T): block
 }
 
 export function isPowerSource(block: Block): block is PowerSourceBlock {
-  return block.type === 'power_source' || block.type === 'powersource';
+  return block.type === 'power_source' || block.type === 'powersource' || block.type === 'power_source_dc_2p' || block.type === 'power_source_ac_1p' || block.type === 'power_source_ac_2p';
 }
 
 export declare function getBlockDefaults(type: BlockType, id?: string, size?: Size, position?: Position, props?: Partial<Block>): Block;

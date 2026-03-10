@@ -247,7 +247,7 @@ export interface BaseBlock<T extends BlockType = BlockType> {
 // ============================================================================
 
 /** Unified power source block (replaces Power24v, Power12v, Gnd) */
-export interface PowerSourceBlock extends BaseBlock<'powersource'> {
+export interface PowerSourceBlock extends BaseBlock<'powersource' | 'power_source' | 'power_source_dc_2p' | 'power_source_ac_1p' | 'power_source_ac_2p'> {
   /** Voltage in volts (24, 12, 5, 0, etc.) */
   voltage: number;
   /** Polarity: determines port direction and symbol */

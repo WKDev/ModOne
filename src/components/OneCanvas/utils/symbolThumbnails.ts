@@ -128,6 +128,9 @@ export function getCachedThumbnail(
 /** All canonical (non-legacy) symbol types eligible for the Toolbox. */
 export const CANONICAL_SYMBOL_TYPES: BlockType[] = [
   'power_source',
+  'power_source_dc_2p',
+  'power_source_ac_1p',
+  'power_source_ac_2p',
   'ground',
   'switch_no',
   'switch_nc',
@@ -161,7 +164,10 @@ export const CANONICAL_SYMBOL_TYPES: BlockType[] = [
 
 /** Human-readable display label for each symbol type. */
 export const SYMBOL_LABELS: Record<string, string> = {
-  power_source: 'Power Source',
+  power_source: 'Power Source (+24V)',
+  power_source_dc_2p: 'DC Power Source (2-port)',
+  power_source_ac_1p: 'AC Power Source (L)',
+  power_source_ac_2p: 'AC Power Source (L/N)',
   ground: 'Ground',
   switch_no: 'Switch (NO)',
   switch_nc: 'Switch (NC)',
@@ -205,7 +211,7 @@ export const SYMBOL_CATEGORIES: SymbolCategory[] = [
   {
     id: 'power',
     label: 'Power',
-    items: ['power_source', 'ground'],
+    items: ['power_source', 'power_source_dc_2p', 'power_source_ac_1p', 'power_source_ac_2p', 'ground'],
   },
   {
     id: 'switches',

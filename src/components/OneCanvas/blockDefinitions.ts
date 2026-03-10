@@ -91,65 +91,65 @@ const BLOCK_DEFINITIONS: Partial<Record<BlockType, BlockDefinition>> = {
   // ========================================================================
 
   relay: {
-    size: { width: 60, height: 60 },
+    size: { width: 80, height: 80 },
     defaultPorts: [
-      { id: 'coil_in', type: 'input', label: 'A1', position: 'top', absolutePosition: { x: 30, y: 0 } },
-      { id: 'coil_out', type: 'output', label: 'A2', position: 'bottom', absolutePosition: { x: 30, y: 60 } },
-      { id: 'com', type: 'input', label: 'COM', position: 'left', offset: 0.5, absolutePosition: { x: 0, y: 30 } },
-      { id: 'no', type: 'output', label: 'NO', position: 'right', offset: 0.35, absolutePosition: { x: 60, y: 21 } },
-      { id: 'nc', type: 'output', label: 'NC', position: 'right', offset: 0.65, absolutePosition: { x: 60, y: 39 } },
+      { id: 'coil_in', type: 'input', label: 'A1', position: 'top', absolutePosition: { x: 40, y: 0 } },
+      { id: 'coil_out', type: 'output', label: 'A2', position: 'bottom', absolutePosition: { x: 40, y: 80 } },
+      { id: 'com', type: 'input', label: 'COM', position: 'left', offset: 0.5, absolutePosition: { x: 0, y: 40 } },
+      { id: 'no', type: 'output', label: 'NO', position: 'right', offset: 0.25, absolutePosition: { x: 80, y: 20 } },
+      { id: 'nc', type: 'output', label: 'NC', position: 'right', offset: 0.75, absolutePosition: { x: 80, y: 60 } },
     ],
     defaultProps: { designation: 'K1', coilVoltage: 24, contacts: 'NO', energized: false },
   },
   fuse: {
-    size: { width: 40, height: 50 },
+    size: { width: 40, height: 60 },
     defaultPorts: [
       { id: 'in', type: 'input', label: 'LINE', position: 'top', absolutePosition: { x: 20, y: 0 } },
-      { id: 'out', type: 'output', label: 'LOAD', position: 'bottom', absolutePosition: { x: 20, y: 50 } },
+      { id: 'out', type: 'output', label: 'LOAD', position: 'bottom', absolutePosition: { x: 20, y: 60 } },
     ],
     defaultProps: { designation: 'F1', fuseType: 'fuse', ratingAmps: 10, tripped: false },
   },
   motor: {
-    size: { width: 60, height: 60 },
+    size: { width: 80, height: 80 },
     defaultPorts: [
-      { id: 'l1', type: 'input', label: 'U', position: 'top', offset: 0.25, absolutePosition: { x: 15, y: 0 } },
-      { id: 'l2', type: 'input', label: 'V', position: 'top', offset: 0.5, absolutePosition: { x: 30, y: 0 } },
-      { id: 'l3', type: 'input', label: 'W', position: 'top', offset: 0.75, absolutePosition: { x: 45, y: 0 } },
-      { id: 'pe', type: 'input', label: 'PE', position: 'bottom', absolutePosition: { x: 30, y: 60 } },
+      { id: 'l1', type: 'input', label: 'U', position: 'top', offset: 0.25, absolutePosition: { x: 20, y: 0 } },
+      { id: 'l2', type: 'input', label: 'V', position: 'top', offset: 0.5, absolutePosition: { x: 40, y: 0 } },
+      { id: 'l3', type: 'input', label: 'W', position: 'top', offset: 0.75, absolutePosition: { x: 60, y: 0 } },
+      { id: 'pe', type: 'input', label: 'PE', position: 'bottom', absolutePosition: { x: 40, y: 80 } },
     ],
     defaultProps: { designation: 'M1', powerKw: 1.5, voltageRating: 400, running: false },
   },
   emergency_stop: {
-    size: { width: 50, height: 50 },
+    size: { width: 60, height: 40 },
     defaultPorts: [
-      { id: 'in', type: 'input', label: 'IN', position: 'left', absolutePosition: { x: 0, y: 25 } },
-      { id: 'out', type: 'output', label: 'OUT', position: 'right', absolutePosition: { x: 50, y: 25 } },
+      { id: 'in', type: 'input', label: 'IN', position: 'left', absolutePosition: { x: 0, y: 20 } },
+      { id: 'out', type: 'output', label: 'OUT', position: 'right', absolutePosition: { x: 60, y: 20 } },
     ],
     defaultProps: { designation: 'ES1', engaged: false },
   },
   selector_switch: {
-    size: { width: 50, height: 50 },
+    size: { width: 80, height: 80 },
     defaultPorts: [
-      { id: 'com', type: 'input', label: 'COM', position: 'left', absolutePosition: { x: 0, y: 25 } },
-      { id: 'pos1', type: 'output', label: '1', position: 'right', offset: 0.35, absolutePosition: { x: 50, y: 17.5 } },
-      { id: 'pos2', type: 'output', label: '2', position: 'right', offset: 0.65, absolutePosition: { x: 50, y: 32.5 } },
+      { id: 'com', type: 'input', label: 'COM', position: 'left', offset: 0.25, absolutePosition: { x: 0, y: 20 } },
+      { id: 'pos1', type: 'output', label: '1', position: 'right', offset: 0.25, absolutePosition: { x: 80, y: 20 } },
+      { id: 'pos2', type: 'output', label: '2', position: 'right', offset: 0.5, absolutePosition: { x: 80, y: 40 } },
     ],
     defaultProps: { designation: 'S1', positions: 2, currentPosition: 0, maintained: true },
   },
   solenoid_valve: {
-    size: { width: 60, height: 50 },
+    size: { width: 40, height: 60 },
     defaultPorts: [
-      { id: 'coil_in', type: 'input', label: 'A1', position: 'top', absolutePosition: { x: 30, y: 0 } },
-      { id: 'coil_out', type: 'output', label: 'A2', position: 'bottom', absolutePosition: { x: 30, y: 50 } },
+      { id: 'coil_in', type: 'input', label: 'A1', position: 'top', absolutePosition: { x: 20, y: 0 } },
+      { id: 'coil_out', type: 'output', label: 'A2', position: 'bottom', absolutePosition: { x: 20, y: 60 } },
     ],
     defaultProps: { designation: 'Y1', valveType: '5-2', coilVoltage: 24, energized: false },
   },
   sensor: {
-    size: { width: 60, height: 40 },
+    size: { width: 40, height: 40 },
     defaultPorts: [
-      { id: 'vcc', type: 'input', label: '+V', position: 'top', absolutePosition: { x: 30, y: 0 } },
-      { id: 'out', type: 'output', label: 'OUT', position: 'right', absolutePosition: { x: 60, y: 20 } },
-      { id: 'gnd', type: 'output', label: '0V', position: 'bottom', absolutePosition: { x: 30, y: 40 } },
+      { id: 'vcc', type: 'input', label: '+V', position: 'top', absolutePosition: { x: 20, y: 0 } },
+      { id: 'out', type: 'output', label: 'OUT', position: 'right', absolutePosition: { x: 40, y: 20 } },
+      { id: 'gnd', type: 'output', label: '0V', position: 'bottom', absolutePosition: { x: 20, y: 40 } },
     ],
     defaultProps: { designation: 'B1', sensorType: 'proximity_inductive', outputType: 'PNP', detecting: false },
   },
@@ -162,9 +162,9 @@ const BLOCK_DEFINITIONS: Partial<Record<BlockType, BlockDefinition>> = {
     defaultProps: { designation: 'H1', lampColor: 'green', voltageRating: 24, lit: false },
   },
   net_label: {
-    size: { width: 80, height: 24 },
+    size: { width: 80, height: 40 },
     defaultPorts: [
-      { id: 'conn', type: 'input', label: '', position: 'left', absolutePosition: { x: 0, y: 12 } },
+      { id: 'conn', type: 'input', label: '', position: 'left', absolutePosition: { x: 0, y: 20 } },
     ],
     defaultProps: { netName: '+24V', direction: 'right', description: '' },
   },
@@ -174,12 +174,12 @@ const BLOCK_DEFINITIONS: Partial<Record<BlockType, BlockDefinition>> = {
   // ========================================================================
 
   transformer: {
-    size: { width: 70, height: 80 },
+    size: { width: 80, height: 80 },
     defaultPorts: [
-      { id: 'pri_1', type: 'input', label: 'L1', position: 'top', offset: 0.3, absolutePosition: { x: 21, y: 0 } },
-      { id: 'pri_2', type: 'input', label: 'N', position: 'top', offset: 0.7, absolutePosition: { x: 49, y: 0 } },
-      { id: 'sec_1', type: 'output', label: 'L', position: 'bottom', offset: 0.3, absolutePosition: { x: 21, y: 80 } },
-      { id: 'sec_2', type: 'output', label: 'N', position: 'bottom', offset: 0.7, absolutePosition: { x: 49, y: 80 } },
+      { id: 'pri_1', type: 'input', label: 'L1', position: 'top', offset: 0.25, absolutePosition: { x: 20, y: 0 } },
+      { id: 'pri_2', type: 'input', label: 'N', position: 'top', offset: 0.75, absolutePosition: { x: 60, y: 0 } },
+      { id: 'sec_1', type: 'output', label: 'L', position: 'bottom', offset: 0.25, absolutePosition: { x: 20, y: 80 } },
+      { id: 'sec_2', type: 'output', label: 'N', position: 'bottom', offset: 0.75, absolutePosition: { x: 60, y: 80 } },
     ],
     defaultProps: {
       designation: 'T1',
@@ -190,10 +190,10 @@ const BLOCK_DEFINITIONS: Partial<Record<BlockType, BlockDefinition>> = {
     },
   },
   terminal_block: {
-    size: { width: 40, height: 50 },
+    size: { width: 40, height: 60 },
     defaultPorts: [
       { id: 'in', type: 'input', label: 'IN', position: 'top', absolutePosition: { x: 20, y: 0 } },
-      { id: 'out', type: 'output', label: 'OUT', position: 'bottom', absolutePosition: { x: 20, y: 50 } },
+      { id: 'out', type: 'output', label: 'OUT', position: 'bottom', absolutePosition: { x: 20, y: 60 } },
     ],
     defaultProps: {
       designation: 'X1:1',
@@ -203,16 +203,16 @@ const BLOCK_DEFINITIONS: Partial<Record<BlockType, BlockDefinition>> = {
     },
   },
   overload_relay: {
-    size: { width: 60, height: 70 },
+    size: { width: 80, height: 80 },
     defaultPorts: [
-      { id: 'l1_in', type: 'input', label: '1', position: 'top', offset: 0.25, absolutePosition: { x: 15, y: 0 } },
-      { id: 'l2_in', type: 'input', label: '3', position: 'top', offset: 0.5, absolutePosition: { x: 30, y: 0 } },
-      { id: 'l3_in', type: 'input', label: '5', position: 'top', offset: 0.75, absolutePosition: { x: 45, y: 0 } },
-      { id: 'l1_out', type: 'output', label: '2', position: 'bottom', offset: 0.25, absolutePosition: { x: 15, y: 70 } },
-      { id: 'l2_out', type: 'output', label: '4', position: 'bottom', offset: 0.5, absolutePosition: { x: 30, y: 70 } },
-      { id: 'l3_out', type: 'output', label: '6', position: 'bottom', offset: 0.75, absolutePosition: { x: 45, y: 70 } },
-      { id: 'nc', type: 'output', label: '95-96', position: 'right', offset: 0.35, absolutePosition: { x: 60, y: 24.5 } },
-      { id: 'no', type: 'output', label: '97-98', position: 'right', offset: 0.65, absolutePosition: { x: 60, y: 45.5 } },
+      { id: 'l1_in', type: 'input', label: '1', position: 'top', offset: 0.25, absolutePosition: { x: 20, y: 0 } },
+      { id: 'l2_in', type: 'input', label: '3', position: 'top', offset: 0.5, absolutePosition: { x: 40, y: 0 } },
+      { id: 'l3_in', type: 'input', label: '5', position: 'top', offset: 0.75, absolutePosition: { x: 60, y: 0 } },
+      { id: 'l1_out', type: 'output', label: '2', position: 'bottom', offset: 0.25, absolutePosition: { x: 20, y: 80 } },
+      { id: 'l2_out', type: 'output', label: '4', position: 'bottom', offset: 0.5, absolutePosition: { x: 40, y: 80 } },
+      { id: 'l3_out', type: 'output', label: '6', position: 'bottom', offset: 0.75, absolutePosition: { x: 60, y: 80 } },
+      { id: 'nc', type: 'output', label: '95-96', position: 'right', offset: 0.25, absolutePosition: { x: 80, y: 20 } },
+      { id: 'no', type: 'output', label: '97-98', position: 'right', offset: 0.75, absolutePosition: { x: 80, y: 60 } },
     ],
     defaultProps: {
       designation: 'F1',
@@ -223,16 +223,16 @@ const BLOCK_DEFINITIONS: Partial<Record<BlockType, BlockDefinition>> = {
     },
   },
   contactor: {
-    size: { width: 70, height: 80 },
+    size: { width: 80, height: 80 },
     defaultPorts: [
       { id: 'coil_a1', type: 'input', label: 'A1', position: 'left', offset: 0.25, absolutePosition: { x: 0, y: 20 } },
       { id: 'coil_a2', type: 'output', label: 'A2', position: 'left', offset: 0.75, absolutePosition: { x: 0, y: 60 } },
-      { id: 'l1_in', type: 'input', label: '1', position: 'top', offset: 0.25, absolutePosition: { x: 17.5, y: 0 } },
-      { id: 'l2_in', type: 'input', label: '3', position: 'top', offset: 0.5, absolutePosition: { x: 35, y: 0 } },
-      { id: 'l3_in', type: 'input', label: '5', position: 'top', offset: 0.75, absolutePosition: { x: 52.5, y: 0 } },
-      { id: 'l1_out', type: 'output', label: '2', position: 'bottom', offset: 0.25, absolutePosition: { x: 17.5, y: 80 } },
-      { id: 'l2_out', type: 'output', label: '4', position: 'bottom', offset: 0.5, absolutePosition: { x: 35, y: 80 } },
-      { id: 'l3_out', type: 'output', label: '6', position: 'bottom', offset: 0.75, absolutePosition: { x: 52.5, y: 80 } },
+      { id: 'l1_in', type: 'input', label: '1', position: 'top', offset: 0.25, absolutePosition: { x: 20, y: 0 } },
+      { id: 'l2_in', type: 'input', label: '3', position: 'top', offset: 0.5, absolutePosition: { x: 40, y: 0 } },
+      { id: 'l3_in', type: 'input', label: '5', position: 'top', offset: 0.75, absolutePosition: { x: 60, y: 0 } },
+      { id: 'l1_out', type: 'output', label: '2', position: 'bottom', offset: 0.25, absolutePosition: { x: 20, y: 80 } },
+      { id: 'l2_out', type: 'output', label: '4', position: 'bottom', offset: 0.5, absolutePosition: { x: 40, y: 80 } },
+      { id: 'l3_out', type: 'output', label: '6', position: 'bottom', offset: 0.75, absolutePosition: { x: 60, y: 80 } },
     ],
     defaultProps: {
       designation: 'KM1',
@@ -245,14 +245,14 @@ const BLOCK_DEFINITIONS: Partial<Record<BlockType, BlockDefinition>> = {
     },
   },
   disconnect_switch: {
-    size: { width: 60, height: 70 },
+    size: { width: 80, height: 80 },
     defaultPorts: [
-      { id: 'l1_in', type: 'input', label: '1', position: 'top', offset: 0.25, absolutePosition: { x: 15, y: 0 } },
-      { id: 'l2_in', type: 'input', label: '3', position: 'top', offset: 0.5, absolutePosition: { x: 30, y: 0 } },
-      { id: 'l3_in', type: 'input', label: '5', position: 'top', offset: 0.75, absolutePosition: { x: 45, y: 0 } },
-      { id: 'l1_out', type: 'output', label: '2', position: 'bottom', offset: 0.25, absolutePosition: { x: 15, y: 70 } },
-      { id: 'l2_out', type: 'output', label: '4', position: 'bottom', offset: 0.5, absolutePosition: { x: 30, y: 70 } },
-      { id: 'l3_out', type: 'output', label: '6', position: 'bottom', offset: 0.75, absolutePosition: { x: 45, y: 70 } },
+      { id: 'l1_in', type: 'input', label: '1', position: 'top', offset: 0.25, absolutePosition: { x: 20, y: 0 } },
+      { id: 'l2_in', type: 'input', label: '3', position: 'top', offset: 0.5, absolutePosition: { x: 40, y: 0 } },
+      { id: 'l3_in', type: 'input', label: '5', position: 'top', offset: 0.75, absolutePosition: { x: 60, y: 0 } },
+      { id: 'l1_out', type: 'output', label: '2', position: 'bottom', offset: 0.25, absolutePosition: { x: 20, y: 80 } },
+      { id: 'l2_out', type: 'output', label: '4', position: 'bottom', offset: 0.5, absolutePosition: { x: 40, y: 80 } },
+      { id: 'l3_out', type: 'output', label: '6', position: 'bottom', offset: 0.75, absolutePosition: { x: 60, y: 80 } },
     ],
     defaultProps: {
       designation: 'Q1',
@@ -263,9 +263,9 @@ const BLOCK_DEFINITIONS: Partial<Record<BlockType, BlockDefinition>> = {
     },
   },
   off_page_connector: {
-    size: { width: 80, height: 32 },
+    size: { width: 80, height: 40 },
     defaultPorts: [
-      { id: 'conn', type: 'bidirectional', label: '', position: 'left', absolutePosition: { x: 0, y: 16 } },
+      { id: 'conn', type: 'bidirectional', label: '', position: 'left', absolutePosition: { x: 0, y: 20 } },
     ],
     defaultProps: {
       signalLabel: 'SIGNAL',
@@ -291,11 +291,34 @@ const BLOCK_DEFINITIONS: Partial<Record<BlockType, BlockDefinition>> = {
 
   // ======== Canonical Symbol Types ========
   ['power_source' as BlockType]: {
-    size: { width: 60, height: 80 },
+    size: { width: 40, height: 80 },
     defaultPorts: [
-      { id: 'out', type: 'output', label: '+', position: 'bottom', absolutePosition: { x: 30, y: 80 } },
+      { id: 'out', type: 'output', label: '+', position: 'bottom', absolutePosition: { x: 20, y: 80 } },
     ],
     defaultProps: { designation: 'PS1', voltage: 24, polarity: 'positive' },
+  },
+  ['power_source_dc_2p' as BlockType]: {
+    size: { width: 40, height: 60 },
+    defaultPorts: [
+      { id: 'pos', type: 'output', label: '+', position: 'top', absolutePosition: { x: 20, y: 0 } },
+      { id: 'neg', type: 'output', label: '-', position: 'bottom', absolutePosition: { x: 20, y: 60 } },
+    ],
+    defaultProps: { designation: 'BAT1', voltage: 24, polarity: 'positive' },
+  },
+  ['power_source_ac_1p' as BlockType]: {
+    size: { width: 40, height: 40 },
+    defaultPorts: [
+      { id: 'out', type: 'output', label: 'L', position: 'bottom', absolutePosition: { x: 20, y: 40 } },
+    ],
+    defaultProps: { designation: 'L1', voltage: 230, frequency: 50 },
+  },
+  ['power_source_ac_2p' as BlockType]: {
+    size: { width: 60, height: 60 },
+    defaultPorts: [
+      { id: 'l', type: 'output', label: 'L', position: 'top', absolutePosition: { x: 30, y: 0 } },
+      { id: 'n', type: 'output', label: 'N', position: 'bottom', absolutePosition: { x: 30, y: 60 } },
+    ],
+    defaultProps: { designation: 'G1', voltage: 230, frequency: 50 },
   },
   ['ground' as BlockType]: {
     size: { width: 40, height: 40 },
@@ -321,11 +344,11 @@ const BLOCK_DEFINITIONS: Partial<Record<BlockType, BlockDefinition>> = {
     defaultProps: { designation: 'S1', normallyOpen: false },
   },
   ['switch_changeover' as BlockType]: {
-    size: { width: 60, height: 60 },
+    size: { width: 80, height: 80 },
     defaultPorts: [
-      { id: 'com', type: 'input', label: 'COM', position: 'left', absolutePosition: { x: 0, y: 30 } },
-      { id: 'pos1', type: 'output', label: 'NO', position: 'right', absolutePosition: { x: 60, y: 18 } },
-      { id: 'pos2', type: 'output', label: 'NC', position: 'right', absolutePosition: { x: 60, y: 42 } },
+      { id: 'com', type: 'input', label: 'COM', position: 'left', offset: 0.5, absolutePosition: { x: 0, y: 40 } },
+      { id: 'pos1', type: 'output', label: 'NO', position: 'right', offset: 0.25, absolutePosition: { x: 80, y: 20 } },
+      { id: 'pos2', type: 'output', label: 'NC', position: 'right', offset: 0.5, absolutePosition: { x: 80, y: 40 } },
     ],
     defaultProps: { designation: 'S1', normallyOpen: true, position: 1 },
   },
@@ -346,18 +369,18 @@ const BLOCK_DEFINITIONS: Partial<Record<BlockType, BlockDefinition>> = {
     defaultProps: { designation: 'S1', normallyOpen: false, momentary: true, pressed: false },
   },
   ['circuit_breaker' as BlockType]: {
-    size: { width: 60, height: 60 },
+    size: { width: 40, height: 60 },
     defaultPorts: [
-      { id: 'in', type: 'input', label: 'LINE', position: 'top', absolutePosition: { x: 30, y: 0 } },
-      { id: 'out', type: 'output', label: 'LOAD', position: 'bottom', absolutePosition: { x: 30, y: 60 } },
+      { id: 'in', type: 'input', label: 'LINE', position: 'top', absolutePosition: { x: 20, y: 0 } },
+      { id: 'out', type: 'output', label: 'LOAD', position: 'bottom', absolutePosition: { x: 20, y: 60 } },
     ],
     defaultProps: { designation: 'Q1', currentRating: 10, tripped: false },
   },
   ['relay_coil' as BlockType]: {
-    size: { width: 60, height: 60 },
+    size: { width: 40, height: 60 },
     defaultPorts: [
-      { id: 'in', type: 'input', label: 'A1', position: 'top', absolutePosition: { x: 30, y: 0 } },
-      { id: 'out', type: 'output', label: 'A2', position: 'bottom', absolutePosition: { x: 30, y: 60 } },
+      { id: 'in', type: 'input', label: 'A1', position: 'top', absolutePosition: { x: 20, y: 0 } },
+      { id: 'out', type: 'output', label: 'A2', position: 'bottom', absolutePosition: { x: 20, y: 60 } },
     ],
     defaultProps: { designation: 'K1', coilVoltage: 24, energized: false },
   },
@@ -378,10 +401,10 @@ const BLOCK_DEFINITIONS: Partial<Record<BlockType, BlockDefinition>> = {
     defaultProps: { designation: 'K1', coilVoltage: 24, energized: false, normallyOpen: false },
   },
   ['resistor' as BlockType]: {
-    size: { width: 60, height: 30 },
+    size: { width: 60, height: 40 },
     defaultPorts: [
-      { id: 'in', type: 'input', label: 'IN', position: 'left', absolutePosition: { x: 0, y: 15 } },
-      { id: 'out', type: 'output', label: 'OUT', position: 'right', absolutePosition: { x: 60, y: 15 } },
+      { id: 'in', type: 'input', label: 'IN', position: 'left', absolutePosition: { x: 0, y: 20 } },
+      { id: 'out', type: 'output', label: 'OUT', position: 'right', absolutePosition: { x: 60, y: 20 } },
     ],
     defaultProps: { designation: 'R1', value: 1000, tolerancePercent: 5 },
   },
@@ -394,10 +417,10 @@ const BLOCK_DEFINITIONS: Partial<Record<BlockType, BlockDefinition>> = {
     defaultProps: { designation: 'C1', value: 10, unit: 'uF', voltageRating: 50 },
   },
   ['inductor' as BlockType]: {
-    size: { width: 60, height: 30 },
+    size: { width: 60, height: 40 },
     defaultPorts: [
-      { id: 'in', type: 'input', label: 'IN', position: 'left', absolutePosition: { x: 0, y: 15 } },
-      { id: 'out', type: 'output', label: 'OUT', position: 'right', absolutePosition: { x: 60, y: 15 } },
+      { id: 'in', type: 'input', label: 'IN', position: 'left', absolutePosition: { x: 0, y: 20 } },
+      { id: 'out', type: 'output', label: 'OUT', position: 'right', absolutePosition: { x: 60, y: 20 } },
     ],
     defaultProps: { designation: 'L1', value: 10, unit: 'mH' },
   },
@@ -426,36 +449,36 @@ const BLOCK_DEFINITIONS: Partial<Record<BlockType, BlockDefinition>> = {
     defaultProps: { address: 'DO:0x0000' },
   },
   ['timer_on_delay' as BlockType]: {
-    size: { width: 80, height: 60 },
+    size: { width: 80, height: 80 },
     defaultPorts: [
-      { id: 'in', type: 'input', label: 'IN', position: 'left', absolutePosition: { x: 0, y: 30 } },
-      { id: 'out', type: 'output', label: 'OUT', position: 'right', absolutePosition: { x: 80, y: 30 } },
+      { id: 'in', type: 'input', label: 'IN', position: 'left', absolutePosition: { x: 0, y: 40 } },
+      { id: 'out', type: 'output', label: 'OUT', position: 'right', absolutePosition: { x: 80, y: 40 } },
     ],
     defaultProps: { designation: 'T1', delayMs: 1000, running: false },
   },
   ['timer_off_delay' as BlockType]: {
-    size: { width: 80, height: 60 },
+    size: { width: 80, height: 80 },
     defaultPorts: [
-      { id: 'in', type: 'input', label: 'IN', position: 'left', absolutePosition: { x: 0, y: 30 } },
-      { id: 'out', type: 'output', label: 'OUT', position: 'right', absolutePosition: { x: 80, y: 30 } },
+      { id: 'in', type: 'input', label: 'IN', position: 'left', absolutePosition: { x: 0, y: 40 } },
+      { id: 'out', type: 'output', label: 'OUT', position: 'right', absolutePosition: { x: 80, y: 40 } },
     ],
     defaultProps: { designation: 'T1', delayMs: 1000, running: false },
   },
   ['counter_up' as BlockType]: {
-    size: { width: 80, height: 60 },
+    size: { width: 80, height: 80 },
     defaultPorts: [
-      { id: 'count_in', type: 'input', label: 'CU', position: 'left', absolutePosition: { x: 0, y: 30 } },
-      { id: 'out', type: 'output', label: 'OUT', position: 'right', absolutePosition: { x: 80, y: 30 } },
-      { id: 'reset', type: 'input', label: 'RST', position: 'bottom', absolutePosition: { x: 40, y: 60 } },
+      { id: 'count_in', type: 'input', label: 'CU', position: 'left', absolutePosition: { x: 0, y: 40 } },
+      { id: 'out', type: 'output', label: 'OUT', position: 'right', absolutePosition: { x: 80, y: 40 } },
+      { id: 'reset', type: 'input', label: 'RST', position: 'bottom', absolutePosition: { x: 40, y: 80 } },
     ],
     defaultProps: { designation: 'C1', preset: 10, currentValue: 0 },
   },
   ['counter_down' as BlockType]: {
-    size: { width: 80, height: 60 },
+    size: { width: 80, height: 80 },
     defaultPorts: [
-      { id: 'count_in', type: 'input', label: 'CD', position: 'left', absolutePosition: { x: 0, y: 30 } },
-      { id: 'out', type: 'output', label: 'OUT', position: 'right', absolutePosition: { x: 80, y: 30 } },
-      { id: 'reset', type: 'input', label: 'RST', position: 'bottom', absolutePosition: { x: 40, y: 60 } },
+      { id: 'count_in', type: 'input', label: 'CD', position: 'left', absolutePosition: { x: 0, y: 40 } },
+      { id: 'out', type: 'output', label: 'OUT', position: 'right', absolutePosition: { x: 80, y: 40 } },
+      { id: 'reset', type: 'input', label: 'RST', position: 'bottom', absolutePosition: { x: 40, y: 80 } },
     ],
     defaultProps: { designation: 'C1', preset: 10, currentValue: 0 },
   },

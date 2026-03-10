@@ -166,6 +166,10 @@ const PropertyEditorRouter = memo(function PropertyEditorRouter({
       );
 
     case 'powersource':
+    case 'power_source':
+    case 'power_source_dc_2p':
+    case 'power_source_ac_1p':
+    case 'power_source_ac_2p':
       return (
         <PowerSourceProperties
           component={component}

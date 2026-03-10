@@ -44,8 +44,8 @@ function collectUniquePins(blockType: BlockType): Array<{ id: string; position: 
 }
 
 describe('builtin symbol migration', () => {
-  it('registry has exactly 42 symbols', () => {
-    expect(BUILTIN_SYMBOLS.size).toBe(42);
+  it('registry has exactly 45 symbols', () => {
+    expect(BUILTIN_SYMBOLS.size).toBe(45);
   });
 
   describe.each(ALL_BLOCK_TYPES)('%s', (blockType) => {
@@ -124,7 +124,7 @@ describe('serialization compatibility', () => {
       id: 'test-relay',
       type: 'relay',
       position: { x: 100, y: 100 },
-      size: { width: 60, height: 60 },
+      size: { width: 80, height: 80 },
       ports: getBlockDefinition('relay').defaultPorts.map((port) => ({ ...port })),
       designation: 'K1',
       coilVoltage: 24,
@@ -141,7 +141,7 @@ describe('serialization compatibility', () => {
     expect(restoredBlock).toBeDefined();
 
     const relayPort = restoredBlock?.ports.find((port) => port.id === 'no');
-    expect(relayPort?.absolutePosition).toEqual({ x: 60, y: 21 });
+    expect(relayPort?.absolutePosition).toEqual({ x: 80, y: 20 });
   });
 
   it('migrates legacy project block types during yaml load', () => {
