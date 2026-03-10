@@ -11,6 +11,7 @@ export type StepExecutionMode = 'single-step' | 'until-breakpoint' | 'continuous
 export type BaudRate = 9600 | 19200 | 38400 | 57600 | 115200;
 export type Parity = 'none' | 'odd' | 'even';
 export type StopBits = 1 | 2;
+export type LadderShortcutProfile = 'default' | 'xg5000' | 'gxworks';
 
 /**
  * Application settings interface
@@ -44,6 +45,9 @@ export interface AppSettings {
   fontSize: number; // 12-20
   gridDisplay: boolean;
   animationEnabled: boolean;
+
+  // Ladder settings
+  ladderShortcutProfile: LadderShortcutProfile;
 
   // Keyboard shortcut overrides
   // Only stores user-modified bindings. Key: command ID, Value: key combo string.
@@ -82,6 +86,9 @@ export const defaultSettings: AppSettings = {
   fontSize: 14,
   gridDisplay: true,
   animationEnabled: true,
+
+  // Ladder
+  ladderShortcutProfile: 'default',
 
   // Keyboard shortcut overrides (empty = all defaults)
   keybindingOverrides: {},

@@ -101,7 +101,9 @@ export const simulationService = {
   async reset(): Promise<void> {
     try {
       await invoke('sim_reset');
-      useLayoutStore.getState().setSimulationStatus('stopped');
+      const store = useLayoutStore.getState();
+      store.setSimulationStatus('stopped');
+      store.triggerReset();
     } catch (error) {
       toast.error('Failed to reset simulation', {
         description: error instanceof Error ? error.message : String(error),

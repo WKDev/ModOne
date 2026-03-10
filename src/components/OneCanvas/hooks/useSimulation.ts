@@ -21,6 +21,8 @@ import {
   type RuntimeState,
 } from '../utils/switchEvaluator';
 import { useModbusStore } from '../../../stores/modbusStore';
+import { useLayoutStore } from '../../../stores/layoutStore';
+import { simulationService } from '../../../services/simulationService';
 
 // ============================================================================
 // Types
@@ -103,11 +105,23 @@ export function useSimulation(
     ...simulationOptions
   } = options;
 
-  // State
-  const [running, setRunning] = useState(autoStart);
+  // Global State
+  const simulationStatus = useLayoutStore((state) => state.simulationStatus);
+  const resetCounter = useLayoutStore((state) => state.resetCounter);
+  const running = simulationStatus === 'running';
+
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [runtimeState, setRuntimeState] = useState<RuntimeState>(createEmptyRuntimeState);
   const [measuredRate, setMeasuredRate] = useState(0);
+
+  // Sync with global reset
+  useEffect(() => {
+    if (resetCounter > 0) {
+      setResult(null);
+      setRuntimeState(createEmptyRuntimeState());
+      setMeasuredRate(0);
+    }
+  }, [resetCounter]);
 
   // Refs for animation loop
   const lastUpdateRef = useRef<number>(0);
@@ -181,23 +195,23 @@ export function useSimulation(
 
   // Control functions
   const start = useCallback(() => {
-    setRunning(true);
+    simulationService.start();
   }, []);
 
   const stop = useCallback(() => {
-    setRunning(false);
-    setMeasuredRate(0);
+    simulationService.stop();
   }, []);
 
   const toggle = useCallback(() => {
-    setRunning((prev) => !prev);
-  }, []);
+    if (running) {
+      simulationService.stop();
+    } else {
+      simulationService.start();
+    }
+  }, [running]);
 
   const reset = useCallback(() => {
-    setRunning(false);
-    setResult(null);
-    setRuntimeState(createEmptyRuntimeState());
-    setMeasuredRate(0);
+    simulationService.reset();
   }, []);
 
   const step = useCallback(() => {

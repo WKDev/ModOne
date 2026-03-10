@@ -43,4 +43,4 @@ export { CommandPalette } from './CommandPalette';
 export type { CommandPaletteProps } from './CommandPalette';
 
 // Command registration
-export { registerAllCommands } from './commands';
+export { registerAllCommands, registerLadderCommands } from './commands';

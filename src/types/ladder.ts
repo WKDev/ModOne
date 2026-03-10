@@ -109,11 +109,11 @@ import type {
  * Example: TOP | LEFT === 0b0101 (5)
  */
 export const WireDirection = {
-  NONE:   0b0000,
-  TOP:    0b0001,
+  NONE: 0b0000,
+  TOP: 0b0001,
   BOTTOM: 0b0010,
-  LEFT:   0b0100,
-  RIGHT:  0b1000,
+  LEFT: 0b0100,
+  RIGHT: 0b1000,
 } as const;
 
 /** Type for WireDirection values */
@@ -130,6 +130,7 @@ export type WireDirectionValue = typeof WireDirection[keyof typeof WireDirection
 export type LadderElementType =
   // Contact types
   | 'contact_no' | 'contact_nc' | 'contact_p' | 'contact_n'
+  | 'contact_p_nc' | 'contact_n_nc' | 'contact_reverse' | 'contact_inv'
   // Coil types
   | 'coil' | 'coil_inverted' | 'coil_set' | 'coil_reset' | 'coil_p' | 'coil_n'
   // Timer types
@@ -145,7 +146,9 @@ export type LadderElementType =
   | 'power_rail' | 'neutral_rail';
 
 /** Contact element type subset */
-export type ContactType = 'contact_no' | 'contact_nc' | 'contact_p' | 'contact_n';
+export type ContactType =
+  | 'contact_no' | 'contact_nc' | 'contact_p' | 'contact_n'
+  | 'contact_p_nc' | 'contact_n_nc' | 'contact_reverse' | 'contact_inv';
 
 /** Coil element type subset */
 export type CoilType = 'coil' | 'coil_inverted' | 'coil_set' | 'coil_reset' | 'coil_p' | 'coil_n';
@@ -170,6 +173,7 @@ export type RailType = 'power_rail' | 'neutral_rail';
 /** Arrays for element type validation */
 export const CONTACT_TYPES: readonly ContactType[] = [
   'contact_no', 'contact_nc', 'contact_p', 'contact_n',
+  'contact_p_nc', 'contact_n_nc', 'contact_reverse', 'contact_inv',
 ] as const;
 
 export const COIL_TYPES: readonly CoilType[] = [
@@ -354,8 +358,8 @@ export interface CompareElement extends BaseLadderElement<CompareType> {
 export interface WireProperties extends ElementProperties {
   /** Specific direction for corner/junction wires */
   direction?: 'corner_tl' | 'corner_tr' | 'corner_bl' | 'corner_br'
-            | 'junction_t' | 'junction_b' | 'junction_l' | 'junction_r'
-            | 'cross';
+  | 'junction_t' | 'junction_b' | 'junction_l' | 'junction_r'
+  | 'cross';
   /** Bit mask of connected directions (runtime computed via WireDirection) */
   connectedDirections?: number;
   /** Wire creation origin: manual (user-placed, XG5000 FF 01) or auto (editor-generated, XG5000 FF 02) */

@@ -10,6 +10,15 @@ import {
   DEVICE_RANGES,
   type DeviceType,
 } from '../../OneParser/types';
+import {
+  type LadderElementType,
+  type GridPosition,
+  COIL_TYPES,
+  TIMER_TYPES,
+  COUNTER_TYPES,
+  COMPARE_TYPES,
+  CONTACT_TYPES,
+} from '../../../types/ladder';
 
 /**
  * Validation error result
@@ -207,4 +216,62 @@ export function collectValidationErrors(
   return Object.entries(validations)
     .filter(([, result]) => !result.valid)
     .map(([field, result]) => formatValidationError(field, result));
+}
+
+/**
+ * Check if a ladder element type is an output-type element
+ * (e.g., coils, timers, counters)
+ */
+export function isOutputElementType(type: LadderElementType): boolean {
+  return (
+    (COIL_TYPES as readonly string[]).includes(type) ||
+    (TIMER_TYPES as readonly string[]).includes(type) ||
+    (COUNTER_TYPES as readonly string[]).includes(type)
+  );
+}
+
+/**
+ * Check if a ladder element type is an input-type element
+ * (e.g., contacts, comparisons)
+ */
+export function isInputElementType(type: LadderElementType): boolean {
+  return (
+    (CONTACT_TYPES as readonly string[]).includes(type) ||
+    (COMPARE_TYPES as readonly string[]).includes(type)
+  );
+}
+
+/**
+ * Validate placement of a ladder element based on IEC 61131-3 rules
+ * @param type - Type of element being placed
+ * @param position - Grid position
+ * @param columns - Total number of columns in a rung
+ * @returns Validation result
+ */
+export function validatePlacement(
+  type: LadderElementType,
+  position: GridPosition,
+  columns: number
+): ValidationResult {
+  const isLastColumn = position.col === columns - 1;
+  const isOutput = isOutputElementType(type);
+  const isInput = isInputElementType(type);
+
+  // Rule 2-1: Output elements must only be in the last column
+  if (isOutput && !isLastColumn) {
+    return {
+      valid: false,
+      error: '코일과 펑션 블록은 반드시 렁의 마지막 열에만 위치해야 합니다.',
+    };
+  }
+
+  // Rule 2-1 (implied): Input elements cannot be in the last column
+  if (isInput && isLastColumn) {
+    return {
+      valid: false,
+      error: '마지막 열에는 코일 혹은 펑션 블록만 배치할 수 있습니다.',
+    };
+  }
+
+  return { valid: true };
 }

@@ -15,7 +15,6 @@ import { useDocumentContext } from '../../../contexts/DocumentContext';
 
 import { PanelErrorBoundary } from '../../error/PanelErrorBoundary';
 import {
-  SimulationToolbar,
   Toolbox,
   type BlockType,
   type Position,
@@ -341,15 +340,6 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
   return (
     <PanelErrorBoundary panelName="Canvas">
       <div className="h-full flex flex-col bg-neutral-950">
-        <SimulationToolbar
-          running={simulation.running}
-          onStart={simulation.start}
-          onStop={simulation.stop}
-          onReset={simulation.reset}
-          onStep={simulation.step}
-          measuredRate={simulation.measuredRate}
-        />
-
         <div className="flex items-center justify-center px-2 py-1 bg-neutral-900 border-b border-neutral-800">
           <CanvasToolbar
             onAlignSelected={alignSelected}

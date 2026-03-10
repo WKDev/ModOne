@@ -5,6 +5,7 @@ import {
   Play,
   Pause,
   Square,
+  RotateCcw,
   StepForward,
   PanelLeft,
   PanelBottom,
@@ -26,13 +27,12 @@ function ToolbarButton({ icon, tooltip, onClick, disabled, active, dataTestId }:
   return (
     <button
       data-testid={dataTestId}
-      className={`w-8 h-8 flex items-center justify-center rounded ${
-        disabled
-          ? 'opacity-50 cursor-not-allowed text-[var(--color-text-muted)]'
-          : active
+      className={`w-8 h-8 flex items-center justify-center rounded ${disabled
+        ? 'opacity-50 cursor-not-allowed text-[var(--color-text-muted)]'
+        : active
           ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)]'
           : 'hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-      }`}
+        }`}
       onClick={onClick}
       disabled={disabled}
       title={tooltip}
@@ -110,6 +110,11 @@ export function Toolbar() {
         tooltip="Stop Simulation (Shift+F5)"
         disabled={isStopped}
         onClick={() => commandRegistry.execute('simulation.stop')}
+      />
+      <ToolbarButton
+        icon={<RotateCcw size={18} />}
+        tooltip="Reset Simulation (Ctrl+Shift+F5)"
+        onClick={() => commandRegistry.execute('simulation.reset')}
       />
       <ToolbarButton
         icon={<StepForward size={18} />}

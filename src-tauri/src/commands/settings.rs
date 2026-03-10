@@ -49,6 +49,10 @@ pub struct AppSettings {
     pub grid_display: bool,
     pub animation_enabled: bool,
 
+    // Ladder settings
+    #[serde(default)]
+    pub ladder_shortcut_profile: LadderShortcutProfile,
+
     // Keyboard shortcut overrides
     // Only stores user-modified bindings. Key: command ID, Value: key combo string.
     // e.g. { "edit.undo": "Ctrl+Shift+Z" }
@@ -86,6 +90,15 @@ pub enum StepExecutionMode {
     SingleStep,
     UntilBreakpoint,
     Continuous,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum LadderShortcutProfile {
+    #[default]
+    Default,
+    Xg5000,
+    GxWorks,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -126,6 +139,9 @@ impl Default for AppSettings {
             font_size: 14,
             grid_display: true,
             animation_enabled: true,
+
+            // Ladder
+            ladder_shortcut_profile: LadderShortcutProfile::Default,
 
             // Keyboard shortcut overrides (empty = all defaults)
             keybinding_overrides: HashMap::new(),

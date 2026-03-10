@@ -2,7 +2,6 @@ export * from './types';
 export * from './utils';
 
 export { CanvasHost } from './CanvasHost';
-export { SimulationToolbar } from './SimulationToolbar';
 export { Toolbox, type ToolboxProps } from './components/Toolbox';
 export { CanvasDropZone } from './CanvasDropZone';
 export { CanvasToolbar } from './CanvasToolbar';

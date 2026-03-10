@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Pencil, RotateCcw, AlertTriangle } from 'lucide-react';
+import { cn } from '../../lib/utils';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { commandRegistry } from '../CommandPalette/commandRegistry';
 import { CATEGORY_LABELS } from '../CommandPalette/types';
@@ -251,20 +252,72 @@ export function KeyboardShortcutsSettings({
 
   const hasAnyOverrides = Object.keys(overrides).length > 0;
 
+  const [activeTab, setActiveTab] = useState<'all' | 'general' | 'editors' | 'simulation'>('all');
+
+  const tabCategories = useMemo(() => {
+    switch (activeTab) {
+      case 'general': return ['file', 'edit', 'view', 'settings', 'help'];
+      case 'editors': return ['ladder', 'canvas', 'scenario'];
+      case 'simulation': return ['simulation', 'debug', 'modbus'];
+      default: return CATEGORY_ORDER;
+    }
+  }, [activeTab]);
+
+  const tabs = [
+    { id: 'all', label: '모두' },
+    { id: 'general', label: '일반' },
+    { id: 'editors', label: '에디터' },
+    { id: 'simulation', label: '시뮬레이션' },
+  ];
+
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-[var(--text-primary)]">단축키 설정</h3>
-        {hasAnyOverrides && (
+        <div className="flex items-center gap-4">
+          {/* Ladder Profile Selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[var(--text-muted)]">Ladder 프로필:</span>
+            <select
+              value={settings.ladderShortcutProfile}
+              onChange={(e) => updatePending('ladderShortcutProfile', e.target.value as any)}
+              className="px-2 py-1 text-xs bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-color)]"
+            >
+              <option value="default">기본 (Generic)</option>
+              <option value="xg5000">XG5000</option>
+              <option value="gxworks">GX-Works</option>
+            </select>
+          </div>
+
+          {hasAnyOverrides && (
+            <button
+              onClick={handleResetAll}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] rounded transition-colors"
+            >
+              <RotateCcw size={12} />
+              모두 초기화
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex border-b border-[var(--border-color)] pb-px gap-4">
+        {tabs.map((tab) => (
           <button
-            onClick={handleResetAll}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] rounded transition-colors"
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={cn(
+              "px-1 py-2 text-xs font-medium border-b-2 transition-colors",
+              activeTab === tab.id
+                ? "border-[var(--accent-color)] text-[var(--accent-color)]"
+                : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+            )}
           >
-            <RotateCcw size={12} />
-            모두 초기화
+            {tab.label}
           </button>
-        )}
+        ))}
       </div>
 
       {/* Conflict warning */}
@@ -286,15 +339,15 @@ export function KeyboardShortcutsSettings({
 
         {/* Table body */}
         <div className="max-h-[400px] overflow-y-auto">
-          {CATEGORY_ORDER.map((category) => {
-            const commands = groupedCommands.get(category);
+          {tabCategories.map((category) => {
+            const commands = groupedCommands.get(category as CommandCategory);
             if (!commands || commands.length === 0) return null;
 
             return (
               <div key={category}>
                 {/* Category header */}
                 <div className="px-3 py-1.5 bg-[var(--bg-secondary)]/50 text-xs font-medium text-[var(--text-muted)] border-b border-[var(--border-color)] sticky top-0 z-10">
-                  {CATEGORY_LABELS[category]}
+                  {CATEGORY_LABELS[category as CommandCategory]}
                 </div>
 
                 {/* Command rows */}
@@ -370,7 +423,7 @@ export function KeyboardShortcutsSettings({
           })}
 
           {/* Empty state */}
-          {groupedCommands.size === 0 && (
+          {tabCategories.every(cat => !groupedCommands.has(cat as CommandCategory)) && (
             <div className="px-3 py-8 text-center text-sm text-[var(--text-muted)]">
               일치하는 단축키가 없습니다.
             </div>

@@ -23,6 +23,7 @@ interface LayoutState {
   sidebarVisible: boolean;
   panelVisible: boolean;
   panelType: PanelType;
+  resetCounter: number;
 }
 
 interface LayoutActions {
@@ -32,6 +33,7 @@ interface LayoutActions {
   // Simulation actions
   setSimulationStatus: (status: SimulationStatus) => void;
   setScanTime: (time: number) => void;
+  triggerReset: () => void;
 
   // Modbus actions
   setModbusConnected: (connected: boolean) => void;
@@ -61,6 +63,7 @@ const initialState: LayoutState = {
   sidebarVisible: true,
   panelVisible: false,
   panelType: 'output',
+  resetCounter: 0,
 };
 
 export const useLayoutStore = create<LayoutStore>()(
@@ -75,6 +78,12 @@ export const useLayoutStore = create<LayoutStore>()(
       setSimulationStatus: (status) =>
         set({ simulationStatus: status }, false, 'setSimulationStatus'),
       setScanTime: (time) => set({ scanTime: time }, false, 'setScanTime'),
+      triggerReset: () =>
+        set(
+          (state) => ({ resetCounter: state.resetCounter + 1 }),
+          false,
+          'triggerReset'
+        ),
 
       // Modbus actions
       setModbusConnected: (connected) =>

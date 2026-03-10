@@ -18,8 +18,7 @@ import { LadderDragHandler } from './interactions/LadderDragHandler';
 import type { LadderPointerEvent } from './LadderEventBridge';
 import type { UseLadderDocumentReturn } from '../../../stores/hooks/useLadderDocument';
 import { useLadderUIStore } from '../../../stores/ladderUIStore';
-import { isWireType } from '../../../types/ladder';
-import type { LadderElementType } from '../../../types/ladder';
+import { handlePlacement } from '../utils/ladderPlacement';
 
 // ============================================================================
 // Types
@@ -304,58 +303,3 @@ export function useLadderPixiRenderer({
   }, [hostRef, handlePointerDown, handlePointerMove, handlePointerUp, handleCellClick, handleCellRightClick]);
 }
 
-// ============================================================================
-// Placement logic (extracted for clarity)
-// ============================================================================
-
-function handlePlacement(
-  doc: UseLadderDocumentReturn,
-  tool: LadderElementType,
-  row: number,
-  col: number,
-  shiftKey: boolean,
-): void {
-  const existingElement = doc.getElementAt(row, col);
-
-  // Wire tool: merge onto existing wire if applicable
-  if (isWireType(tool) && existingElement && isWireType(existingElement.type)) {
-    doc.mergeWireElement(existingElement.id, tool as 'wire_h' | 'wire_v');
-    trackWireVPlacement(tool, row, col);
-    return;
-  }
-
-  // Vertical wire + Shift → span from last placement
-  if (tool === 'wire_v' && shiftKey) {
-    const lastPos = useLadderUIStore.getState().lastWireVPlacement;
-    if (lastPos && lastPos.col === col) {
-      doc.placeVerticalWireSpan(col, lastPos.row, row);
-      useLadderUIStore.getState().setLastWireVPlacement({ row, col });
-      return;
-    }
-  }
-
-  // Normal placement on empty cell
-  if (!existingElement) {
-    const newId = doc.addElement(tool, { row, col });
-    if (newId) {
-      trackWireVPlacement(tool, row, col);
-      // Auto-select placed element (non-wire)
-      if (!isWireType(tool)) {
-        useLadderUIStore.getState().setSelection([newId]);
-      }
-    }
-  }
-}
-
-/** Track last wire_v placement for Shift+Click spanning */
-function trackWireVPlacement(
-  tool: LadderElementType,
-  row: number,
-  col: number,
-): void {
-  if (tool === 'wire_v') {
-    useLadderUIStore.getState().setLastWireVPlacement({ row, col });
-  } else {
-    useLadderUIStore.getState().setLastWireVPlacement(null);
-  }
-}

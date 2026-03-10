@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { useSettingsStore } from './stores/settingsStore';
 import { MainLayout } from './components/layout/MainLayout';
 import { useLayoutPersistenceStore } from './stores/layoutPersistenceStore';
 import { useToolPanelStore } from './stores/toolPanelStore';
@@ -10,7 +11,7 @@ import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { FloatingWindowContent } from './components/floating/FloatingWindowContent';
 import { FloatingWindowRenderer } from './components/floating/FloatingWindowRenderer';
-import { CommandPalette, useCommandPalette, registerAllCommands } from './components/CommandPalette';
+import { CommandPalette, useCommandPalette, registerAllCommands, registerLadderCommands } from './components/CommandPalette';
 import { ProjectDialogProvider } from './contexts/ProjectDialogContext';
 import { UnsavedChangesDialog } from './components/project/UnsavedChangesDialog';
 import { SymbolEditor } from './components/SymbolEditor';
@@ -77,6 +78,16 @@ function MainWindowContent() {
   // Register all commands on mount
   useEffect(() => {
     registerAllCommands();
+  }, []);
+
+  // Listen for ladder shortcut profile changes and re-register commands
+  useEffect(() => {
+    const unsub = useSettingsStore.subscribe((state: any, prevState: any) => {
+      if (state.settings.ladderShortcutProfile !== prevState.settings.ladderShortcutProfile) {
+        registerLadderCommands();
+      }
+    });
+    return unsub;
   }, []);
 
   useEffect(() => {

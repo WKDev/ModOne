@@ -11,6 +11,9 @@ import {
   validateCompareValue,
   validateLabel,
   collectValidationErrors,
+  isOutputElementType,
+  isInputElementType,
+  validatePlacement,
 } from '../validation';
 
 describe('validateDeviceAddress', () => {
@@ -224,5 +227,64 @@ describe('collectValidationErrors', () => {
     expect(errors[0]).toContain('Invalid address');
     expect(errors[1]).toContain('label');
     expect(errors[1]).toContain('Too long');
+  });
+});
+
+describe('isOutputElementType', () => {
+  it('should return true for coils, timers, and counters', () => {
+    expect(isOutputElementType('coil')).toBe(true);
+    expect(isOutputElementType('coil_set')).toBe(true);
+    expect(isOutputElementType('timer_ton')).toBe(true);
+    expect(isOutputElementType('counter_ctu')).toBe(true);
+  });
+
+  it('should return false for contacts and comparisons', () => {
+    expect(isOutputElementType('contact_no')).toBe(false);
+    expect(isOutputElementType('compare_eq')).toBe(false);
+    expect(isOutputElementType('wire_h')).toBe(false);
+  });
+});
+
+describe('isInputElementType', () => {
+  it('should return true for contacts and comparisons', () => {
+    expect(isInputElementType('contact_no')).toBe(true);
+    expect(isInputElementType('contact_nc')).toBe(true);
+    expect(isInputElementType('compare_eq')).toBe(true);
+    expect(isInputElementType('compare_gt')).toBe(true);
+  });
+
+  it('should return false for coils and wires', () => {
+    expect(isInputElementType('coil')).toBe(false);
+    expect(isInputElementType('wire_h')).toBe(false);
+  });
+});
+
+describe('validatePlacement', () => {
+  const COLUMNS = 10;
+
+  it('should allow output elements in the last column', () => {
+    const pos = { row: 0, col: 9 };
+    expect(validatePlacement('coil', pos, COLUMNS)).toEqual({ valid: true });
+    expect(validatePlacement('timer_ton', pos, COLUMNS)).toEqual({ valid: true });
+  });
+
+  it('should reject output elements in non-last columns', () => {
+    const pos = { row: 0, col: 5 };
+    const result = validatePlacement('coil', pos, COLUMNS);
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain('마지막 열에만');
+  });
+
+  it('should allow input elements in non-last columns', () => {
+    const pos = { row: 0, col: 5 };
+    expect(validatePlacement('contact_no', pos, COLUMNS)).toEqual({ valid: true });
+    expect(validatePlacement('compare_eq', pos, COLUMNS)).toEqual({ valid: true });
+  });
+
+  it('should reject input elements in the last column', () => {
+    const pos = { row: 0, col: 9 };
+    const result = validatePlacement('contact_no', pos, COLUMNS);
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain('코일 혹은 펑션 블록만');
   });
 });
