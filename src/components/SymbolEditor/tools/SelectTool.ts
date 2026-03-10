@@ -1,6 +1,7 @@
-import React from 'react';
+
 import { BaseTool, type CanvasPoint, type ToolCallbacks } from './BaseTool';
 import type { GraphicPrimitive } from '../../../types/symbol';
+import type { GhostShape } from '../types';
 
 export class SelectTool extends BaseTool {
   private startPoint: CanvasPoint | null = null;
@@ -37,7 +38,7 @@ export class SelectTool extends BaseTool {
     }
   }
 
-  onMouseMove(pt: CanvasPoint, _callbacks: ToolCallbacks): React.ReactNode | null {
+  onMouseMove(pt: CanvasPoint, _callbacks: ToolCallbacks): GhostShape | null {
     if (!this.startPoint || !this.isDragging) return null;
     this.currentPoint = pt;
 
@@ -46,16 +47,13 @@ export class SelectTool extends BaseTool {
     const width = Math.abs(this.currentPoint.x - this.startPoint.x);
     const height = Math.abs(this.currentPoint.y - this.startPoint.y);
 
-    return React.createElement('rect', {
+    return {
+      kind: 'marquee',
       x,
       y,
       width,
       height,
-      stroke: '#0066ff',
-      fill: 'rgba(0, 102, 255, 0.1)',
-      strokeWidth: 1,
-      strokeDasharray: '2 2',
-    });
+    };
   }
 
   onMouseUp(pt: CanvasPoint, callbacks: ToolCallbacks): void {

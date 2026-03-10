@@ -1,6 +1,7 @@
-import React from 'react';
+
 import { BaseTool, type CanvasPoint, type ToolCallbacks } from './BaseTool';
 import type { ArcPrimitive } from '../../../types/symbol';
+import type { GhostShape } from '../types';
 
 export class ArcTool extends BaseTool {
   private step: 0 | 1 | 2 = 0;
@@ -39,29 +40,28 @@ export class ArcTool extends BaseTool {
     }
   }
 
-  onMouseMove(pt: CanvasPoint, _callbacks: ToolCallbacks): React.ReactNode | null {
+  onMouseMove(pt: CanvasPoint, _callbacks: ToolCallbacks): GhostShape | null {
     if (this.step === 0) return null;
     if (!this.center) return null;
 
     if (this.step === 1) {
-      return React.createElement('line', {
+      return {
+        kind: 'line',
         x1: this.center.x,
         y1: this.center.y,
         x2: pt.x,
         y2: pt.y,
-        stroke: '#cccccc',
-        strokeWidth: 1,
-        strokeDasharray: '4 4',
-      });
+      };
     } else if (this.step === 2) {
       const currentAngle = Math.atan2(pt.y - this.center.y, pt.x - this.center.x) * 180 / Math.PI;
-      return React.createElement('path', {
-        d: this.describeArc(this.center.x, this.center.y, this.radius, this.startAngle, currentAngle),
-        stroke: '#cccccc',
-        fill: 'none',
-        strokeWidth: 1,
-        strokeDasharray: '4 4',
-      });
+      return {
+        kind: 'arc',
+        cx: this.center.x,
+        cy: this.center.y,
+        r: this.radius,
+        startAngle: this.startAngle,
+        endAngle: currentAngle,
+      };
     }
     return null;
   }
@@ -81,21 +81,5 @@ export class ArcTool extends BaseTool {
     this.startAngle = 0;
   }
 
-  private describeArc(x: number, y: number, radius: number, startAngle: number, endAngle: number): string {
-    const toRad = (deg: number) => (deg * Math.PI) / 180;
-    const sx = x + radius * Math.cos(toRad(startAngle));
-    const sy = y + radius * Math.sin(toRad(startAngle));
-    const ex = x + radius * Math.cos(toRad(endAngle));
-    const ey = y + radius * Math.sin(toRad(endAngle));
-    
-    const startNorm = (startAngle % 360 + 360) % 360;
-    const endNorm = (endAngle % 360 + 360) % 360;
-    
-    let diff = endNorm - startNorm;
-    if (diff < 0) diff += 360;
-    
-    const largeArcFlag = diff > 180 ? 1 : 0;
-    
-    return `M ${sx} ${sy} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${ex} ${ey}`;
-  }
+
 }

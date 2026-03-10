@@ -1,6 +1,7 @@
-import React from 'react';
+
 import { BaseTool, type CanvasPoint, type ToolCallbacks } from './BaseTool';
 import type { PolylinePrimitive } from '../../../types/symbol';
+import type { GhostShape } from '../types';
 
 export class PolylineTool extends BaseTool {
   private points: CanvasPoint[] = [];
@@ -17,22 +18,17 @@ export class PolylineTool extends BaseTool {
 
   }
 
-  onMouseMove(pt: CanvasPoint, _callbacks: ToolCallbacks): React.ReactNode | null {
+  onMouseMove(pt: CanvasPoint, _callbacks: ToolCallbacks): GhostShape | null {
     if (this.points.length === 0) return null;
     
 
     
-    // Construct points for preview: all committed points + current mouse position
     const previewPoints = [...this.points, pt];
-    const pointsStr = previewPoints.map(p => `${p.x},${p.y}`).join(' ');
 
-    return React.createElement('polyline', {
-      points: pointsStr,
-      stroke: '#cccccc',
-      fill: 'none',
-      strokeWidth: 1,
-      strokeDasharray: '4 4',
-    });
+    return {
+      kind: 'polyline',
+      points: previewPoints,
+    };
   }
 
   onMouseUp(_pt: CanvasPoint, _callbacks: ToolCallbacks): void {

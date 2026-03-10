@@ -1,6 +1,7 @@
-import React from 'react';
+
 import { BaseTool, type CanvasPoint, type ToolCallbacks } from './BaseTool';
 import type { TextPrimitive } from '../../../types/symbol';
+import type { GhostShape } from '../types';
 
 export class TextTool extends BaseTool {
   onMouseDown(pt: CanvasPoint, callbacks: ToolCallbacks): void {
@@ -24,7 +25,7 @@ export class TextTool extends BaseTool {
     }
   }
 
-  onMouseMove(_pt: CanvasPoint, _callbacks: ToolCallbacks): React.ReactNode | null {
+  onMouseMove(_pt: CanvasPoint, _callbacks: ToolCallbacks): GhostShape | null {
     // No preview for text tool currently
     return null;
   }

@@ -1,6 +1,7 @@
-import React from 'react';
+
 import { BaseTool, type CanvasPoint, type ToolCallbacks } from './BaseTool';
 import type { RectPrimitive } from '../../../types/symbol';
+import type { GhostShape } from '../types';
 
 export class RectTool extends BaseTool {
   private startPoint: CanvasPoint | null = null;
@@ -11,7 +12,7 @@ export class RectTool extends BaseTool {
     this.currentPoint = pt;
   }
 
-  onMouseMove(pt: CanvasPoint, _callbacks: ToolCallbacks): React.ReactNode | null {
+  onMouseMove(pt: CanvasPoint, _callbacks: ToolCallbacks): GhostShape | null {
     if (!this.startPoint) return null;
     this.currentPoint = pt;
 
@@ -20,16 +21,13 @@ export class RectTool extends BaseTool {
     const width = Math.abs(this.currentPoint.x - this.startPoint.x);
     const height = Math.abs(this.currentPoint.y - this.startPoint.y);
 
-    return React.createElement('rect', {
+    return {
+      kind: 'rect',
       x,
       y,
       width,
       height,
-      stroke: '#cccccc',
-      fill: 'none',
-      strokeWidth: 1,
-      strokeDasharray: '4 4',
-    });
+    };
   }
 
   onMouseUp(pt: CanvasPoint, callbacks: ToolCallbacks): void {

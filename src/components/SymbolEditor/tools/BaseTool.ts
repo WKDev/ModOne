@@ -1,5 +1,6 @@
 import type { EditorAction } from '../SymbolEditor';
 import type { GraphicPrimitive, SymbolDefinition } from '../../../types/symbol';
+import type { GhostShape } from '../types';
 
 export interface CanvasPoint {
   x: number;
@@ -14,7 +15,7 @@ export interface ToolCallbacks {
 
 export abstract class BaseTool {
   abstract onMouseDown(pt: CanvasPoint, callbacks: ToolCallbacks): void;
-  abstract onMouseMove(pt: CanvasPoint, callbacks: ToolCallbacks): React.ReactNode | null;
+  abstract onMouseMove(pt: CanvasPoint, callbacks: ToolCallbacks): GhostShape | null;
   abstract onMouseUp(pt: CanvasPoint, callbacks: ToolCallbacks): void;
   
   // Optional handlers

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { Save, X, Layers } from 'lucide-react';
 import type { GraphicPrimitive, SymbolDefinition, SymbolPin, SymbolUnit } from '../../types/symbol';
-import { EditorCanvas } from './EditorCanvas';
+import { SymbolEditorHost } from './SymbolEditorHost';
 import { EditorToolbar } from './EditorToolbar';
 import { PinConfigPopover } from './PinConfigPopover';
 import { PropertiesPanel } from './PropertiesPanel';
@@ -382,9 +382,10 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
         </div>
 
         <div data-testid="symbol-editor-canvas" className="flex-1">
-          <EditorCanvas
+          <SymbolEditorHost
             symbol={canvasSymbol}
-            state={state}
+            currentTool={state.currentTool}
+            selectedIds={state.selectedIds}
             dispatch={dispatch}
             onAddPrimitive={handleAddPrimitive}
             onAddPin={handleAddPin}

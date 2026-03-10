@@ -221,8 +221,6 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
             },
             minZoom: 0.1,
             maxZoom: 10,
-            snapToGrid: true,
-            debug: false,
           },
         });
 
@@ -247,8 +245,6 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
             },
             minZoom: 0.1,
             maxZoom: 10,
-            snapToGrid: true,
-            debug: false,
           },
           onViewportChange: () => {
             // Re-render grid on viewport change
@@ -524,7 +520,7 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
 
     useImperativeHandle(ref, () => ({
       getViewportState() {
-        return viewportRef.current?.state ?? { x: 0, y: 0, zoom: 1, rotation: 0 };
+        return viewportRef.current?.state ?? { panX: 0, panY: 0, zoom: 1 };
       },
 
       renderSymbol() {

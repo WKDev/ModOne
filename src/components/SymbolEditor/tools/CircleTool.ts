@@ -1,6 +1,7 @@
-import React from 'react';
+
 import { BaseTool, type CanvasPoint, type ToolCallbacks } from './BaseTool';
 import type { CirclePrimitive } from '../../../types/symbol';
+import type { GhostShape } from '../types';
 
 export class CircleTool extends BaseTool {
   private centerPoint: CanvasPoint | null = null;
@@ -11,7 +12,7 @@ export class CircleTool extends BaseTool {
     this.currentPoint = pt;
   }
 
-  onMouseMove(pt: CanvasPoint, _callbacks: ToolCallbacks): React.ReactNode | null {
+  onMouseMove(pt: CanvasPoint, _callbacks: ToolCallbacks): GhostShape | null {
     if (!this.centerPoint) return null;
     this.currentPoint = pt;
 
@@ -20,15 +21,12 @@ export class CircleTool extends BaseTool {
       Math.pow(this.currentPoint.y - this.centerPoint.y, 2)
     );
 
-    return React.createElement('circle', {
+    return {
+      kind: 'circle',
       cx: this.centerPoint.x,
       cy: this.centerPoint.y,
       r,
-      stroke: '#cccccc',
-      fill: 'none',
-      strokeWidth: 1,
-      strokeDasharray: '4 4',
-    });
+    };
   }
 
   onMouseUp(pt: CanvasPoint, callbacks: ToolCallbacks): void {

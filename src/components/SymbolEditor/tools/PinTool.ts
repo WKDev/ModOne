@@ -1,4 +1,5 @@
 import { BaseTool, type CanvasPoint, type ToolCallbacks } from './BaseTool';
+import type { GhostShape } from '../types';
 
 export interface PinToolCallbacks extends ToolCallbacks {
   onOpenPinPopover: (screenX: number, screenY: number, canvasX: number, canvasY: number) => void;
@@ -21,7 +22,7 @@ export class PinTool extends BaseTool {
     );
   }
 
-  onMouseMove(_pt: CanvasPoint, _callbacks: ToolCallbacks): React.ReactNode | null {
+  onMouseMove(_pt: CanvasPoint, _callbacks: ToolCallbacks): GhostShape | null {
     return null;
   }
 
