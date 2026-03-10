@@ -31,7 +31,9 @@ interface SchematicPageBarProps {
   hasPreviousPage: boolean;
   onNextPage: () => void;
   onPreviousPage: () => void;
+  className?: string;
 }
+
 
 interface ContextMenuState {
   pageId: string;
@@ -55,6 +57,7 @@ export const SchematicPageBar = memo(function SchematicPageBar({
   hasPreviousPage,
   onNextPage,
   onPreviousPage,
+  className,
 }: SchematicPageBarProps) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
@@ -94,7 +97,9 @@ export const SchematicPageBar = memo(function SchematicPageBar({
 
   return (
     <>
-      <div className="absolute bottom-0 left-0 right-0 h-9 bg-neutral-900/95 backdrop-blur-sm border-t border-neutral-700 flex items-center z-10 px-1 gap-0.5">
+      <div className={`absolute bottom-0 right-0 h-9 bg-neutral-900/95 backdrop-blur-sm border-t border-neutral-700 flex items-center z-10 px-1 gap-0.5 ${className || 'left-0'}`}>
+
+
         {/* Previous page button */}
         <button
           type="button"

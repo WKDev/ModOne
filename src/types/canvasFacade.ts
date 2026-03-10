@@ -211,6 +211,8 @@ export interface CanvasFacadeReturn {
   showGrid: boolean;
   /** Grid style mode */
   gridStyle: 'dots' | 'lines';
+  /** Grid unit mode */
+  gridUnit: 'px' | 'mil' | 'mm';
 
   /** Toggle grid visibility */
   toggleGrid: () => void;
@@ -220,6 +222,8 @@ export interface CanvasFacadeReturn {
   setGridSize: (size: number) => void;
   /** Setup new grid style */
   setGridStyle: (style: 'dots' | 'lines') => void;
+  /** Setup new grid unit */
+  setGridUnit: (unit: 'px' | 'mil' | 'mm') => void;
 
   // --------------------------------------------------------------------------
   // History (Undo / Redo)

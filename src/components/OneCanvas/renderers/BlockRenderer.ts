@@ -317,7 +317,7 @@ export class BlockRenderer {
     const labelText = block.label || '';
     if (labelText) {
       if (!dobj.label) {
-        dobj.label = new Text({ text: labelText, style: LABEL_STYLE });
+        dobj.label = new Text({ text: labelText, style: LABEL_STYLE, resolution: 2 });
         dobj.label.label = 'block-label';
         dobj.label.anchor.set(0.5, 0);
         dobj.container.addChild(dobj.label);
@@ -333,7 +333,7 @@ export class BlockRenderer {
     const desText = block.designation || '';
     if (desText) {
       if (!dobj.designation) {
-        dobj.designation = new Text({ text: desText, style: DESIGNATION_STYLE });
+        dobj.designation = new Text({ text: desText, style: DESIGNATION_STYLE, resolution: 2 });
         dobj.designation.label = 'block-designation';
         dobj.designation.anchor.set(0.5, 1);
         dobj.container.addChild(dobj.designation);

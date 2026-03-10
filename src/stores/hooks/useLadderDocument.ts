@@ -53,6 +53,7 @@ export interface UseLadderDocumentReturn {
   wires: LadderWire[];
   comment?: string;
   gridConfig: LadderGridConfig;
+  rungLabels: Map<number, string>;
   isDirty: boolean;
 
   // Element operations
@@ -67,8 +68,9 @@ export interface UseLadderDocumentReturn {
   mergeWireElement: (existingId: string, newWireType: 'wire_h' | 'wire_v') => void;
   placeVerticalWireSpan: (col: number, startRow: number, endRow: number) => void;
 
-  // Comment
+  // Comment & Labels
   updateComment: (comment: string) => void;
+  updateRungLabel: (row: number, label: string) => void;
 
   // Grid configuration
   setGridConfig: (config: Partial<LadderGridConfig>) => void;
@@ -573,7 +575,7 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
     [documentId, data, pushHistoryAction, updateLadderData]
   );
 
-  // Comment
+  // Comment & Labels
   const updateComment = useCallback(
     (comment: string) => {
       if (!documentId) return;
@@ -581,6 +583,22 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
       pushHistoryAction(documentId);
       updateLadderData(documentId, (docData) => {
         docData.comment = comment;
+      });
+    },
+    [documentId, pushHistoryAction, updateLadderData]
+  );
+
+  const updateRungLabel = useCallback(
+    (row: number, label: string) => {
+      if (!documentId) return;
+
+      pushHistoryAction(documentId, `Update rung label for row ${row}`);
+      updateLadderData(documentId, (docData) => {
+        if (label.trim() === '') {
+          docData.rungLabels.delete(row);
+        } else {
+          docData.rungLabels.set(row, label);
+        }
       });
     },
     [documentId, pushHistoryAction, updateLadderData]
@@ -716,6 +734,7 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
       elements: data.elements,
       wires: data.wires,
       comment: data.comment,
+      rungLabels: data.rungLabels,
       gridConfig: data.gridConfig,
       isDirty: ladderDoc.isDirty,
 
@@ -731,8 +750,9 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
       mergeWireElement,
       placeVerticalWireSpan,
 
-      // Comment
+      // Comment & Labels
       updateComment,
+      updateRungLabel,
 
       // Grid configuration
       setGridConfig,
@@ -764,6 +784,7 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
     mergeWireElement,
     placeVerticalWireSpan,
     updateComment,
+    updateRungLabel,
     setGridConfig,
     undo,
     redo,

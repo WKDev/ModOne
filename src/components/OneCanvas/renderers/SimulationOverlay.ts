@@ -80,6 +80,7 @@ export class SimulationOverlay {
         fill: 0xffffff,
         letterSpacing: 0.5,
       },
+      resolution: 2,
     });
     statusText.label = 'simulation-status-text';
     root.addChild(statusText);
@@ -127,6 +128,14 @@ export class SimulationOverlay {
     if (this._destroyed) return;
     this._energizedWirePoints = new Map(wirePoints);
     this._redrawWireAnimation();
+  }
+
+  /**
+   * Handle screen resize.
+   */
+  resize(): void {
+    if (this._destroyed) return;
+    this._layoutStatusBadge();
   }
 
   destroy(): void {

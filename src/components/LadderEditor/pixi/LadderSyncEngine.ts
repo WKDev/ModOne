@@ -76,6 +76,7 @@ export class LadderSyncEngine {
     _wires: LadderWire[],
     config: LadderGridConfig,
     selectedIds: Set<string>,
+    cursorCell?: { row: number; col: number } | null,
   ): void {
     this.currentConfig = config;
 
@@ -114,7 +115,7 @@ export class LadderSyncEngine {
     }
 
     // 5. Selection
-    this.syncSelection(selectedIds, config);
+    this.syncSelection(selectedIds, cursorCell, config);
   }
 
   // ===========================================================================
@@ -177,9 +178,30 @@ export class LadderSyncEngine {
    */
   syncSelection(
     selectedIds: Set<string>,
+    cursorCellOrConfig?: { row: number; col: number } | null | LadderGridConfig,
     config?: LadderGridConfig,
   ): void {
-    const cfg = config ?? this.currentConfig;
+    // Handle overloaded signature: (ids, config) or (ids, cursorCell, config)
+    let cfg: LadderGridConfig;
+    let cursorCell: { row: number; col: number } | null | undefined;
+
+    if (config !== undefined) {
+      // Called as syncSelection(ids, cursorCell, config)
+      cursorCell = cursorCellOrConfig as { row: number; col: number } | null;
+      cfg = config;
+    } else if (
+      cursorCellOrConfig !== null &&
+      cursorCellOrConfig !== undefined &&
+      'cellWidth' in cursorCellOrConfig
+    ) {
+      // Called as syncSelection(ids, config)
+      cfg = cursorCellOrConfig as LadderGridConfig;
+      cursorCell = null;
+    } else {
+      cfg = this.currentConfig;
+      cursorCell = cursorCellOrConfig as { row: number; col: number } | null | undefined;
+    }
+
     const cells: Array<{ row: number; col: number }> = [];
 
     // Find grid positions for selected elements
@@ -193,7 +215,7 @@ export class LadderSyncEngine {
       }
     }
 
-    this.selectionRenderer.renderSelection(cells, cfg.cellWidth, cfg.cellHeight);
+    this.selectionRenderer.renderSelection(cells, cursorCell ?? null, cfg.cellWidth, cfg.cellHeight);
   }
 
   /**

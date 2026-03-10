@@ -89,7 +89,7 @@ function isValidPosition(
 export function useLadderKeyboardShortcuts(
   options: UseLadderKeyboardShortcutsOptions = {}
 ) {
-  const { enabled = true, onEditElement, onNavigate } = options;
+  const { enabled = true, onEditElement } = options;
   const { documentId } = useDocumentContext();
 
   const selectedElementIds = useLadderUIStore((state) => state.selectedElementIds);
@@ -341,22 +341,79 @@ export function useLadderKeyboardShortcuts(
     }
   }, []);
 
-  // Handle enter (edit element)
+  // Handle enter (edit element or move cursor down like Excel)
   const handleEnter = useCallback(() => {
     if (selectedElementIds.size === 1 && onEditElement) {
       const [elementId] = Array.from(selectedElementIds);
       onEditElement(elementId);
+      return;
     }
-  }, [selectedElementIds, onEditElement]);
+    // Enter with no editor: move cursor down (Excel style)
+    if (!documentId) return;
+    const registry = useDocumentRegistry.getState();
+    const doc = registry.getDocument(documentId);
+    if (!doc || !isLadderDocument(doc)) return;
+    const uiStore = useLadderUIStore.getState();
+    const cursor = uiStore.cursorCell;
+    if (!cursor) return;
+    const newRow = cursor.row + 1;
+    const newCursor = { row: newRow, col: cursor.col };
+    uiStore.setCursorCell(newCursor);
+    uiStore.setSelectionAnchor(newCursor);
+    uiStore.clearSelection();
+  }, [selectedElementIds, onEditElement, documentId]);
 
-  // Handle arrow key navigation
+  // Handle arrow key navigation — moves cursor, Shift+Arrow extends selection range
   const handleArrowKey = useCallback(
-    (direction: 'up' | 'down' | 'left' | 'right') => {
-      if (onNavigate) {
-        onNavigate(direction);
+    (direction: 'up' | 'down' | 'left' | 'right', shiftKey: boolean) => {
+      if (!documentId) return;
+      const registry = useDocumentRegistry.getState();
+      const doc = registry.getDocument(documentId);
+      if (!doc || !isLadderDocument(doc)) return;
+
+      const uiStore = useLadderUIStore.getState();
+      const cursor = uiStore.cursorCell;
+      if (!cursor) return;
+
+      const { columns } = doc.data.gridConfig;
+      const delta = {
+        up: { dRow: -1, dCol: 0 },
+        down: { dRow: 1, dCol: 0 },
+        left: { dRow: 0, dCol: -1 },
+        right: { dRow: 0, dCol: 1 },
+      }[direction];
+
+      const newRow = Math.max(0, cursor.row + delta.dRow);
+      const newCol = Math.max(0, Math.min(columns - 1, cursor.col + delta.dCol));
+      const newCursor = { row: newRow, col: newCol };
+
+      uiStore.setCursorCell(newCursor);
+
+      if (shiftKey) {
+        // Extend selection range from anchor to new cursor
+        const anchor = uiStore.selectionAnchor ?? cursor;
+        const minRow = Math.min(anchor.row, newRow);
+        const maxRow = Math.max(anchor.row, newRow);
+        const minCol = Math.min(anchor.col, newCol);
+        const maxCol = Math.max(anchor.col, newCol);
+
+        const rangeIds: string[] = [];
+        for (const el of doc.data.elements.values()) {
+          if (
+            el.position.row >= minRow && el.position.row <= maxRow &&
+            el.position.col >= minCol && el.position.col <= maxCol
+          ) {
+            rangeIds.push(el.id);
+          }
+        }
+        uiStore.setSelection(rangeIds);
+      } else {
+        // Plain arrow: clear selection, reset anchor to new cursor
+        uiStore.clearSelection();
+        uiStore.setSelectionAnchor(newCursor);
       }
     },
-    [onNavigate]
+    [documentId]
   );
 
   // Main keyboard event handler
@@ -395,22 +452,22 @@ export function useLadderKeyboardShortcuts(
       // Arrow keys - navigate cells
       if (key === 'ArrowUp') {
         event.preventDefault();
-        handleArrowKey('up');
+        handleArrowKey('up', shiftKey);
         return;
       }
       if (key === 'ArrowDown') {
         event.preventDefault();
-        handleArrowKey('down');
+        handleArrowKey('down', shiftKey);
         return;
       }
       if (key === 'ArrowLeft') {
         event.preventDefault();
-        handleArrowKey('left');
+        handleArrowKey('left', shiftKey);
         return;
       }
       if (key === 'ArrowRight') {
         event.preventDefault();
-        handleArrowKey('right');
+        handleArrowKey('right', shiftKey);
         return;
       }
 

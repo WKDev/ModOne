@@ -12,76 +12,32 @@ export const CanvasProperties = memo(function CanvasProperties({
 }: CanvasPropertiesProps) {
   const facade = useCanvasFacade(documentId);
   const canvasSettings = useProjectStore((s) => s.currentProject?.config.canvas);
-  const updateConfig = useProjectStore((s) => s.updateConfig);
 
   const showGrid = canvasSettings?.show_grid ?? facade.showGrid;
   const snapToGrid = canvasSettings?.snap_to_grid ?? facade.snapToGrid;
   const gridSize = canvasSettings?.grid_size ?? facade.gridSize;
   const gridStyle = canvasSettings?.grid_style ?? facade.gridStyle;
+  const gridUnit = facade.gridUnit;
 
   const handleToggleGrid = useCallback(() => {
-    const nextValue = !showGrid;
-    updateConfig({
-      canvas: {
-        ...(canvasSettings || {
-          grid_size: 20,
-          snap_to_grid: true,
-          show_grid: true,
-          grid_style: 'dots',
-        }),
-        show_grid: nextValue,
-      },
-    });
-    // Also update current doc for immediate feedback if necessary, 
-    // but ideally the project store update should propagate.
     facade.toggleGrid();
-  }, [showGrid, updateConfig, canvasSettings, facade]);
+  }, [facade]);
 
   const handleToggleSnap = useCallback(() => {
-    const nextValue = !snapToGrid;
-    updateConfig({
-      canvas: {
-        ...(canvasSettings || {
-          grid_size: 20,
-          snap_to_grid: true,
-          show_grid: true,
-          grid_style: 'dots',
-        }),
-        snap_to_grid: nextValue,
-      },
-    });
     facade.toggleSnap();
-  }, [snapToGrid, updateConfig, canvasSettings, facade]);
+  }, [facade]);
 
   const handleGridSizeChange = useCallback((size: number) => {
-    updateConfig({
-      canvas: {
-        ...(canvasSettings || {
-          grid_size: 20,
-          snap_to_grid: true,
-          show_grid: true,
-          grid_style: 'dots',
-        }),
-        grid_size: size,
-      },
-    });
     facade.setGridSize(size);
-  }, [updateConfig, canvasSettings, facade]);
+  }, [facade]);
 
   const handleGridStyleChange = useCallback((style: 'dots' | 'lines') => {
-    updateConfig({
-      canvas: {
-        ...(canvasSettings || {
-          grid_size: 20,
-          snap_to_grid: true,
-          show_grid: true,
-          grid_style: 'dots',
-        }),
-        grid_style: style,
-      },
-    });
     facade.setGridStyle(style);
-  }, [updateConfig, canvasSettings, facade]);
+  }, [facade]);
+
+  const handleGridUnitChange = useCallback((unit: 'px' | 'mil' | 'mm') => {
+    facade.setGridUnit(unit);
+  }, [facade]);
 
   return (
     <div className="space-y-4">
@@ -105,14 +61,12 @@ export const CanvasProperties = memo(function CanvasProperties({
           <label className="text-sm text-neutral-300">Show Grid</label>
           <button
             onClick={handleToggleGrid}
-            className={`w-10 h-5 rounded-full relative transition-colors ${
-              showGrid ? 'bg-blue-600' : 'bg-neutral-600'
-            }`}
+            className={`w-10 h-5 rounded-full relative transition-colors ${showGrid ? 'bg-blue-600' : 'bg-neutral-600'
+              }`}
           >
             <div
-              className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-transform ${
-                showGrid ? 'translate-x-[22px]' : 'translate-x-0.5'
-              }`}
+              className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-transform ${showGrid ? 'translate-x-[22px]' : 'translate-x-0.5'
+                }`}
             />
           </button>
         </div>
@@ -122,30 +76,58 @@ export const CanvasProperties = memo(function CanvasProperties({
           <label className="text-sm text-neutral-300">Snap to Grid</label>
           <button
             onClick={handleToggleSnap}
-            className={`w-10 h-5 rounded-full relative transition-colors ${
-              snapToGrid ? 'bg-blue-600' : 'bg-neutral-600'
-            }`}
+            className={`w-10 h-5 rounded-full relative transition-colors ${snapToGrid ? 'bg-blue-600' : 'bg-neutral-600'
+              }`}
           >
             <div
-              className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-transform ${
-                snapToGrid ? 'translate-x-[22px]' : 'translate-x-0.5'
-              }`}
+              className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-transform ${snapToGrid ? 'translate-x-[22px]' : 'translate-x-0.5'
+                }`}
             />
           </button>
         </div>
 
+        {/* Grid Unit Select */}
+        <div className="space-y-1">
+          <label className="text-xs text-neutral-500">Grid Unit</label>
+          <select
+            value={gridUnit}
+            onChange={(e) => handleGridUnitChange(e.target.value as 'px' | 'mil' | 'mm')}
+            className="w-full px-2 py-1.5 bg-neutral-800 border border-neutral-700 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 appearance-none cursor-pointer"
+          >
+            <option value="px">px (pixels)</option>
+            <option value="mil">mil (1/1000 inch)</option>
+            <option value="mm">mm (millimeters)</option>
+          </select>
+        </div>
+
         {/* Grid Size Select */}
         <div className="space-y-1">
-          <label className="text-xs text-neutral-500">Grid Size</label>
+          <label className="text-xs text-neutral-500">Grid Size ({gridUnit})</label>
           <select
             value={gridSize}
             onChange={(e) => handleGridSizeChange(Number(e.target.value))}
             className="w-full px-2 py-1.5 bg-neutral-800 border border-neutral-700 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 appearance-none cursor-pointer"
           >
-            <option value={5}>5 px</option>
-            <option value={10}>10 px</option>
-            <option value={20}>20 px (Default)</option>
-            <option value={50}>50 px</option>
+            {gridUnit === 'px' && <>
+              <option value={5}>5 px</option>
+              <option value={10}>10 px</option>
+              <option value={20}>20 px</option>
+              <option value={50}>50 px</option>
+            </>}
+            {gridUnit === 'mil' && <>
+              <option value={5}>5 mil</option>
+              <option value={10}>10 mil</option>
+              <option value={25}>25 mil (PCB standard)</option>
+              <option value={50}>50 mil</option>
+              <option value={100}>100 mil (100mil = 2.54mm)</option>
+            </>}
+            {gridUnit === 'mm' && <>
+              <option value={1}>1 mm</option>
+              <option value={2}>2 mm</option>
+              <option value={4}>4 mm (Default)</option>
+              <option value={8}>8 mm</option>
+              <option value={16}>16 mm</option>
+            </>}
           </select>
         </div>
 

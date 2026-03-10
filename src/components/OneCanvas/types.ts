@@ -599,8 +599,8 @@ export type Block =
   | OverloadRelayBlock
   | ContactorBlock
   | DisconnectSwitchBlock
-   | OffPageConnectorBlock
-   | CustomSymbolBlock;
+  | OffPageConnectorBlock
+  | CustomSymbolBlock;
 
 // ============================================================================
 // Junction (wire-level concept)
@@ -1000,10 +1000,13 @@ export interface GridConfig {
   majorAlpha?: number;
   subdivisions?: number;
   style?: 'dots' | 'lines';
+  /** Physical unit for the `size` value. 'px' (default) | 'mil' | 'mm' */
+  unit?: 'px' | 'mil' | 'mm';
 }
 
 export const DEFAULT_GRID: GridConfig = {
-  size: 20,
+  size: 4,
+  unit: 'mm',
   visible: true,
   color: '#cccccc',
   alpha: 0.3,
@@ -1023,7 +1026,7 @@ export interface CanvasConfig {
 
 export const DEFAULT_CANVAS_CONFIG: CanvasConfig = {
   grid: DEFAULT_GRID,
-  minZoom: 0.05,
+  minZoom: 0.01,
   maxZoom: 10,
   backgroundColor: 0xffffff,
 };

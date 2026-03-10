@@ -23,6 +23,7 @@ const { mockUIState, mockLadderDoc } = vi.hoisted(() => ({
     wires: [] as LadderWire[],
     comment: undefined as string | undefined,
     gridConfig: { columns: 10, cellWidth: 80, cellHeight: 60 },
+    rungLabels: new Map<number, string>(),
     isDirty: false,
 
     // Element operations
@@ -37,8 +38,9 @@ const { mockUIState, mockLadderDoc } = vi.hoisted(() => ({
     mergeWireElement: vi.fn(),
     placeVerticalWireSpan: vi.fn(),
 
-    // Comment
+    // Comment & Labels
     updateComment: vi.fn(),
+    updateRungLabel: vi.fn(),
 
     // Grid configuration
     setGridConfig: vi.fn(),

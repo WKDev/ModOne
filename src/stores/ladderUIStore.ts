@@ -16,6 +16,12 @@ export interface LadderUIState {
   activeTool: LadderElementType | null;
   /** Last placed wire_v position for Shift+Click vertical spanning */
   lastWireVPlacement: GridPosition | null;
+  /** Active cursor cell position (Excel-style active cell indicator) */
+  cursorCell: GridPosition | null;
+  /** Anchor cell for range selection (Shift+Click/ArrowKey extends from here) */
+  selectionAnchor: GridPosition | null;
+  /** Current vertical scroll offset of the Pixi viewport (world Y) */
+  viewportY: number;
 }
 
 export interface LadderUIActions {
@@ -34,11 +40,19 @@ export interface LadderUIActions {
 
   setLastWireVPlacement: (position: GridPosition | null) => void;
 
+  /** Set the active cursor cell (Excel-style current cell) */
+  setCursorCell: (position: GridPosition | null) => void;
+  /** Set the selection anchor for range selection (Shift+click/arrows) */
+  setSelectionAnchor: (position: GridPosition | null) => void;
+
   startMonitoring: () => void;
   stopMonitoring: () => void;
   updateMonitoringState: (updates: Partial<LadderMonitoringState>) => void;
   forceDevice: (address: string, value: boolean | number) => void;
   releaseForce: (address: string) => void;
+
+  /** Set the current vertical scroll offset */
+  setViewportY: (y: number) => void;
 
   reset: () => void;
 }
@@ -52,6 +66,9 @@ const createInitialState = (): LadderUIState => ({
   monitoringState: null,
   activeTool: null,
   lastWireVPlacement: null,
+  cursorCell: null,
+  selectionAnchor: null,
+  viewportY: 0,
 });
 
 export const useLadderUIStore = create<LadderUIStore>()(
@@ -174,6 +191,26 @@ export const useLadderUIStore = create<LadderUIStore>()(
         );
       },
 
+      setCursorCell: (position) => {
+        set(
+          (state) => {
+            state.cursorCell = position;
+          },
+          false,
+          'setCursorCell'
+        );
+      },
+
+      setSelectionAnchor: (position) => {
+        set(
+          (state) => {
+            state.selectionAnchor = position;
+          },
+          false,
+          'setSelectionAnchor'
+        );
+      },
+
       startMonitoring: () => {
         set(
           (state) => {
@@ -253,14 +290,20 @@ export const useLadderUIStore = create<LadderUIStore>()(
         );
       },
 
+      setViewportY: (y) => {
+        set(
+          (state) => {
+            state.viewportY = y;
+          },
+          false,
+          'setViewportY'
+        );
+      },
+
       reset: () => {
         set(
           () => ({
             ...createInitialState(),
-            selectedElementIds: new Set(),
-            clipboard: [],
-            activeTool: null,
-            lastWireVPlacement: null,
           }),
           false,
           'reset'

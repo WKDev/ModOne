@@ -20,6 +20,8 @@ import { useLadderPixiRenderer } from './pixi/useLadderPixiRenderer';
 import { LadderToolbox } from './LadderToolbox';
 import { LadderToolbar } from './LadderToolbar';
 import { NetworkCommentHeader } from './NetworkCommentHeader';
+import { LadderStepNumberPanel } from './LadderStepNumberPanel';
+import { LadderRungLabelPanel } from './LadderRungLabelPanel';
 import { LadderPropertiesPanel } from './properties';
 import { useLadderKeyboardShortcuts } from './hooks';
 
@@ -135,26 +137,33 @@ export function LadderEditor({
         )}
 
         {/* Content area with canvas and properties */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* Canvas area */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            {/* Comment header */}
-            <NetworkCommentHeader
-              comment={comment}
-              onUpdateComment={handleUpdateComment}
-              editable={!isMonitorMode}
-            />
+        <div className="flex-1 flex overflow-hidden bg-neutral-900 border-t border-neutral-700">
+          {/* Main workspace (gutter + canvas + labels) */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* Left Gutter: Step Numbers */}
+            <LadderStepNumberPanel />
 
-            {/* Pixi canvas */}
-            <LadderPixiCanvasHost
-              className="flex-1"
-              onReady={handlePixiReady}
-            />
+            {/* Central Area: Comment + Canvas */}
+            <div className="flex-1 flex flex-col overflow-hidden relative">
+              <NetworkCommentHeader
+                comment={comment}
+                onUpdateComment={handleUpdateComment}
+                editable={!isMonitorMode}
+              />
+
+              <LadderPixiCanvasHost
+                className="flex-1"
+                onReady={handlePixiReady}
+              />
+            </div>
+
+            {/* Right Gutter: Rung Labels */}
+            <LadderRungLabelPanel />
           </div>
 
-          {/* Properties Panel */}
+          {/* Properties Panel (optional, collapsable) */}
           {showPropertiesPanel && (
-            <LadderPropertiesPanel className="w-64 border-l border-neutral-700 shrink-0" />
+            <LadderPropertiesPanel className="w-64 border-l border-neutral-700 shrink-0 bg-neutral-900" />
           )}
         </div>
 

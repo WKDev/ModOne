@@ -15,6 +15,8 @@ const mockSelectAll = vi.fn();
 const mockSetClipboard = vi.fn();
 const mockSetSelection = vi.fn();
 const mockClearActiveTool = vi.fn();
+const mockSetCursorCell = vi.fn();
+const mockSetSelectionAnchor = vi.fn();
 
 let uiStoreState: Record<string, unknown> = {};
 
@@ -27,11 +29,15 @@ vi.mock('../../../../stores/ladderUIStore', () => {
   store.getState = () => ({
     ...uiStoreState,
     activeTool: uiStoreState.activeTool ?? null,
+    cursorCell: uiStoreState.cursorCell ?? null,
+    selectionAnchor: uiStoreState.selectionAnchor ?? null,
     clearSelection: mockClearSelection,
     clearActiveTool: mockClearActiveTool,
     selectAll: mockSelectAll,
     setClipboard: mockSetClipboard,
     setSelection: mockSetSelection,
+    setCursorCell: mockSetCursorCell,
+    setSelectionAnchor: mockSetSelectionAnchor,
     clipboard: [],
   });
   return { useLadderUIStore: store };
@@ -73,14 +79,14 @@ vi.mock('../../../../stores/documentRegistry', () => ({
       getDocument: (id: string) =>
         id === 'doc-1'
           ? {
-              id: 'doc-1',
-              type: 'ladder' as const,
-              data: {
-                elements: mockElements,
-                wires: [],
-                gridConfig: { columns: 12 },
-              },
-            }
+            id: 'doc-1',
+            type: 'ladder' as const,
+            data: {
+              elements: mockElements,
+              wires: [],
+              gridConfig: { columns: 12 },
+            },
+          }
           : null,
       pushHistory: mockPushHistory,
       updateLadderData: mockUpdateLadderData,
@@ -100,11 +106,15 @@ describe('useLadderKeyboardShortcuts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockClearActiveTool.mockClear();
+    mockSetCursorCell.mockClear();
+    mockSetSelectionAnchor.mockClear();
 
     // Default UI store state
     uiStoreState = {
       selectedElementIds: new Set(['element-1', 'element-2']),
       mode: 'edit',
+      cursorCell: { row: 0, col: 0 },
+      selectionAnchor: { row: 0, col: 0 },
     };
   });
 
@@ -308,29 +318,34 @@ describe('useLadderKeyboardShortcuts', () => {
   });
 
   describe('Navigation', () => {
-    it('should call onNavigate for arrow keys', () => {
-      const onNavigate = vi.fn();
-      renderHook(() => useLadderKeyboardShortcuts({ onNavigate }));
+    it('should move cursor cell on arrow keys', () => {
+      uiStoreState = {
+        selectedElementIds: new Set(),
+        mode: 'edit',
+        cursorCell: { row: 2, col: 2 },
+        selectionAnchor: { row: 2, col: 2 },
+      };
+      renderHook(() => useLadderKeyboardShortcuts());
 
       act(() => {
         simulateKeyDown('ArrowUp');
       });
-      expect(onNavigate).toHaveBeenCalledWith('up');
+      expect(mockSetCursorCell).toHaveBeenLastCalledWith({ row: 1, col: 2 });
 
       act(() => {
         simulateKeyDown('ArrowDown');
       });
-      expect(onNavigate).toHaveBeenCalledWith('down');
+      expect(mockSetCursorCell).toHaveBeenLastCalledWith({ row: 3, col: 2 });
 
       act(() => {
         simulateKeyDown('ArrowLeft');
       });
-      expect(onNavigate).toHaveBeenCalledWith('left');
+      expect(mockSetCursorCell).toHaveBeenLastCalledWith({ row: 2, col: 1 });
 
       act(() => {
         simulateKeyDown('ArrowRight');
       });
-      expect(onNavigate).toHaveBeenCalledWith('right');
+      expect(mockSetCursorCell).toHaveBeenLastCalledWith({ row: 2, col: 3 });
     });
   });
 

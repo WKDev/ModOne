@@ -47,12 +47,13 @@ export function useLadderPixiRenderer({
   const dragHandlerRef = useRef<LadderDragHandler | null>(null);
 
   // Subscribe to UI store state
-  const { selectedElementIds, activeTool, monitoringState, mode } = useLadderUIStore(
+  const { selectedElementIds, activeTool, monitoringState, mode, cursorCell } = useLadderUIStore(
     useShallow((state) => ({
       selectedElementIds: state.selectedElementIds,
       activeTool: state.activeTool,
       monitoringState: state.monitoringState,
       mode: state.mode,
+      cursorCell: state.cursorCell,
     }))
   );
 
@@ -107,8 +108,9 @@ export function useLadderPixiRenderer({
       ladderDoc.wires,
       ladderDoc.gridConfig,
       selectedElementIds,
+      cursorCell,
     );
-  }, [ladderDoc?.elements, ladderDoc?.wires, ladderDoc?.gridConfig, ladderDoc, selectedElementIds]);
+  }, [ladderDoc?.elements, ladderDoc?.wires, ladderDoc?.gridConfig, ladderDoc, selectedElementIds, cursorCell]);
 
   // ===========================================================================
   // Monitoring visualization sync
@@ -124,6 +126,19 @@ export function useLadderPixiRenderer({
       engine.clearMonitoring();
     }
   }, [mode, monitoringState, ladderDoc?.elements, ladderDoc]);
+
+  // ===========================================================================
+  // Auto-scroll when cursor cell changes (keyboard navigation)
+  // ===========================================================================
+
+  useEffect(() => {
+    if (!hostRef || !cursorCell || !ladderDoc) return;
+    hostRef.scrollToCell(
+      cursorCell.row,
+      cursorCell.col,
+      ladderDoc.gridConfig.cellHeight,
+    );
+  }, [hostRef, cursorCell, ladderDoc?.gridConfig.cellHeight, ladderDoc]);
 
   // ===========================================================================
   // Grid config → EventBridge sync
@@ -183,28 +198,65 @@ export function useLadderPixiRenderer({
 
     const tool = activeToolRef.current;
     const { gridRow, gridCol, shiftKey, ctrlKey } = event;
+    const uiStore = useLadderUIStore.getState();
 
     // --- Click-to-place: active tool is set ---
     if (tool) {
       handlePlacement(doc, tool, gridRow, gridCol, shiftKey);
+      // Set cursor to placed position
+      uiStore.setCursorCell({ row: gridRow, col: gridCol });
+      uiStore.setSelectionAnchor({ row: gridRow, col: gridCol });
       return;
+    }
+
+    // --- Always update cursor cell on click ---
+    uiStore.setCursorCell({ row: gridRow, col: gridCol });
+
+    // --- Range selection via Shift+Click ---
+    if (shiftKey && !ctrlKey) {
+      const anchor = uiStore.selectionAnchor;
+      if (anchor) {
+        // Select all elements within the rectangular range anchor → cursor
+        const minRow = Math.min(anchor.row, gridRow);
+        const maxRow = Math.max(anchor.row, gridRow);
+        const minCol = Math.min(anchor.col, gridCol);
+        const maxCol = Math.max(anchor.col, gridCol);
+
+        const rangeIds: string[] = [];
+        for (const el of doc.elements.values()) {
+          if (
+            el.position.row >= minRow && el.position.row <= maxRow &&
+            el.position.col >= minCol && el.position.col <= maxCol
+          ) {
+            rangeIds.push(el.id);
+          }
+        }
+        uiStore.setSelection(rangeIds);
+        return;
+      }
     }
 
     // --- Selection: no active tool ---
     const existingElement = doc.getElementAt(gridRow, gridCol);
 
     if (existingElement) {
-      if (ctrlKey || shiftKey) {
-        // Toggle selection
-        useLadderUIStore.getState().toggleSelection(existingElement.id);
+      if (ctrlKey) {
+        // Toggle selection (Ctrl)
+        uiStore.toggleSelection(existingElement.id);
+        // Keep anchor where it was (or set it if this is first selection)
+        if (!uiStore.selectionAnchor) {
+          uiStore.setSelectionAnchor({ row: gridRow, col: gridCol });
+        }
       } else {
-        // Replace selection
-        useLadderUIStore.getState().setSelection([existingElement.id]);
+        // Replace selection — set new anchor
+        uiStore.setSelection([existingElement.id]);
+        uiStore.setSelectionAnchor({ row: gridRow, col: gridCol });
       }
     } else {
-      // Click empty cell → clear selection
+      // Click empty cell
       if (!ctrlKey && !shiftKey) {
-        useLadderUIStore.getState().clearSelection();
+        uiStore.clearSelection();
+        uiStore.setSelectionAnchor({ row: gridRow, col: gridCol });
       }
     }
   }, []);

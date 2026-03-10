@@ -103,19 +103,21 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
   const projectCanvasSettings = useProjectStore((s) => s.currentProject?.config.canvas);
   const updateProjectConfig = useProjectStore((s) => s.updateConfig);
 
-  const gridSize = projectCanvasSettings?.grid_size ?? activeDocumentState?.gridSize ?? 20;
+  const gridSize = projectCanvasSettings?.grid_size ?? activeDocumentState?.gridSize ?? 4;
   const snapToGrid = projectCanvasSettings?.snap_to_grid ?? activeDocumentState?.snapToGrid ?? true;
   const showGrid = projectCanvasSettings?.show_grid ?? activeDocumentState?.showGrid ?? true;
   const gridStyle = projectCanvasSettings?.grid_style ?? activeDocumentState?.gridStyle ?? 'dots';
+  const gridUnit = projectCanvasSettings?.grid_unit ?? (activeDocumentState as any)?.gridUnit ?? 'mm';
 
   const setGridSize = useCallback((size: number) => {
     updateProjectConfig({
       canvas: {
         ...(projectCanvasSettings || {
-          grid_size: 20,
+          grid_size: 4,
           snap_to_grid: true,
           show_grid: true,
           grid_style: 'dots',
+          grid_unit: 'mm',
         }),
         grid_size: size,
       },
@@ -127,10 +129,11 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
     updateProjectConfig({
       canvas: {
         ...(projectCanvasSettings || {
-          grid_size: 20,
+          grid_size: 4,
           snap_to_grid: true,
           show_grid: true,
           grid_style: 'dots',
+          grid_unit: 'mm',
         }),
         grid_style: style,
       },
@@ -138,15 +141,35 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
     activeDocumentState?.setGridStyle(style);
   }, [updateProjectConfig, projectCanvasSettings, activeDocumentState]);
 
+  const setGridUnit = useCallback((unit: 'px' | 'mil' | 'mm') => {
+    updateProjectConfig({
+      canvas: {
+        ...(projectCanvasSettings || {
+          grid_size: 4,
+          snap_to_grid: true,
+          show_grid: true,
+          grid_style: 'dots',
+          grid_unit: 'mm',
+        }),
+        grid_unit: unit,
+      },
+    });
+    // activeDocumentState might need to handle unit if it stores it independently
+    if (activeDocumentState && 'setGridUnit' in activeDocumentState) {
+      (activeDocumentState as any).setGridUnit(unit);
+    }
+  }, [updateProjectConfig, projectCanvasSettings, activeDocumentState]);
+
   const toggleGrid = useCallback(() => {
     const nextValue = !showGrid;
     updateProjectConfig({
       canvas: {
         ...(projectCanvasSettings || {
-          grid_size: 20,
+          grid_size: 4,
           snap_to_grid: true,
           show_grid: true,
           grid_style: 'dots',
+          grid_unit: 'mm',
         }),
         show_grid: nextValue,
       },
@@ -159,10 +182,11 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
     updateProjectConfig({
       canvas: {
         ...(projectCanvasSettings || {
-          grid_size: 20,
+          grid_size: 4,
           snap_to_grid: true,
           show_grid: true,
           grid_style: 'dots',
+          grid_unit: 'mm',
         }),
         snap_to_grid: nextValue,
       },
@@ -179,7 +203,7 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
     }
     if (projectCanvasSettings.snap_to_grid !== activeDocumentState.snapToGrid) {
       activeDocumentState.toggleSnap(); // toggleSnap doesn't take value, it just toggles. 
-                                        // Wait, toggleSnap might be problematic if we want a specific value.
+      // Wait, toggleSnap might be problematic if we want a specific value.
     }
     if (projectCanvasSettings.show_grid !== activeDocumentState.showGrid) {
       activeDocumentState.toggleGrid();
@@ -454,18 +478,18 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
               to: { ...wire.to },
               handles: wire.handles
                 ? wire.handles.map((handle) => ({
-                    ...handle,
-                    position: { ...handle.position },
-                  }))
+                  ...handle,
+                  position: { ...handle.position },
+                }))
                 : undefined,
             })),
             metadata: { ...data.metadata },
             viewport: data.viewport
               ? {
-                  zoom: data.viewport.zoom,
-                  panX: data.viewport.panX,
-                  panY: data.viewport.panY,
-                }
+                zoom: data.viewport.zoom,
+                panX: data.viewport.panX,
+                panY: data.viewport.panY,
+              }
               : { zoom: 1, panX: 0, panY: 0 },
           };
           page.updatedAt = new Date().toISOString();
@@ -555,11 +579,13 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
         snapToGrid,
         showGrid,
         gridStyle,
+        gridUnit,
 
         toggleGrid,
         toggleSnap,
         setGridSize,
         setGridStyle,
+        setGridUnit,
         // History
         undo: documentUndo,
         redo: documentRedo,
@@ -586,31 +612,31 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
         zoom: 1,
         pan: { x: 0, y: 0 },
         addComponent: () => '',
-        moveComponent: () => {},
-        updateComponent: () => {},
-        removeComponent: () => {},
-        moveJunction: () => {},
+        moveComponent: () => { },
+        updateComponent: () => { },
+        removeComponent: () => { },
+        moveJunction: () => { },
         addWire: () => null,
-        removeWire: () => {},
+        removeWire: () => { },
         createJunctionOnWire: () => null,
-        updateWireHandle: () => {},
-        recalculateWireHandles: () => {},
-        removeWireHandle: () => {},
-        moveWireSegment: () => {},
+        updateWireHandle: () => { },
+        recalculateWireHandles: () => { },
+        removeWireHandle: () => { },
+        moveWireSegment: () => { },
         dragWireSegment: () => null,
-        insertEndpointHandle: () => {},
-        cleanupOverlappingHandles: () => {},
-        commitWirePolyline: () => {},
-        alignSelected: () => {},
-        distributeSelected: () => {},
-        flipSelected: () => {},
+        insertEndpointHandle: () => { },
+        cleanupOverlappingHandles: () => { },
+        commitWirePolyline: () => { },
+        alignSelected: () => { },
+        distributeSelected: () => { },
+        flipSelected: () => { },
         getCircuitData: () => ({
           components: {},
           wires: [],
           metadata: { name: 'Untitled Circuit', description: '', tags: [] },
           viewport: { zoom: 1, panX: 0, panY: 0 },
         }),
-        loadCircuit: () => {},
+        loadCircuit: () => { },
         wireDrawing: documentWireDrawing,
         startWireDrawing: startDocumentWireDrawing,
         updateWireDrawing: updateDocumentWireDrawing,
@@ -620,16 +646,18 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
         addToSelection: addDocumentSelection,
         toggleSelection: toggleDocumentSelection,
         clearSelection: clearDocumentSelection,
-        setPan: () => {},
-        setZoom: () => {},
-        gridSize: 20,
+        setPan: () => { },
+        setZoom: () => { },
+        gridSize: 4,
         snapToGrid: true,
         showGrid: true,
         gridStyle: 'dots',
-        toggleGrid: () => {},
-        toggleSnap: () => {},
-        setGridSize: () => {},
-        setGridStyle: () => {},
+        gridUnit: 'mm',
+        toggleGrid: () => { },
+        toggleSnap: () => { },
+        setGridSize: () => { },
+        setGridStyle: () => { },
+        setGridUnit: () => { },
         undo: documentUndo,
         redo: documentRedo,
         canUndo: documentCanUndo,

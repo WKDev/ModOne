@@ -270,11 +270,12 @@ function createLadderHistorySnapshot(data: LadderDocumentData): LadderHistoryDat
       to: { ...wire.to },
     })),
     comment: data.comment,
+    rungLabels: Array.from(data.rungLabels.entries()),
   };
 }
 
 /** Restore ladder data from history snapshot */
-function restoreLadderFromHistory(snapshot: LadderHistoryData): Pick<LadderDocumentData, 'elements' | 'wires' | 'comment'> {
+function restoreLadderFromHistory(snapshot: LadderHistoryData): Pick<LadderDocumentData, 'elements' | 'wires' | 'comment' | 'rungLabels'> {
   const elements = new Map<string, LadderElement>();
   snapshot.elements.forEach(([id, element]) => {
     elements.set(id, JSON.parse(JSON.stringify(element)));
@@ -288,6 +289,7 @@ function restoreLadderFromHistory(snapshot: LadderHistoryData): Pick<LadderDocum
       to: { ...wire.to },
     })),
     comment: snapshot.comment,
+    rungLabels: new Map(snapshot.rungLabels ?? []),
   };
 }
 
@@ -802,6 +804,7 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
               doc.data.elements = restored.elements;
               doc.data.wires = restored.wires;
               doc.data.comment = restored.comment;
+              doc.data.rungLabels = restored.rungLabels;
               doc.historyIndex--;
               doc.isDirty = true;
             } else if (isScenarioDocument(doc)) {
@@ -867,6 +870,7 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
                 doc.data.elements = restored.elements;
                 doc.data.wires = restored.wires;
                 doc.data.comment = restored.comment;
+                doc.data.rungLabels = restored.rungLabels;
                 doc.isDirty = true;
               }
             } else if (isScenarioDocument(doc)) {

@@ -128,6 +128,7 @@ export interface LadderHistoryData {
   elements: Array<[string, LadderElement]>;
   wires: LadderWire[];
   comment?: string;
+  rungLabels?: Array<[number, string]>;
 }
 
 /** Ladder document data */
@@ -136,8 +137,10 @@ export interface LadderDocumentData {
   elements: Map<string, LadderElement>;
   /** Wire connections */
   wires: LadderWire[];
-  /** Ladder comment */
+  /** Ladder comment (overall) */
   comment?: string;
+  /** Rung labels by row index */
+  rungLabels: Map<number, string>;
   /** Grid configuration */
   gridConfig: LadderGridConfig;
 }
@@ -262,6 +265,7 @@ export const DEFAULT_LADDER_DATA: LadderDocumentData = {
   elements: new Map(),
   wires: [],
   comment: undefined,
+  rungLabels: new Map(),
   gridConfig: {
     columns: 10,
     cellWidth: 80,

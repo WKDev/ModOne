@@ -201,11 +201,13 @@ export function useGlobalCanvasAdapter(): CanvasFacadeReturn {
       snapToGrid: globalSnapToGrid,
       showGrid: globalShowGrid,
       gridStyle: globalGridStyle,
+      gridUnit: 'mm',
 
       toggleGrid: globalToggleGrid,
       toggleSnap: globalToggleSnap,
       setGridSize: globalSetGridSize,
       setGridStyle: globalSetGridStyle,
+      setGridUnit: () => { },
 
       // History
       undo: globalUndo,

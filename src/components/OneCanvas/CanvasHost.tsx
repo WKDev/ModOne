@@ -294,6 +294,17 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
         await pixiApp.init({
           container,
           config: canvasConfig,
+          onResize: (width, height) => {
+            if (destroyed) return;
+            // 1. Notify Viewport
+            viewportRef.current?.resize(width, height);
+
+            // 2. Force Full Sync (Redraws grid, blocks, wires synchronously)
+            syncEngineRef.current?.forceSync();
+
+            // 3. Update Overlays
+            simulationOverlayRef.current?.resize();
+          },
         });
 
         if (destroyed) {

@@ -66,6 +66,7 @@ export interface CanvasSettings {
   snap_to_grid: boolean;
   show_grid: boolean;
   grid_style: 'dots' | 'lines';
+  grid_unit?: 'px' | 'mil' | 'mm';
 }
 
 // Directory configuration for v2.0 folder-based projects
@@ -177,7 +178,8 @@ export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
   },
   auto_save: DEFAULT_AUTO_SAVE_SETTINGS,
   canvas: {
-    grid_size: 20,
+    grid_size: 4,
+    grid_unit: 'mm',
     snap_to_grid: true,
     show_grid: true,
     grid_style: 'dots',

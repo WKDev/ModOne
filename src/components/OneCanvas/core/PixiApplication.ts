@@ -17,6 +17,8 @@ export interface PixiApplicationOptions {
   config?: Partial<CanvasConfig>;
   /** Device pixel ratio override (defaults to window.devicePixelRatio) */
   resolution?: number;
+  /** Callback when canvas is resized */
+  onResize?: (width: number, height: number) => void;
 }
 
 /**
@@ -114,6 +116,8 @@ export class PixiApplication {
         const { width, height } = entry.contentRect;
         if (width > 0 && height > 0) {
           this._app.renderer.resize(width, height);
+          options.onResize?.(width, height);
+          this._app.render(); // Force immediate redraw to prevent flicker
         }
       }
     });

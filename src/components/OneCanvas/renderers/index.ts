@@ -3,7 +3,7 @@
  */
 
 export { GridRenderer } from './GridRenderer';
-export type { GridRendererOptions } from './GridRenderer';
+export type { GridRendererOptions, GridUnit } from './GridRenderer';
 
 export { BlockRenderer } from './BlockRenderer';
 export type { BlockRendererOptions, BlockStyle } from './BlockRenderer';
