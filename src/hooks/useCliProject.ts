@@ -5,6 +5,7 @@ import { useProjectStore } from '@stores/projectStore';
 import { projectService } from '@services/projectService';
 import { explorerService } from '@services/explorerService';
 import { useExplorerStore } from '@stores/explorerStore';
+import { useSidebarStore } from '@stores/sidebarStore';
 
 function extractProjectDir(projectPath: string): string {
   return projectPath.replace(/[\\/][^\\/]+\.mop$/i, '');
@@ -17,6 +18,7 @@ export function useCliProject(isInitialized: boolean) {
   const setError = useProjectStore((s) => s.setError);
   const setRecentProjects = useProjectStore((s) => s.setRecentProjects);
   const loadProjectStructure = useExplorerStore((s) => s.loadProjectStructure);
+  const showSidebarPanel = useSidebarStore((s) => s.showPanel);
 
   useEffect(() => {
     if (!isInitialized || hasChecked.current) return;
@@ -33,6 +35,9 @@ export function useCliProject(isInitialized: boolean) {
         const projectDir = extractProjectDir(path);
         const files = await explorerService.listProjectFiles(projectDir);
         loadProjectStructure(projectDir, files);
+
+        // Activate explorer panel
+        showSidebarPanel('explorer');
 
         const recentProjects = await projectService.getRecentProjects();
         setRecentProjects(recentProjects);

@@ -9,6 +9,7 @@ import { useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useProjectStore } from '../stores/projectStore';
 import { useExplorerStore } from '../stores/explorerStore';
+import { useSidebarStore } from '../stores/sidebarStore';
 import { projectService } from '../services/projectService';
 import { explorerService } from '../services/explorerService';
 import type {
@@ -66,6 +67,9 @@ export function useProject() {
     setLoading: setExplorerLoading,
     setError: setExplorerError,
   } = useExplorerStore();
+
+  // Get sidebar store actions
+  const showSidebarPanel = useSidebarStore((state) => state.showPanel);
 
   // ============================================================================
   // Recent Projects Management
@@ -176,6 +180,9 @@ export function useProject() {
         // Load file tree into explorer
         await loadFileTree(info.path);
 
+        // Activate explorer panel
+        showSidebarPanel('explorer');
+
         // Refresh recent projects
         await refreshRecentProjects();
 
@@ -208,6 +215,9 @@ export function useProject() {
 
         // Load file tree into explorer
         await loadFileTree(path);
+
+        // Activate explorer panel
+        showSidebarPanel('explorer');
 
         // Refresh recent projects
         await refreshRecentProjects();

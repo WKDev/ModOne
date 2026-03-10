@@ -15,6 +15,7 @@ interface SidebarState {
 
 interface SidebarActions {
   setActivePanel: (panel: SidebarPanel) => void;
+  showPanel: (panel: SidebarPanel) => void;
   toggleVisibility: () => void;
   setWidth: (width: number) => void;
 }
@@ -35,6 +36,9 @@ export const useSidebarStore = create<SidebarStore>()(
 
         setActivePanel: (panel) =>
           set({ activePanel: panel }, false, 'setActivePanel'),
+
+        showPanel: (panel) =>
+          set({ activePanel: panel, isVisible: true }, false, 'showPanel'),
 
         toggleVisibility: () =>
           set(
