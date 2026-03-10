@@ -290,7 +290,7 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
   void historyVersion;
 
   return (
-    <div data-testid="symbol-editor" className="fixed inset-0 z-50 flex flex-col bg-neutral-900">
+    <div data-testid="symbol-editor" className="flex flex-col w-full h-full bg-neutral-900 overflow-hidden">
       <header className="flex items-center justify-between px-4 py-3 border-b border-neutral-700 bg-neutral-800">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-semibold text-white">Symbol Editor</h2>
@@ -337,11 +337,10 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
               key={unit.unitId}
               type="button"
               onClick={() => setActiveUnit(i)}
-              className={`px-3 py-1 text-xs rounded transition-colors ${
-                activeUnit === i
+              className={`px-3 py-1 text-xs rounded transition-colors ${activeUnit === i
                   ? 'bg-blue-600 text-white'
                   : 'bg-neutral-700 text-neutral-400 hover:text-white hover:bg-neutral-600'
-              }`}
+                }`}
             >
               {unit.name}
               {localSymbol.units!.length > 1 && (

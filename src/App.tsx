@@ -14,8 +14,6 @@ import { FloatingWindowRenderer } from './components/floating/FloatingWindowRend
 import { CommandPalette, useCommandPalette, registerAllCommands, registerLadderCommands } from './components/CommandPalette';
 import { ProjectDialogProvider } from './contexts/ProjectDialogContext';
 import { UnsavedChangesDialog } from './components/project/UnsavedChangesDialog';
-import { SymbolEditor } from './components/SymbolEditor';
-import { useSymbolStore } from './stores/symbolStore';
 import { Toaster, toast } from 'sonner';
 import { useMacosNativeMenu } from "./hooks/useMacosNativeMenu";
 import { useCliProject } from "./hooks/useCliProject";
@@ -50,10 +48,6 @@ function MainWindowContent() {
   const toolPanelTabs = useToolPanelStore((state) => state.tabs);
   const projectName = useProjectStore((state) => state.currentProject?.config.project.name);
   const isModified = useProjectStore((state) => state.isModified);
-  const currentProjectPath = useProjectStore((state) => state.currentProjectPath);
-  const editorOpen = useSymbolStore((s) => s.editorOpen);
-  const editorSymbol = useSymbolStore((s) => s.editorSymbol);
-  const closeEditor = useSymbolStore((s) => s.closeEditor);
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Command palette state (useCommandPalette hook handles Ctrl+Shift+P shortcut)
@@ -142,14 +136,6 @@ function MainWindowContent() {
         onDontSave={handleWindowCloseDontSave}
         onCancel={handleWindowCloseCancel}
       />
-      {editorOpen && currentProjectPath && (
-        <SymbolEditor
-          symbol={editorSymbol}
-          projectDir={currentProjectPath}
-          onClose={closeEditor}
-          onSave={() => closeEditor()}
-        />
-      )}
     </ProjectDialogProvider>
   );
 }

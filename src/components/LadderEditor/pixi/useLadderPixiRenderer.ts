@@ -135,12 +135,13 @@ export function useLadderPixiRenderer({
     hostRef.scrollToCell(
       cursorCell.row,
       cursorCell.col,
+      ladderDoc.gridConfig.cellWidth,
       ladderDoc.gridConfig.cellHeight,
     );
-  }, [hostRef, cursorCell, ladderDoc?.gridConfig.cellHeight, ladderDoc]);
+  }, [hostRef, cursorCell, ladderDoc?.gridConfig.cellWidth, ladderDoc?.gridConfig.cellHeight, ladderDoc]);
 
   // ===========================================================================
-  // Grid config → EventBridge sync
+  // Grid config → EventBridge & Host sync
   // ===========================================================================
 
   useEffect(() => {
@@ -150,7 +151,11 @@ export function useLadderPixiRenderer({
       ladderDoc.gridConfig.cellWidth,
       ladderDoc.gridConfig.cellHeight,
     );
-  }, [hostRef, ladderDoc?.gridConfig.cellWidth, ladderDoc?.gridConfig.cellHeight, ladderDoc]);
+
+    // Sync world width based on grid columns
+    const gridWidth = ladderDoc.gridConfig.columns * ladderDoc.gridConfig.cellWidth;
+    hostRef.updateWorldConfig(gridWidth);
+  }, [hostRef, ladderDoc?.gridConfig.columns, ladderDoc?.gridConfig.cellWidth, ladderDoc?.gridConfig.cellHeight, ladderDoc]);
 
   // ===========================================================================
   // Event callbacks

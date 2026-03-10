@@ -9,20 +9,9 @@ interface SymbolStoreState {
   isLoading: boolean;
   error: string | null;
 
-  /** Symbol Editor popup state */
-  editorOpen: boolean;
-  editorSymbol: SymbolDefinition | null;
-
-  loadLibrary: (projectDir: string) => Promise<void>;
-  loadSymbol: (projectDir: string, id: string, scope: LibraryScope) => Promise<void>;
-  saveSymbol: (projectDir: string, symbol: SymbolDefinition, scope: LibraryScope) => Promise<void>;
-  deleteSymbol: (projectDir: string, id: string, scope: LibraryScope) => Promise<void>;
-  setCurrentSymbol: (symbol: SymbolDefinition | null) => void;
-  clearError: () => void;
-
-  /** Open the Symbol Editor popup, optionally with a symbol to edit */
+  /** Open the Symbol Editor in a new floating window */
   openEditor: (symbol?: SymbolDefinition | null) => void;
-  /** Close the Symbol Editor popup */
+  /** @deprecated Modal editor is replaced by floating window panel */
   closeEditor: () => void;
 }
 
@@ -33,7 +22,7 @@ export const useSymbolStore = create<SymbolStoreState>((set) => ({
   isLoading: false,
   error: null,
 
-  loadLibrary: async (projectDir) => {
+  loadLibrary: async (projectDir: string) => {
     set({ isLoading: true, error: null });
     try {
       const [projectSymbols, globalSymbols] = await Promise.all([
@@ -46,7 +35,7 @@ export const useSymbolStore = create<SymbolStoreState>((set) => ({
     }
   },
 
-  loadSymbol: async (projectDir, id, scope) => {
+  loadSymbol: async (projectDir: string, id: string, scope: LibraryScope) => {
     set({ isLoading: true, error: null });
     try {
       const symbol = await symbolService.loadSymbol(projectDir, id, scope);
@@ -56,7 +45,7 @@ export const useSymbolStore = create<SymbolStoreState>((set) => ({
     }
   },
 
-  saveSymbol: async (projectDir, symbol, scope) => {
+  saveSymbol: async (projectDir: string, symbol: SymbolDefinition, scope: LibraryScope) => {
     set({ isLoading: true, error: null });
     try {
       await symbolService.saveSymbol(projectDir, symbol, scope);
@@ -72,7 +61,7 @@ export const useSymbolStore = create<SymbolStoreState>((set) => ({
     }
   },
 
-  deleteSymbol: async (projectDir, id, scope) => {
+  deleteSymbol: async (projectDir: string, id: string, scope: LibraryScope) => {
     set({ isLoading: true, error: null });
     try {
       await symbolService.deleteSymbol(projectDir, id, scope);
@@ -87,11 +76,30 @@ export const useSymbolStore = create<SymbolStoreState>((set) => ({
     }
   },
 
-  setCurrentSymbol: (symbol) => set({ currentSymbol: symbol }),
+  setCurrentSymbol: (symbol: SymbolDefinition | null) => set({ currentSymbol: symbol }),
   clearError: () => set({ error: null }),
 
-  editorOpen: false,
-  editorSymbol: null,
-  openEditor: (symbol) => set({ editorOpen: true, editorSymbol: symbol ?? null }),
-  closeEditor: () => set({ editorOpen: false, editorSymbol: null }),
+  openEditor: async (symbol: SymbolDefinition | null = null) => {
+    // Dynamically import to avoid circular dependency if any
+    const { usePanelStore } = await import('./panelStore');
+    const panelStore = usePanelStore.getState();
+
+    // 1. Create a transient panel to hold the editor
+    // We use a dummy grid area since it will be undocked immediately
+    const panelId = panelStore.addPanel('symbol-editor', '1 / 1 / 2 / 2');
+
+    // 2. Add a tab with the symbol data
+    panelStore.addTab(panelId, 'symbol-editor', symbol?.name || 'New Symbol', { symbol });
+
+    // 3. Undock it into a floating window
+    await panelStore.undockPanel(panelId, {
+      x: 100,
+      y: 100,
+      width: 1000,
+      height: 800,
+    });
+  },
+  closeEditor: () => {
+    // No-op - removed modal editor
+  },
 }));

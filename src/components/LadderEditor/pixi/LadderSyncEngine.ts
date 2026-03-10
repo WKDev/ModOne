@@ -158,7 +158,8 @@ export class LadderSyncEngine {
     if (isWireType(element.type)) {
       const container = this.wireContainers.get(element.id);
       if (container) {
-        this.wireRenderer.update(container, element as WireElement);
+        this.wireRenderer.update(container, element as WireElement, this.currentConfig.cellWidth, this.currentConfig.cellHeight);
+
       }
     } else {
       const container = this.elementContainers.get(element.id);

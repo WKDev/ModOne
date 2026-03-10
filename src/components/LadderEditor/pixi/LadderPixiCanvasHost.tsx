@@ -14,10 +14,14 @@ export interface LadderPixiCanvasHostRef {
   layers: LadderLayerManager;
   eventBridge: LadderEventBridge;
   /**
+   * Update the viewport's world size and clamping based on grid configuration.
+   */
+  updateWorldConfig: (gridWidth: number) => void;
+  /**
    * Scroll the viewport so that a grid cell is visible.
    * Used when keyboard navigation moves the cursor outside the visible area.
    */
-  scrollToCell: (row: number, col: number, cellHeight: number) => void;
+  scrollToCell: (row: number, col: number, cellWidth: number, cellHeight: number) => void;
 }
 
 interface LadderPixiCanvasHostProps {
@@ -44,11 +48,10 @@ function setHostRef(
  *
  * Hosts the Pixi.js application for the ladder editor canvas.
  *
- * Scroll behaviour: VERTICAL ONLY (like XG5000 / GXWorks3).
- * - No horizontal pan / zoom.
- * - Mouse wheel → vertical scroll only, deltaMode-aware.
- * - Viewport X is locked to 0 at all times.
- * - Canvas always fills the full container width.
+ * Scroll behaviour: VERTICAL and HORIZONTAL.
+ * - Mouse wheel -> vertical scroll only.
+ * - Shift + Mouse wheel -> horizontal scroll.
+ * - Viewport X is clamped to [0, gridWidth] minus screen width.
  * - scrollToCell() keeps the cursor visible when keyboard navigation
  *   moves it outside the current viewport.
  */
@@ -60,7 +63,7 @@ export const LadderPixiCanvasHost = forwardRef<
   const initRef = useRef(false);
   const onReadyRef = useRef<LadderPixiCanvasHostProps['onReady']>(onReady);
 
-  // Internal viewport ref so scrollToCell can access it after init
+  // Internal viewport ref
   const viewportRef = useRef<Viewport | null>(null);
   const appRef = useRef<Application | null>(null);
 
@@ -111,17 +114,13 @@ export const LadderPixiCanvasHost = forwardRef<
         container.appendChild(nextApp.canvas);
 
         // ----------------------------------------------------------------
-        // Viewport setup — vertical scroll only
+        // Viewport setup
         // ----------------------------------------------------------------
         const nextViewport = new Viewport({
           worldWidth: container.clientWidth,
-          worldHeight: 100_000, // tall virtual world for vertical scroll
+          worldHeight: 20000, // tall virtual world for vertical scroll
           events: nextApp.renderer.events,
         });
-
-        // Lock X to 0 — no horizontal movement ever
-        nextViewport.x = 0;
-        nextViewport.clamp({ left: true, right: true, direction: 'x' });
 
         nextApp.stage.addChild(nextViewport);
         viewportRef.current = nextViewport;
@@ -131,47 +130,65 @@ export const LadderPixiCanvasHost = forwardRef<
         setViewportY(0);
 
         // ----------------------------------------------------------------
-        // Native wheel → vertical scroll only (no zoom, no horizontal)
-        // deltaMode:
-        //   0 = pixels    → use directly with a small multiplier
-        //   1 = lines     → multiply by ~40px per line
-        //   2 = pages     → multiply by screen height
+        // Native wheel handler
         // ----------------------------------------------------------------
         wheelHandler = (e: WheelEvent) => {
           e.preventDefault();
           if (!nextViewport) return;
 
-          let pixelDelta: number;
+          let deltaX = 0;
+          let deltaY = 0;
+
+          // Shift + Wheel -> Horizontal scroll
+          if (e.shiftKey) {
+            deltaX = e.deltaY; // most mice use vertical wheel for horizontal with shift
+          } else {
+            deltaY = e.deltaY;
+          }
+
+          // Convert wheel delta to pixels based on deltaMode
+          let pixelDeltaX: number;
+          let pixelDeltaY: number;
+
           switch (e.deltaMode) {
             case 1: // lines
-              pixelDelta = e.deltaY * 40;
+              pixelDeltaX = deltaX * 40;
+              pixelDeltaY = deltaY * 40;
               break;
             case 2: // pages
-              pixelDelta = e.deltaY * nextApp.screen.height;
+              pixelDeltaX = deltaX * nextApp.screen.width;
+              pixelDeltaY = deltaY * nextApp.screen.height;
               break;
             default: // pixels (mode 0)
-              pixelDelta = e.deltaY;
+              pixelDeltaX = deltaX;
+              pixelDeltaY = deltaY;
               break;
           }
 
-          const maxScroll = Math.max(0, nextViewport.worldHeight - nextApp.screen.height);
-          const newY = Math.min(0, Math.max(-maxScroll, nextViewport.y - pixelDelta));
+          // Apply vertical scroll
+          const maxScrollY = Math.max(0, nextViewport.worldHeight - nextApp.screen.height);
+          const newY = Math.min(0, Math.max(-maxScrollY, nextViewport.y - pixelDeltaY));
           nextViewport.y = newY;
-          // Always snap X to 0
-          nextViewport.x = 0;
-
-          // Sync to store
           setViewportY(-newY);
+
+          // Apply horizontal scroll (if enabled by worldWidth > screenWidth)
+          const maxScrollX = Math.max(0, nextViewport.worldWidth - nextApp.screen.width);
+          const newX = Math.min(0, Math.max(-maxScrollX, nextViewport.x - pixelDeltaX));
+          nextViewport.x = newX;
         };
         container.addEventListener('wheel', wheelHandler, { passive: false });
 
         // ----------------------------------------------------------------
-        // ResizeObserver — keep viewport world width in sync with container
+        // ResizeObserver
         // ----------------------------------------------------------------
         resizeObserver = new ResizeObserver(() => {
           if (!nextViewport) return;
-          nextViewport.worldWidth = container.clientWidth;
-          nextViewport.x = 0;
+          // Clamp X and Y after resize to avoid being out of bounds
+          const maxScrollX = Math.max(0, nextViewport.worldWidth - nextApp.screen.width);
+          const maxScrollY = Math.max(0, nextViewport.worldHeight - nextApp.screen.height);
+          nextViewport.x = Math.max(-maxScrollX, Math.min(0, nextViewport.x));
+          nextViewport.y = Math.max(-maxScrollY, Math.min(0, nextViewport.y));
+          setViewportY(-nextViewport.y);
         });
         resizeObserver.observe(container);
 
@@ -179,38 +196,63 @@ export const LadderPixiCanvasHost = forwardRef<
         const nextEventBridge = new LadderEventBridge(nextViewport);
         nextEventBridge.attach();
 
-        /** Scroll viewport so that the given cell row is visible, with padding. */
-        const scrollToCell = (row: number, _col: number, cellHeight: number) => {
+        /** Update world width from gridConfig */
+        const updateWorldConfig = (gridWidth: number) => {
+          if (!nextViewport) return;
+          // Add some padding to Ensure the neutral rail isn't right on the edge
+          const padding = 40;
+          nextViewport.worldWidth = gridWidth + padding;
+
+          // Clamp X immediately
+          const maxScrollX = Math.max(0, nextViewport.worldWidth - nextApp.screen.width);
+          nextViewport.x = Math.max(-maxScrollX, Math.min(0, nextViewport.x));
+        };
+
+        /** Scroll viewport so that the given cell row/col is visible, with padding. */
+        const scrollToCell = (row: number, col: number, cellWidth: number, cellHeight: number) => {
           if (!nextViewport || !nextApp) return;
 
+          const screenW = nextApp.screen.width;
           const screenH = nextApp.screen.height;
-          const PADDING = cellHeight; // one cell of padding around the cursor
+          const PADDING = 40;
 
-          // World Y of the cell top and bottom
+          // Vertical scroll
           const cellTop = row * cellHeight;
           const cellBottom = cellTop + cellHeight;
-
-          // Current visible world range (note: viewport.y is negative when scrolled down)
-          // worldTop = -viewport.y
           const worldTop = -nextViewport.y;
           const worldBottom = worldTop + screenH;
 
           let newWorldTop = worldTop;
-
           if (cellTop - PADDING < worldTop) {
-            // Cursor is above the visible area → scroll up
             newWorldTop = Math.max(0, cellTop - PADDING);
           } else if (cellBottom + PADDING > worldBottom) {
-            // Cursor is below the visible area → scroll down
             newWorldTop = cellBottom + PADDING - screenH;
           }
 
           if (newWorldTop !== worldTop) {
-            const maxScroll = Math.max(0, nextViewport.worldHeight - screenH);
-            const finalWorldTop = Math.min(maxScroll, Math.max(0, newWorldTop));
+            const maxScrollY = Math.max(0, nextViewport.worldHeight - screenH);
+            const finalWorldTop = Math.min(maxScrollY, Math.max(0, newWorldTop));
             nextViewport.y = -finalWorldTop;
-            nextViewport.x = 0;
             setViewportY(finalWorldTop);
+          }
+
+          // Horizontal scroll
+          const cellLeft = col * cellWidth;
+          const cellRight = cellLeft + cellWidth;
+          const worldLeft = -nextViewport.x;
+          const worldRight = worldLeft + screenW;
+
+          let newWorldLeft = worldLeft;
+          if (cellLeft - PADDING < worldLeft) {
+            newWorldLeft = Math.max(0, cellLeft - PADDING);
+          } else if (cellRight + PADDING > worldRight) {
+            newWorldLeft = cellRight + PADDING - screenW;
+          }
+
+          if (newWorldLeft !== worldLeft) {
+            const maxScrollX = Math.max(0, nextViewport.worldWidth - screenW);
+            const finalWorldLeft = Math.min(maxScrollX, Math.max(0, newWorldLeft));
+            nextViewport.x = -finalWorldLeft;
           }
         };
 
@@ -219,6 +261,7 @@ export const LadderPixiCanvasHost = forwardRef<
           viewport: nextViewport,
           layers: nextLayers,
           eventBridge: nextEventBridge,
+          updateWorldConfig,
           scrollToCell,
         };
 
