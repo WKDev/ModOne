@@ -36,6 +36,7 @@ interface CanvasSnapshot {
   gridSize: number;
   showGrid: boolean;
   gridStyle: 'dots' | 'lines';
+  gridUnit: 'px' | 'mil' | 'mm';
 }
 
 export interface SyncEngineConfig {
@@ -185,7 +186,8 @@ export class SyncEngine {
       const gridChanged =
         current.gridSize !== previous.gridSize ||
         current.showGrid !== previous.showGrid ||
-        current.gridStyle !== previous.gridStyle;
+        current.gridStyle !== previous.gridStyle ||
+        current.gridUnit !== previous.gridUnit;
 
       if (gridChanged) {
         this._dirtyFlags.add('grid');
@@ -358,7 +360,8 @@ export class SyncEngine {
     if (
       currentGridConfig.size === snapshot.gridSize &&
       currentGridConfig.visible === snapshot.showGrid &&
-      currentGridConfig.style === snapshot.gridStyle
+      currentGridConfig.style === snapshot.gridStyle &&
+      (currentGridConfig as any).unit === snapshot.gridUnit
     ) {
       return;
     }
@@ -368,7 +371,8 @@ export class SyncEngine {
       size: snapshot.gridSize,
       visible: snapshot.showGrid,
       style: snapshot.gridStyle,
-    };
+      unit: snapshot.gridUnit,
+    } as any;
   }
 
   private _renderGrid(): void {
@@ -394,6 +398,7 @@ export class SyncEngine {
         gridSize: doc.data.gridSize,
         showGrid: doc.data.showGrid,
         gridStyle: doc.data.gridStyle,
+        gridUnit: doc.data.gridUnit ?? 'mm',
       };
     }
 
@@ -416,9 +421,10 @@ export class SyncEngine {
         zoom: circuit.viewport?.zoom ?? 1.0,
         panX: circuit.viewport?.panX ?? 0,
         panY: circuit.viewport?.panY ?? 0,
-        gridSize: 20,
-        showGrid: true,
-        gridStyle: 'dots',
+        gridSize: circuit.gridSize ?? 20,
+        showGrid: circuit.showGrid ?? true,
+        gridStyle: circuit.gridStyle ?? 'dots',
+        gridUnit: circuit.gridUnit ?? 'px',
       };
     }
 

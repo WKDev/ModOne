@@ -247,8 +247,8 @@ export class GridRenderer {
       uMajorAlpha: cfg.majorAlpha ?? 0.55,
       uStyle: cfg.style === 'lines' ? 0.0 : 1.0,
       uZoom: 1.0,
-      uLodMinorFade: 0.25,
-      uLodMajorFade: 0.05,
+      uLodMinorFade: 0.1,    // Fade minor grid below 0.1 zoom
+      uLodMajorFade: 0.02,   // Fade major grid below 0.02 zoom (extremely zoomed out)
       uDotRadius: 1.5,
     };
     // Keep a typed reference for direct field access in render() / _syncConfigUniforms()

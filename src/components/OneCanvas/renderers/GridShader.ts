@@ -34,10 +34,12 @@ in vec2 aUV;
 out vec2 vUV;
 
 uniform mat3 uProjectionMatrix;
+uniform mat3 uWorldTransformMatrix;
 
 void main() {
   vUV = aUV;
-  gl_Position = vec4((uProjectionMatrix * vec3(aPosition, 1.0)).xy, 0.0, 1.0);
+  vec3 worldPos = uWorldTransformMatrix * vec3(aPosition, 1.0);
+  gl_Position = vec4((uProjectionMatrix * worldPos).xy, 0.0, 1.0);
 }
 `;
 
@@ -159,24 +161,23 @@ void main() {
 }
 `;
 
-// ---------------------------------------------------------------------------
-// WebGPU (WGSL) — simple passthrough; same logic ported for WebGPU support
-// ---------------------------------------------------------------------------
 export const GRID_VERT_WGSL = /* wgsl */ `
 struct VertexOutput {
   @builtin(position) position: vec4<f32>,
   @location(0) uv: vec2<f32>,
 }
 
-struct Uniforms {
+struct GlobalUniforms {
   uProjectionMatrix: mat3x3<f32>,
+  uWorldTransformMatrix: mat3x3<f32>,
 }
-@group(0) @binding(0) var<uniform> global: Uniforms;
+@group(0) @binding(0) var<uniform> global: GlobalUniforms;
 
 @vertex
 fn main(@location(0) aPosition: vec2<f32>, @location(1) aUV: vec2<f32>) -> VertexOutput {
   var out: VertexOutput;
-  let proj = global.uProjectionMatrix * vec3<f32>(aPosition, 1.0);
+  let worldPos = global.uWorldTransformMatrix * vec3<f32>(aPosition, 1.0);
+  let proj = global.uProjectionMatrix * worldPos;
   out.position = vec4<f32>(proj.xy, 0.0, 1.0);
   out.uv = aUV;
   return out;
@@ -203,7 +204,24 @@ struct GridUniforms {
 @group(1) @binding(0) var<uniform> grid: GridUniforms;
 
 fn lodFade(zoom: f32, threshold: f32) -> f32 {
+  // Linear fade over one octave
   return clamp((zoom - threshold) / threshold, 0.0, 1.0);
+}
+
+fn gridLine(worldPos: vec2<f32>, cellSize: f32) -> f32 {
+  let f = fract(worldPos / cellSize);
+  let df = min(f, 1.0 - f) * cellSize;
+  let fw = fwidth(worldPos);
+  let strength = 1.0 - smoothstep(fw * 0.5, fw * 1.5, df);
+  return max(strength.x, strength.y);
+}
+
+fn gridDot(worldPos: vec2<f32>, cellSize: f32) -> f32 {
+  let nearest = round(worldPos / cellSize) * cellSize;
+  let diff = worldPos - nearest;
+  let fw = fwidth(worldPos);
+  let dx = length(diff / fw);
+  return 1.0 - smoothstep(grid.uDotRadius - 0.5, grid.uDotRadius + 0.5, dx);
 }
 
 @fragment
@@ -213,35 +231,35 @@ fn main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
   let minorFade = lodFade(grid.uZoom, grid.uLodMinorFade);
   let majorFade = lodFade(grid.uZoom, grid.uLodMajorFade);
 
-  // WGSL lacks fwidth in a portable way — approximate with simple threshold
-  let eps = 0.012;
   var minorMask = 0.0;
   var majorMask = 0.0;
 
-  if majorFade > 0.001 {
-    let mf = fract(worldPos / majorSize);
-    let dm = min(mf, 1.0 - mf);
-    majorMask = f32(dm.x < eps || dm.y < eps);
-  }
-  if minorFade > 0.001 {
-    let mf = fract(worldPos / grid.uGridSize);
-    let dm = min(mf, 1.0 - mf);
-    let m = f32(dm.x < eps || dm.y < eps) * (1.0 - majorMask);
-    minorMask = m;
+  if (grid.uStyle < 0.5) {
+    if (majorFade > 0.001) { majorMask = gridLine(worldPos, majorSize); }
+    if (minorFade > 0.001) { 
+      minorMask = gridLine(worldPos, grid.uGridSize) * (1.0 - majorMask); 
+    }
+  } else {
+    if (majorFade > 0.001) { majorMask = gridDot(worldPos, majorSize); }
+    if (minorFade > 0.001) { 
+      minorMask = gridDot(worldPos, grid.uGridSize) * (1.0 - majorMask); 
+    }
   }
 
   var color = vec3<f32>(0.0);
   var alpha = 0.0;
-  if majorMask > 0.001 && majorFade > 0.001 {
+
+  if (majorMask > 0.001 && majorFade > 0.001) {
     alpha = majorMask * grid.uMajorAlpha * majorFade;
     color = grid.uMajorColor;
   }
-  if minorMask > 0.001 && minorFade > 0.001 {
+  if (minorMask > 0.001 && minorFade > 0.001) {
     let a = minorMask * grid.uMinorAlpha * minorFade;
     let outA = a + alpha * (1.0 - a);
     color = select(color, (grid.uMinorColor * a + color * alpha * (1.0 - a)) / outA, outA > 0.0);
     alpha = outA;
   }
+
   return vec4<f32>(color * alpha, alpha);
 }
 `;

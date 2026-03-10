@@ -109,6 +109,8 @@ export interface CanvasDocumentData {
   showGrid: boolean;
   /** Grid style */
   gridStyle: 'dots' | 'lines';
+  /** Grid unit */
+  gridUnit: 'px' | 'mil' | 'mm';
 }
 
 /** Complete canvas document state */
@@ -258,6 +260,7 @@ export const DEFAULT_CANVAS_DATA: CanvasDocumentData = {
   snapToGrid: true,
   showGrid: true,
   gridStyle: 'dots',
+  gridUnit: 'mm',
 };
 
 /** Default ladder document data */

@@ -694,5 +694,16 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
     documentCanRedo,
     // Global adapter
     globalFacade,
+    // Grid settings
+    gridSize,
+    showGrid,
+    gridStyle,
+    gridUnit,
+    snapToGrid,
+    toggleGrid,
+    toggleSnap,
+    setGridSize,
+    setGridStyle,
+    setGridUnit,
   ]);
 }

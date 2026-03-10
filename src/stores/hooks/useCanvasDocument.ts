@@ -93,6 +93,7 @@ export interface UseCanvasDocumentReturn {
   snapToGrid: boolean;
   showGrid: boolean;
   gridStyle: 'dots' | 'lines';
+  gridUnit: 'px' | 'mil' | 'mm';
   isDirty: boolean;
 
   // Component operations
@@ -114,7 +115,7 @@ export interface UseCanvasDocumentReturn {
   removeWireHandle: (wireId: string, handleIndex: number) => void;
   moveWireSegment: (wireId: string, handleIndexA: number, handleIndexB: number, delta: Position, isFirstMove?: boolean) => void;
   dragWireSegment: (wireId: string, polySegIndex: number, delta: Position, isFirstMove: boolean) => { handleA: number; handleB: number; orientation: 'horizontal' | 'vertical' | null } | null;
-  insertEndpointHandle: (wireId: string, end: 'from' | 'to', newHandles: Array<{position: Position, constraint: HandleConstraint}>) => void;
+  insertEndpointHandle: (wireId: string, end: 'from' | 'to', newHandles: Array<{ position: Position, constraint: HandleConstraint }>) => void;
   cleanupOverlappingHandles: (wireId: string) => void;
   commitWirePolyline: (wireId: string, poly: readonly Position[], routingMode: 'auto' | 'manual', skipHistory?: boolean) => void;
 
@@ -128,6 +129,7 @@ export interface UseCanvasDocumentReturn {
   toggleSnap: () => void;
   setGridSize: (size: number) => void;
   setGridStyle: (style: 'dots' | 'lines') => void;
+  setGridUnit: (unit: 'px' | 'mil' | 'mm') => void;
 
   // History operations
   undo: () => void;
@@ -355,17 +357,17 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       // Auto-promote FloatingEndpoint → PortEndpoint if on a port
       const promotedFrom = isFloatingEndpoint(from)
         ? (() => {
-            const detected = detectPortAtPosition(from.position, data.components);
-            if (detected) return { type: 'port' as const, componentId: detected.componentId, portId: detected.portId };
-            return from;
-          })()
+          const detected = detectPortAtPosition(from.position, data.components);
+          if (detected) return { type: 'port' as const, componentId: detected.componentId, portId: detected.portId };
+          return from;
+        })()
         : from;
       const promotedTo = isFloatingEndpoint(to)
         ? (() => {
-            const detected = detectPortAtPosition(to.position, data.components);
-            if (detected) return { type: 'port' as const, componentId: detected.componentId, portId: detected.portId };
-            return to;
-          })()
+          const detected = detectPortAtPosition(to.position, data.components);
+          if (detected) return { type: 'port' as const, componentId: detected.componentId, portId: detected.portId };
+          return to;
+        })()
         : to;
 
       // Block self-connection and duplicates
@@ -693,7 +695,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
   );
 
   const insertEndpointHandle = useCallback(
-    (wireId: string, end: 'from' | 'to', newHandles: Array<{position: Position, constraint: HandleConstraint}>) => {
+    (wireId: string, end: 'from' | 'to', newHandles: Array<{ position: Position, constraint: HandleConstraint }>) => {
       if (!documentId) return;
 
       pushHistory(documentId);
@@ -830,6 +832,17 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
     [documentId, updateCanvasData]
   );
 
+  const setGridUnit = useCallback(
+    (unit: 'px' | 'mil' | 'mm') => {
+      if (!documentId) return;
+
+      updateCanvasData(documentId, (docData) => {
+        docData.gridUnit = unit;
+      });
+    },
+    [documentId, updateCanvasData]
+  );
+
   // History operations
   const undo = useCallback(() => {
     if (documentId) undoAction(documentId);
@@ -890,6 +903,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       snapToGrid: data.snapToGrid,
       showGrid: data.showGrid,
       gridStyle: data.gridStyle,
+      gridUnit: (data as any).gridUnit ?? 'mm',
       isDirty: canvasDoc.isDirty,
 
       // Component operations
@@ -925,6 +939,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       toggleSnap,
       setGridSize,
       setGridStyle,
+      setGridUnit,
 
       // History operations
       undo,
@@ -964,6 +979,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
     toggleSnap,
     setGridSize,
     setGridStyle,
+    setGridUnit,
     undo,
     redo,
     canUndo,

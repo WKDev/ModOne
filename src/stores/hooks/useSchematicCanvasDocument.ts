@@ -79,6 +79,7 @@ interface WorkingCircuitData {
   snapToGrid: boolean;
   showGrid: boolean;
   gridStyle: 'dots' | 'lines';
+  gridUnit: 'px' | 'mil' | 'mm';
 }
 
 function getDefaultPorts(type: BlockType): Block['ports'] {
@@ -101,9 +102,9 @@ function circuitToWorkingData(circuit: SerializableCircuitState): WorkingCircuit
       to: { ...wire.to },
       handles: wire.handles
         ? wire.handles.map((handle) => ({
-            ...handle,
-            position: { ...handle.position },
-          }))
+          ...handle,
+          position: { ...handle.position },
+        }))
         : undefined,
     })),
     metadata: { ...circuit.metadata },
@@ -116,6 +117,7 @@ function circuitToWorkingData(circuit: SerializableCircuitState): WorkingCircuit
     snapToGrid: true,
     showGrid: true,
     gridStyle: 'dots',
+    gridUnit: 'px',
   };
 }
 
@@ -129,9 +131,9 @@ function workingDataToCircuit(data: WorkingCircuitData): SerializableCircuitStat
       to: { ...wire.to },
       handles: wire.handles
         ? wire.handles.map((handle) => ({
-            ...handle,
-            position: { ...handle.position },
-          }))
+          ...handle,
+          position: { ...handle.position },
+        }))
         : undefined,
     })),
     metadata: { ...data.metadata },
@@ -375,17 +377,17 @@ export function useSchematicCanvasDocument(
       // Auto-promote FloatingEndpoint → PortEndpoint if on a port
       const promotedFrom = isFloatingEndpoint(from)
         ? (() => {
-            const detected = detectPortAtPosition(from.position, data.components);
-            if (detected) return { type: 'port' as const, componentId: detected.componentId, portId: detected.portId };
-            return from;
-          })()
+          const detected = detectPortAtPosition(from.position, data.components);
+          if (detected) return { type: 'port' as const, componentId: detected.componentId, portId: detected.portId };
+          return from;
+        })()
         : from;
       const promotedTo = isFloatingEndpoint(to)
         ? (() => {
-            const detected = detectPortAtPosition(to.position, data.components);
-            if (detected) return { type: 'port' as const, componentId: detected.componentId, portId: detected.portId };
-            return to;
-          })()
+          const detected = detectPortAtPosition(to.position, data.components);
+          if (detected) return { type: 'port' as const, componentId: detected.componentId, portId: detected.portId };
+          return to;
+        })()
         : to;
 
       // Block self-connection and duplicates
@@ -864,6 +866,17 @@ export function useSchematicCanvasDocument(
     [documentId, updateActivePageCircuit]
   );
 
+  const setGridUnit = useCallback(
+    (unit: 'px' | 'mil' | 'mm') => {
+      if (!documentId) return;
+
+      updateActivePageCircuit((working) => {
+        working.gridUnit = unit;
+      });
+    },
+    [documentId, updateActivePageCircuit]
+  );
+
   const undo = useCallback(() => {
     if (documentId) undoAction(documentId);
   }, [documentId, undoAction]);
@@ -920,6 +933,7 @@ export function useSchematicCanvasDocument(
       snapToGrid: data.snapToGrid,
       showGrid: data.showGrid,
       gridStyle: data.gridStyle,
+      gridUnit: (data as any).gridUnit ?? 'px',
       isDirty: schematicDoc.isDirty,
       addComponent,
       removeComponent,
@@ -945,6 +959,7 @@ export function useSchematicCanvasDocument(
       toggleSnap,
       setGridSize,
       setGridStyle,
+      setGridUnit,
       undo,
       redo,
       canUndo,
@@ -980,6 +995,7 @@ export function useSchematicCanvasDocument(
     toggleSnap,
     setGridSize,
     setGridStyle,
+    setGridUnit,
     undo,
     redo,
     canUndo,

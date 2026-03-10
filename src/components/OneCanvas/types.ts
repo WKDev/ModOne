@@ -792,6 +792,10 @@ export interface CircuitState {
   selection?: SelectionState;
   /** Viewport state */
   viewport?: ViewportState;
+  gridSize?: number;
+  showGrid?: boolean;
+  gridStyle?: 'dots' | 'lines';
+  gridUnit?: 'px' | 'mil' | 'mm';
 }
 
 /** Viewport (pan/zoom) state */
@@ -811,6 +815,10 @@ export interface SerializableCircuitState {
   wires: Wire[];
   metadata: CircuitMetadata;
   viewport?: ViewportState;
+  gridSize?: number;
+  showGrid?: boolean;
+  gridStyle?: 'dots' | 'lines';
+  gridUnit?: 'px' | 'mil' | 'mm';
 }
 
 // ============================================================================
@@ -1123,6 +1131,10 @@ export function circuitStateToSerializable(
     wires: state.wires,
     metadata: state.metadata,
     viewport: state.viewport,
+    gridSize: state.selection ? undefined : state.gridSize,
+    showGrid: state.selection ? undefined : state.showGrid,
+    gridStyle: state.selection ? undefined : state.gridStyle,
+    gridUnit: state.selection ? undefined : state.gridUnit,
   };
 }
 
