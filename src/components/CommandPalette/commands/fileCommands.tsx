@@ -9,6 +9,10 @@ import { FileText, FolderOpen, Save, SaveAll, X } from 'lucide-react';
 import { commandRegistry } from '../commandRegistry';
 import { projectDialogService } from '../../../services/projectDialogService';
 import { projectService } from '../../../services/projectService';
+import {
+  saveActiveDocument,
+  saveAllDocuments,
+} from '../../../services/documentSaveService';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useDocumentRegistry } from '../../../stores/documentRegistry';
 import type { Command } from '../types';
@@ -54,21 +58,23 @@ export function registerFileCommands(): void {
         const { currentProjectPath, setLoading, setError, setModified } =
           useProjectStore.getState();
 
-        // If no project is open, do nothing
-        if (!currentProjectPath) {
-          // Optionally trigger Save As for unsaved projects
-          projectDialogService.requestSaveAs();
-          return;
-        }
-
         try {
           setLoading(true, 'save');
-          await projectService.saveProject();
-          setModified(false);
+
+          // 1. Save the active document's data (canvas / schematic / etc.) to disk
+          await saveActiveDocument();
+
+          // 2. If a project is open, also update the project manifest
+          if (currentProjectPath) {
+            await projectService.saveProject();
+            setModified(false);
+          }
+
           setLoading(false);
         } catch (error) {
-          console.error('Failed to save project:', error);
-          setError(error instanceof Error ? error.message : 'Failed to save project');
+          console.error('Failed to save:', error);
+          setError(error instanceof Error ? error.message : 'Failed to save');
+          setLoading(false);
         }
       },
     },
@@ -94,17 +100,22 @@ export function registerFileCommands(): void {
       keywords: ['save', 'all', 'documents'],
       when: () => useDocumentRegistry.getState().hasUnsavedChanges(),
       execute: async () => {
-        const { getDirtyDocuments, markClean } = useDocumentRegistry.getState();
-        const dirtyDocs = getDirtyDocuments();
+        const { currentProjectPath, setModified } = useProjectStore.getState();
 
-        // TODO: Implement actual file save when file save service is ready
-        // For now, just mark all as clean
-        for (const doc of dirtyDocs) {
-          // In the future: await documentSaveService.save(doc);
-          markClean(doc.id);
+        try {
+          // Save all dirty documents to disk
+          const savedCount = await saveAllDocuments();
+
+          // Also update the project manifest if a project is open
+          if (currentProjectPath) {
+            await projectService.saveProject();
+            setModified(false);
+          }
+
+          console.log(`[file.saveAll] Saved ${savedCount} document(s)`);
+        } catch (error) {
+          console.error('[file.saveAll] Failed to save all documents:', error);
         }
-
-        console.log(`Saved ${dirtyDocs.length} document(s)`);
       },
     },
     {
