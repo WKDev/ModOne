@@ -13,9 +13,10 @@ export const switchNcSymbol: SymbolDefinition = {
   height: 40,
   graphics: [
     { kind: 'polyline', points: [{ x: 4, y: 20 }, { x: 20, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 20, y: 20 }, { x: 42, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 42, y: 20 }, { x: 56, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { kind: 'circle', cx: 20, cy: 20, r: 2, stroke: '#888', fill: 'transparent', strokeWidth: 2 },
+    { kind: 'polyline', points: [{ x: 40, y: 20 }, { x: 56, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { kind: 'circle', cx: 20, cy: 20, r: 2, stroke: '#888', fill: '#888', strokeWidth: 2 },
+    { kind: 'circle', cx: 40, cy: 20, r: 2, stroke: '#888', fill: '#888', strokeWidth: 2 },
+    { kind: 'polyline', points: [{ x: 20, y: 20 }, { x: 38, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
   ],
   pins: [
     { id: 'in', name: 'IN', number: '1', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 0, y: 20 }, orientation: 'left', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },

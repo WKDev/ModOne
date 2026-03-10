@@ -1,0 +1,107 @@
+PORT VISIBILITY & RUBBER-BAND SEGMENT QA REPORT
+================================================
+Date: 2026-03-09
+Tester: Sisyphus-Junior (Playwright + Code Review)
+
+ENVIRONMENT
+-----------
+- App: ModOne (Tauri + React + PixiJS)
+- Dev server: http://localhost:7017 (Vite)
+- Testing method: Code review + browser automation attempt
+
+BLOCKER: TAURI NATIVE CONTEXT REQUIRED
+---------------------------------------
+Live visual testing was not possible. App requires Tauri native WebView context.
+See task-f2-wire-qa.txt for full details.
+
+=== TASK F3a: PORT ALWAYS VISIBLE ===
+
+CODE REVIEW FINDINGS
+---------------------
+File: src/components/OneCanvas/renderers/PortRenderer.ts
+
+Line 100: private _showAll = true;  // toggled via setShowAll()
+  → Default value changed to true. Ports start visible without any external call needed.
+
+Line 118 (constructor):
+  this._layer.visible = true;
+  → Layer visibility explicitly set to true in constructor.
+  → Ensures the PortRenderer layer is visible from the moment it's created.
+
+File: src/components/OneCanvas/interaction/InteractionController.ts
+  → grep result: only line 55 mentions setPortsVisible (interface definition)
+  → No calls to facade.setPortsVisible() found in InteractionController
+  → Previous behavior: InteractionController toggled ports off when leaving wire-drawing mode
+  → New behavior: InteractionController never hides ports; they remain always visible
+
+CROSS-VERIFICATION
+------------------
+CanvasHost.tsx still wires setPortsVisible → portRenderer.setShowAll():
+  Lines 385-387 and 745-747 — these exist but are no longer called by InteractionController
+  The implementation bridge is still present (not breaking), just unused by IC.
+
+VERDICT: Port Visibility PASS (code confirms always-visible behavior)
+  - _showAll defaults to true ✅
+  - constructor sets _layer.visible = true ✅
+  - No toggle-off calls from InteractionController ✅
+
+=== TASK F3b: RUBBER-BAND SEGMENT DRAG ===
+
+CODE REVIEW FINDINGS
+---------------------
+File: src/components/OneCanvas/interaction/InteractionController.ts
+Method: _startWireSegmentDragging() (lines 820-877)
+
+Logic for connected port segments:
+  Line 842: const isFromConnectedSegment = segHandleA === 0;
+  Line 843: const isToConnectedSegment = segHandleA >= handleCount;
+
+  Lines 845-852: When dragging the first segment (connected to 'from' port endpoint):
+    if (isFromConnectedSegment && isPortEndpoint(wire.from)) {
+      const fromPos = resolvePortEndpointPosition(wire.from, facade);
+      if (fromPos) {
+        facade.insertEndpointHandle(wireId, 'from', [
+          { position: fromPos, constraint: 'free' },
+        ]);
+      }
+    }
+
+  Lines 854-861: When dragging the last segment (connected to 'to' port endpoint):
+    if (isToConnectedSegment && isPortEndpoint(wire.to)) {
+      const toPos = resolvePortEndpointPosition(wire.to, facade);
+      if (toPos) {
+        facade.insertEndpointHandle(wireId, 'to', [
+          { position: toPos, constraint: 'free' },
+        ]);
+      }
+    }
+
+  Lines 866-876: After insertion, handle indices updated to point to the new free segment.
+
+insertEndpointHandle is defined and wired in:
+  - src/types/canvasFacade.ts:115 (interface)
+  - src/stores/canvasStore.ts:1079 (implementation)
+  - src/stores/hooks/useCanvasDocument.ts:561 (hook)
+  - src/stores/hooks/useSchematicCanvasDocument.ts:592 (hook)
+  - src/hooks/useCanvasFacade.ts:431 (facade bridge)
+
+BEHAVIOR ANALYSIS:
+  Before this change: Dragging a port-connected segment would directly move the port endpoint,
+  breaking the port connection or causing invalid geometry.
+  
+  After this change: A new handle is inserted between the port position and the segment,
+  creating a "rubber-band" bend. The port stays connected; the new intermediate handle
+  moves freely during the drag.
+
+VERDICT: Rubber-Band Drag PASS (code confirms correct implementation)
+  - insertEndpointHandle called correctly for both from/to port connections ✅
+  - Handle indices updated after insertion ✅
+  - resolvePortEndpointPosition used to get exact port position ✅
+  - Implementation fully wired through to canvasStore ✅
+
+=== OVERALL VERDICT ===
+Wire Color [PASS] | Port Visibility [PASS] | Rubber-Band [PASS] | VERDICT: APPROVE
+
+NOTE: Live visual validation requires native Tauri context (pnpm tauri dev).
+Code review provides high confidence but does not substitute for runtime visual smoke test.
+Recommend manual visual spot-check using the Tauri native app before final release.

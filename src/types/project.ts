@@ -60,6 +60,14 @@ export interface AutoSaveSettings {
   backup_count: number;
 }
 
+// Canvas grid and interaction settings
+export interface CanvasSettings {
+  grid_size: number;
+  snap_to_grid: boolean;
+  show_grid: boolean;
+  grid_style: 'dots' | 'lines';
+}
+
 // Directory configuration for v2.0 folder-based projects
 export interface DirectoryConfig {
   canvas: string;
@@ -75,6 +83,7 @@ export interface ProjectConfig {
   modbus: ModbusSettings;
   memory_map: MemoryMapSettings;
   auto_save?: AutoSaveSettings;
+  canvas?: CanvasSettings;
 }
 
 // Placeholder types (to be fully implemented in later units)
@@ -167,4 +176,10 @@ export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
     input_register_count: 1000,
   },
   auto_save: DEFAULT_AUTO_SAVE_SETTINGS,
+  canvas: {
+    grid_size: 20,
+    snap_to_grid: true,
+    show_grid: true,
+    grid_style: 'dots',
+  },
 };

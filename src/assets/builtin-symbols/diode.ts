@@ -12,10 +12,10 @@ export const diodeSymbol: SymbolDefinition = {
   width: 40,
   height: 40,
   graphics: [
-    { kind: 'polyline', points: [{ x: 20, y: 4 }, { x: 20, y: 10 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 10, y: 24 }, { x: 30, y: 24 }, { x: 20, y: 12 }, { x: 10, y: 24 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 10, y: 28 }, { x: 30, y: 28 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 20, y: 28 }, { x: 20, y: 36 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { kind: 'polyline', points: [{ x: 20, y: 4 }, { x: 20, y: 14 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { kind: 'polyline', points: [{ x: 10, y: 14 }, { x: 30, y: 14 }, { x: 20, y: 26 }, { x: 10, y: 14 }], stroke: '#888', fill: '#1a1d23', strokeWidth: 2 },
+    { kind: 'polyline', points: [{ x: 10, y: 26 }, { x: 30, y: 26 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { kind: 'polyline', points: [{ x: 20, y: 26 }, { x: 20, y: 36 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
   ],
   pins: [
     { id: 'anode', name: 'A', number: '1', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 20, y: 0 }, orientation: 'up', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },

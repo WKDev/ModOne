@@ -24,7 +24,7 @@ import type {
   LadderNetwork as LadderNetworkAST,
   DeviceAddress,
 } from '../../../OneParser/types';
-import type { LadderItem } from '../../../../types/ladder';
+import type { LadderElement } from '../../../../types/ladder';
 import { isContactType, isCoilType, isTimerType, isCounterType } from '../../../../types/ladder';
 
 // ============================================================================
@@ -172,7 +172,7 @@ describe('gridConverter', () => {
       expect(result.elements).toHaveLength(1);
       expect(result.elements[0].type).toBe('contact_p');
       expect(isContactType(result.elements[0].type)).toBe(true);
-      expect((result.elements[0] as LadderItem<'contact'>).properties.edgeDetection).toBe('rising');
+      expect((result.elements[0] as any).properties.edgeDetection).toBe('rising');
     });
 
     it('should convert contact_n with falling edge property', () => {
@@ -182,7 +182,7 @@ describe('gridConverter', () => {
       expect(result.elements).toHaveLength(1);
       expect(result.elements[0].type).toBe('contact_n');
       expect(isContactType(result.elements[0].type)).toBe(true);
-      expect((result.elements[0] as LadderItem<'contact'>).properties.edgeDetection).toBe('falling');
+      expect((result.elements[0] as any).properties.edgeDetection).toBe('falling');
     });
 
     it('should convert coil_out to coil element', () => {
@@ -201,7 +201,7 @@ describe('gridConverter', () => {
       expect(result.elements).toHaveLength(1);
       expect(result.elements[0].type).toBe('coil_set');
       expect(isCoilType(result.elements[0].type)).toBe(true);
-      expect((result.elements[0] as LadderItem<'coil'>).properties.latched).toBe(true);
+      expect((result.elements[0] as any).properties.latched).toBe(true);
     });
 
     it('should convert coil_rst to coil_reset element', () => {
@@ -219,8 +219,8 @@ describe('gridConverter', () => {
       expect(result.elements).toHaveLength(1);
       expect(result.elements[0].type).toBe('timer_ton');
       expect(isTimerType(result.elements[0].type)).toBe(true);
-      expect((result.elements[0] as LadderItem<'timer'>).properties.presetTime).toBe(1000);
-      expect((result.elements[0] as LadderItem<'timer'>).properties.timeBase).toBe('ms');
+      expect((result.elements[0] as any).properties.presetTime).toBe(1000);
+      expect((result.elements[0] as any).properties.timeBase).toBe('ms');
     });
 
     it('should convert counter_ctu element with preset', () => {
@@ -230,8 +230,8 @@ describe('gridConverter', () => {
       expect(result.elements).toHaveLength(1);
       expect(result.elements[0].type).toBe('counter_ctu');
       expect(isCounterType(result.elements[0].type)).toBe(true);
-      expect((result.elements[0] as LadderItem<'counter'>).properties.presetValue).toBe(10);
-      expect((result.elements[0] as LadderItem<'counter'>).properties.direction).toBe('up');
+      expect((result.elements[0] as any).properties.presetValue).toBe(10);
+      expect((result.elements[0] as any).properties.direction).toBe('up');
     });
 
     it('should convert counter_ctd with down direction', () => {
@@ -239,7 +239,7 @@ describe('gridConverter', () => {
       const result = convertNodeToGrid(node);
 
       expect(isCounterType(result.elements[0].type)).toBe(true);
-      expect((result.elements[0] as LadderItem<'counter'>).properties.direction).toBe('down');
+      expect((result.elements[0] as any).properties.direction).toBe('down');
     });
 
     it('should convert counter_ctud with both direction', () => {
@@ -247,7 +247,7 @@ describe('gridConverter', () => {
       const result = convertNodeToGrid(node);
 
       expect(isCounterType(result.elements[0].type)).toBe(true);
-      expect((result.elements[0] as LadderItem<'counter'>).properties.direction).toBe('both');
+      expect((result.elements[0] as any).properties.direction).toBe('both');
     });
 
     it('should convert comparison node to compare element', () => {
@@ -633,14 +633,14 @@ describe('Grid to AST Conversion', () => {
     col: number,
     device: string,
     address: number
-  ): LadderItem {
+  ): LadderElement {
     return {
       id,
       type: 'contact_no',
       position: { row, col },
       address: `${device}${address.toString().padStart(4, '0')}`,
       properties: {},
-    } as LadderItem;
+    } as LadderElement;
   }
 
   function createEditorCoil(
@@ -649,14 +649,14 @@ describe('Grid to AST Conversion', () => {
     col: number,
     device: string,
     address: number
-  ): LadderItem {
+  ): LadderElement {
     return {
       id,
       type: 'coil',
       position: { row, col },
       address: `${device}${address.toString().padStart(4, '0')}`,
       properties: {},
-    } as LadderItem;
+    } as LadderElement;
   }
 
   function createEditorTimer(
@@ -665,7 +665,7 @@ describe('Grid to AST Conversion', () => {
     col: number,
     address: number,
     preset: number = 100
-  ): LadderItem {
+  ): LadderElement {
     return {
       id,
       type: 'timer_ton',
@@ -675,7 +675,7 @@ describe('Grid to AST Conversion', () => {
         presetTime: preset,
         timeBase: 'ms',
       },
-    } as LadderItem;
+    } as LadderElement;
   }
 
   describe('groupElementsByRow', () => {
@@ -685,7 +685,7 @@ describe('Grid to AST Conversion', () => {
     });
 
     it('groups single element correctly', () => {
-      const elements = new Map<string, LadderItem>();
+      const elements = new Map<string, LadderElement>();
       elements.set('e1', createEditorContact('e1', 0, 0, 'M', 0));
 
       const result = groupElementsByRow(elements);
@@ -695,7 +695,7 @@ describe('Grid to AST Conversion', () => {
     });
 
     it('groups multiple elements in same row', () => {
-      const elements = new Map<string, LadderItem>();
+      const elements = new Map<string, LadderElement>();
       elements.set('e1', createEditorContact('e1', 0, 0, 'M', 0));
       elements.set('e2', createEditorContact('e2', 0, 1, 'M', 1));
       elements.set('e3', createEditorCoil('e3', 0, 2, 'M', 10));
@@ -707,7 +707,7 @@ describe('Grid to AST Conversion', () => {
     });
 
     it('sorts elements by column within row', () => {
-      const elements = new Map<string, LadderItem>();
+      const elements = new Map<string, LadderElement>();
       elements.set('e3', createEditorContact('e3', 0, 2, 'M', 2));
       elements.set('e1', createEditorContact('e1', 0, 0, 'M', 0));
       elements.set('e2', createEditorContact('e2', 0, 1, 'M', 1));
@@ -721,7 +721,7 @@ describe('Grid to AST Conversion', () => {
     });
 
     it('groups elements in different rows', () => {
-      const elements = new Map<string, LadderItem>();
+      const elements = new Map<string, LadderElement>();
       elements.set('e1', createEditorContact('e1', 0, 0, 'M', 0));
       elements.set('e2', createEditorContact('e2', 1, 0, 'M', 1));
       elements.set('e3', createEditorContact('e3', 2, 0, 'M', 2));
@@ -735,14 +735,14 @@ describe('Grid to AST Conversion', () => {
     });
 
     it('skips wire elements', () => {
-      const elements = new Map<string, LadderItem>();
+      const elements = new Map<string, LadderElement>();
       elements.set('e1', createEditorContact('e1', 0, 0, 'M', 0));
       elements.set('w1', {
         id: 'w1',
         type: 'wire_h',
         position: { row: 0, col: 1 },
         properties: {},
-      } as LadderItem);
+      } as LadderElement);
 
       const result = groupElementsByRow(elements);
 
@@ -758,20 +758,20 @@ describe('Grid to AST Conversion', () => {
     });
 
     it('returns null for grid with only wires', () => {
-      const elements = new Map<string, LadderItem>();
+      const elements = new Map<string, LadderElement>();
       elements.set('w1', {
         id: 'w1',
         type: 'wire_h',
         position: { row: 0, col: 0 },
         properties: {},
-      } as LadderItem);
+      } as LadderElement);
 
       const result = gridToAST(elements, []);
       expect(result).toBeNull();
     });
 
     it('converts single element to single node', () => {
-      const elements = new Map<string, LadderItem>();
+      const elements = new Map<string, LadderElement>();
       elements.set('e1', createEditorContact('e1', 0, 0, 'M', 0));
 
       const result = gridToAST(elements, []);
@@ -781,7 +781,7 @@ describe('Grid to AST Conversion', () => {
     });
 
     it('converts single row to series node', () => {
-      const elements = new Map<string, LadderItem>();
+      const elements = new Map<string, LadderElement>();
       elements.set('e1', createEditorContact('e1', 0, 0, 'M', 0));
       elements.set('e2', createEditorContact('e2', 0, 1, 'M', 1));
       elements.set('e3', createEditorCoil('e3', 0, 2, 'M', 10));
@@ -794,7 +794,7 @@ describe('Grid to AST Conversion', () => {
     });
 
     it('converts multiple rows to parallel node', () => {
-      const elements = new Map<string, LadderItem>();
+      const elements = new Map<string, LadderElement>();
       elements.set('e1', createEditorContact('e1', 0, 0, 'M', 0));
       elements.set('e2', createEditorContact('e2', 1, 0, 'M', 1));
 
@@ -806,7 +806,7 @@ describe('Grid to AST Conversion', () => {
     });
 
     it('preserves timer properties', () => {
-      const elements = new Map<string, LadderItem>();
+      const elements = new Map<string, LadderElement>();
       elements.set('t1', createEditorTimer('t1', 0, 0, 0, 500));
 
       const result = gridToAST(elements, []);
@@ -818,7 +818,7 @@ describe('Grid to AST Conversion', () => {
     });
 
     it('parses address correctly', () => {
-      const elements = new Map<string, LadderItem>();
+      const elements = new Map<string, LadderElement>();
       elements.set('e1', createEditorContact('e1', 0, 0, 'M', 1234));
 
       const result = gridToAST(elements, []);
@@ -888,7 +888,7 @@ describe('Grid to AST Conversion', () => {
       const gridResult = convertNodeToGrid(originalAST);
 
       // Grid -> AST
-      const elementsMap = new Map<string, LadderItem>();
+      const elementsMap = new Map<string, LadderElement>();
       for (const elem of gridResult.elements) {
         elementsMap.set(elem.id, elem);
       }
@@ -908,7 +908,7 @@ describe('Grid to AST Conversion', () => {
       ]);
       const gridResult = convertNodeToGrid(originalAST);
 
-      const elementsMap = new Map<string, LadderItem>();
+      const elementsMap = new Map<string, LadderElement>();
       for (const elem of gridResult.elements) {
         elementsMap.set(elem.id, elem);
       }
@@ -926,7 +926,7 @@ describe('Grid to AST Conversion', () => {
       ]);
       const gridResult = convertNodeToGrid(originalAST);
 
-      const elementsMap = new Map<string, LadderItem>();
+      const elementsMap = new Map<string, LadderElement>();
       for (const elem of gridResult.elements) {
         elementsMap.set(elem.id, elem);
       }

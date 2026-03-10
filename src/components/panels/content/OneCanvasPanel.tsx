@@ -68,6 +68,7 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
     zoom,
     pan,
     addComponent,
+    removeComponent,
     addWire,
     removeWire,
     updateComponent,
@@ -174,7 +175,9 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
     selectedIds,
     clearSelection,
     addComponent,
+    removeComponent,
     addWire,
+    removeWire,
     undo,
     redo,
   });

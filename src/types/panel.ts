@@ -18,6 +18,7 @@ export type PanelType =
   | 'properties'
   | 'csv-viewer'
   | 'settings'
+  | 'project-settings'
   | 'symbol-editor'
   | 'welcome';
 
@@ -102,6 +103,7 @@ export const PANEL_TYPE_LABELS: Record<PanelType, string> = {
   'properties': 'Properties',
   'csv-viewer': 'CSV Viewer',
   'settings': 'Settings',
+  'project-settings': 'Project Settings',
   'symbol-editor': 'Symbol Editor',
   'welcome': 'Welcome',
 };
@@ -127,7 +129,7 @@ export const TOOL_PANEL_TYPES: PanelType[] = ['console', 'memory-visualizer', 'p
 /**
  * Panel types that belong to the editor zone (main area).
  */
-export const EDITOR_PANEL_TYPES: PanelType[] = ['ladder-editor', 'one-canvas', 'scenario-editor', 'csv-viewer', 'settings', 'symbol-editor', 'welcome'];
+export const EDITOR_PANEL_TYPES: PanelType[] = ['ladder-editor', 'one-canvas', 'scenario-editor', 'csv-viewer', 'settings', 'project-settings', 'symbol-editor', 'welcome'];
 
 /**
  * Determines which zone a panel type belongs to.

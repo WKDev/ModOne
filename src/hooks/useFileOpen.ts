@@ -24,6 +24,7 @@ import {
   isProjectFile,
   getTabTitle,
 } from '../utils/fileTypeResolver';
+import { useProject } from './useProject';
 import {
   getDocumentTypeFromPath,
   shouldUseDocumentMode,
@@ -70,6 +71,9 @@ export function useFileOpen(): UseFileOpenResult {
   const setDocumentStatus = useDocumentRegistry((state) => state.setDocumentStatus);
   const setDocumentTab = useDocumentRegistry((state) => state.setDocumentTab);
 
+  // Project management
+  const { openProject } = useProject();
+
   /**
    * Open a file in the appropriate editor.
    */
@@ -77,11 +81,32 @@ export function useFileOpen(): UseFileOpenResult {
     async (absolutePath: string, relativePath?: string) => {
       const fileInfo = resolveFileType(relativePath || absolutePath);
 
-      // Handle project files specially (open project instead of tab)
+      // Handle project files specially
       if (isProjectFile(fileInfo)) {
-        // Project files should be handled by the project opener
-        console.log('Opening project file:', absolutePath);
-        // TODO: Integrate with useProject hook for opening .mop files
+        console.log('Opening project manifest:', absolutePath);
+        
+        try {
+          // 1. Actually open the project if it's not the current one
+          await openProject(absolutePath);
+          
+          // 2. Open the project settings panel as a tab
+          const panelType = fileInfo.panelType as PanelType;
+          const title = getTabTitle(relativePath || absolutePath);
+          
+          const existingTab = findEditorTabByFilePath(absolutePath);
+          if (existingTab) {
+            setActiveEditorTab(existingTab.id);
+            return;
+          }
+
+          addEditorTab(panelType, title, {
+            filePath: absolutePath,
+            relativePath: relativePath,
+            fileCategory: fileInfo.category,
+          });
+        } catch (error) {
+          console.error('Failed to open project file:', error);
+        }
         return;
       }
 

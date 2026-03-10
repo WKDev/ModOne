@@ -143,6 +143,8 @@ interface CanvasState {
   snapToGrid: boolean;
   /** Whether to show grid lines */
   showGrid: boolean;
+  /** Grid render style */
+  gridStyle: 'dots' | 'lines';
 
   // Interaction state
   /** Current active tool */
@@ -250,6 +252,9 @@ interface CanvasActions {
   toggleSnap: () => void;
   /** Set grid size */
   setGridSize: (size: number) => void;
+  /** Set grid style */
+  /** Set grid style */
+  setGridStyle: (style: 'dots' | 'lines') => void;
 
   // Tool operations
   /** Set active tool */
@@ -318,6 +323,7 @@ const initialState: CanvasState = {
   gridSize: DEFAULT_GRID_SIZE,
   snapToGrid: true,
   showGrid: true,
+  gridStyle: 'dots',
   tool: 'select',
   wireDrawing: null,
   history: [],
@@ -1363,35 +1369,37 @@ export const useCanvasStore = create<CanvasStore>()(
       // ========================================================================
 
       toggleGrid: () => {
-        set(
-          (state) => {
-            state.showGrid = !state.showGrid;
-          },
-          false,
-          'toggleGrid'
-        );
+        set((state) => {
+          state.showGrid = !state.showGrid;
+          state.isDirty = true;
+        }, false, 'toggleGrid');
       },
 
       toggleSnap: () => {
-        set(
-          (state) => {
-            state.snapToGrid = !state.snapToGrid;
-          },
-          false,
-          'toggleSnap'
-        );
+        set((state) => {
+          state.snapToGrid = !state.snapToGrid;
+          state.isDirty = true;
+        }, false, 'toggleSnap');
       },
 
       setGridSize: (size) => {
-        const clampedSize = Math.max(MIN_GRID_SIZE, size);
+        set((state) => {
+          state.gridSize = Math.max(MIN_GRID_SIZE, size);
+          state.isDirty = true;
+        }, false, `setGridSize/${size}`);
+      },
+
+      setGridStyle: (style: 'dots' | 'lines') => {
         set(
           (state) => {
-            state.gridSize = clampedSize;
+            state.gridStyle = style;
+            state.isDirty = true; // Optional, grid style could be considered an app setting mostly
           },
           false,
-          `setGridSize/${clampedSize}`
+          `setGridStyle/${style}`
         );
       },
+
 
       // ========================================================================
       // Tool Operations

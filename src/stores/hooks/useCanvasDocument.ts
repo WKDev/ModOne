@@ -92,6 +92,7 @@ export interface UseCanvasDocumentReturn {
   gridSize: number;
   snapToGrid: boolean;
   showGrid: boolean;
+  gridStyle: 'dots' | 'lines';
   isDirty: boolean;
 
   // Component operations
@@ -126,6 +127,7 @@ export interface UseCanvasDocumentReturn {
   toggleGrid: () => void;
   toggleSnap: () => void;
   setGridSize: (size: number) => void;
+  setGridStyle: (style: 'dots' | 'lines') => void;
 
   // History operations
   undo: () => void;
@@ -796,6 +798,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
     });
   }, [documentId, updateCanvasData]);
 
+
   const toggleSnap = useCallback(() => {
     if (!documentId) return;
 
@@ -811,6 +814,17 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       const clampedSize = Math.max(MIN_GRID_SIZE, size);
       updateCanvasData(documentId, (docData) => {
         docData.gridSize = clampedSize;
+      });
+    },
+    [documentId, updateCanvasData]
+  );
+
+  const setGridStyle = useCallback(
+    (style: 'dots' | 'lines') => {
+      if (!documentId) return;
+
+      updateCanvasData(documentId, (docData) => {
+        docData.gridStyle = style;
       });
     },
     [documentId, updateCanvasData]
@@ -875,6 +889,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       gridSize: data.gridSize,
       snapToGrid: data.snapToGrid,
       showGrid: data.showGrid,
+      gridStyle: data.gridStyle,
       isDirty: canvasDoc.isDirty,
 
       // Component operations
@@ -909,6 +924,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       toggleGrid,
       toggleSnap,
       setGridSize,
+      setGridStyle,
 
       // History operations
       undo,
@@ -947,6 +963,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
     toggleGrid,
     toggleSnap,
     setGridSize,
+    setGridStyle,
     undo,
     redo,
     canUndo,

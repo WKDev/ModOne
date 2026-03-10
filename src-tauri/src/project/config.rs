@@ -26,6 +26,10 @@ pub struct ProjectConfig {
     /// Auto-save configuration
     #[serde(default)]
     pub auto_save: AutoSaveSettings,
+
+    /// Canvas settings
+    #[serde(default)]
+    pub canvas: CanvasSettings,
 }
 
 impl Default for ProjectConfig {
@@ -37,6 +41,31 @@ impl Default for ProjectConfig {
             modbus: ModbusSettings::default(),
             memory_map: MemoryMapSettings::default(),
             auto_save: AutoSaveSettings::default(),
+            canvas: CanvasSettings::default(),
+        }
+    }
+}
+
+/// Canvas grid and interaction settings
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CanvasSettings {
+    /// Grid spacing in pixels
+    pub grid_size: u32,
+    /// Whether to snap to grid
+    pub snap_to_grid: bool,
+    /// Whether to show the grid
+    pub show_grid: bool,
+    /// Grid style ("dots" | "lines")
+    pub grid_style: String,
+}
+
+impl Default for CanvasSettings {
+    fn default() -> Self {
+        Self {
+            grid_size: 20,
+            snap_to_grid: true,
+            show_grid: true,
+            grid_style: "dots".to_string(),
         }
     }
 }

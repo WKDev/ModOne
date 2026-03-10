@@ -45,6 +45,10 @@ pub struct ProjectManifest {
     /// Auto-save settings
     #[serde(default)]
     pub auto_save: AutoSaveSettings,
+
+    /// Canvas settings
+    #[serde(default)]
+    pub canvas: super::config::CanvasSettings,
 }
 
 impl ProjectManifest {
@@ -64,6 +68,7 @@ impl ProjectManifest {
             modbus: ModbusSettings::default(),
             memory_map: MemoryMapSettings::default(),
             auto_save: AutoSaveSettings::default(),
+            canvas: super::config::CanvasSettings::default(),
         }
     }
 
@@ -77,6 +82,7 @@ impl ProjectManifest {
             modbus: config.modbus.clone(),
             memory_map: config.memory_map.clone(),
             auto_save: config.auto_save.clone(),
+            canvas: config.canvas.clone(),
         }
     }
 
@@ -89,6 +95,7 @@ impl ProjectManifest {
             modbus: self.modbus.clone(),
             memory_map: self.memory_map.clone(),
             auto_save: self.auto_save.clone(),
+            canvas: self.canvas.clone(),
         }
     }
 

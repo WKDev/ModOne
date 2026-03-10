@@ -13,6 +13,7 @@ import { CsvViewerPanel } from './content/CsvViewerPanel';
 import { SettingsPanel } from './content/SettingsPanel';
 import { SymbolEditorPanel } from './content/SymbolEditorPanel';
 import { WelcomePanel } from './content/WelcomePanel';
+import { ProjectSettingsPanel } from './content/ProjectSettingsPanel';
 
 const panelContentMap: Record<PanelType, React.ComponentType<{ data?: unknown }>> = {
   'ladder-editor': LadderEditorPanel,
@@ -25,6 +26,7 @@ const panelContentMap: Record<PanelType, React.ComponentType<{ data?: unknown }>
   'settings': SettingsPanel,
   'symbol-editor': SymbolEditorPanel,
   'welcome': WelcomePanel,
+  'project-settings': ProjectSettingsPanel,
 };
 
 /**

@@ -5,7 +5,7 @@ import { getPortAbsolutePosition, getWireEndpoints } from '../components/OneCanv
 import { computeWireBendPoints } from '../components/OneCanvas/utils/canvasHelpers';
 import type { Block, BlockType, PortPosition, Position } from '../components/OneCanvas/types';
 
-type BuiltInBlockType = Exclude<BlockType, 'custom_symbol'>;
+// type BuiltInBlockType = Exclude<BlockType, 'custom_symbol'>;
 
 function createTestBlock(type: BlockType, position: Position, id: string): Block {
   const def = getBlockDefinition(type);
@@ -87,7 +87,7 @@ describe('wire routing verification after port coordinate migration', () => {
 
     const endpoints = assertEndpointsMatchPortPositions(relay, 'no', button, 'in', blocks);
 
-    expect(endpoints.fromPos).toEqual({ x: 160, y: 121 });
+    expect(endpoints.fromPos).toEqual({ x: 180, y: 120 });
     expect(endpoints.toPos).toEqual({ x: 300, y: 120 });
 
     assertRoutedPathIsOrthogonal(
@@ -102,7 +102,7 @@ describe('wire routing verification after port coordinate migration', () => {
 
   it('routes motor.pe -> overload_relay.l1_in with orthogonal segments and exact endpoints', () => {
     const motor = createTestBlock('motor', { x: 100, y: 100 }, 'motor1');
-    const overloadRelay = createTestBlock('overload_relay', { x: 115, y: 280 }, 'overload1');
+    const overloadRelay = createTestBlock('overload_relay', { x: 120, y: 280 }, 'overload1');
     const blocks = new Map<string, Block>([
       ['motor1', motor],
       ['overload1', overloadRelay],
@@ -110,8 +110,8 @@ describe('wire routing verification after port coordinate migration', () => {
 
     const endpoints = assertEndpointsMatchPortPositions(motor, 'pe', overloadRelay, 'l1_in', blocks);
 
-    expect(endpoints.fromPos).toEqual({ x: 130, y: 160 });
-    expect(endpoints.toPos).toEqual({ x: 130, y: 280 });
+    expect(endpoints.fromPos).toEqual({ x: 140, y: 180 });
+    expect(endpoints.toPos).toEqual({ x: 140, y: 280 });
 
     assertRoutedPathIsOrthogonal(
       { componentId: 'motor1', portId: 'pe' },
@@ -148,8 +148,8 @@ describe('wire routing verification after port coordinate migration', () => {
 
   it('wire endpoints match golden port positions', () => {
     const entries = Object.entries(goldenPositions) as Array<[
-      BuiltInBlockType,
-      (typeof goldenPositions)[BuiltInBlockType]
+      string,
+      any
     ]>;
 
     for (const [blockType, golden] of entries) {

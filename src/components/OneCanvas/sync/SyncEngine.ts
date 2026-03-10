@@ -35,6 +35,7 @@ interface CanvasSnapshot {
   panY: number;
   gridSize: number;
   showGrid: boolean;
+  gridStyle: 'dots' | 'lines';
 }
 
 export interface SyncEngineConfig {
@@ -183,7 +184,8 @@ export class SyncEngine {
 
       const gridChanged =
         current.gridSize !== previous.gridSize ||
-        current.showGrid !== previous.showGrid;
+        current.showGrid !== previous.showGrid ||
+        current.gridStyle !== previous.gridStyle;
 
       if (gridChanged) {
         this._dirtyFlags.add('grid');
@@ -355,7 +357,8 @@ export class SyncEngine {
     const currentGridConfig = this._config.gridRenderer.config;
     if (
       currentGridConfig.size === snapshot.gridSize &&
-      currentGridConfig.visible === snapshot.showGrid
+      currentGridConfig.visible === snapshot.showGrid &&
+      currentGridConfig.style === snapshot.gridStyle
     ) {
       return;
     }
@@ -364,6 +367,7 @@ export class SyncEngine {
       ...currentGridConfig,
       size: snapshot.gridSize,
       visible: snapshot.showGrid,
+      style: snapshot.gridStyle,
     };
   }
 
@@ -389,6 +393,7 @@ export class SyncEngine {
         panY: doc.data.pan.y,
         gridSize: doc.data.gridSize,
         showGrid: doc.data.showGrid,
+        gridStyle: doc.data.gridStyle,
       };
     }
 
@@ -413,6 +418,7 @@ export class SyncEngine {
         panY: circuit.viewport?.panY ?? 0,
         gridSize: 20,
         showGrid: true,
+        gridStyle: 'dots',
       };
     }
 

@@ -145,3 +145,14 @@ this._wireDrawingFromPos = { x: 0, y: 0 };
 - L-route approach: horizontal-first when exit is left/right, vertical-first otherwise
 - Test result: 986 passed, 0 failed
 - Any unexpected findings: None
+
+## [2026-03-09T04:00:00.000Z] Task 3 complete
+- New test files:
+  - `src/components/OneCanvas/interaction/__tests__/wireSegmentDrag.test.ts` (9 tests)
+  - `src/components/OneCanvas/utils/__tests__/wirePreviewPath.test.ts` (12 tests)
+- New test count: 21
+- Total tests: 1007 (was 986)
+- Approach used: pure function extraction for preview path (no class instantiation), direct canvasStore.getState().moveWireSegment() calls for segment drag (bypasses React rendering overhead)
+- Key finding: canvasStore.setState() + getState().moveWireSegment() works cleanly without renderHook — avoids all hook/act overhead for store-level unit tests
+- Segment drag tests verify: single move exactness, sequential increment accumulation, axis constraint, large delta, zero delta no-op, negative delta, history snapshot only on isFirstMove=true, and the anti-amplification regression case
+- Preview path tests verify: 3-point output, right/left/up/down/null exit directions, collinear cases, orthogonality for all directions, axis-correct mid computation, and bug documentation test

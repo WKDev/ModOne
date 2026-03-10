@@ -10,7 +10,6 @@
  */
 
 import { memo, useCallback, useMemo } from 'react';
-import { Settings2 } from 'lucide-react';
 import { useCanvasFacade } from '../../../hooks/useCanvasFacade';
 import { useEditorAreaStore } from '../../../stores/editorAreaStore';
 import type { Block } from '../../OneCanvas/types';
@@ -24,6 +23,7 @@ import {
   TextProperties,
   IndustrialProperties,
 } from './properties';
+import { CanvasProperties } from './properties/CanvasProperties';
 
 // ============================================================================
 // Types
@@ -82,17 +82,11 @@ export const PropertiesPanel = memo(function PropertiesPanel({
     [selectedComponent, updateComponent]
   );
 
-  // Empty state - no selection
+  // Empty state - no selection (Show Canvas Properties)
   if (!selectedComponent) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-neutral-500 p-4">
-        <Settings2 size={48} className="mb-4 text-neutral-600" />
-        <h3 className="text-lg font-medium mb-2">Properties</h3>
-        <p className="text-sm text-center">
-          {selectedComponents.length > 1
-            ? 'Select a single element to edit properties'
-            : 'Select an element to view its properties'}
-        </p>
+      <div className="h-full overflow-y-auto p-3">
+        <CanvasProperties documentId={documentId} />
       </div>
     );
   }
@@ -121,9 +115,16 @@ interface PropertyEditorRouterProps {
  * Routes to the appropriate property editor based on component type.
  */
 const PropertyEditorRouter = memo(function PropertyEditorRouter({
-  component,
+  component: initialComponent,
   onChange,
 }: PropertyEditorRouterProps) {
+  // Defensive check: normalize the component type to remove any invisible characters or whitespace
+  // that may have been injected during symbol resolution or custom block creation.
+  const cleanType = String(initialComponent.type).trim().replace(/[\u200B-\u200D\uFEFF]/g, '') as Block['type'];
+  const component = (initialComponent.type === cleanType 
+    ? initialComponent 
+    : { ...initialComponent, type: cleanType }) as Block;
+
   switch (component.type) {
     case 'plc_out':
       return (

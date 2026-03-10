@@ -15,6 +15,7 @@ import { useGlobalCanvasAdapter } from '../stores/adapters/globalCanvasAdapter';
 import { useDocumentRegistry } from '../stores/documentRegistry';
 import { useCanvasDocument } from '../stores/hooks/useCanvasDocument';
 import { useSchematicCanvasDocument } from '../stores/hooks/useSchematicCanvasDocument';
+import { useProjectStore } from '../stores/projectStore';
 import type {
   Block,
   Junction,
@@ -97,6 +98,102 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
     }
     return null;
   }, [document, canvasDocumentState, schematicDocumentState]);
+
+  // Project-wide settings overrides
+  const projectCanvasSettings = useProjectStore((s) => s.currentProject?.config.canvas);
+  const updateProjectConfig = useProjectStore((s) => s.updateConfig);
+
+  const gridSize = projectCanvasSettings?.grid_size ?? activeDocumentState?.gridSize ?? 20;
+  const snapToGrid = projectCanvasSettings?.snap_to_grid ?? activeDocumentState?.snapToGrid ?? true;
+  const showGrid = projectCanvasSettings?.show_grid ?? activeDocumentState?.showGrid ?? true;
+  const gridStyle = projectCanvasSettings?.grid_style ?? activeDocumentState?.gridStyle ?? 'dots';
+
+  const setGridSize = useCallback((size: number) => {
+    updateProjectConfig({
+      canvas: {
+        ...(projectCanvasSettings || {
+          grid_size: 20,
+          snap_to_grid: true,
+          show_grid: true,
+          grid_style: 'dots',
+        }),
+        grid_size: size,
+      },
+    });
+    activeDocumentState?.setGridSize(size);
+  }, [updateProjectConfig, projectCanvasSettings, activeDocumentState]);
+
+  const setGridStyle = useCallback((style: 'dots' | 'lines') => {
+    updateProjectConfig({
+      canvas: {
+        ...(projectCanvasSettings || {
+          grid_size: 20,
+          snap_to_grid: true,
+          show_grid: true,
+          grid_style: 'dots',
+        }),
+        grid_style: style,
+      },
+    });
+    activeDocumentState?.setGridStyle(style);
+  }, [updateProjectConfig, projectCanvasSettings, activeDocumentState]);
+
+  const toggleGrid = useCallback(() => {
+    const nextValue = !showGrid;
+    updateProjectConfig({
+      canvas: {
+        ...(projectCanvasSettings || {
+          grid_size: 20,
+          snap_to_grid: true,
+          show_grid: true,
+          grid_style: 'dots',
+        }),
+        show_grid: nextValue,
+      },
+    });
+    activeDocumentState?.toggleGrid();
+  }, [showGrid, updateProjectConfig, projectCanvasSettings, activeDocumentState]);
+
+  const toggleSnap = useCallback(() => {
+    const nextValue = !snapToGrid;
+    updateProjectConfig({
+      canvas: {
+        ...(projectCanvasSettings || {
+          grid_size: 20,
+          snap_to_grid: true,
+          show_grid: true,
+          grid_style: 'dots',
+        }),
+        snap_to_grid: nextValue,
+      },
+    });
+    activeDocumentState?.toggleSnap();
+  }, [snapToGrid, updateProjectConfig, projectCanvasSettings, activeDocumentState]);
+
+  // Synchronize document state with project settings when they change
+  useEffect(() => {
+    if (!activeDocumentState || !projectCanvasSettings) return;
+
+    if (projectCanvasSettings.grid_size !== activeDocumentState.gridSize) {
+      activeDocumentState.setGridSize(projectCanvasSettings.grid_size);
+    }
+    if (projectCanvasSettings.snap_to_grid !== activeDocumentState.snapToGrid) {
+      activeDocumentState.toggleSnap(); // toggleSnap doesn't take value, it just toggles. 
+                                        // Wait, toggleSnap might be problematic if we want a specific value.
+    }
+    if (projectCanvasSettings.show_grid !== activeDocumentState.showGrid) {
+      activeDocumentState.toggleGrid();
+    }
+    if (projectCanvasSettings.grid_style !== activeDocumentState.gridStyle) {
+      activeDocumentState.setGridStyle(projectCanvasSettings.grid_style as 'dots' | 'lines');
+    }
+  }, [
+    projectCanvasSettings?.grid_size,
+    projectCanvasSettings?.snap_to_grid,
+    projectCanvasSettings?.show_grid,
+    projectCanvasSettings?.grid_style,
+    activeDocumentState,
+  ]);
 
   // Reset interaction state when document changes
   useEffect(() => {
@@ -417,6 +514,7 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
         moveComponent: (id, position, skipHistory, skipWireRecalc) =>
           activeDocumentState.moveComponent(id, position, skipHistory, skipWireRecalc),
         updateComponent: activeDocumentState.updateComponent,
+        removeComponent: activeDocumentState.removeComponent,
         // Junction Commands
         moveJunction: (id, position, skipHistory, skipWireRecalc) =>
           activeDocumentState.moveJunction(id, position, skipHistory, skipWireRecalc),
@@ -453,8 +551,15 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
         // Viewport
         setPan: activeDocumentState.setPan,
         setZoom: activeDocumentState.setZoom,
-        gridSize: activeDocumentState.gridSize,
-        snapToGrid: activeDocumentState.snapToGrid,
+        gridSize,
+        snapToGrid,
+        showGrid,
+        gridStyle,
+
+        toggleGrid,
+        toggleSnap,
+        setGridSize,
+        setGridStyle,
         // History
         undo: documentUndo,
         redo: documentRedo,
@@ -483,6 +588,7 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
         addComponent: () => '',
         moveComponent: () => {},
         updateComponent: () => {},
+        removeComponent: () => {},
         moveJunction: () => {},
         addWire: () => null,
         removeWire: () => {},
@@ -518,6 +624,12 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
         setZoom: () => {},
         gridSize: 20,
         snapToGrid: true,
+        showGrid: true,
+        gridStyle: 'dots',
+        toggleGrid: () => {},
+        toggleSnap: () => {},
+        setGridSize: () => {},
+        setGridStyle: () => {},
         undo: documentUndo,
         redo: documentRedo,
         canUndo: documentCanUndo,

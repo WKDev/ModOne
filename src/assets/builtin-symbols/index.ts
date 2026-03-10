@@ -22,6 +22,9 @@ import { pilotLampSymbol } from './pilot_lamp';
 import { plcInSymbol } from './plc_in';
 import { plcOutSymbol } from './plc_out';
 import { powersourceSymbol } from './powersource';
+import { powerSourceDc2pSymbol } from './power_source_dc_2p';
+import { powerSourceAc1pSymbol } from './power_source_ac_1p';
+import { powerSourceAc2pSymbol } from './power_source_ac_2p';
 import { pushButtonNcSymbol } from './push_button_nc';
 import { pushButtonNoSymbol } from './push_button_no';
 import { relaySymbol } from './relay';
@@ -80,6 +83,9 @@ export const BUILTIN_SYMBOLS: ReadonlyMap<string, SymbolDefinition> = new Map([
   ['builtin:solenoid_valve', solenoidValveSymbol],
   ['builtin:disconnect_switch', disconnectSwitchSymbol],
   ['builtin:powersource', powersourceSymbol],
+  ['builtin:power_source_dc_2p', powerSourceDc2pSymbol],
+  ['builtin:power_source_ac_1p', powerSourceAc1pSymbol],
+  ['builtin:power_source_ac_2p', powerSourceAc2pSymbol],
   ['builtin:transformer', transformerSymbol],
   ['builtin:plc_in', plcInSymbol],
   ['builtin:plc_out', plcOutSymbol],
@@ -90,6 +96,9 @@ export const BUILTIN_SYMBOLS: ReadonlyMap<string, SymbolDefinition> = new Map([
 const BLOCK_TYPE_TO_SYMBOL_ID: ReadonlyMap<string, string> = new Map([
   ['powersource', 'builtin:powersource'],
   ['power_source', 'builtin:powersource'],
+  ['power_source_dc_2p', 'builtin:power_source_dc_2p'],
+  ['power_source_ac_1p', 'builtin:power_source_ac_1p'],
+  ['power_source_ac_2p', 'builtin:power_source_ac_2p'],
   ['ground', 'builtin:ground'],
   ['plc_in', 'builtin:plc_in'],
   ['plc_out', 'builtin:plc_out'],

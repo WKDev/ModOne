@@ -1,0 +1,9 @@
+.sisyphus/boulder.json
+.sisyphus/evidence/task-3-full-suite-pass.txt
+.sisyphus/evidence/task-3-wire-tests-pass.txt
+.sisyphus/notepads/symbol-bridge-plan/learnings.md
+.sisyphus/notepads/symbol-model-migration/issues.md
+.sisyphus/notepads/symbol-model-migration/learnings.md
+src/components/OneCanvas/interaction/__tests__/wireSegmentDrag.test.ts
+src/components/OneCanvas/utils/__tests__/wirePreviewPath.test.ts
+src/components/ScenarioEditor/ScenarioSettingsDialog.tsx

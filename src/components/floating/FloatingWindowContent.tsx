@@ -23,6 +23,7 @@ import { CsvViewerPanel } from '../panels/content/CsvViewerPanel';
 import { SettingsPanel } from '../panels/content/SettingsPanel';
 import { SymbolEditorPanel } from '../panels/content/SymbolEditorPanel';
 import { WelcomePanel } from '../panels/content/WelcomePanel';
+import { ProjectSettingsPanel } from '../panels/content/ProjectSettingsPanel';
 import type { PanelType } from '../../types/panel';
 
 const panelContentMap: Record<PanelType, React.ComponentType> = {
@@ -36,6 +37,7 @@ const panelContentMap: Record<PanelType, React.ComponentType> = {
   'settings': SettingsPanel,
   'symbol-editor': SymbolEditorPanel,
   'welcome': WelcomePanel,
+  'project-settings': ProjectSettingsPanel,
 };
 
 interface FloatingWindowContentProps {

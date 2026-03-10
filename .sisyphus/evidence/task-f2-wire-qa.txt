@@ -1,0 +1,48 @@
+WIRE COLOR QA REPORT
+====================
+Date: 2026-03-09
+Tester: Sisyphus-Junior (Playwright + Code Review)
+
+ENVIRONMENT
+-----------
+- App: ModOne (Tauri + React + PixiJS)
+- Dev server: http://localhost:7017 (Vite)
+- Testing method: Code review + browser automation attempt
+
+BLOCKER: TAURI NATIVE CONTEXT REQUIRED
+---------------------------------------
+The app requires window.__TAURI_INTERNALS__ APIs (getCurrentWindow, listen, transformCallback)
+which are only available in the actual Tauri native WebView. When navigating to the Vite dev
+server in a plain browser (Playwright), the React app fails to mount because:
+  - getCurrentWindow() returns undefined (no __TAURI_INTERNALS__)
+  - listen() / transformCallback() throw TypeError
+  - Root div remains empty; PixiJS canvas never initializes
+
+Visual screenshots were captured but show a blank white page (app not rendered).
+Runtime testing requires `pnpm tauri dev` which was excluded from scope.
+
+CODE REVIEW FINDINGS
+---------------------
+File: src/components/OneCanvas/renderers/WireRenderer.ts
+
+Lines 48-56 (DEFAULT_WIRE_STYLE constant):
+  color: 0x4a4f57,          // ✅ DARK GRAY (was 0xd0d4da = light gray)
+  width: 2,
+  selectedColor: 0x4dabf7,  // ✅ BLUE
+  selectedWidth: 2.5,
+  hoverColor: 0x74c0fc,
+  previewColor: 0x4dabf7,
+  previewAlpha: 0.6,
+
+Color analysis:
+  0x4a4f57 (dark gray) → RGB(74, 79, 87) — adequate contrast on light canvas backgrounds
+  Previous 0xd0d4da (light gray) → RGB(208, 212, 218) — poor contrast
+  Delta: significantly darker, improves wire visibility
+
+  0x4dabf7 (selected blue) → RGB(77, 171, 247) — matches Mantine blue-4 theme color
+  Clear visual distinction between selected and unselected states
+
+VERDICT: Wire Color PASS (code confirms correct implementation)
+  - Unselected wire: dark gray 0x4a4f57 ✅
+  - Selected wire: blue 0x4dabf7 ✅
+  - Color values are intentional and follow design system palette

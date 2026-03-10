@@ -24,6 +24,8 @@ interface GridBackgroundProps {
   majorColor?: string;
   /** Background color */
   backgroundColor?: string;
+  /** Grid style mode */
+  style?: 'dots' | 'lines';
 }
 
 // ============================================================================
@@ -48,6 +50,7 @@ export const GridBackground = memo(function GridBackground({
   minorColor = '#2a2a2a',
   majorColor = '#3a3a3a',
   backgroundColor = '#1a1a1a',
+  style = 'dots',
 }: GridBackgroundProps) {
   // Calculate scaled grid size
   const scaledSize = gridSize * zoom;
@@ -87,12 +90,21 @@ export const GridBackground = memo(function GridBackground({
             height={scaledSize}
             patternUnits="userSpaceOnUse"
           >
-            <path
-              d={`M ${scaledSize} 0 L 0 0 0 ${scaledSize}`}
-              fill="none"
-              stroke={minorColor}
-              strokeWidth={minorStroke}
-            />
+            {style === 'dots' ? (
+              <circle
+                cx={scaledSize}
+                cy={scaledSize}
+                r={1 / zoom}
+                fill={minorColor}
+              />
+            ) : (
+              <path
+                d={`M ${scaledSize} 0 L 0 0 0 ${scaledSize}`}
+                fill="none"
+                stroke={minorColor}
+                strokeWidth={minorStroke}
+              />
+            )}
           </pattern>
         )}
 
@@ -107,13 +119,22 @@ export const GridBackground = memo(function GridBackground({
           {showMinorLines && (
             <rect width={majorSize} height={majorSize} fill={`url(#${patternId})`} />
           )}
-          {/* Major lines */}
-          <path
-            d={`M ${majorSize} 0 L 0 0 0 ${majorSize}`}
-            fill="none"
-            stroke={majorColor}
-            strokeWidth={majorStroke}
-          />
+          {/* Major lines or dots */}
+          {style === 'dots' ? (
+            <circle
+              cx={majorSize}
+              cy={majorSize}
+              r={1.5 / zoom}
+              fill={majorColor}
+            />
+          ) : (
+            <path
+              d={`M ${majorSize} 0 L 0 0 0 ${majorSize}`}
+              fill="none"
+              stroke={majorColor}
+              strokeWidth={majorStroke}
+            />
+          )}
         </pattern>
       </defs>
 

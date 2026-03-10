@@ -2,17 +2,17 @@
 
 ## TL;DR
 
-> **Quick Summary**: Add toolbar and dialogs to integrate three existing utilities (wire numbering, alignment/distribution, print support) into the canvas panel UI.
+> **Quick Summary**: Create three missing UI component files. The integration layer (OneCanvasPanel.tsx, CanvasDialogs.tsx) is ALREADY DONE — only the component files are missing.
 > 
 > **Deliverables**:
 > - `CanvasToolbar.tsx` - Toolbar with alignment, distribution, flip, wire numbering, and print buttons
 > - `WireNumberingDialog.tsx` - Configuration dialog for wire numbering options
 > - `PrintDialog.tsx` - Configuration dialog for print settings and title block
-> - Updated `OneCanvasPanel.tsx` - Integration of all components
+> - ~~Updated `OneCanvasPanel.tsx`~~ — ALREADY DONE (integration complete)
 > 
-> **Estimated Effort**: Medium (4 tasks, ~2-3 hours)
+> **Estimated Effort**: Short (3 parallel tasks)
 > **Parallel Execution**: YES - 3 waves
-> **Critical Path**: Wave 1 (parallel) → Wave 2 (integration)
+> **Critical Path**: Wave 1 (3 parallel component files) → F1-F2 (verification)
 
 ---
 
@@ -166,7 +166,18 @@ Parallel Speedup: ~60% faster than sequential (3 tasks parallel)
   - Add dividers between button groups (align | distribute | flip | actions)
   - Add "Wire Numbers" button with Hash icon
   - Add "Print" button with Printer icon
-  - Accept props for all callbacks: `onAlign`, `onDistribute`, `onFlip`, `onWireNumbering`, `onPrint`
+  - Props interface (MUST match `OneCanvasPanel.tsx:337-344` exactly):
+    ```tsx
+    interface CanvasToolbarProps {
+      onAlignSelected: (direction: 'left' | 'right' | 'top' | 'bottom' | 'centerH' | 'centerV') => void;
+      onDistributeSelected: (direction: 'horizontal' | 'vertical') => void;
+      onFlipSelected: (axis: 'horizontal' | 'vertical') => void;
+      onOpenWireNumbering: () => void;
+      onOpenPrint: () => void;
+      hasSelection: boolean;
+      selectionCount: number;
+    }
+    ```
   - Accept `selectionCount` prop to disable buttons appropriately:
     - Align: disabled if < 2 selected
     - Distribute: disabled if < 3 selected
@@ -258,7 +269,7 @@ Parallel Speedup: ~60% faster than sequential (3 tasks parallel)
 - [x] 2. Create WireNumberingDialog Component
 
   **What to do**:
-  - Create `src/components/OneCanvas/dialogs/WireNumberingDialog.tsx`
+  - Create `src/components/OneCanvas/components/WireNumberingDialog.tsx` (NOT dialogs/)
   - Create dialogs folder if it doesn't exist
   - Follow CircuitLibraryPanel dialog pattern exactly:
     - Fixed overlay with bg-black/50
@@ -272,10 +283,10 @@ Parallel Speedup: ~60% faster than sequential (3 tasks parallel)
     - Start Number: Number input (default: 1, min: 1)
     - Include Signal Type: Checkbox (optional enhancement)
     - Sort by Position: Checkbox (default: true)
-  - Props interface:
-    - `isOpen: boolean`
-    - `onClose: () => void`
-    - `onApply: (options: WireNumberingOptions) => void`
+  - Props interface (MUST match `CanvasDialogs.tsx:22-24` exactly):
+    - `wireNumberingOpen: boolean`
+    - `onCloseWireNumbering: () => void`
+    - `onApplyWireNumbering: (options: WireNumberingOptions) => void`
   - Use local state for form values, reset on open
   - Keyboard: Escape to close, Enter to apply
 
@@ -377,7 +388,7 @@ Parallel Speedup: ~60% faster than sequential (3 tasks parallel)
 - [x] 3. Create PrintDialog Component
 
   **What to do**:
-  - Create `src/components/OneCanvas/dialogs/PrintDialog.tsx`
+  - Create `src/components/OneCanvas/components/PrintDialog.tsx` (NOT dialogs/)
   - Follow same dialog pattern as WireNumberingDialog
   - Form fields organized in sections:
     - **Paper Settings**:
@@ -397,9 +408,9 @@ Parallel Speedup: ~60% faster than sequential (3 tasks parallel)
       - Show Grid: Checkbox
       - Show Wire Labels: Checkbox
       - Show Designations: Checkbox
-  - Props interface:
-    - `isOpen: boolean`
-    - `onClose: () => void`
+  - Props interface (MUST match `CanvasDialogs.tsx:25-28` exactly):
+    - `printDialogOpen: boolean`
+    - `onClosePrintDialog: () => void`
     - `onPrint: (config: PrintLayoutConfig) => void`
   - Use `createDefaultPrintLayout()` for initial values
   - Print button triggers onPrint callback

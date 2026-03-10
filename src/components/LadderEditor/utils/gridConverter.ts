@@ -642,7 +642,7 @@ export function convertMultipleNetworks(
 
   for (const network of networks) {
     const data = convertToEditorNetwork(network, { ...options, startRow: rowOffset });
-    for (const [id, element] of data.elements) {
+    for (const [id, element] of Array.from(data.elements.entries())) {
       mergedElements.set(id, element);
     }
     mergedWires.push(...data.wires);
@@ -761,7 +761,7 @@ export function groupElementsByRow(
 ): RowGroups {
   const rows = new Map<number, LadderElement[]>();
 
-  for (const element of elements.values()) {
+  for (const element of Array.from(elements.values())) {
     // Skip wire and rail elements
     if (
       element.type.startsWith('wire_') ||

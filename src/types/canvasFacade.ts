@@ -75,6 +75,8 @@ export interface CanvasFacadeReturn {
   moveComponent: (id: string, position: Position, skipHistory?: boolean, skipWireRecalc?: boolean) => void;
   /** Update a component's properties */
   updateComponent: (id: string, updates: Partial<Block>) => void;
+  /** Remove a component and its connected wires */
+  removeComponent: (id: string) => void;
 
   // --------------------------------------------------------------------------
   // Junction Commands
@@ -205,6 +207,19 @@ export interface CanvasFacadeReturn {
   gridSize: number;
   /** Whether snap-to-grid is enabled */
   snapToGrid: boolean;
+  /** Whether to show grid */
+  showGrid: boolean;
+  /** Grid style mode */
+  gridStyle: 'dots' | 'lines';
+
+  /** Toggle grid visibility */
+  toggleGrid: () => void;
+  /** Toggle snap-to-grid */
+  toggleSnap: () => void;
+  /** Setup new grid size */
+  setGridSize: (size: number) => void;
+  /** Setup new grid style */
+  setGridStyle: (style: 'dots' | 'lines') => void;
 
   // --------------------------------------------------------------------------
   // History (Undo / Redo)

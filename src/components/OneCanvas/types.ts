@@ -999,6 +999,7 @@ export interface GridConfig {
   majorColor?: string;
   majorAlpha?: number;
   subdivisions?: number;
+  style?: 'dots' | 'lines';
 }
 
 export const DEFAULT_GRID: GridConfig = {
@@ -1010,6 +1011,7 @@ export const DEFAULT_GRID: GridConfig = {
   majorColor: '#999999',
   majorAlpha: 0.5,
   subdivisions: 5,
+  style: 'dots',
 };
 
 export interface CanvasConfig {

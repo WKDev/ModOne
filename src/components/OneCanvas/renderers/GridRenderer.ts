@@ -106,19 +106,32 @@ export class GridRenderer {
 
     // Draw minor vertical lines
     if (showMinor) {
-      for (let x = left; x <= right; x += gridSize) {
-        // Skip major lines (drawn separately with different style)
-        if (x % majorInterval === 0) continue;
-        g.moveTo(x, top);
-        g.lineTo(x, bottom);
+      if (this._config.style === 'dots') {
+        g.setStrokeStyle({ width: 0 }); // Use fill instead of stroke for dots
+        g.beginPath();
+        for (let x = left; x <= right; x += gridSize) {
+           if (x % majorInterval === 0) continue;
+           for (let y = top; y <= bottom; y += gridSize) {
+             if (y % majorInterval === 0) continue;
+             g.drawCircle(x, y, 1 / zoom);
+           }
+        }
+        g.fill({ color: minorColor, alpha: minorAlpha * 0.4 });
+      } else {
+        for (let x = left; x <= right; x += gridSize) {
+          // Skip major lines (drawn separately with different style)
+          if (x % majorInterval === 0) continue;
+          g.moveTo(x, top);
+          g.lineTo(x, bottom);
+        }
+        // Draw minor horizontal lines
+        for (let y = top; y <= bottom; y += gridSize) {
+          if (y % majorInterval === 0) continue;
+          g.moveTo(left, y);
+          g.lineTo(right, y);
+        }
+        g.stroke({ color: minorColor, width: 1, pixelLine: true, alpha: minorAlpha * 0.4 });
       }
-      // Draw minor horizontal lines
-      for (let y = top; y <= bottom; y += gridSize) {
-        if (y % majorInterval === 0) continue;
-        g.moveTo(left, y);
-        g.lineTo(right, y);
-      }
-      g.stroke({ color: minorColor, width: 1, pixelLine: true, alpha: minorAlpha * 0.4 });
     }
 
     // Draw major vertical lines
@@ -127,15 +140,26 @@ export class GridRenderer {
     const majorTop = Math.floor((bounds.minY - pad) / majorInterval) * majorInterval;
     const majorBottom = Math.ceil((bounds.maxY + pad) / majorInterval) * majorInterval;
 
-    for (let x = majorLeft; x <= majorRight; x += majorInterval) {
-      g.moveTo(x, majorTop);
-      g.lineTo(x, majorBottom);
+    if (this._config.style === 'dots') {
+      g.setStrokeStyle({ width: 0 });
+      g.beginPath();
+      for (let x = majorLeft; x <= majorRight; x += majorInterval) {
+        for (let y = majorTop; y <= majorBottom; y += majorInterval) {
+          g.drawCircle(x, y, 1.5 / zoom);
+        }
+      }
+      g.fill({ color: majorColor, alpha: 0.5 });
+    } else {
+      for (let x = majorLeft; x <= majorRight; x += majorInterval) {
+        g.moveTo(x, majorTop);
+        g.lineTo(x, majorBottom);
+      }
+      for (let y = majorTop; y <= majorBottom; y += majorInterval) {
+        g.moveTo(majorLeft, y);
+        g.lineTo(majorRight, y);
+      }
+      g.stroke({ color: majorColor, width: 1, pixelLine: true, alpha: 0.5 });
     }
-    for (let y = majorTop; y <= majorBottom; y += majorInterval) {
-      g.moveTo(majorLeft, y);
-      g.lineTo(majorRight, y);
-    }
-    g.stroke({ color: majorColor, width: 1, pixelLine: true, alpha: 0.5 });
 
     // Origin cross-hair (slightly brighter)
     if (left <= 0 && right >= 0 && top <= 0 && bottom >= 0) {

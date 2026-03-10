@@ -14,6 +14,7 @@ import { CsvViewerPanel } from './content/CsvViewerPanel';
 import { SettingsPanel } from './content/SettingsPanel';
 import { SymbolEditorPanel } from './content/SymbolEditorPanel';
 import { WelcomePanel } from './content/WelcomePanel';
+import { ProjectSettingsPanel } from './content/ProjectSettingsPanel';
 import { TabBar } from './TabBar';
 import { TabContent } from './TabContent';
 import { TabContextMenu } from './TabContextMenu';
@@ -29,6 +30,7 @@ const panelContentMap: Record<PanelType, React.ComponentType> = {
   'settings': SettingsPanel,
   'symbol-editor': SymbolEditorPanel,
   'welcome': WelcomePanel,
+  'project-settings': ProjectSettingsPanel,
 };
 
 export interface ExtendedPanelProps extends PanelProps {

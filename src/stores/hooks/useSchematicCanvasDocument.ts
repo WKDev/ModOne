@@ -78,6 +78,7 @@ interface WorkingCircuitData {
   gridSize: number;
   snapToGrid: boolean;
   showGrid: boolean;
+  gridStyle: 'dots' | 'lines';
 }
 
 function getDefaultPorts(type: BlockType): Block['ports'] {
@@ -114,6 +115,7 @@ function circuitToWorkingData(circuit: SerializableCircuitState): WorkingCircuit
     gridSize: DEFAULT_GRID_SIZE,
     snapToGrid: true,
     showGrid: true,
+    gridStyle: 'dots',
   };
 }
 
@@ -851,6 +853,17 @@ export function useSchematicCanvasDocument(
     [documentId, updateActivePageCircuit]
   );
 
+  const setGridStyle = useCallback(
+    (style: 'dots' | 'lines') => {
+      if (!documentId) return;
+
+      updateActivePageCircuit((working) => {
+        working.gridStyle = style;
+      });
+    },
+    [documentId, updateActivePageCircuit]
+  );
+
   const undo = useCallback(() => {
     if (documentId) undoAction(documentId);
   }, [documentId, undoAction]);
@@ -906,6 +919,7 @@ export function useSchematicCanvasDocument(
       gridSize: data.gridSize,
       snapToGrid: data.snapToGrid,
       showGrid: data.showGrid,
+      gridStyle: data.gridStyle,
       isDirty: schematicDoc.isDirty,
       addComponent,
       removeComponent,
@@ -930,6 +944,7 @@ export function useSchematicCanvasDocument(
       toggleGrid,
       toggleSnap,
       setGridSize,
+      setGridStyle,
       undo,
       redo,
       canUndo,
@@ -964,6 +979,7 @@ export function useSchematicCanvasDocument(
     toggleGrid,
     toggleSnap,
     setGridSize,
+    setGridStyle,
     undo,
     redo,
     canUndo,

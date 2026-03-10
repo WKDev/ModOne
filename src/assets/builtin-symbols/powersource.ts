@@ -12,10 +12,10 @@ export const powersourceSymbol: SymbolDefinition = {
   width: 40,
   height: 40,
   graphics: [
-    { kind: 'circle', cx: 20, cy: 16, r: 10, stroke: '#888', fill: 'transparent', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 20, y: 8 }, { x: 20, y: 24 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
-    { kind: 'polyline', points: [{ x: 14, y: 16 }, { x: 26, y: 16 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
-    { kind: 'polyline', points: [{ x: 20, y: 26 }, { x: 20, y: 40 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { kind: 'polyline', points: [{ x: 8, y: 16 }, { x: 32, y: 16 }], stroke: '#ef4444', fill: 'none', strokeWidth: 2 },
+    { kind: 'polyline', points: [{ x: 14, y: 24 }, { x: 26, y: 24 }], stroke: '#888', fill: 'none', strokeWidth: 4 },
+    { kind: 'polyline', points: [{ x: 20, y: 16 }, { x: 20, y: 4 }], stroke: '#ef4444', fill: 'none', strokeWidth: 2 },
+    { kind: 'polyline', points: [{ x: 20, y: 24 }, { x: 20, y: 40 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
   ],
   pins: [
     { id: 'out', name: '+', number: '1', type: 'output', electricalType: 'power_out', functionalRole: 'general', shape: 'line', position: { x: 20, y: 40 }, orientation: 'down', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },

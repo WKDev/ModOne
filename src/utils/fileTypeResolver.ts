@@ -25,7 +25,7 @@ const FILE_TYPE_MAP: Record<string, FileTypeInfo> = {
   // Project files
   '.mop': {
     category: 'project',
-    panelType: null, // Special handling - opens project
+    panelType: 'project-settings',
     icon: 'FolderKanban',
     color: 'text-purple-500',
     description: 'ModOne Project',

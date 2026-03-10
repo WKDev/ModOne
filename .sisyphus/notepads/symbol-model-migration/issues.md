@@ -25,3 +25,13 @@ for backward compat but new types use symbolBridge.
 - gridConverter.test.ts — LadderItem rename (pre-existing)
 - useAppIntegration.ts — missing plugin (pre-existing)
 - SymbolEditorHost.tsx — multiple issues (pre-existing)
+
+## [2026-03-09] F3 Manual QA Notes
+
+### Plan vs repo path mismatches
+- Serialization module is at src/components/OneCanvas/utils/serialization.ts (not src/components/OneCanvas/serialization.ts)
+- v2 pin fields are set in src/components/SymbolEditor/PinConfigPopover.tsx (SymbolEditor.tsx itself does not reference electricalType/functionalRole)
+
+### Minor count/expectation mismatches
+- Pre-existing build error breakdown observed: wire-routing-verification.test.ts reports 24 TS error lines (plan note said 23); total remains 33
+- Builtin symbols directory lists 43 files because index.ts is included; BUILTIN_SYMBOLS.size is 42 (asserted by tests)
