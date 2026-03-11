@@ -9,6 +9,8 @@ import { useEffect, useRef } from 'react';
 import { usePanelStore } from '../stores/panelStore';
 import { useWindowStore } from '../stores/windowStore';
 import { useSidebarStore } from '../stores/sidebarStore';
+import { useProjectStore } from '../stores/projectStore';
+import { useEditorAreaStore } from '../stores/editorAreaStore';
 import type { FloatingWindowState } from '../types/window';
 import {
   setupStateSync,
@@ -130,25 +132,99 @@ export function useStateSync(): void {
     );
     syncControllersRef.current.push(sidebarSync as StateSyncController<unknown>);
 
+    // Project store sync
+    const projectSync = setupStateSync<ReturnType<typeof useProjectStore.getState>>(
+      'project-store',
+      (state) => {
+        useProjectStore.setState({
+          currentProject: state.currentProject,
+          currentProjectPath: state.currentProjectPath,
+          isModified: state.isModified,
+        });
+      },
+      {
+        transformForBroadcast: (state) => ({
+          currentProject: state.currentProject,
+          currentProjectPath: state.currentProjectPath,
+          isModified: state.isModified,
+        }),
+      }
+    );
+    syncControllersRef.current.push(projectSync as StateSyncController<unknown>);
+
+    // Editor Area store sync
+    const editorAreaSync = setupStateSync<ReturnType<typeof useEditorAreaStore.getState>>(
+      'editor-area-store',
+      (state) => {
+        useEditorAreaStore.setState({
+          tabs: state.tabs,
+          activeTabId: state.activeTabId,
+        });
+      },
+      {
+        transformForBroadcast: (state) => ({
+          tabs: state.tabs,
+          activeTabId: state.activeTabId,
+        }),
+      }
+    );
+    syncControllersRef.current.push(editorAreaSync as StateSyncController<unknown>);
+
     // Set up state request handlers (main window only)
     if (isMainWindow) {
       const panelRequestCleanup = setupStateRequestHandler(
         'panel-store',
-        () => usePanelStore.getState()
+        () => usePanelStore.getState(),
+        (state) => ({
+          panels: state.panels,
+          gridConfig: state.gridConfig,
+          activePanel: state.activePanel,
+        })
       );
       cleanupFnsRef.current.push(panelRequestCleanup);
 
       const windowRequestCleanup = setupStateRequestHandler(
         'window-store',
-        () => useWindowStore.getState()
+        () => useWindowStore.getState(),
+        (state) => ({
+          floatingWindows: Array.from(state.floatingWindows.entries()),
+          nextZIndex: state.nextZIndex,
+          focusedWindowId: state.focusedWindowId,
+        })
       );
       cleanupFnsRef.current.push(windowRequestCleanup);
 
       const sidebarRequestCleanup = setupStateRequestHandler(
         'sidebar-store',
-        () => useSidebarStore.getState()
+        () => useSidebarStore.getState(),
+        (state) => ({
+          isVisible: state.isVisible,
+          width: state.width,
+          activePanel: state.activePanel,
+        })
       );
       cleanupFnsRef.current.push(sidebarRequestCleanup);
+
+      const projectRequestCleanup = setupStateRequestHandler(
+        'project-store',
+        () => useProjectStore.getState(),
+        (state) => ({
+          currentProject: state.currentProject,
+          currentProjectPath: state.currentProjectPath,
+          isModified: state.isModified,
+        })
+      );
+      cleanupFnsRef.current.push(projectRequestCleanup);
+
+      const editorAreaRequestCleanup = setupStateRequestHandler(
+        'editor-area-store',
+        () => useEditorAreaStore.getState(),
+        (state) => ({
+          tabs: state.tabs,
+          activeTabId: state.activeTabId,
+        })
+      );
+      cleanupFnsRef.current.push(editorAreaRequestCleanup);
     } else {
       // Floating windows request state from main on init
       const requestWithTimeout = async (storeName: string) => {
@@ -167,6 +243,8 @@ export function useStateSync(): void {
       requestWithTimeout('panel-store');
       requestWithTimeout('window-store');
       requestWithTimeout('sidebar-store');
+      requestWithTimeout('project-store');
+      requestWithTimeout('editor-area-store');
     }
 
     // Subscribe to store changes and broadcast
@@ -204,11 +282,29 @@ export function useStateSync(): void {
       }
     });
 
+    const unsubProject = useProjectStore.subscribe((state, prevState) => {
+      if (
+        state.currentProject !== prevState.currentProject ||
+        state.currentProjectPath !== prevState.currentProjectPath ||
+        state.isModified !== prevState.isModified
+      ) {
+        projectSync.broadcastState(state);
+      }
+    });
+
+    const unsubEditorArea = useEditorAreaStore.subscribe((state, prevState) => {
+      if (state.tabs !== prevState.tabs || state.activeTabId !== prevState.activeTabId) {
+        editorAreaSync.broadcastState(state);
+      }
+    });
+
     // Cleanup on unmount
     return () => {
       unsubPanel();
       unsubWindow();
       unsubSidebar();
+      unsubProject();
+      unsubEditorArea();
 
       syncControllersRef.current.forEach((controller) => {
         controller.cleanup();

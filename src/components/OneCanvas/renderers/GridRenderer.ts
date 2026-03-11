@@ -1,14 +1,13 @@
 /**
- * GridRenderer — Shader-based Procedural Grid (CAD-style, single draw call)
+ * GridRenderer — Procedural GPU Grid (CAD-style, single draw call)
  *
- * Implements an infinite grid using a full-viewport Mesh with a custom GLSL
- * fragment shader. The shader computes every grid line/dot mathematically
- * per-pixel on the GPU — no per-element CPU loop, no Graphics.clear() overhead.
+ * Uses a Mesh with a custom GLSL fragment shader placed inside the
+ * pixi-viewport child container (world-space coordinates).
  *
- * Performance characteristics:
- *  - CPU: O(1) uniform upload per frame (panX, panY, zoom)
- *  - GPU: 1 draw call, parallel pixel computation via fragment shader
- *  - fwidth() provides perfect antialiasing at any zoom level
+ * KEY DESIGN:
+ *   Pixi Mesh ignores .width/.height setters — size is determined by vertex
+ *   positions. We update geometry.positions each frame via the Pixi v8
+ *   positions setter so the quad always covers the visible world-space rectangle.
  */
 
 import {
@@ -17,72 +16,28 @@ import {
   Shader,
   GlProgram,
   UniformGroup,
-  GpuProgram,
   type Container,
 } from 'pixi.js';
 import type { GridConfig, ViewportBounds } from '../types';
-import { DEFAULT_GRID } from '../types';
+import { DEFAULT_GRID, unitToPx } from '../types';
 import {
   GRID_FRAG_GLSL,
-  GRID_FRAG_WGSL,
   GRID_VERT_GLSL,
-  GRID_VERT_WGSL,
 } from './GridShader';
-
-// Typed uniforms object to avoid `unknown` indexing on UniformGroup.uniforms
-interface GridUniforms {
-  uBoundsMin: Float32Array;
-  uBoundsMax: Float32Array;
-  uGridSize: number;
-  uMajorFactor: number;
-  uMinorColor: Float32Array;
-  uMajorColor: Float32Array;
-  uMinorAlpha: number;
-  uMajorAlpha: number;
-  uStyle: number;
-  uZoom: number;
-  uLodMinorFade: number;
-  uLodMajorFade: number;
-  uDotRadius: number;
-}
-
-// ---------------------------------------------------------------------------
-// Unit conversion helpers
-// ---------------------------------------------------------------------------
-
-/** Physical unit for the grid spacing. */
-export type GridUnit = 'px' | 'mil' | 'mm';
-
-/** Pixels per mil (1 mil = 1/1000 inch, 1 inch = 96 CSS px). */
-const PX_PER_MIL = 96 / 1000;
-/** Pixels per millimeter (1 mm = 96/25.4 CSS px). */
-const PX_PER_MM = 96 / 25.4;
-
-/**
- * Convert a value from the given unit to canvas pixels.
- * The canvas coordinate system uses 1 px = 1 unit by default.
- */
-export function unitToPx(value: number, unit: GridUnit): number {
-  switch (unit) {
-    case 'mil': return value * PX_PER_MIL;
-    case 'mm': return value * PX_PER_MM;
-    default: return value;
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Grid Renderer options
 // ---------------------------------------------------------------------------
 
 export interface GridRendererOptions {
-  /** Stage layer to add the grid mesh to. */
+  /** The grid layer container (viewport child, world-space). */
   layer: Container;
   /** Initial grid configuration. */
   config?: GridConfig;
 }
 
 // ---------------------------------------------------------------------------
-// Helper: parse a CSS hex color string into a [r, g, b] triple (0..1 range)
+// Utility: parse CSS hex color → [r, g, b] in 0..1 range
 // ---------------------------------------------------------------------------
 function hexToRgb(hex: string): [number, number, number] {
   const clean = hex.replace('#', '');
@@ -94,34 +49,26 @@ function hexToRgb(hex: string): [number, number, number] {
 // GridRenderer
 // ---------------------------------------------------------------------------
 
-/**
- * Renders an infinite grid via a single GPU draw call.
- * Update `render(bounds, zoom)` once per frame — the shader does the rest.
- */
 export class GridRenderer {
-  // ----- Pixi objects -------------------------------------------------------
   private _mesh: Mesh<MeshGeometry, Shader> | null = null;
+  private _geometry: MeshGeometry | null = null;
   private _uniforms: UniformGroup | null = null;
-  private _uniformData: GridUniforms | null = null;
 
-  // ----- State --------------------------------------------------------------
   private _config: GridConfig;
   private _layer: Container;
-  private _destroyed = false;
+  private _destroyed: boolean = false;
+  private _unit: 'px' | 'mil' | 'mm' = 'mm';
 
-  // Full-screen quad vertices (two triangles): covers [-1, 1] NDC range,
-  // but we position in world-space by passing bounds as uniforms.
-  private static readonly QUAD_POSITIONS = new Float32Array([
-    0, 0, 1, 0, 1, 1, 0, 1,
-  ]);
-  private static readonly QUAD_UVS = new Float32Array([
-    0, 0, 1, 0, 1, 1, 0, 1,
-  ]);
-  private static readonly QUAD_INDICES = new Uint32Array([0, 1, 2, 0, 2, 3]);
+  // Uniform storage for direct access
+  private _uBoundsMin = new Float32Array([0, 0]);
+  private _uBoundsMax = new Float32Array([1920, 1080]);
+  private _uMinorColor = new Float32Array([0.8, 0.8, 0.8]);
+  private _uMajorColor = new Float32Array([0.6, 0.6, 0.6]);
 
   constructor(options: GridRendererOptions) {
     this._config = options.config ?? DEFAULT_GRID;
     this._layer = options.layer;
+    this._unit = (this._config.unit) ?? 'mm';
     this._initMesh();
   }
 
@@ -129,43 +76,53 @@ export class GridRenderer {
   // Public API
   // -----------------------------------------------------------------------
 
-  get config(): GridConfig {
-    return this._config;
-  }
-
+  get config(): GridConfig { return this._config; }
   set config(value: GridConfig) {
     this._config = value;
+    this._unit = (value.unit) ?? 'mm';
+    this._syncConfigUniforms();
+  }
+
+  set unit(value: 'px' | 'mil' | 'mm') {
+    this._unit = value;
     this._syncConfigUniforms();
   }
 
   /**
-   * Call once per viewport change. Passes pan/zoom/bounds to the shader.
-   * No geometry rebuilt — just uniform upload (bytes, not draw calls).
+   * Update per-frame. Call whenever the viewport changes.
+   *
+   * @param bounds  Visible area in WORLD coordinates (PixiViewport.visibleBounds)
+   * @param zoom    Current zoom level (viewport.state.zoom)
    */
   render(bounds: ViewportBounds, zoom: number): void {
-    if (this._destroyed || !this._mesh || !this._uniforms) return;
+    if (this._destroyed || !this._mesh || !this._geometry || !this._uniforms) return;
 
     const visible = this._config.visible ?? true;
     this._mesh.visible = visible;
     if (!visible) return;
 
-    const u = this._uniformData!;
-    u.uBoundsMin[0] = bounds.minX;
-    u.uBoundsMin[1] = bounds.minY;
-    u.uBoundsMax[0] = bounds.maxX;
-    u.uBoundsMax[1] = bounds.maxY;
-    u.uZoom = zoom;
-    // Propagate scalar changes back into the UniformGroup so Pixi uploads them
-    const ug = this._uniforms!.uniforms as Record<string, unknown>;
-    ug['uZoom'] = zoom;
+    const { minX, minY, maxX, maxY } = bounds;
 
-    // Resize the mesh quad to cover the world-space viewport area exactly
-    const w = bounds.maxX - bounds.minX;
-    const h = bounds.maxY - bounds.minY;
-    this._mesh.x = bounds.minX;
-    this._mesh.y = bounds.minY;
-    this._mesh.width = w;
-    this._mesh.height = h;
+    // ── 1. Stretch quad to cover visible world area ─────────────────────
+    // Pixi v8: setting positions marks the vertex buffer as dirty.
+    this._geometry.positions = new Float32Array([
+      minX, minY,   // TL
+      maxX, minY,   // TR
+      maxX, maxY,   // BR
+      minX, maxY,   // BL
+    ]);
+
+    // ── 2. Update per-frame uniforms ─────────────────────────────────────
+    this._uBoundsMin[0] = minX;
+    this._uBoundsMin[1] = minY;
+    this._uBoundsMax[0] = maxX;
+    this._uBoundsMax[1] = maxY;
+
+    // In Pixi v8, updating the underlying Float32Array is sufficient if it's 
+    // bound correctly, but we must mark the uniform group as dirty for scalar changes.
+    const ug = this._uniforms.uniforms;
+    ug.uZoom = zoom;
+    this._uniforms.update(); // Force uniform upload update
   }
 
   setVisible(visible: boolean): void {
@@ -178,6 +135,7 @@ export class GridRenderer {
     this._destroyed = true;
     this._mesh?.destroy();
     this._mesh = null;
+    this._geometry = null;
     this._uniforms = null;
   }
 
@@ -186,114 +144,87 @@ export class GridRenderer {
   // -----------------------------------------------------------------------
 
   private _initMesh(): void {
-    const geometry = new MeshGeometry({
-      positions: GridRenderer.QUAD_POSITIONS,
-      uvs: GridRenderer.QUAD_UVS,
-      indices: GridRenderer.QUAD_INDICES,
-    });
-
-    const uniforms = this._buildUniforms();
-    this._uniforms = uniforms;
-
+    // ── GLSL program (WebGL) ──────────────────────────────────────────────
     const glProgram = new GlProgram({
       vertex: GRID_VERT_GLSL,
       fragment: GRID_FRAG_GLSL,
     });
 
-    let gpuProgram: GpuProgram | undefined;
-    try {
-      gpuProgram = new GpuProgram({
-        vertex: { source: GRID_VERT_WGSL, entryPoint: 'main' },
-        fragment: { source: GRID_FRAG_WGSL, entryPoint: 'main' },
-      });
-    } catch {
-      // WebGPU not available — fine, WebGL will be used.
-    }
+    // Pixi v8 Note: We omit GpuProgram here to let Pixi's auto-translator 
+    // handle it, avoiding potential WGSL binding errors during debugging.
+
+    const uniforms = this._buildUniforms();
+    this._uniforms = uniforms;
 
     const shader = new Shader({
       glProgram,
-      ...(gpuProgram ? { gpuProgram } : {}),
       resources: {
         gridUniforms: uniforms,
       },
     });
 
+    // Initial geometry
+    const geometry = new MeshGeometry({
+      positions: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
+      uvs: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
+      indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+    });
+    this._geometry = geometry;
+
     const mesh = new Mesh<MeshGeometry, Shader>({ geometry, shader });
     mesh.label = 'grid-shader-mesh';
+    // Mesh is a child of the grid layer (viewport child), so world coordinates 
+    // are passed to the vertex shader.
 
-    // The mesh lives in world-space — its position and dimensions are
-    // updated each render() call to match the visible viewport bounds.
     this._mesh = mesh;
     this._layer.addChild(mesh as unknown as import('pixi.js').Container);
   }
 
   private _buildUniforms(): UniformGroup {
     const cfg = this._config;
-    const unit = (cfg as GridConfig & { unit?: GridUnit }).unit ?? 'px';
-    const gridSizePx = unitToPx(cfg.size, unit);
+    const gridSizePx = unitToPx(cfg.size, this._unit);
     const majorFactor = cfg.subdivisions ?? 5;
 
     const [mr, mg, mb] = hexToRgb(cfg.color ?? '#cccccc');
     const [Mr, Mg, Mb] = hexToRgb(cfg.majorColor ?? '#999999');
 
-    const data: GridUniforms = {
-      uBoundsMin: new Float32Array([0, 0]),
-      uBoundsMax: new Float32Array([100, 100]),
-      uGridSize: gridSizePx,
-      uMajorFactor: majorFactor,
-      uMinorColor: new Float32Array([mr, mg, mb]),
-      uMajorColor: new Float32Array([Mr, Mg, Mb]),
-      uMinorAlpha: cfg.alpha ?? 0.4,
-      uMajorAlpha: cfg.majorAlpha ?? 0.55,
-      uStyle: cfg.style === 'lines' ? 0.0 : 1.0,
-      uZoom: 1.0,
-      uLodMinorFade: 0.1,    // Fade minor grid below 0.1 zoom
-      uLodMajorFade: 0.02,   // Fade major grid below 0.02 zoom (extremely zoomed out)
-      uDotRadius: 1.5,
-    };
-    // Keep a typed reference for direct field access in render() / _syncConfigUniforms()
-    this._uniformData = data;
+    this._uMinorColor.set([mr, mg, mb]);
+    this._uMajorColor.set([Mr, Mg, Mb]);
 
+    // Use shorthand initialization for direct value access
     return new UniformGroup({
-      uBoundsMin: { value: data.uBoundsMin, type: 'vec2<f32>' },
-      uBoundsMax: { value: data.uBoundsMax, type: 'vec2<f32>' },
-      uGridSize: { value: data.uGridSize, type: 'f32' },
-      uMajorFactor: { value: data.uMajorFactor, type: 'f32' },
-      uMinorColor: { value: data.uMinorColor, type: 'vec3<f32>' },
-      uMajorColor: { value: data.uMajorColor, type: 'vec3<f32>' },
-      uMinorAlpha: { value: data.uMinorAlpha, type: 'f32' },
-      uMajorAlpha: { value: data.uMajorAlpha, type: 'f32' },
-      uStyle: { value: data.uStyle, type: 'f32' },
-      uZoom: { value: data.uZoom, type: 'f32' },
-      uLodMinorFade: { value: data.uLodMinorFade, type: 'f32' },
-      uLodMajorFade: { value: data.uLodMajorFade, type: 'f32' },
-      uDotRadius: { value: data.uDotRadius, type: 'f32' },
+      uBoundsMin: { value: this._uBoundsMin, type: 'vec2<f32>' },
+      uBoundsMax: { value: this._uBoundsMax, type: 'vec2<f32>' },
+      uGridSize: { value: gridSizePx, type: 'f32' },
+      uMajorFactor: { value: majorFactor, type: 'f32' },
+      uMinorColor: { value: this._uMinorColor, type: 'vec3<f32>' },
+      uMajorColor: { value: this._uMajorColor, type: 'vec3<f32>' },
+      uMinorAlpha: { value: cfg.alpha ?? 0.4, type: 'f32' },
+      uMajorAlpha: { value: cfg.majorAlpha ?? 0.6, type: 'f32' },
+      uStyle: { value: cfg.style === 'lines' ? 0.0 : 1.0, type: 'f32' },
+      uZoom: { value: 1.0, type: 'f32' },
+      uLodMinorFade: { value: 0.02, type: 'f32' }, // More generous thresholds
+      uLodMajorFade: { value: 0.005, type: 'f32' },
+      uDotRadius: { value: 1.5, type: 'f32' },
     });
   }
 
   private _syncConfigUniforms(): void {
-    if (!this._uniformData || !this._uniforms) return;
+    if (!this._uniforms) return;
     const cfg = this._config;
-    const unit = (cfg as GridConfig & { unit?: GridUnit }).unit ?? 'px';
-    const d = this._uniformData;
-    const ug = this._uniforms.uniforms as Record<string, unknown>;
+    const ug = this._uniforms.uniforms;
 
-    d.uGridSize = unitToPx(cfg.size, unit);
-    d.uMajorFactor = cfg.subdivisions ?? 5;
-    d.uStyle = cfg.style === 'lines' ? 0.0 : 1.0;
-    d.uMinorAlpha = cfg.alpha ?? 0.4;
-    d.uMajorAlpha = cfg.majorAlpha ?? 0.55;
+    ug.uGridSize = unitToPx(cfg.size, this._unit);
+    ug.uMajorFactor = cfg.subdivisions ?? 5;
+    ug.uStyle = cfg.style === 'lines' ? 0.0 : 1.0;
+    ug.uMinorAlpha = cfg.alpha ?? 0.4;
+    ug.uMajorAlpha = cfg.majorAlpha ?? 0.6;
 
     const [mr, mg, mb] = hexToRgb(cfg.color ?? '#cccccc');
     const [Mr, Mg, Mb] = hexToRgb(cfg.majorColor ?? '#999999');
-    d.uMinorColor[0] = mr; d.uMinorColor[1] = mg; d.uMinorColor[2] = mb;
-    d.uMajorColor[0] = Mr; d.uMajorColor[1] = Mg; d.uMajorColor[2] = Mb;
+    this._uMinorColor.set([mr, mg, mb]);
+    this._uMajorColor.set([Mr, Mg, Mb]);
 
-    // Sync scalar values to UniformGroup (arrays are shared by reference so auto-dirty)
-    ug['uGridSize'] = d.uGridSize;
-    ug['uMajorFactor'] = d.uMajorFactor;
-    ug['uStyle'] = d.uStyle;
-    ug['uMinorAlpha'] = d.uMinorAlpha;
-    ug['uMajorAlpha'] = d.uMajorAlpha;
+    this._uniforms.update();
   }
 }

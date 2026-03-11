@@ -113,7 +113,10 @@ export const ScenarioGrid = memo(function ScenarioGrid({
 
   // Handle cell focus
   const handleCellFocus = useCallback((row: number, column: number) => {
-    setFocusedCell({ row, column });
+    setFocusedCell((prev) => {
+      if (prev?.row === row && prev?.column === column) return prev;
+      return { row, column };
+    });
   }, []);
 
   // Handle cell edit (no-op: cells are always editable, kept for ScenarioRow API)
@@ -327,23 +330,29 @@ export const ScenarioGrid = memo(function ScenarioGrid({
             No events. Click "Add Event" to create one.
           </div>
         ) : (
-          events.map((event, index) => (
-            <ScenarioRow
-              key={event.id}
-              event={event}
-              rowIndex={index}
-              events={events}
-              executionState={executionState}
-              isSelected={selectedIndices.has(index)}
-              focusedCell={focusedCell}
-              onCellFocus={handleCellFocus}
-              onCellEdit={handleCellEdit}
-              onCellKeyDown={handleCellKeyDown}
-              onRowClick={handleRowClick}
-              onContextMenu={handleContextMenu}
-              readonly={readonly}
-            />
-          ))
+          events.map((event, index) => {
+            const isCurrent = executionState.currentEventIndex === index && executionState.status === 'running';
+            const isCompleted = executionState.completedEvents.includes(event.id);
+
+            return (
+              <ScenarioRow
+                key={event.id}
+                event={event}
+                rowIndex={index}
+                events={events}
+                isCurrent={isCurrent}
+                isCompleted={isCompleted}
+                isSelected={selectedIndices.has(index)}
+                focusedCell={focusedCell}
+                onCellFocus={handleCellFocus}
+                onCellEdit={handleCellEdit}
+                onCellKeyDown={handleCellKeyDown}
+                onRowClick={handleRowClick}
+                onContextMenu={handleContextMenu}
+                readonly={readonly}
+              />
+            );
+          })
         )}
       </div>
 

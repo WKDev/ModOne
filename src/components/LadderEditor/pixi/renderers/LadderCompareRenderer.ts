@@ -36,50 +36,56 @@ export class LadderCompareRenderer {
       element.position.row * cellHeight,
     );
 
+    const midX = cellWidth / 2;
+    const midY = cellHeight * 0.65; // New wire level
+
+    // 1. Connection lines
+    const lines = new Graphics();
+    lines.label = 'lines';
+    const boxX = 12;
+    const boxW = cellWidth - 24;
+    // Use 'butt' cap for seamless joining
+    const stroke = { width: STROKE_WIDTH, color: STROKE_COLOR, cap: 'butt' } as const;
+    lines.moveTo(0, midY).lineTo(boxX, midY).stroke(stroke);
+    lines.moveTo(boxX + boxW, midY).lineTo(cellWidth, midY).stroke(stroke);
+    container.addChild(lines);
+
+    // 2. Block graphics
     const gfx = new Graphics();
     gfx.label = 'symbol';
     this.drawBox(gfx, cellWidth, cellHeight);
     container.addChild(gfx);
 
-    // Connection lines
-    const lines = new Graphics();
-    lines.label = 'lines';
-    const midY = cellHeight / 2;
-    const boxX = 10;
-    const boxW = cellWidth - 20;
-    lines.moveTo(0, midY).lineTo(boxX, midY).stroke({ width: STROKE_WIDTH, color: STROKE_COLOR });
-    lines.moveTo(boxX + boxW, midY).lineTo(cellWidth, midY).stroke({ width: STROKE_WIDTH, color: STROKE_COLOR });
-    container.addChildAt(lines, 0);
-
-    // Operator symbol
+    // 3. Labels
+    // Operator (Header)
     const opText = new Text({
       text: compareOperatorDisplay(element.type),
-      style: { fontFamily: 'sans-serif', fontSize: 14, fontWeight: 'bold', fill: TEXT_COLOR },
+      style: { fontFamily: 'sans-serif', fontSize: 11, fontWeight: 'bold', fill: TEXT_COLOR },
     });
     opText.label = 'operator';
     opText.anchor.set(0.5, 0);
-    opText.position.set(cellWidth / 2, 5);
+    opText.position.set(midX, 20); // Down for boxY shift
     container.addChild(opText);
 
-    // Address
+    // Address (Center-ish)
     const addrText = new Text({
       text: element.address ?? '',
       style: { fontFamily: 'monospace', fontSize: 10, fill: TEXT_COLOR },
     });
     addrText.label = 'address';
     addrText.anchor.set(0.5, 0.5);
-    addrText.position.set(cellWidth / 2, cellHeight / 2);
+    addrText.position.set(midX, midY - 2);
     container.addChild(addrText);
 
-    // Compare value
+    // Compare Value (Bottom)
     const cv = element.properties?.compareValue ?? '';
     const compareText = new Text({
-      text: `vs ${cv}`,
+      text: `${cv}`,
       style: { fontFamily: 'monospace', fontSize: 8, fill: TEXT_COLOR },
     });
     compareText.label = 'compareValue';
     compareText.anchor.set(0.5, 1);
-    compareText.position.set(cellWidth / 2, cellHeight - 4);
+    compareText.position.set(midX, cellHeight - 14);
     container.addChild(compareText);
 
     return container;
@@ -95,18 +101,25 @@ export class LadderCompareRenderer {
     const compareText = container.getChildByLabel('compareValue') as Text | null;
     if (compareText) {
       const cv = element.properties?.compareValue ?? '';
-      compareText.text = `vs ${cv}`;
+      compareText.text = `${cv}`;
     }
   }
 
-  destroy(): void {}
+  destroy(): void { }
 
   private drawBox(gfx: Graphics, cellWidth: number, cellHeight: number): void {
-    const boxX = 10;
-    const boxY = 3;
-    const boxW = cellWidth - 20;
-    const boxH = cellHeight - 6;
+    const boxX = 12;
+    const boxY = 18;
+    const boxW = cellWidth - 24;
+    const boxH = cellHeight - 28;
+    const headerH = 12;
+
+    // Body
     gfx.roundRect(boxX, boxY, boxW, boxH, CORNER_RADIUS)
-      .stroke({ width: STROKE_WIDTH, color: STROKE_COLOR });
+      .fill({ color: 0x1e293b, alpha: 0.5 })
+      .stroke({ width: STROKE_WIDTH, color: STROKE_COLOR, alpha: 0.8 });
+
+    // Header divider
+    gfx.moveTo(boxX, boxY + headerH).lineTo(boxX + boxW, boxY + headerH).stroke({ width: 1, color: STROKE_COLOR, alpha: 0.4 });
   }
 }

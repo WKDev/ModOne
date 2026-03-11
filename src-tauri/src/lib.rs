@@ -402,6 +402,7 @@ pub fn run() {
             sim_add_breakpoint,
             sim_remove_breakpoint,
             sim_get_breakpoints,
+            sim_set_breakpoint_enabled,
             sim_add_watch,
             sim_remove_watch,
             sim_get_watches,

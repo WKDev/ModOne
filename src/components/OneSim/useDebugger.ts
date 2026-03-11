@@ -178,13 +178,26 @@ export function useDebugger(): UseDebuggerResult {
   }, []);
 
   const toggleBreakpoint = useCallback(async (id: string): Promise<void> => {
+    const bp = breakpoints.find((b) => b.id === id);
+    if (!bp) return;
+
+    const newEnabled = !bp.enabled;
+
     // Toggle locally first for immediate feedback
     setBreakpoints((prev) =>
-      prev.map((bp) => (bp.id === id ? { ...bp, enabled: !bp.enabled } : bp))
+      prev.map((b) => (b.id === id ? { ...b, enabled: newEnabled } : b))
     );
 
-    // Note: If backend support is added for toggling, add invoke here
-  }, []);
+    try {
+      await invoke('sim_set_breakpoint_enabled', { id, enabled: newEnabled });
+    } catch (err) {
+      // Revert on error
+      setBreakpoints((prev) =>
+        prev.map((b) => (b.id === id ? { ...b, enabled: !newEnabled } : b))
+      );
+      console.error('Failed to toggle breakpoint:', err);
+    }
+  }, [breakpoints]);
 
   const clearBreakpoints = useCallback(async (): Promise<void> => {
     setIsLoading(true);

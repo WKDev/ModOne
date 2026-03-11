@@ -1088,6 +1088,29 @@ export type DirtyFlag =
   | 'all';
 
 // ============================================================================
+// Unit Conversion Utilities
+// ============================================================================
+
+/** Pixels per mil (1 mil = 1/1000 inch, 1 inch ≈ 96 CSS px). */
+const PX_PER_MIL = 96 / 1000;
+/** Pixels per millimeter (1 mm = 96/25.4 CSS px ≈ 3.779). */
+const PX_PER_MM = 96 / 25.4;
+
+/**
+ * Convert a value from a physical unit to canvas pixels.
+ */
+export function unitToPx(value: number, unit: 'px' | 'mil' | 'mm' = 'px'): number {
+  switch (unit) {
+    case 'mil':
+      return value * PX_PER_MIL;
+    case 'mm':
+      return value * PX_PER_MM;
+    default:
+      return value;
+  }
+}
+
+// ============================================================================
 // Default Values
 // ============================================================================
 

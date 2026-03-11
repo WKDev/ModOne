@@ -256,7 +256,7 @@ export const DEFAULT_CANVAS_DATA: CanvasDocumentData = {
   },
   zoom: 1.0,
   pan: { x: 0, y: 0 },
-  gridSize: 20,
+  gridSize: 4,
   snapToGrid: true,
   showGrid: true,
   gridStyle: 'dots',

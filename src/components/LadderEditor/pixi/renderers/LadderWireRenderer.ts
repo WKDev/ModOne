@@ -1,31 +1,23 @@
 /**
  * LadderWireRenderer
  *
- * Renders wire connections between ladder elements using Pixi.js Graphics.
+ * Convention: all wires route through the horizontal midline (midY) of each cell.
  *
- * Layout convention (like XG5000 / GX Works 3):
- *   - Horizontal wires run through the vertical center: y = midY
- *   - Vertical wires are at the LEFT boundary of the cell: x = 0
- *   - Junction/corner knees meet at (0, midY) — the left-midpoint
- *
- *   wire_h    ────────  (0, midY) → (w, midY)
- *   wire_v    │         (0, 0) → (0, h)  — left edge
- *   corner_tl ┌──       from (0, h) up to (0, midY) then right to (w, midY)
- *   corner_tr ──┐       from (0, midY) right to (w, midY) then down to (w, h)
- *   corner_bl └──       from (0, 0) down to (0, midY) then right to (w, midY)
- *   corner_br ──┘       from (0, midY) right to (w, midY) then up to (w, 0)
- *   junction_t ├──      full wire_v at x=0 + right half of wire_h
- *   junction_b ──┤      full wire_v at x=w + left half of wire_h
- *   junction_l ┬        full wire_h + lower half of wire_v at x=0
- *   junction_r ┴        full wire_h + upper half of wire_v at x=0
- *   cross      ╋        full wire_h + full wire_v at x=0
+ *  - wire_h  : (0, midY) → (w, midY)          — full horizontal
+ *  - wire_v  : (0, midY) → (0, h+midY)        — LEFT edge, from this row's midY
+ *                                                 to the NEXT row's midY (spans the row boundary)
+ *  - Corners / junctions use the same ref points:
+ *      TOP direction    → draw (0, 0) → (0, midY)       upper half, left edge
+ *      BOTTOM direction → draw (0, midY) → (0, h+midY)  lower half, left edge (extends into next row)
+ *      LEFT/RIGHT dir.  → draw (0, midY) → (w, midY)    horizontal
  */
 
 import { Container, Graphics } from 'pixi.js';
 import type { WireElement } from '../../../../types/ladder';
-import type { WireProperties } from '../../../../types/ladder';
+import { WireDirection } from '../../../../types/ladder';
 
-const WIRE_COLOR = 0x6b7280;   // neutral-500
+
+const WIRE_COLOR = 0x6b7280;  // neutral-500
 const WIRE_WIDTH = 2;
 
 export class LadderWireRenderer {
@@ -37,12 +29,10 @@ export class LadderWireRenderer {
       element.position.col * cellWidth,
       element.position.row * cellHeight,
     );
-
     const gfx = new Graphics();
     gfx.label = 'wire';
     this.drawWire(gfx, element, cellWidth, cellHeight);
     container.addChild(gfx);
-
     return container;
   }
 
@@ -58,88 +48,105 @@ export class LadderWireRenderer {
 
   // ---------------------------------------------------------------------------
 
-  private drawWire(
-    gfx: Graphics,
-    element: WireElement,
-    w: number,
-    h: number,
-  ): void {
-    const midY = h / 2;
-    const stroke = { width: WIRE_WIDTH, color: WIRE_COLOR };
-    const props = element.properties as WireProperties | undefined;
-    const dir = props?.direction;
+  private drawWire(gfx: Graphics, element: WireElement, w: number, h: number): void {
+    const midX = w / 2;
+    const midY = h * 0.65; // Shifted down for label space
 
+    // Stroke styles: 'butt' for horizontal to join seamlessly, 'round' for vertical/internal
+    const strokeH = { width: WIRE_WIDTH, color: WIRE_COLOR, cap: 'butt' } as const;
+    const strokeV = { width: WIRE_WIDTH, color: WIRE_COLOR, cap: 'round' } as const;
+
+    const props = element.properties;
+    const connected = props.connectedDirections;
+
+    // Shared drawing helpers
+    const drawH = () => gfx.moveTo(0, midY).lineTo(w, midY).stroke(strokeH);
+    const drawVUp = () => gfx.moveTo(midX, 0).lineTo(midX, midY).stroke(strokeV);
+    const drawVDown = () => gfx.moveTo(midX, midY).lineTo(midX, h).stroke(strokeV);
+    const drawVFull = () => gfx.moveTo(midX, 0).lineTo(midX, h).stroke(strokeV);
+
+    // A. Use precise connectedDirections if available
+    if (connected !== undefined) {
+      if (connected & WireDirection.TOP) drawVUp();
+      if (connected & WireDirection.BOTTOM) drawVDown();
+      if (connected & (WireDirection.LEFT | WireDirection.RIGHT) || element.type === 'wire_h') {
+        drawH();
+      }
+      return;
+    }
+
+    // B. Fallback to type-based logic
     switch (element.type) {
-      // ── Straight ──────────────────────────────────────────────────────────
-
       case 'wire_h':
-        // ─────────────  horizontal center line, full cell width
-        gfx.moveTo(0, midY).lineTo(w, midY).stroke(stroke);
+        drawH();
         break;
 
       case 'wire_v':
-        // │  vertical at left boundary, full cell height
-        gfx.moveTo(0, 0).lineTo(0, h).stroke(stroke);
+        drawVFull();
         break;
 
-      // ── Corners ───────────────────────────────────────────────────────────
-
       case 'wire_corner': {
+        const dir = props.direction;
         switch (dir) {
-          case 'corner_tl': // ┌──  from bottom-left → midY, then right
-            gfx.moveTo(0, h).lineTo(0, midY).lineTo(w, midY).stroke(stroke);
+          case 'corner_tl':
+            drawVDown();
+            gfx.moveTo(midX, midY).lineTo(w, midY).stroke(strokeH);
             break;
-          case 'corner_tr': // ──┐  from left → midY at right edge, then down
-            gfx.moveTo(0, midY).lineTo(w, midY).lineTo(w, h).stroke(stroke);
+          case 'corner_tr':
+            gfx.moveTo(0, midY).lineTo(midX, midY).stroke(strokeH);
+            drawVDown();
             break;
-          case 'corner_bl': // └──  from top-left → midY, then right
-            gfx.moveTo(0, 0).lineTo(0, midY).lineTo(w, midY).stroke(stroke);
+          case 'corner_bl':
+            drawVUp();
+            gfx.moveTo(midX, midY).lineTo(w, midY).stroke(strokeH);
             break;
-          case 'corner_br': // ──┘  from left → midY at right edge, then up
-            gfx.moveTo(0, midY).lineTo(w, midY).lineTo(w, 0).stroke(stroke);
+          case 'corner_br':
+            gfx.moveTo(0, midY).lineTo(midX, midY).stroke(strokeH);
+            drawVUp();
             break;
-          default:          // fallback: corner_tl
-            gfx.moveTo(0, h).lineTo(0, midY).lineTo(w, midY).stroke(stroke);
+          default:
+            drawVFull();
             break;
         }
         break;
       }
 
-      // ── Junctions ─────────────────────────────────────────────────────────
-
       case 'wire_junction': {
+        const dir = props.direction;
         switch (dir) {
-          case 'junction_t': // ├──  full vertical at left + right half of horizontal
-            gfx.moveTo(0, 0).lineTo(0, h).stroke(stroke);
-            gfx.moveTo(0, midY).lineTo(w, midY).stroke(stroke);
+          case 'junction_t':
+            drawVFull();
+            gfx.moveTo(midX, midY).lineTo(w, midY).stroke(strokeH);
             break;
-          case 'junction_b': // ──┤  full vertical at right edge + left half of horizontal
-            gfx.moveTo(w, 0).lineTo(w, h).stroke(stroke);
-            gfx.moveTo(0, midY).lineTo(w, midY).stroke(stroke);
+          case 'junction_b':
+            drawVFull();
+            gfx.moveTo(0, midY).lineTo(midX, midY).stroke(strokeH);
             break;
-          case 'junction_l': // ┬   full horizontal + lower half of left vertical
-            gfx.moveTo(0, midY).lineTo(w, midY).stroke(stroke);
-            gfx.moveTo(0, midY).lineTo(0, h).stroke(stroke);
+          case 'junction_l':
+            drawH();
+            drawVDown();
             break;
-          case 'junction_r': // ┴   full horizontal + upper half of left vertical
-            gfx.moveTo(0, midY).lineTo(w, midY).stroke(stroke);
-            gfx.moveTo(0, 0).lineTo(0, midY).stroke(stroke);
+          case 'junction_r':
+            drawH();
+            drawVUp();
             break;
-          case 'cross':      // ╋   full horizontal + full left vertical
-            gfx.moveTo(0, midY).lineTo(w, midY).stroke(stroke);
-            gfx.moveTo(0, 0).lineTo(0, h).stroke(stroke);
+          case 'cross':
+            drawH();
+            drawVFull();
             break;
-          default:           // fallback: junction_t
-            gfx.moveTo(0, 0).lineTo(0, h).stroke(stroke);
-            gfx.moveTo(0, midY).lineTo(w, midY).stroke(stroke);
+          default:
+            drawVFull();
+            drawH();
             break;
         }
         break;
       }
 
       default:
-        gfx.moveTo(0, midY).lineTo(w, midY).stroke(stroke);
+        drawH();
         break;
     }
   }
 }
+
+

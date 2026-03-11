@@ -4,7 +4,7 @@
  * Wrapper component that delegates to individual cell implementations based on column type.
  */
 
-import { memo, useEffect, useRef, type KeyboardEvent } from 'react';
+import { memo, type KeyboardEvent } from 'react';
 import { Check } from 'lucide-react';
 import { TimeCell } from './cells/TimeCell';
 import { AddressCell } from './cells/AddressCell';
@@ -45,14 +45,6 @@ export const ScenarioCell = memo(function ScenarioCell({
   onKeyDown,
   readonly,
 }: ScenarioCellProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (isFocused && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [isFocused]);
-
   switch (column) {
     case 'enabled':
       return (

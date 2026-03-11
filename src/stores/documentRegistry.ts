@@ -532,18 +532,21 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
               doc.isDirty = true;
               doc.lastModified = Date.now();
 
-              payloadToBroadcast = {
-                documentId,
-                revision: doc.revision,
-                data: canvasDataToSerializable(doc.data),
-                sourceWindowId: getSyncWindowId(),
-                timestamp: doc.lastModified,
-              };
+              payloadToBroadcast = JSON.parse(
+                JSON.stringify({
+                  documentId,
+                  revision: doc.revision,
+                  data: canvasDataToSerializable(doc.data),
+                  sourceWindowId: getSyncWindowId(),
+                  timestamp: doc.lastModified,
+                })
+              );
             }
           },
           false,
           `updateCanvasData/${documentId}`
         );
+
 
         if (payloadToBroadcast) {
           void broadcastDocumentSync(payloadToBroadcast).catch((error) => {

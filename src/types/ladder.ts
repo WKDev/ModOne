@@ -264,6 +264,8 @@ export interface ElementProperties {
   inverted?: boolean;
   /** Element comment */
   comment?: string;
+  /** Bit mask of connected directions (runtime computed via WireDirection) */
+  connectedDirections?: number;
 }
 
 /** Contact-specific properties */
@@ -360,8 +362,6 @@ export interface WireProperties extends ElementProperties {
   direction?: 'corner_tl' | 'corner_tr' | 'corner_bl' | 'corner_br'
   | 'junction_t' | 'junction_b' | 'junction_l' | 'junction_r'
   | 'cross';
-  /** Bit mask of connected directions (runtime computed via WireDirection) */
-  connectedDirections?: number;
   /** Wire creation origin: manual (user-placed, XG5000 FF 01) or auto (editor-generated, XG5000 FF 02) */
   origin?: 'manual' | 'auto';
 }
@@ -370,6 +370,7 @@ export interface WireProperties extends ElementProperties {
 export interface WireElement extends BaseLadderElement<WireType> {
   properties: WireProperties;
 }
+
 
 /** Rail element */
 export interface RailElement extends BaseLadderElement<RailType> {

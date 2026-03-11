@@ -21,6 +21,8 @@ import {
   DEFAULT_EXECUTION_STATE,
 } from '../types/scenario';
 
+const EMPTY_ARRAY: any[] = [];
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -535,7 +537,7 @@ export const useScenarioStore = create<ScenarioStore>()(
 
 export const selectScenario = (state: ScenarioStore) => state.scenario;
 export const selectEvents = (state: ScenarioStore) =>
-  state.scenario?.events ?? [];
+  state.scenario?.events ?? (EMPTY_ARRAY as ScenarioEvent[]);
 export const selectEnabledEvents = (state: ScenarioStore) =>
   state.scenario?.events.filter((e) => e.enabled) ?? [];
 export const selectSelectedEventIds = (state: ScenarioStore) =>

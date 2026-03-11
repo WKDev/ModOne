@@ -97,19 +97,20 @@ export class LadderMonitoringRenderer {
       const timerState = monitoringState.timerStates.get(address);
       const counterState = monitoringState.counterStates.get(address);
 
+      // midY is 0.65 * cellHeight. Place ET/CV just below the midline/address.
       if (timerState) {
         this.showValueLabel(
           id,
           `${timerState.et}`,
           element.position.col * config.cellWidth + config.cellWidth / 2,
-          element.position.row * config.cellHeight + config.cellHeight + 2,
+          element.position.row * config.cellHeight + (config.cellHeight * 0.65) + 4,
         );
       } else if (counterState) {
         this.showValueLabel(
           id,
           `${counterState.cv}`,
           element.position.col * config.cellWidth + config.cellWidth / 2,
-          element.position.row * config.cellHeight + config.cellHeight + 2,
+          element.position.row * config.cellHeight + (config.cellHeight * 0.65) + 4,
         );
       }
     }

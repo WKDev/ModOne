@@ -14,7 +14,6 @@ const TEXT_COLOR = 0xa3a3a3;
 const STROKE_WIDTH = 2;
 const LABEL_FONT_SIZE = 10;
 const SYMBOL_FONT_SIZE = 12;
-const RADIUS = 9;
 
 /** Map coil type to its inner symbol character (null = no character) */
 function coilSymbolChar(type: CoilType): string | null {
@@ -40,12 +39,16 @@ export class LadderCoilRenderer {
       element.position.row * cellHeight,
     );
 
+    const midX = cellWidth / 2;
+    const midY = cellHeight * 0.65; // The "Golden Line"
+
+    // 1. Symbol Graphics
     const gfx = new Graphics();
     gfx.label = 'symbol';
     this.drawCoil(gfx, element.type, cellWidth, cellHeight);
     container.addChild(gfx);
 
-    // Inner symbol text (S, R, P, N)
+    // 2. Inner symbol text (S, R, P, N)
     const ch = coilSymbolChar(element.type);
     if (ch) {
       const symText = new Text({
@@ -59,22 +62,38 @@ export class LadderCoilRenderer {
       });
       symText.label = 'symbolChar';
       symText.anchor.set(0.5, 0.5);
-      symText.position.set(cellWidth / 2, cellHeight / 2);
+      symText.position.set(midX, midY);
       container.addChild(symText);
     }
 
-    // Address label
+    // 3. Dual Labels Above
+    // Label (Variable Name) - Topmost (Y=3)
+    const labelText = new Text({
+      text: element.label ?? '',
+      style: {
+        fontFamily: 'sans-serif',
+        fontSize: LABEL_FONT_SIZE,
+        fontWeight: 'bold',
+        fill: 0xe5e7eb,
+      },
+    });
+    labelText.label = 'labelVariable';
+    labelText.anchor.set(0.5, 0);
+    labelText.position.set(midX, 3);
+    container.addChild(labelText);
+
+    // Address (Register) - Below Variable Label (Y=14)
     const addressText = new Text({
       text: element.address ?? '',
       style: {
         fontFamily: 'monospace',
-        fontSize: LABEL_FONT_SIZE,
+        fontSize: LABEL_FONT_SIZE - 1,
         fill: TEXT_COLOR,
       },
     });
     addressText.label = 'address';
-    addressText.anchor.set(0.5, 1);
-    addressText.position.set(cellWidth / 2, cellHeight - 2);
+    addressText.anchor.set(0.5, 0);
+    addressText.position.set(midX, 14);
     container.addChild(addressText);
 
     return container;
@@ -87,17 +106,19 @@ export class LadderCoilRenderer {
       this.drawCoil(gfx, element.type, 80, 60);
     }
 
+    const labelText = container.getChildByLabel('labelVariable') as Text | null;
+    if (labelText) labelText.text = element.label ?? '';
+
     const addressText = container.getChildByLabel('address') as Text | null;
-    if (addressText) {
-      addressText.text = element.address ?? '';
+    if (addressText) addressText.text = element.address ?? '';
+
+    const symChar = container.getChildByLabel('symbolChar') as Text | null;
+    if (symChar) {
+      symChar.position.set(40, 60 * 0.65);
     }
   }
 
-  destroy(): void {
-    // Stateless
-  }
-
-  // ---------------------------------------------------------------------------
+  destroy(): void { }
 
   private drawCoil(
     gfx: Graphics,
@@ -105,25 +126,25 @@ export class LadderCoilRenderer {
     cellWidth: number,
     cellHeight: number,
   ): void {
-    const cx = cellWidth / 2;
-    const cy = cellHeight / 2;
+    const midX = cellWidth / 2;
+    const midY = cellHeight * 0.65; // The "Golden Line"
+    const radius = 11;
 
-    // Left connection line
-    gfx.moveTo(0, cy).lineTo(cx - RADIUS, cy).stroke({ width: STROKE_WIDTH, color: STROKE_COLOR });
+    // Use 'butt' cap for horizontal lines touching cell edges
+    const stroke = { width: STROKE_WIDTH, color: STROKE_COLOR, cap: 'butt' } as const;
+    const strokeIcon = { width: STROKE_WIDTH, color: STROKE_COLOR, cap: 'round', join: 'round' } as const;
 
-    // Right connection line
-    gfx.moveTo(cx + RADIUS, cy).lineTo(cellWidth, cy).stroke({ width: STROKE_WIDTH, color: STROKE_COLOR });
+    // 1. Connection Lines (terminating at circle)
+    gfx.moveTo(0, midY).lineTo(midX - radius, midY).stroke(stroke);
+    gfx.moveTo(midX + radius, midY).lineTo(cellWidth, midY).stroke(stroke);
 
-    // Circle
-    gfx.circle(cx, cy, RADIUS).stroke({ width: STROKE_WIDTH, color: STROKE_COLOR });
+    // 2. Main Coil Shape (Circle)
+    gfx.circle(midX, midY, radius).stroke(strokeIcon);
 
-    // Inverted coil — diagonal slash inside circle
+    // 3. Inverted Marker
     if (type === 'coil_inverted') {
-      const off = RADIUS * 0.6;
-      gfx
-        .moveTo(cx - off, cy + off)
-        .lineTo(cx + off, cy - off)
-        .stroke({ width: STROKE_WIDTH, color: STROKE_COLOR });
+      const off = radius * 0.6;
+      gfx.moveTo(midX - off, midY + off).lineTo(midX + off, midY - off).stroke(strokeIcon);
     }
   }
 }

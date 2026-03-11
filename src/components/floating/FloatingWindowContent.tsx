@@ -11,6 +11,7 @@ import { usePanelStore } from '../../stores/panelStore';
 
 import { windowService } from '../../services/windowService';
 import { FloatingWindowHeader } from './FloatingWindowHeader';
+import { TabContent } from '../panels/TabContent';
 
 // Panel content components
 import { LadderEditorPanel } from '../panels/content/LadderEditorPanel';
@@ -139,6 +140,7 @@ export function FloatingWindowContent({
   }
 
   const ContentComponent = panelContentMap[panel.type];
+  const hasTabs = panel.tabs && panel.tabs.length > 0;
 
   return (
     <div className="h-screen w-screen flex flex-col bg-[var(--color-bg-primary)] overflow-hidden">
@@ -152,7 +154,11 @@ export function FloatingWindowContent({
         onClose={handleClose}
       />
       <div className="flex-1 overflow-auto">
-        <ContentComponent />
+        {hasTabs ? (
+          <TabContent tabs={panel.tabs!} activeTabId={panel.activeTabId ?? null} />
+        ) : (
+          <ContentComponent />
+        )}
       </div>
     </div>
   );

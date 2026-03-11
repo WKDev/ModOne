@@ -5,9 +5,7 @@
  * timing display, status indicators, and breakpoint hit information.
  */
 
-import { memo, useCallback, useEffect, useState } from 'react';
-import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { invoke } from '@tauri-apps/api/core';
+import { memo, useEffect } from 'react';
 import {
   Play,
   Square,
@@ -20,14 +18,12 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { PanelErrorBoundary } from '../error/PanelErrorBoundary';
+import { useSimulation } from '../../hooks/useSimulation';
+import { useDebugger } from './useDebugger';
 import type {
   SimStatus,
-  SimStats,
   ScanTiming,
   BreakpointHit,
-  SimStatusUpdatePayload,
-  BreakpointHitPayload,
-  StepType,
 } from '../../types/onesim';
 
 // ============================================================================
@@ -41,28 +37,7 @@ export interface DebuggerPanelProps {
   compact?: boolean;
 }
 
-// ============================================================================
-// Constants
-// ============================================================================
-
-const SIM_STATUS_UPDATE_EVENT = 'sim:status-update';
-const BREAKPOINT_HIT_EVENT = 'sim:breakpoint-hit';
-
-const DEFAULT_TIMING: ScanTiming = {
-  current: 0,
-  average: 0,
-  min: 0,
-  max: 0,
-};
-
-const DEFAULT_STATS: SimStats = {
-  scanCount: 0,
-  currentNetworkId: null,
-  timing: DEFAULT_TIMING,
-  watchdogTriggered: false,
-};
-
-// ============================================================================
+// = =========================================================================
 // Sub-components
 // ============================================================================
 
@@ -243,136 +218,50 @@ export const DebuggerPanel = memo(function DebuggerPanel({
   className,
   compact = false,
 }: DebuggerPanelProps) {
-  // State
-  const [status, setStatus] = useState<SimStatus>('stopped');
-  const [stats, setStats] = useState<SimStats>(DEFAULT_STATS);
-  const [breakpointHit, setBreakpointHit] = useState<BreakpointHit | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  // Hooks
+  const {
+    status,
+    stats,
+    isLoading: simLoading,
+    breakpointHit: simBreakpointHit,
+    start,
+    stop,
+    pause,
+    resume,
+    reset,
+    stepNetwork,
+    stepScan,
+    continue: continueExecution,
+    isRunning,
+    isPaused,
+    isStopped,
+    canStep,
+  } = useSimulation();
 
-  // Derived state
-  const isRunning = status === 'running';
-  const isPaused = status === 'paused';
-  const isStopped = status === 'stopped';
-  const canStep = isPaused || isStopped;
+  const {
+    isLoading: debugLoading,
+    continueExecution: debugContinue,
+  } = useDebugger();
 
-  // ============================================================================
-  // Tauri Commands
-  // ============================================================================
-
-  const handleRun = useCallback(async () => {
-    setIsLoading(true);
-    setBreakpointHit(null);
-    try {
-      await invoke('sim_run');
-      setStatus('running');
-    } catch (err) {
-      console.error('Failed to start simulation:', err);
-      setStatus('error');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const handleStop = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      await invoke('sim_stop');
-      setStatus('stopped');
-      setBreakpointHit(null);
-    } catch (err) {
-      console.error('Failed to stop simulation:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const handlePause = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      await invoke('sim_pause');
-      setStatus('paused');
-    } catch (err) {
-      console.error('Failed to pause simulation:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const handleStepNetwork = useCallback(async () => {
-    setIsLoading(true);
-    setBreakpointHit(null);
-    try {
-      const stepType: StepType = 'network';
-      await invoke('sim_step', { stepType });
-    } catch (err) {
-      console.error('Failed to step network:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const handleStepScan = useCallback(async () => {
-    setIsLoading(true);
-    setBreakpointHit(null);
-    try {
-      const stepType: StepType = 'scan';
-      await invoke('sim_step', { stepType });
-    } catch (err) {
-      console.error('Failed to step scan:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const handleReset = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      await invoke('sim_reset');
-      setStatus('stopped');
-      setStats(DEFAULT_STATS);
-      setBreakpointHit(null);
-    } catch (err) {
-      console.error('Failed to reset simulation:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const isLoading = simLoading || debugLoading;
+  const breakpointHit = simBreakpointHit;
 
   // ============================================================================
-  // Event Listeners
+  // Handlers
   // ============================================================================
 
-  useEffect(() => {
-    let unlistenStatus: UnlistenFn | null = null;
-    let unlistenBreakpoint: UnlistenFn | null = null;
-
-    const setupListeners = async () => {
-      // Listen for status updates
-      unlistenStatus = await listen<SimStatusUpdatePayload>(
-        SIM_STATUS_UPDATE_EVENT,
-        (event) => {
-          setStatus(event.payload.status);
-          setStats(event.payload.stats);
-        }
-      );
-
-      // Listen for breakpoint hits
-      unlistenBreakpoint = await listen<BreakpointHitPayload>(
-        BREAKPOINT_HIT_EVENT,
-        (event) => {
-          setBreakpointHit(event.payload.hit);
-          setStatus('paused');
-        }
-      );
-    };
-
-    setupListeners();
-
-    return () => {
-      if (unlistenStatus) unlistenStatus();
-      if (unlistenBreakpoint) unlistenBreakpoint();
-    };
-  }, []);
+  const handleRun = () => start();
+  const handleStop = () => stop();
+  const handlePause = () => pause();
+  const handleResume = () => resume();
+  const handleReset = () => reset();
+  const handleStepNetwork = () => stepNetwork();
+  const handleStepScan = () => stepScan();
+  const handleContinue = () => {
+    // Both hooks have continue, use simulation one as primary for logic consistency
+    continueExecution();
+    debugContinue();
+  };
 
   // ============================================================================
   // Keyboard Shortcuts
@@ -393,6 +282,8 @@ export const DebuggerPanel = memo(function DebuggerPanel({
           event.preventDefault();
           if (isRunning) {
             handlePause();
+          } else if (isPaused) {
+            handleResume();
           } else {
             handleRun();
           }
@@ -418,7 +309,7 @@ export const DebuggerPanel = memo(function DebuggerPanel({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isRunning, canStep, handleRun, handlePause, handleStop, handleStepNetwork, handleStepScan]);
+  }, [isRunning, isPaused, canStep, start, stop, pause, resume, stepNetwork, stepScan, continueExecution, debugContinue]);
 
   // ============================================================================
   // Render
@@ -433,121 +324,140 @@ export const DebuggerPanel = memo(function DebuggerPanel({
           className
         )}
       >
-      {/* Control Buttons */}
-      <div className="flex items-center gap-1">
-        {/* Run/Pause Button */}
-        {isRunning ? (
+        {/* Control Buttons */}
+        <div className="flex items-center gap-1">
+          {/* Run/Pause/Resume Button */}
+          {isRunning ? (
+            <ControlButton
+              onClick={handlePause}
+              disabled={isLoading}
+              variant="warning"
+              title="Pause Simulation"
+              shortcut="F5"
+            >
+              <Pause size={16} />
+              {!compact && <span className="text-sm">Pause</span>}
+            </ControlButton>
+          ) : isPaused ? (
+            <ControlButton
+              onClick={handleResume}
+              disabled={isLoading}
+              variant="success"
+              title="Resume Simulation"
+              shortcut="F5"
+            >
+              <Play size={16} />
+              {!compact && <span className="text-sm">Resume</span>}
+            </ControlButton>
+          ) : (
+            <ControlButton
+              onClick={handleRun}
+              disabled={isLoading}
+              variant="success"
+              title="Run Simulation"
+              shortcut="F5"
+            >
+              <Play size={16} />
+              {!compact && <span className="text-sm">Run</span>}
+            </ControlButton>
+          )}
+
+          {/* Stop Button */}
           <ControlButton
-            onClick={handlePause}
-            disabled={isLoading}
-            variant="warning"
-            title="Pause Simulation"
-            shortcut="F5"
+            onClick={handleStop}
+            disabled={isLoading || isStopped}
+            variant="danger"
+            title="Stop Simulation"
+            shortcut="F6"
           >
-            <Pause size={16} />
-            {!compact && <span className="text-sm">Pause</span>}
+            <Square size={16} />
+            {!compact && <span className="text-sm">Stop</span>}
           </ControlButton>
-        ) : (
+        </div>
+
+        {/* Divider */}
+        <div className="w-px h-6 bg-neutral-600" />
+
+        {/* Step Buttons */}
+        <div className="flex items-center gap-1">
           <ControlButton
-            onClick={handleRun}
-            disabled={isLoading}
-            variant="success"
-            title="Run Simulation"
-            shortcut="F5"
+            onClick={handleStepNetwork}
+            disabled={isLoading || !canStep}
+            title="Step Network"
+            shortcut="F10"
           >
-            <Play size={16} />
-            {!compact && <span className="text-sm">Run</span>}
+            <StepForward size={16} />
+            {!compact && <span className="text-sm">Step Net</span>}
           </ControlButton>
+
+          <ControlButton
+            onClick={handleStepScan}
+            disabled={isLoading || !canStep}
+            title="Step Scan"
+            shortcut="F11"
+          >
+            <SkipForward size={16} />
+            {!compact && <span className="text-sm">Step Scan</span>}
+          </ControlButton>
+        </div>
+
+        {/* Divider */}
+        <div className="w-px h-6 bg-neutral-600" />
+
+        {/* Reset Button */}
+        <ControlButton onClick={handleReset} disabled={isLoading} title="Reset Simulation">
+          <RotateCcw size={16} />
+          {!compact && <span className="text-sm">Reset</span>}
+        </ControlButton>
+
+        {/* Divider */}
+        <div className="w-px h-6 bg-neutral-600" />
+
+        {/* Status Indicator */}
+        <StatusIndicator status={status} compact={compact} />
+
+        {/* Watchdog Warning */}
+        {stats.watchdogTriggered && (
+          <div
+            className="flex items-center gap-1 text-red-400"
+            title="Watchdog timeout - scan time exceeded"
+          >
+            <AlertTriangle size={14} />
+            {!compact && <span className="text-xs">Watchdog</span>}
+          </div>
         )}
 
-        {/* Stop Button */}
-        <ControlButton
-          onClick={handleStop}
-          disabled={isLoading || isStopped}
-          variant="danger"
-          title="Stop Simulation"
-          shortcut="F6"
-        >
-          <Square size={16} />
-          {!compact && <span className="text-sm">Stop</span>}
-        </ControlButton>
-      </div>
+        {/* Divider */}
+        <div className="w-px h-6 bg-neutral-600" />
 
-      {/* Divider */}
-      <div className="w-px h-6 bg-neutral-600" />
+        {/* Timing Display */}
+        <TimingDisplay timing={stats.timing} scanCount={stats.scanCount} compact={compact} />
 
-      {/* Step Buttons */}
-      <div className="flex items-center gap-1">
-        <ControlButton
-          onClick={handleStepNetwork}
-          disabled={isLoading || !canStep}
-          title="Step Network"
-          shortcut="F10"
-        >
-          <StepForward size={16} />
-          {!compact && <span className="text-sm">Step Net</span>}
-        </ControlButton>
+        {/* Current Network (if available) */}
+        {stats.currentNetworkId !== null && !compact && (
+          <>
+            <div className="w-px h-6 bg-neutral-600" />
+            <div className="text-xs text-neutral-400">
+              Network: <span className="text-blue-400">{stats.currentNetworkId}</span>
+            </div>
+          </>
+        )}
 
-        <ControlButton
-          onClick={handleStepScan}
-          disabled={isLoading || !canStep}
-          title="Step Scan"
-          shortcut="F11"
-        >
-          <SkipForward size={16} />
-          {!compact && <span className="text-sm">Step Scan</span>}
-        </ControlButton>
-      </div>
-
-      {/* Divider */}
-      <div className="w-px h-6 bg-neutral-600" />
-
-      {/* Reset Button */}
-      <ControlButton onClick={handleReset} disabled={isLoading} title="Reset Simulation">
-        <RotateCcw size={16} />
-        {!compact && <span className="text-sm">Reset</span>}
-      </ControlButton>
-
-      {/* Divider */}
-      <div className="w-px h-6 bg-neutral-600" />
-
-      {/* Status Indicator */}
-      <StatusIndicator status={status} compact={compact} />
-
-      {/* Watchdog Warning */}
-      {stats.watchdogTriggered && (
-        <div
-          className="flex items-center gap-1 text-red-400"
-          title="Watchdog timeout - scan time exceeded"
-        >
-          <AlertTriangle size={14} />
-          {!compact && <span className="text-xs">Watchdog</span>}
-        </div>
-      )}
-
-      {/* Divider */}
-      <div className="w-px h-6 bg-neutral-600" />
-
-      {/* Timing Display */}
-      <TimingDisplay timing={stats.timing} scanCount={stats.scanCount} compact={compact} />
-
-      {/* Current Network (if available) */}
-      {stats.currentNetworkId !== null && !compact && (
-        <>
-          <div className="w-px h-6 bg-neutral-600" />
-          <div className="text-xs text-neutral-400">
-            Network: <span className="text-blue-400">{stats.currentNetworkId}</span>
-          </div>
-        </>
-      )}
-
-      {/* Breakpoint Hit Info */}
-      {breakpointHit && !compact && (
-        <>
-          <div className="w-px h-6 bg-neutral-600" />
-          <BreakpointHitDisplay hit={breakpointHit} />
-        </>
-       )}
+        {/* Breakpoint Hit Info */}
+        {breakpointHit && !compact && (
+          <>
+            <div className="w-px h-6 bg-neutral-600" />
+            <div className="flex items-center gap-2">
+              <BreakpointHitDisplay hit={breakpointHit} />
+              <button
+                onClick={handleContinue}
+                className="text-xs text-blue-400 hover:text-blue-300 underline"
+              >
+                Continue
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </PanelErrorBoundary>
   );

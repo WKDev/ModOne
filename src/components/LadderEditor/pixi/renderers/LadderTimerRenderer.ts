@@ -34,52 +34,57 @@ export class LadderTimerRenderer {
       element.position.row * cellHeight,
     );
 
-    // Box graphics
+    const midX = cellWidth / 2;
+    const midY = cellHeight * 0.65; // New wire level
+
+    // 1. Connection lines
+    const lines = new Graphics();
+    lines.label = 'lines';
+    const boxX = 8;
+    const boxW = cellWidth - 16;
+    // Use 'butt' cap for seamless joining
+    const stroke = { width: STROKE_WIDTH, color: STROKE_COLOR, cap: 'butt' } as const;
+    lines.moveTo(0, midY).lineTo(boxX, midY).stroke(stroke);
+    lines.moveTo(boxX + boxW, midY).lineTo(cellWidth, midY).stroke(stroke);
+    container.addChild(lines);
+
+    // 2. Block graphics
     const gfx = new Graphics();
     gfx.label = 'symbol';
     this.drawBox(gfx, cellWidth, cellHeight);
     container.addChild(gfx);
 
-    // Connection lines (separate so they sit behind box visually)
-    const lines = new Graphics();
-    lines.label = 'lines';
-    const midY = cellHeight / 2;
-    const boxX = 10;
-    const boxW = cellWidth - 20;
-    lines.moveTo(0, midY).lineTo(boxX, midY).stroke({ width: STROKE_WIDTH, color: STROKE_COLOR });
-    lines.moveTo(boxX + boxW, midY).lineTo(cellWidth, midY).stroke({ width: STROKE_WIDTH, color: STROKE_COLOR });
-    container.addChildAt(lines, 0);
-
-    // Type label (e.g., "TON")
+    // 3. Labels (Block internal)
+    // Type label (Header)
     const typeText = new Text({
       text: timerDisplayName(element.type),
-      style: { fontFamily: 'monospace', fontSize: 10, fontWeight: 'bold', fill: TEXT_COLOR },
+      style: { fontFamily: 'sans-serif', fontSize: 9, fontWeight: 'bold', fill: TEXT_COLOR },
     });
     typeText.label = 'typeLabel';
     typeText.anchor.set(0.5, 0);
-    typeText.position.set(cellWidth / 2, 6);
+    typeText.position.set(midX, 18); // Shifted down a bit
     container.addChild(typeText);
 
-    // Address
+    // Address (Center-ish)
     const addrText = new Text({
       text: element.address ?? '',
       style: { fontFamily: 'monospace', fontSize: 10, fill: TEXT_COLOR },
     });
     addrText.label = 'address';
     addrText.anchor.set(0.5, 0.5);
-    addrText.position.set(cellWidth / 2, cellHeight / 2);
+    addrText.position.set(midX, midY - 2);
     container.addChild(addrText);
 
-    // Preset
+    // Preset (Bottom)
     const presetVal = element.properties?.presetTime ?? 0;
     const tb = element.properties?.timeBase ?? 'ms';
     const presetText = new Text({
-      text: `PT:${presetVal}${tb}`,
+      text: `PV: ${presetVal}${tb}`,
       style: { fontFamily: 'monospace', fontSize: 8, fill: TEXT_COLOR },
     });
     presetText.label = 'preset';
     presetText.anchor.set(0.5, 1);
-    presetText.position.set(cellWidth / 2, cellHeight - 4);
+    presetText.position.set(midX, cellHeight - 12);
     container.addChild(presetText);
 
     return container;
@@ -96,18 +101,25 @@ export class LadderTimerRenderer {
     if (presetText) {
       const presetVal = element.properties?.presetTime ?? 0;
       const tb = element.properties?.timeBase ?? 'ms';
-      presetText.text = `PT:${presetVal}${tb}`;
+      presetText.text = `PV: ${presetVal}${tb}`;
     }
   }
 
-  destroy(): void {}
+  destroy(): void { }
 
   private drawBox(gfx: Graphics, cellWidth: number, cellHeight: number): void {
-    const boxX = 10;
-    const boxY = 3;
-    const boxW = cellWidth - 20;
-    const boxH = cellHeight - 6;
+    const boxX = 8;
+    const boxY = 16; // Shifted down to make top spacing consistent
+    const boxW = cellWidth - 16;
+    const boxH = cellHeight - 24;
+    const headerH = 12;
+
+    // Body
     gfx.roundRect(boxX, boxY, boxW, boxH, CORNER_RADIUS)
-      .stroke({ width: STROKE_WIDTH, color: STROKE_COLOR });
+      .fill({ color: 0x1e293b, alpha: 0.5 })
+      .stroke({ width: STROKE_WIDTH, color: STROKE_COLOR, alpha: 0.8 });
+
+    // Header divider
+    gfx.moveTo(boxX, boxY + headerH).lineTo(boxX + boxW, boxY + headerH).stroke({ width: 1, color: STROKE_COLOR, alpha: 0.4 });
   }
 }

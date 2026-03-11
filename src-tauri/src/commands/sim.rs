@@ -786,6 +786,19 @@ pub fn sim_remove_breakpoint(state: State<'_, SimState>, id: String) -> Result<(
         .map_err(|e| e.to_string())
 }
 
+/// Enable or disable a breakpoint
+#[tauri::command]
+pub fn sim_set_breakpoint_enabled(
+    state: State<'_, SimState>,
+    id: String,
+    enabled: bool,
+) -> Result<(), String> {
+    state
+        .debugger
+        .set_breakpoint_enabled(&id, enabled)
+        .map_err(|e| e.to_string())
+}
+
 /// Get all breakpoints
 #[tauri::command]
 pub fn sim_get_breakpoints(state: State<'_, SimState>) -> Result<Vec<Breakpoint>, String> {

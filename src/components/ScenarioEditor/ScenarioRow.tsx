@@ -7,7 +7,7 @@
 import { memo, useCallback, type KeyboardEvent, type MouseEvent } from 'react';
 import { useScenarioStore } from '../../stores/scenarioStore';
 import { ScenarioCell } from './ScenarioCell';
-import type { ScenarioEvent, ScenarioExecutionState } from '../../types/scenario';
+import type { ScenarioEvent } from '../../types/scenario';
 import { type ColumnKey, COLUMNS, GRID_TEMPLATE_COLUMNS } from './constants';
 
 // ============================================================================
@@ -23,7 +23,8 @@ interface RowProps {
   event: ScenarioEvent;
   rowIndex: number;
   events: ScenarioEvent[];
-  executionState: ScenarioExecutionState;
+  isCurrent: boolean;
+  isCompleted: boolean;
   isSelected: boolean;
   focusedCell: CellPosition | null;
   onCellFocus: (row: number, column: number) => void;
@@ -45,9 +46,9 @@ interface RowProps {
  */
 function getRowClassName(
   event: ScenarioEvent,
-  executionState: ScenarioExecutionState,
-  isSelected: boolean,
-  events: ScenarioEvent[]
+  isCurrent: boolean,
+  isCompleted: boolean,
+  isSelected: boolean
 ): string {
   const baseClasses = 'grid items-center border-b border-neutral-700 transition-colors duration-200';
   const classes: string[] = [baseClasses];
@@ -62,11 +63,6 @@ function getRowClassName(
     classes.push('text-neutral-500 opacity-60');
     return classes.join(' ');
   }
-
-  // Execution state highlighting
-  const eventIndex = events.findIndex((e) => e.id === event.id);
-  const isCompleted = executionState.completedEvents.includes(event.id);
-  const isCurrent = executionState.currentEventIndex === eventIndex && executionState.status === 'running';
 
   if (isCurrent) {
     classes.push('bg-green-500/20 animate-pulse');
@@ -84,10 +80,10 @@ function getRowClassName(
 export const ScenarioRow = memo(function ScenarioRow({
   event,
   rowIndex,
-  events,
-  executionState,
   isSelected,
   focusedCell,
+  isCurrent,
+  isCompleted,
   onCellFocus,
   onCellEdit,
   onCellKeyDown,
@@ -128,8 +124,7 @@ export const ScenarioRow = memo(function ScenarioRow({
     [event.id, updateEvent]
   );
 
-  const rowClassName = getRowClassName(event, executionState, isSelected, events);
-  const isCompleted = executionState.completedEvents.includes(event.id);
+  const rowClassName = getRowClassName(event, isCurrent, isCompleted, isSelected);
 
   return (
     <div
@@ -149,8 +144,8 @@ export const ScenarioRow = memo(function ScenarioRow({
           isCompleted={col.key === 'enabled' ? isCompleted : undefined}
           onFocus={() => onCellFocus(rowIndex, colIndex)}
           onEdit={() => onCellEdit(rowIndex, colIndex)}
-          onUpdate={(value) => handleUpdate(col.key, value)}
-          onKeyDown={(e) => onCellKeyDown(e, rowIndex, colIndex)}
+          onUpdate={(value: unknown) => handleUpdate(col.key, value)}
+          onKeyDown={(e: KeyboardEvent) => onCellKeyDown(e, rowIndex, colIndex)}
           readonly={readonly}
         />
       ))}

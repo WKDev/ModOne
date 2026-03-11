@@ -241,13 +241,14 @@ export async function requestStateFromMain(storeName: string): Promise<void> {
 /**
  * Listen for state requests and respond (for main window)
  */
-export function setupStateRequestHandler<T>(
+export function setupStateRequestHandler<T, R = T>(
   storeName: string,
-  getState: () => T
+  getState: () => T,
+  transform?: (state: T) => R
 ): () => Promise<void> {
   const windowId = getWindowId();
   if (windowId !== 'main') {
-    return async () => {};
+    return async () => { };
   }
 
   let unlistenFn: UnlistenFn | null = null;
@@ -258,10 +259,12 @@ export function setupStateRequestHandler<T>(
       (event) => {
         if (event.payload.storeName !== storeName) return;
 
-        // Send current state
+        // Send current state, transformed if needed for serialization
+        const stateToSend = transform ? transform(getState()) : getState();
+
         emit(STATE_SYNC_EVENT, {
           storeName,
-          state: getState(),
+          state: stateToSend,
           sourceWindowId: windowId,
           timestamp: Date.now(),
         });
