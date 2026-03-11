@@ -49,6 +49,8 @@ export class EventBridge {
   private _onPointerUp: ((e: FederatedPointerEvent) => void) | null = null;
   private _onKeyDown: ((e: KeyboardEvent) => void) | null = null;
   private _onKeyUp: ((e: KeyboardEvent) => void) | null = null;
+  private _onPointerOver: ((e: FederatedPointerEvent) => void) | null = null;
+  private _onPointerOut: ((e: FederatedPointerEvent) => void) | null = null;
   private _onContextMenu: ((e: Event) => void) | null = null;
 
   // Track whether a pointer interaction is active (left button down)
@@ -72,6 +74,8 @@ export class EventBridge {
     this._onPointerUp = this._handlePointerUp.bind(this);
     this._onKeyDown = this._handleKeyDown.bind(this);
     this._onKeyUp = this._handleKeyUp.bind(this);
+    this._onPointerOver = () => this._controller?.handlePointerOver();
+    this._onPointerOut = () => this._controller?.handlePointerOut();
     this._onContextMenu = (e: Event) => e.preventDefault();
 
     // Attach Pixi event listeners on the viewport container
@@ -80,6 +84,8 @@ export class EventBridge {
     this._viewport.on('pointerup', this._onPointerUp);
     this._viewport.on('pointerupoutside', this._onPointerUp);
     this._viewport.on('pointercancel', this._onPointerUp);
+    this._viewport.on('pointerover', this._onPointerOver!);
+    this._viewport.on('pointerout', this._onPointerOut!);
 
     // Attach DOM keyboard listeners
     this._domElement.addEventListener('keydown', this._onKeyDown);
@@ -106,6 +112,8 @@ export class EventBridge {
       this._viewport.off('pointerup', this._onPointerUp!);
       this._viewport.off('pointerupoutside', this._onPointerUp!);
       this._viewport.off('pointercancel', this._onPointerUp!);
+      if (this._onPointerOver) this._viewport.off('pointerover', this._onPointerOver);
+      if (this._onPointerOut) this._viewport.off('pointerout', this._onPointerOut);
     }
 
     // Remove DOM event listeners
@@ -150,9 +158,8 @@ export class EventBridge {
   private _handlePointerMove(e: FederatedPointerEvent): void {
     if (this._destroyed || !this._viewport || !this._controller) return;
 
-    // Only send move events when a pointer interaction is active,
-    // or when the controller is in placing/wire mode for hover-style previews.
-    if (!this._isPointerActive && !this._controller.isPlacing && !this._controller.isWireMode) return;
+    // We no longer guard with _isPointerActive so that lastMoveWorld is always up-to-date
+    // in the controller, enabling immediate 'w' key wire drawing.
 
     const worldPos = this._toWorld(e);
     const screenPos = this._toScreen(e);

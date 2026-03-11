@@ -152,6 +152,9 @@ export class InteractionController {
   // Key state
   private _isSpaceHeld = false;
 
+  // Mouse presence state
+  private _isMouseOverCanvas = false;
+
   constructor(config: InteractionControllerConfig) {
     this._hitTester = config.hitTester;
     this._spatialIndex = config.spatialIndex;
@@ -205,6 +208,22 @@ export class InteractionController {
     this._state = 'wire_mode';
     this._visuals.setPortsVisible(true);
     this._onStateChange?.(this._state);
+
+    // If mouse is already over canvas, immediately start wire drawing from current position
+    if (this._isMouseOverCanvas && this._lastMoveWorld) {
+      if (import.meta.env.DEV) {
+        console.debug('[InteractionController] w-key immediate wire start at', this._lastMoveWorld);
+      }
+      this._handleWireModePointerDown(this._lastMoveWorld, 0);
+    }
+  }
+
+  handlePointerOver(): void {
+    this._isMouseOverCanvas = true;
+  }
+
+  handlePointerOut(): void {
+    this._isMouseOverCanvas = false;
   }
 
   cancel(): void {
@@ -840,10 +859,10 @@ export class InteractionController {
       // Convert user bend points to WireHandle format
       const handles = this._wireBendPoints.length > 0
         ? this._wireBendPoints.map(pos => ({
-            position: pos,
-            constraint: 'free' as const,
-            source: 'user' as const,
-          }))
+          position: pos,
+          constraint: 'free' as const,
+          source: 'user' as const,
+        }))
         : undefined;
 
       this._facade.addWire(this._wireFrom, to, {
