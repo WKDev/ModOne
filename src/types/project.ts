@@ -17,6 +17,46 @@ export interface PlcSettings {
   manufacturer: PlcManufacturer;
   model: string;
   scan_time_ms: number;
+  hardware_topology: PlcHardwareTopology;
+}
+
+export type PlcRackKind = 'MainBase' | 'ExpansionBase' | 'RemoteBase';
+export type PlcModuleKind =
+  | 'Power'
+  | 'Cpu'
+  | 'DigitalInput'
+  | 'DigitalOutput'
+  | 'DigitalIo'
+  | 'AnalogInput'
+  | 'AnalogOutput'
+  | 'AnalogIo'
+  | 'Communication'
+  | 'Special';
+export type PlcIoDirection = 'Input' | 'Output' | 'Bidirectional';
+
+export interface PlcAddressWindow {
+  family: string;
+  start: number;
+  count: number;
+  io_direction?: PlcIoDirection;
+}
+
+export interface PlcHardwareModule {
+  slot: number;
+  module_kind: PlcModuleKind;
+  model: string;
+  point_count?: number;
+  address_windows: PlcAddressWindow[];
+}
+
+export interface PlcRackTopology {
+  rack_id: string;
+  rack_kind: PlcRackKind;
+  modules: PlcHardwareModule[];
+}
+
+export interface PlcHardwareTopology {
+  racks: PlcRackTopology[];
 }
 
 // Modbus TCP server settings
@@ -39,6 +79,41 @@ export interface ModbusRtuSettings {
 export interface ModbusSettings {
   tcp: ModbusTcpSettings;
   rtu: ModbusRtuSettings;
+  simulation: ModbusServerSimulationSettings;
+  exposure: ModbusExposureSettings;
+}
+
+export type ModbusSimulationTransport = 'Tcp' | 'Rtu' | 'TcpAscii' | 'RtuAscii';
+export type ModbusExposureMode = 'Recommended' | 'LegacyWide' | 'Custom';
+export type ModbusExposureAddressSpace =
+  | 'Coil'
+  | 'DiscreteInput'
+  | 'HoldingRegister'
+  | 'InputRegister';
+
+export interface ModbusServerSimulationSettings {
+  enabled: boolean;
+  transport: ModbusSimulationTransport;
+  address: string;
+  com_port: string;
+  unit_id: number;
+  baud_rate: number;
+  parity: Parity;
+  stop_bits: number;
+  coil_start_address: number;
+  word_start_address: number;
+}
+
+export interface ModbusExposureRule {
+  family: string;
+  address_space: ModbusExposureAddressSpace;
+  offset: number;
+  count: number;
+}
+
+export interface ModbusExposureSettings {
+  mode: ModbusExposureMode;
+  rules: ModbusExposureRule[];
 }
 
 // Memory map configuration settings
@@ -66,7 +141,7 @@ export interface CanvasSettings {
   snap_to_grid: boolean;
   show_grid: boolean;
   grid_style: 'dots' | 'lines';
-  grid_unit?: 'px' | 'mil' | 'mm';
+  grid_unit?: 'mil' | 'mm';
 }
 
 // Directory configuration for v2.0 folder-based projects
@@ -151,6 +226,9 @@ export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
     manufacturer: 'LS',
     model: '',
     scan_time_ms: 10,
+    hardware_topology: {
+      racks: [],
+    },
   },
   modbus: {
     tcp: {
@@ -165,6 +243,22 @@ export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
       parity: 'None',
       stop_bits: 1,
     },
+    simulation: {
+      enabled: false,
+      transport: 'Tcp',
+      address: '127.0.0.1:502',
+      com_port: '',
+      unit_id: 1,
+      baud_rate: 9600,
+      parity: 'None',
+      stop_bits: 1,
+      coil_start_address: 0,
+      word_start_address: 0,
+    },
+    exposure: {
+      mode: 'Recommended',
+      rules: [],
+    },
   },
   memory_map: {
     coil_start: 0,
@@ -178,7 +272,7 @@ export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
   },
   auto_save: DEFAULT_AUTO_SAVE_SETTINGS,
   canvas: {
-    grid_size: 4,
+    grid_size: 5,
     grid_unit: 'mm',
     snap_to_grid: true,
     show_grid: true,

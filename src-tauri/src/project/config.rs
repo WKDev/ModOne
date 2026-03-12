@@ -292,6 +292,10 @@ pub struct ModbusSettings {
     /// RTU settings
     pub rtu: ModbusRtuSettings,
 
+    /// Project-level Modbus server simulation preferences.
+    #[serde(default)]
+    pub simulation: ModbusServerSimulationSettings,
+
     /// Vendor-facing register exposure policy.
     #[serde(default)]
     pub exposure: ModbusExposureSettings,
@@ -302,8 +306,68 @@ impl Default for ModbusSettings {
         Self {
             tcp: ModbusTcpSettings::default(),
             rtu: ModbusRtuSettings::default(),
+            simulation: ModbusServerSimulationSettings::default(),
             exposure: ModbusExposureSettings::default(),
         }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModbusServerSimulationSettings {
+    /// Whether project simulation should expose a Modbus server surface.
+    pub enabled: bool,
+    /// Transport/protocol flavor for the simulated server.
+    #[serde(default)]
+    pub transport: ModbusSimulationTransport,
+    /// IP address/host:port for TCP variants.
+    #[serde(default)]
+    pub address: String,
+    /// COM path/device path for RTU variants.
+    #[serde(default)]
+    pub com_port: String,
+    /// Unit/slave identifier.
+    pub unit_id: u8,
+    /// Baud rate for serial variants.
+    pub baud_rate: u32,
+    /// Parity for serial variants.
+    #[serde(default)]
+    pub parity: Parity,
+    /// Stop bits for serial variants.
+    pub stop_bits: u8,
+    /// Coil exposure base address chosen by the user.
+    pub coil_start_address: u16,
+    /// Word/register exposure base address chosen by the user.
+    pub word_start_address: u16,
+}
+
+impl Default for ModbusServerSimulationSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            transport: ModbusSimulationTransport::Tcp,
+            address: "127.0.0.1:502".to_string(),
+            com_port: String::new(),
+            unit_id: 1,
+            baud_rate: 9600,
+            parity: Parity::None,
+            stop_bits: 1,
+            coil_start_address: 0,
+            word_start_address: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ModbusSimulationTransport {
+    Tcp,
+    Rtu,
+    TcpAscii,
+    RtuAscii,
+}
+
+impl Default for ModbusSimulationTransport {
+    fn default() -> Self {
+        Self::Tcp
     }
 }
 

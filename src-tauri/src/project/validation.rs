@@ -5,7 +5,8 @@
 use crate::error::ModOneError;
 use super::config::{
     AutoSaveSettings, MemoryMapSettings, ModbusExposureMode, ModbusExposureSettings,
-    ModbusRtuSettings, ModbusTcpSettings, PlcHardwareTopology, ProjectConfig,
+    ModbusRtuSettings, ModbusServerSimulationSettings, ModbusSimulationTransport,
+    ModbusTcpSettings, PlcHardwareTopology, ProjectConfig,
 };
 
 /// Standard baud rates supported for serial communication
@@ -429,6 +430,51 @@ pub fn validate_modbus_exposure(settings: &ModbusExposureSettings, result: &mut 
     }
 }
 
+/// Validate project-level Modbus server simulation settings
+pub fn validate_modbus_simulation(
+    settings: &ModbusServerSimulationSettings,
+    result: &mut ValidationResult,
+) {
+    if !settings.enabled {
+        return;
+    }
+
+    if let Some((field, msg)) = validate_unit_id(settings.unit_id, "modbus.simulation.unit_id") {
+        result.add_error(field, msg);
+    }
+
+    match settings.transport {
+        ModbusSimulationTransport::Tcp | ModbusSimulationTransport::TcpAscii => {
+            if settings.address.trim().is_empty() {
+                result.add_error(
+                    "modbus.simulation.address",
+                    "Address must not be empty for TCP simulation",
+                );
+            }
+        }
+        ModbusSimulationTransport::Rtu | ModbusSimulationTransport::RtuAscii => {
+            if settings.com_port.trim().is_empty() {
+                result.add_error(
+                    "modbus.simulation.com_port",
+                    "COM port must not be empty for RTU simulation",
+                );
+            }
+
+            if let Some((field, msg)) =
+                validate_baud_rate(settings.baud_rate, "modbus.simulation.baud_rate")
+            {
+                result.add_error(field, msg);
+            }
+
+            if let Some((field, msg)) =
+                validate_stop_bits(settings.stop_bits, "modbus.simulation.stop_bits")
+            {
+                result.add_error(field, msg);
+            }
+        }
+    }
+}
+
 // ============================================================================
 // Main Validation Function
 // ============================================================================
@@ -461,6 +507,9 @@ pub fn validate_project_config(config: &ProjectConfig) -> Result<(), ModOneError
 
     // Validate Modbus exposure
     validate_modbus_exposure(&config.modbus.exposure, &mut result);
+
+    // Validate Modbus simulation preferences
+    validate_modbus_simulation(&config.modbus.simulation, &mut result);
 
     // Validate memory map
     validate_memory_map(&config.memory_map, &mut result);
