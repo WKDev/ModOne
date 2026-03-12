@@ -588,12 +588,14 @@ fn bridge_canonical_to_legacy_device(
         (VendorProfileId::LsXg5000, CanonicalAreaKind::CounterValueWord) => {
             map_word(SimWordDeviceType::Cd)
         }
-        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::OutputBit) => {
-            ResolvedSimAddress::Bit {
-                device: SimBitDeviceType::P,
-                address,
-            }
-        }
+        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::InputBit) => ResolvedSimAddress::Bit {
+            device: SimBitDeviceType::X,
+            address,
+        },
+        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::OutputBit) => ResolvedSimAddress::Bit {
+            device: SimBitDeviceType::Y,
+            address,
+        },
         (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::InternalBit) => {
             ResolvedSimAddress::Bit {
                 device: SimBitDeviceType::M,
@@ -620,12 +622,6 @@ fn bridge_canonical_to_legacy_device(
         }
         (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::DataWord) => {
             map_word(SimWordDeviceType::D)
-        }
-        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::InputBit) => {
-            return Err(
-                "MELSEC X input addresses are not bridged to a dedicated simulator input area yet"
-                    .to_string(),
-            );
         }
         (_, CanonicalAreaKind::OutputBit) => {
             return Err("OutputBit is not bridged by the active simulator profile yet".to_string());
@@ -818,12 +814,21 @@ mod tests {
     }
 
     #[test]
-    fn resolves_melsec_internal_and_output_addresses() {
+    fn resolves_melsec_internal_input_and_output_addresses() {
         let settings = PlcSettings {
             manufacturer: PlcManufacturer::Mitsubishi,
             model: "FX5U".to_string(),
             scan_time_ms: 10,
         };
+
+        let (_, x) = resolve_sim_address_for_settings(&settings, "X10").expect("X should map");
+        assert_eq!(
+            x,
+            ResolvedSimAddress::Bit {
+                device: SimBitDeviceType::X,
+                address: 0o10,
+            }
+        );
 
         let (_, m) = resolve_sim_address_for_settings(&settings, "M100").expect("M should map");
         assert_eq!(
@@ -838,24 +843,10 @@ mod tests {
         assert_eq!(
             y,
             ResolvedSimAddress::Bit {
-                device: SimBitDeviceType::P,
+                device: SimBitDeviceType::Y,
                 address: 0o17,
             }
         );
-    }
-
-    #[test]
-    fn rejects_melsec_input_addresses_until_canonical_cutover() {
-        let settings = PlcSettings {
-            manufacturer: PlcManufacturer::Mitsubishi,
-            model: "FX5U".to_string(),
-            scan_time_ms: 10,
-        };
-
-        let error =
-            resolve_sim_address_for_settings(&settings, "X10").expect_err("X should fail");
-
-        assert!(error.contains("not bridged"));
     }
 }
 

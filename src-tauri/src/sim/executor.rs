@@ -96,7 +96,7 @@ pub enum NodeType {
 /// Device address parsed from string
 #[derive(Debug, Clone)]
 pub struct DeviceAddress {
-    /// Device type character (P, M, K, F, T, C, D, R, Z, N)
+    /// Device type character (X, Y, P, M, K, F, T, C, D, R, Z, N)
     pub device: char,
     /// Address number
     pub address: u16,
@@ -115,7 +115,7 @@ impl DeviceAddress {
         let device = s.chars().next()?;
         if !matches!(
             device,
-            'P' | 'M' | 'K' | 'F' | 'T' | 'C' | 'D' | 'R' | 'Z' | 'N'
+            'X' | 'Y' | 'P' | 'M' | 'K' | 'F' | 'T' | 'C' | 'D' | 'R' | 'Z' | 'N'
         ) {
             return None;
         }
@@ -158,7 +158,7 @@ impl DeviceAddress {
 
     /// Check if this is a bit device
     pub fn is_bit_device(&self) -> bool {
-        matches!(self.device, 'P' | 'M' | 'K' | 'F' | 'T' | 'C')
+        matches!(self.device, 'X' | 'Y' | 'P' | 'M' | 'K' | 'F' | 'T' | 'C')
     }
 
     /// Check if this is a word device
@@ -169,6 +169,8 @@ impl DeviceAddress {
     /// Get as bit device type
     pub fn as_bit_device(&self) -> Option<SimBitDeviceType> {
         match self.device {
+            'X' => Some(SimBitDeviceType::X),
+            'Y' => Some(SimBitDeviceType::Y),
             'P' => Some(SimBitDeviceType::P),
             'M' => Some(SimBitDeviceType::M),
             'K' => Some(SimBitDeviceType::K),

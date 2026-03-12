@@ -327,6 +327,8 @@ impl SimDebugger {
         let addr: u16 = addr_str.parse().ok()?;
 
         let device_type = match device_char {
+            'X' => SimBitDeviceType::X,
+            'Y' => SimBitDeviceType::Y,
             'P' => SimBitDeviceType::P,
             'M' => SimBitDeviceType::M,
             'K' => SimBitDeviceType::K,
@@ -791,6 +793,8 @@ mod tests {
     #[test]
     fn test_parse_bit_device() {
         // Test valid bit devices
+        assert!(SimDebugger::parse_bit_device("X0000").is_some());
+        assert!(SimDebugger::parse_bit_device("Y0001").is_some());
         assert!(SimDebugger::parse_bit_device("M0000").is_some());
         assert!(SimDebugger::parse_bit_device("P0100").is_some());
         assert!(SimDebugger::parse_bit_device("K0050").is_some());
@@ -802,6 +806,10 @@ mod tests {
         let (device, addr) = SimDebugger::parse_bit_device("M0100").unwrap();
         assert_eq!(device, SimBitDeviceType::M);
         assert_eq!(addr, 100);
+
+        let (device, addr) = SimDebugger::parse_bit_device("Y0017").unwrap();
+        assert_eq!(device, SimBitDeviceType::Y);
+        assert_eq!(addr, 17);
 
         // Test invalid - word device letter
         assert!(SimDebugger::parse_bit_device("D0000").is_none());

@@ -44,6 +44,10 @@ pub type SimMemoryResult<T> = Result<T, SimMemoryError>;
 
 /// P relay size (Input Relay)
 const P_SIZE: usize = 2048;
+/// X input size (MELSEC external input)
+const X_SIZE: usize = 2048;
+/// Y output size (MELSEC output relay)
+const Y_SIZE: usize = 2048;
 /// M relay size (Auxiliary Relay)
 const M_SIZE: usize = 8192;
 /// K relay size (Keep Relay - persistent)
@@ -78,6 +82,10 @@ const CD_SIZE: usize = 2048;
 /// (relays/contacts) and word devices (registers).
 pub struct DeviceMemory {
     // Bit devices
+    /// X - MELSEC external inputs (2048 bits)
+    x_inputs: RwLock<BitVec<u8, Msb0>>,
+    /// Y - MELSEC outputs (2048 bits)
+    y_outputs: RwLock<BitVec<u8, Msb0>>,
     /// P - Input Relay (2048 bits)
     p_relays: RwLock<BitVec<u8, Msb0>>,
     /// M - Auxiliary Relay (8192 bits)
@@ -114,6 +122,8 @@ impl DeviceMemory {
     pub fn new() -> Self {
         Self {
             // Bit devices
+            x_inputs: RwLock::new(bitvec![u8, Msb0; 0; X_SIZE]),
+            y_outputs: RwLock::new(bitvec![u8, Msb0; 0; Y_SIZE]),
             p_relays: RwLock::new(bitvec![u8, Msb0; 0; P_SIZE]),
             m_relays: RwLock::new(bitvec![u8, Msb0; 0; M_SIZE]),
             k_relays: RwLock::new(bitvec![u8, Msb0; 0; K_SIZE]),
@@ -141,6 +151,8 @@ impl DeviceMemory {
     /// Get the maximum address for a bit device type
     fn bit_device_max(&self, device: SimBitDeviceType) -> u16 {
         match device {
+            SimBitDeviceType::X => X_SIZE as u16 - 1,
+            SimBitDeviceType::Y => Y_SIZE as u16 - 1,
             SimBitDeviceType::P => P_SIZE as u16 - 1,
             SimBitDeviceType::M => M_SIZE as u16 - 1,
             SimBitDeviceType::K => K_SIZE as u16 - 1,
@@ -169,6 +181,20 @@ impl DeviceMemory {
 
         let idx = address as usize;
         let value = match device {
+            SimBitDeviceType::X => self.x_inputs.read().get(idx).map(|b| *b).ok_or_else(|| {
+                SimMemoryError::AddressOutOfRange {
+                    device: "X".to_string(),
+                    address,
+                    max: X_SIZE as u16 - 1,
+                }
+            })?,
+            SimBitDeviceType::Y => self.y_outputs.read().get(idx).map(|b| *b).ok_or_else(|| {
+                SimMemoryError::AddressOutOfRange {
+                    device: "Y".to_string(),
+                    address,
+                    max: Y_SIZE as u16 - 1,
+                }
+            })?,
             SimBitDeviceType::P => self.p_relays.read().get(idx).map(|b| *b).ok_or_else(|| {
                 SimMemoryError::AddressOutOfRange {
                     device: "P".to_string(),
@@ -237,6 +263,8 @@ impl DeviceMemory {
 
         let idx = address as usize;
         match device {
+            SimBitDeviceType::X => self.x_inputs.write().set(idx, value),
+            SimBitDeviceType::Y => self.y_outputs.write().set(idx, value),
             SimBitDeviceType::P => self.p_relays.write().set(idx, value),
             SimBitDeviceType::M => self.m_relays.write().set(idx, value),
             SimBitDeviceType::K => self.k_relays.write().set(idx, value),
@@ -261,6 +289,8 @@ impl DeviceMemory {
 
         let idx = address as usize;
         match device {
+            SimBitDeviceType::X => self.x_inputs.write().set(idx, value),
+            SimBitDeviceType::Y => self.y_outputs.write().set(idx, value),
             SimBitDeviceType::P => self.p_relays.write().set(idx, value),
             SimBitDeviceType::M => self.m_relays.write().set(idx, value),
             SimBitDeviceType::K => self.k_relays.write().set(idx, value),
@@ -286,6 +316,14 @@ impl DeviceMemory {
         let end_idx = start_idx + count as usize;
 
         let bits: Vec<bool> = match device {
+            SimBitDeviceType::X => self.x_inputs.read()[start_idx..end_idx]
+                .iter()
+                .map(|b| *b)
+                .collect(),
+            SimBitDeviceType::Y => self.y_outputs.read()[start_idx..end_idx]
+                .iter()
+                .map(|b| *b)
+                .collect(),
             SimBitDeviceType::P => self.p_relays.read()[start_idx..end_idx]
                 .iter()
                 .map(|b| *b)
@@ -549,6 +587,30 @@ impl DeviceMemory {
         // Capture bit devices
         let bit_devices = &mut snapshot.bit_devices;
 
+        let x_map: std::collections::HashMap<u32, bool> = self
+            .x_inputs
+            .read()
+            .iter()
+            .enumerate()
+            .filter(|(_, v)| **v)
+            .map(|(i, v)| (i as u32, *v))
+            .collect();
+        if !x_map.is_empty() {
+            bit_devices.insert("X".to_string(), x_map);
+        }
+
+        let y_map: std::collections::HashMap<u32, bool> = self
+            .y_outputs
+            .read()
+            .iter()
+            .enumerate()
+            .filter(|(_, v)| **v)
+            .map(|(i, v)| (i as u32, *v))
+            .collect();
+        if !y_map.is_empty() {
+            bit_devices.insert("Y".to_string(), y_map);
+        }
+
         // P relays
         let p_map: std::collections::HashMap<u32, bool> = self
             .p_relays
@@ -688,6 +750,8 @@ impl DeviceMemory {
     /// Clear all memory areas to zero
     pub fn clear(&self) {
         // Clear bit devices
+        self.x_inputs.write().fill(false);
+        self.y_outputs.write().fill(false);
         self.p_relays.write().fill(false);
         self.m_relays.write().fill(false);
         self.k_relays.write().fill(false);
@@ -710,6 +774,8 @@ impl DeviceMemory {
     /// Clear volatile memory (all except K relays which are persistent)
     pub fn clear_volatile(&self) {
         // Clear bit devices (except K)
+        self.x_inputs.write().fill(false);
+        self.y_outputs.write().fill(false);
         self.p_relays.write().fill(false);
         self.m_relays.write().fill(false);
         // K relays are NOT cleared - they are persistent
@@ -735,6 +801,22 @@ impl DeviceMemory {
         self.clear();
 
         // Restore bit devices
+        if let Some(x_map) = snapshot.bit_devices.get("X") {
+            let mut x = self.x_inputs.write();
+            for (addr, value) in x_map {
+                if (*addr as usize) < X_SIZE {
+                    x.set(*addr as usize, *value);
+                }
+            }
+        }
+        if let Some(y_map) = snapshot.bit_devices.get("Y") {
+            let mut y = self.y_outputs.write();
+            for (addr, value) in y_map {
+                if (*addr as usize) < Y_SIZE {
+                    y.set(*addr as usize, *value);
+                }
+            }
+        }
         if let Some(p_map) = snapshot.bit_devices.get("P") {
             let mut p = self.p_relays.write();
             for (addr, value) in p_map {
@@ -837,6 +919,8 @@ mod tests {
     #[test]
     fn test_new_creates_correct_sizes() {
         let mem = DeviceMemory::new();
+        assert_eq!(mem.x_inputs.read().len(), X_SIZE);
+        assert_eq!(mem.y_outputs.read().len(), Y_SIZE);
         assert_eq!(mem.p_relays.read().len(), P_SIZE);
         assert_eq!(mem.m_relays.read().len(), M_SIZE);
         assert_eq!(mem.k_relays.read().len(), K_SIZE);
@@ -847,6 +931,12 @@ mod tests {
     #[test]
     fn test_bit_read_write() {
         let mem = DeviceMemory::new();
+
+        mem.write_bit(SimBitDeviceType::X, 0, true).unwrap();
+        assert!(mem.read_bit(SimBitDeviceType::X, 0).unwrap());
+
+        mem.write_bit(SimBitDeviceType::Y, 10, true).unwrap();
+        assert!(mem.read_bit(SimBitDeviceType::Y, 10).unwrap());
 
         // Write and read P relay
         mem.write_bit(SimBitDeviceType::P, 0, true).unwrap();
@@ -982,6 +1072,8 @@ mod tests {
         let mem = DeviceMemory::new();
 
         // Set some values
+        mem.write_bit(SimBitDeviceType::X, 0, true).unwrap();
+        mem.write_bit(SimBitDeviceType::Y, 0, true).unwrap();
         mem.write_bit(SimBitDeviceType::P, 0, true).unwrap();
         mem.write_bit(SimBitDeviceType::M, 0, true).unwrap();
         mem.write_bit(SimBitDeviceType::K, 0, true).unwrap();
@@ -997,6 +1089,8 @@ mod tests {
         assert_eq!(mem.read_word(SimWordDeviceType::R, 0).unwrap(), 200);
 
         // P and M should be cleared
+        assert!(!mem.read_bit(SimBitDeviceType::X, 0).unwrap());
+        assert!(!mem.read_bit(SimBitDeviceType::Y, 0).unwrap());
         assert!(!mem.read_bit(SimBitDeviceType::P, 0).unwrap());
         assert!(!mem.read_bit(SimBitDeviceType::M, 0).unwrap());
         // D should be cleared
@@ -1033,6 +1127,8 @@ mod tests {
         let mem = DeviceMemory::new();
 
         // Set some values
+        mem.write_bit(SimBitDeviceType::X, 10, true).unwrap();
+        mem.write_bit(SimBitDeviceType::Y, 20, true).unwrap();
         mem.write_bit(SimBitDeviceType::M, 100, true).unwrap();
         mem.write_word(SimWordDeviceType::D, 50, 12345).unwrap();
 
@@ -1046,6 +1142,8 @@ mod tests {
 
         // Restore
         mem.restore_snapshot(&snapshot);
+        assert!(mem.read_bit(SimBitDeviceType::X, 10).unwrap());
+        assert!(mem.read_bit(SimBitDeviceType::Y, 20).unwrap());
         assert!(mem.read_bit(SimBitDeviceType::M, 100).unwrap());
         assert_eq!(mem.read_word(SimWordDeviceType::D, 50).unwrap(), 12345);
     }

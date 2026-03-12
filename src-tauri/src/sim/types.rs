@@ -14,6 +14,10 @@ use std::collections::HashMap;
 /// Bit device types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SimBitDeviceType {
+    /// X - External Input
+    X,
+    /// Y - Output Relay
+    Y,
     /// P - Output Relay
     P,
     /// M - Internal Relay
@@ -32,6 +36,8 @@ impl SimBitDeviceType {
     /// Get the device letter
     pub fn as_str(&self) -> &'static str {
         match self {
+            SimBitDeviceType::X => "X",
+            SimBitDeviceType::Y => "Y",
             SimBitDeviceType::P => "P",
             SimBitDeviceType::M => "M",
             SimBitDeviceType::K => "K",
@@ -44,6 +50,8 @@ impl SimBitDeviceType {
     /// Get the default size for this device type
     pub fn default_size(&self) -> u32 {
         match self {
+            SimBitDeviceType::X => 2048,
+            SimBitDeviceType::Y => 2048,
             SimBitDeviceType::P => 2048,
             SimBitDeviceType::M => 8192,
             SimBitDeviceType::K => 2048,
