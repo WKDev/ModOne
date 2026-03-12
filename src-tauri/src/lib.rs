@@ -8,6 +8,7 @@ pub mod error;
 pub mod logging;
 pub mod modbus;
 pub mod parser;
+pub mod plc_runtime;
 pub mod project;
 pub mod scenario;
 pub mod sim;
