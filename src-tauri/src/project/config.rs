@@ -182,6 +182,10 @@ pub struct PlcSettings {
 
     /// Scan time in milliseconds
     pub scan_time_ms: u32,
+
+    /// Hardware topology for rack/base/module oriented PLC families.
+    #[serde(default)]
+    pub hardware_topology: PlcHardwareTopology,
 }
 
 impl Default for PlcSettings {
@@ -190,8 +194,93 @@ impl Default for PlcSettings {
             manufacturer: PlcManufacturer::default(),
             model: String::new(),
             scan_time_ms: 10,
+            hardware_topology: PlcHardwareTopology::default(),
         }
     }
+}
+
+/// Generic PLC hardware topology shared across vendor profiles.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PlcHardwareTopology {
+    /// Rack/base definitions in installation order.
+    #[serde(default)]
+    pub racks: Vec<PlcRackTopology>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlcRackTopology {
+    /// Stable rack/base identifier within the project.
+    pub rack_id: String,
+    /// Rack role in the hardware layout.
+    #[serde(default)]
+    pub rack_kind: PlcRackKind,
+    /// Installed modules on this rack/base.
+    #[serde(default)]
+    pub modules: Vec<PlcHardwareModule>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PlcRackKind {
+    MainBase,
+    ExpansionBase,
+    RemoteBase,
+}
+
+impl Default for PlcRackKind {
+    fn default() -> Self {
+        Self::MainBase
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlcHardwareModule {
+    /// Slot number within the rack/base.
+    pub slot: u16,
+    /// Hardware role.
+    pub module_kind: PlcModuleKind,
+    /// Vendor model identifier.
+    #[serde(default)]
+    pub model: String,
+    /// Optional channel/point count for the module.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub point_count: Option<u16>,
+    /// Address windows exposed by this module in vendor notation.
+    #[serde(default)]
+    pub address_windows: Vec<PlcAddressWindow>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PlcModuleKind {
+    Power,
+    Cpu,
+    DigitalInput,
+    DigitalOutput,
+    DigitalIo,
+    AnalogInput,
+    AnalogOutput,
+    AnalogIo,
+    Communication,
+    Special,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlcAddressWindow {
+    /// Vendor family name such as `P`, `X`, `Y`, or `D`.
+    pub family: String,
+    /// Start index within the family.
+    pub start: u32,
+    /// Number of points/words in the window.
+    pub count: u32,
+    /// Optional I/O direction for ambiguous vendor families.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub io_direction: Option<PlcIoDirection>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PlcIoDirection {
+    Input,
+    Output,
+    Bidirectional,
 }
 
 /// Modbus communication settings
@@ -202,6 +291,10 @@ pub struct ModbusSettings {
 
     /// RTU settings
     pub rtu: ModbusRtuSettings,
+
+    /// Vendor-facing register exposure policy.
+    #[serde(default)]
+    pub exposure: ModbusExposureSettings,
 }
 
 impl Default for ModbusSettings {
@@ -209,8 +302,61 @@ impl Default for ModbusSettings {
         Self {
             tcp: ModbusTcpSettings::default(),
             rtu: ModbusRtuSettings::default(),
+            exposure: ModbusExposureSettings::default(),
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModbusExposureSettings {
+    /// Policy mode used to materialize effective mapping rules.
+    #[serde(default)]
+    pub mode: ModbusExposureMode,
+    /// Explicit mapping rules used when mode is `Custom`.
+    #[serde(default)]
+    pub rules: Vec<ModbusExposureRule>,
+}
+
+impl Default for ModbusExposureSettings {
+    fn default() -> Self {
+        Self {
+            mode: ModbusExposureMode::Recommended,
+            rules: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ModbusExposureMode {
+    Recommended,
+    LegacyWide,
+    Custom,
+}
+
+impl Default for ModbusExposureMode {
+    fn default() -> Self {
+        Self::Recommended
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModbusExposureRule {
+    /// Vendor family name such as `M`, `P`, `X`, `Y`, or `D`.
+    pub family: String,
+    /// Modbus space that should expose the family.
+    pub address_space: ModbusExposureAddressSpace,
+    /// Modbus offset where the family begins.
+    pub offset: u16,
+    /// Number of exposed points/registers.
+    pub count: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ModbusExposureAddressSpace {
+    Coil,
+    DiscreteInput,
+    HoldingRegister,
+    InputRegister,
 }
 
 /// Modbus TCP server settings
@@ -382,6 +528,8 @@ mod tests {
         assert!(config.auto_save.enabled);
         assert_eq!(config.auto_save.interval_secs, 300);
         assert_eq!(config.auto_save.backup_count, 3);
+        assert!(config.plc.hardware_topology.racks.is_empty());
+        assert_eq!(config.modbus.exposure.mode, ModbusExposureMode::Recommended);
     }
 
     #[test]
@@ -422,6 +570,44 @@ mod tests {
         let config = ProjectConfig::new("Valid Project");
         let result = config.validate();
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_topology_and_modbus_exposure_yaml_roundtrip() {
+        let mut config = ProjectConfig::new("Topology Project");
+        config.plc.hardware_topology.racks.push(PlcRackTopology {
+            rack_id: "main".to_string(),
+            rack_kind: PlcRackKind::MainBase,
+            modules: vec![PlcHardwareModule {
+                slot: 0,
+                module_kind: PlcModuleKind::DigitalInput,
+                model: "XBF-DI16".to_string(),
+                point_count: Some(16),
+                address_windows: vec![PlcAddressWindow {
+                    family: "P".to_string(),
+                    start: 0,
+                    count: 16,
+                    io_direction: Some(PlcIoDirection::Input),
+                }],
+            }],
+        });
+        config.modbus.exposure = ModbusExposureSettings {
+            mode: ModbusExposureMode::Custom,
+            rules: vec![ModbusExposureRule {
+                family: "D".to_string(),
+                address_space: ModbusExposureAddressSpace::HoldingRegister,
+                offset: 0,
+                count: 200,
+            }],
+        };
+
+        let yaml = serde_yaml::to_string(&config).unwrap();
+        let parsed: ProjectConfig = serde_yaml::from_str(&yaml).unwrap();
+
+        assert_eq!(parsed.plc.hardware_topology.racks.len(), 1);
+        assert_eq!(parsed.plc.hardware_topology.racks[0].modules[0].slot, 0);
+        assert_eq!(parsed.modbus.exposure.mode, ModbusExposureMode::Custom);
+        assert_eq!(parsed.modbus.exposure.rules[0].family, "D");
     }
 
     #[test]

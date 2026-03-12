@@ -3,7 +3,10 @@
 //! Provides comprehensive validation for project configuration values.
 
 use crate::error::ModOneError;
-use super::config::{ProjectConfig, MemoryMapSettings, ModbusRtuSettings, ModbusTcpSettings, AutoSaveSettings};
+use super::config::{
+    AutoSaveSettings, MemoryMapSettings, ModbusExposureMode, ModbusExposureSettings,
+    ModbusRtuSettings, ModbusTcpSettings, PlcHardwareTopology, ProjectConfig,
+};
 
 /// Standard baud rates supported for serial communication
 const STANDARD_BAUD_RATES: &[u32] = &[
@@ -330,6 +333,102 @@ pub fn validate_auto_save(settings: &AutoSaveSettings, result: &mut ValidationRe
     }
 }
 
+/// Validate PLC hardware topology settings
+pub fn validate_hardware_topology(settings: &PlcHardwareTopology, result: &mut ValidationResult) {
+    for (rack_idx, rack) in settings.racks.iter().enumerate() {
+        if rack.rack_id.trim().is_empty() {
+            result.add_error(
+                format!("plc.hardware_topology.racks[{rack_idx}].rack_id"),
+                "Rack ID must not be empty",
+            );
+        }
+
+        let mut seen_slots = std::collections::BTreeSet::new();
+        for (module_idx, module) in rack.modules.iter().enumerate() {
+            if !seen_slots.insert(module.slot) {
+                result.add_error(
+                    format!(
+                        "plc.hardware_topology.racks[{rack_idx}].modules[{module_idx}].slot"
+                    ),
+                    format!("Duplicate slot {} in rack {}", module.slot, rack.rack_id),
+                );
+            }
+
+            if matches!(module.point_count, Some(0)) {
+                result.add_error(
+                    format!(
+                        "plc.hardware_topology.racks[{rack_idx}].modules[{module_idx}].point_count"
+                    ),
+                    "Point count must be greater than 0 when provided",
+                );
+            }
+
+            for (window_idx, window) in module.address_windows.iter().enumerate() {
+                if window.family.trim().is_empty() {
+                    result.add_error(
+                        format!("plc.hardware_topology.racks[{rack_idx}].modules[{module_idx}].address_windows[{window_idx}].family"),
+                        "Address window family must not be empty",
+                    );
+                }
+
+                if window.count == 0 {
+                    result.add_error(
+                        format!("plc.hardware_topology.racks[{rack_idx}].modules[{module_idx}].address_windows[{window_idx}].count"),
+                        "Address window count must be greater than 0",
+                    );
+                }
+
+                if window.io_direction.is_none()
+                    && window.family.eq_ignore_ascii_case("P")
+                {
+                    result.add_error(
+                        format!("plc.hardware_topology.racks[{rack_idx}].modules[{module_idx}].address_windows[{window_idx}].io_direction"),
+                        "Ambiguous P-address windows must declare io_direction",
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// Validate Modbus exposure settings
+pub fn validate_modbus_exposure(settings: &ModbusExposureSettings, result: &mut ValidationResult) {
+    if settings.mode != ModbusExposureMode::Custom {
+        return;
+    }
+
+    if settings.rules.is_empty() {
+        result.add_error(
+            "modbus.exposure.rules",
+            "Custom Modbus exposure mode requires at least one rule",
+        );
+        return;
+    }
+
+    for (idx, rule) in settings.rules.iter().enumerate() {
+        if rule.family.trim().is_empty() {
+            result.add_error(
+                format!("modbus.exposure.rules[{idx}].family"),
+                "Family must not be empty",
+            );
+        }
+
+        if rule.count == 0 {
+            result.add_error(
+                format!("modbus.exposure.rules[{idx}].count"),
+                "Count must be greater than 0",
+            );
+        }
+
+        if rule.offset as u32 + rule.count as u32 > 65535 {
+            result.add_error(
+                format!("modbus.exposure.rules[{idx}].offset"),
+                "Offset + count exceeds Modbus 16-bit address space",
+            );
+        }
+    }
+}
+
 // ============================================================================
 // Main Validation Function
 // ============================================================================
@@ -357,6 +456,12 @@ pub fn validate_project_config(config: &ProjectConfig) -> Result<(), ModOneError
     // Validate Modbus RTU settings
     validate_rtu_settings(&config.modbus.rtu, &mut result);
 
+    // Validate PLC topology
+    validate_hardware_topology(&config.plc.hardware_topology, &mut result);
+
+    // Validate Modbus exposure
+    validate_modbus_exposure(&config.modbus.exposure, &mut result);
+
     // Validate memory map
     validate_memory_map(&config.memory_map, &mut result);
 
@@ -373,7 +478,10 @@ pub fn validate_project_config(config: &ProjectConfig) -> Result<(), ModOneError
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::project::config::Parity;
+    use crate::project::config::{
+        ModbusExposureAddressSpace, ModbusExposureRule, Parity, PlcAddressWindow,
+        PlcHardwareModule, PlcIoDirection, PlcModuleKind, PlcRackKind, PlcRackTopology,
+    };
 
     #[test]
     fn test_validate_port() {
@@ -570,6 +678,89 @@ mod tests {
         };
         let mut result = ValidationResult::new();
         validate_auto_save(&settings, &mut result);
+        assert!(!result.is_valid());
+    }
+
+    #[test]
+    fn test_validate_hardware_topology_rejects_ambiguous_p_window() {
+        let topology = PlcHardwareTopology {
+            racks: vec![PlcRackTopology {
+                rack_id: "main".to_string(),
+                rack_kind: PlcRackKind::MainBase,
+                modules: vec![PlcHardwareModule {
+                    slot: 0,
+                    module_kind: PlcModuleKind::DigitalIo,
+                    model: "XBF-DI16DO16".to_string(),
+                    point_count: Some(32),
+                    address_windows: vec![PlcAddressWindow {
+                        family: "P".to_string(),
+                        start: 0,
+                        count: 16,
+                        io_direction: None,
+                    }],
+                }],
+            }],
+        };
+
+        let mut result = ValidationResult::new();
+        validate_hardware_topology(&topology, &mut result);
+        assert!(!result.is_valid());
+    }
+
+    #[test]
+    fn test_validate_hardware_topology_accepts_explicit_window_direction() {
+        let topology = PlcHardwareTopology {
+            racks: vec![PlcRackTopology {
+                rack_id: "main".to_string(),
+                rack_kind: PlcRackKind::MainBase,
+                modules: vec![PlcHardwareModule {
+                    slot: 0,
+                    module_kind: PlcModuleKind::DigitalOutput,
+                    model: "QY42P".to_string(),
+                    point_count: Some(16),
+                    address_windows: vec![PlcAddressWindow {
+                        family: "Y".to_string(),
+                        start: 0,
+                        count: 16,
+                        io_direction: Some(PlcIoDirection::Output),
+                    }],
+                }],
+            }],
+        };
+
+        let mut result = ValidationResult::new();
+        validate_hardware_topology(&topology, &mut result);
+        assert!(result.is_valid());
+    }
+
+    #[test]
+    fn test_validate_custom_modbus_exposure_requires_rules() {
+        let mut result = ValidationResult::new();
+        validate_modbus_exposure(
+            &ModbusExposureSettings {
+                mode: ModbusExposureMode::Custom,
+                rules: vec![],
+            },
+            &mut result,
+        );
+        assert!(!result.is_valid());
+    }
+
+    #[test]
+    fn test_validate_custom_modbus_exposure_rule_range() {
+        let mut result = ValidationResult::new();
+        validate_modbus_exposure(
+            &ModbusExposureSettings {
+                mode: ModbusExposureMode::Custom,
+                rules: vec![ModbusExposureRule {
+                    family: "D".to_string(),
+                    address_space: ModbusExposureAddressSpace::HoldingRegister,
+                    offset: 65530,
+                    count: 10,
+                }],
+            },
+            &mut result,
+        );
         assert!(!result.is_valid());
     }
 }

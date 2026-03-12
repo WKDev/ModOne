@@ -45,6 +45,7 @@ Exit criteria:
 - external writes do not bypass runtime mutation rules
 - LS compatibility is preserved
 - segmented or topology-driven LS `P` projection has an explicit mapping representation instead of one family-wide assumption
+- project-level `modbus.exposure` can select `recommended`, `legacy_wide`, or `custom` register exposure without rewriting profile code
 
 Rollback boundary:
 

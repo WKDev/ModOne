@@ -58,6 +58,16 @@ The MELSEC profile must provide its own Modbus mapping policy.
 
 No LS offset table may be reused by assumption. If a mapping rule is needed for v1 behavior, it must be defined explicitly in the profile.
 
+Recommended v1 exposure is intentionally conservative:
+
+- `Y` -> coil area
+- `X` -> discrete input area
+- `D` -> holding register area
+
+Broader mappings such as internal `M/L` exposure remain valid as compatibility or custom choices, but they must not be smuggled in as if every MELSEC project wants the same surface.
+
+MELSEC hardware is also topology-oriented in practice. The runtime therefore stores rack/base/module topology generically for both LS and MELSEC, even though v1 canonical semantics already distinguish `X` and `Y` without needing LS-style compatibility projection.
+
 ## Compatibility Note
 
 This profile is deliberately limited to `FX/Q common core`.

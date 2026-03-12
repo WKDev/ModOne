@@ -12,9 +12,10 @@ pub mod types;
 pub use event_bus::CanonicalMemoryBus;
 pub use memory::{CanonicalMemory, CanonicalMemoryError, CanonicalMemorySnapshot};
 pub use profile::{
-    resolve_vendor_profile, ModbusAddressSpace, ModbusMappingPolicy, ModbusMappingRule,
-    OpcUaAliasPolicy, VendorAddress, VendorAddressMetadata, VendorAddressNumberBase,
-    VendorDataKind, VendorProfile, VendorProfileError, VendorProfileId,
+    resolve_modbus_mapping_policy, resolve_vendor_profile, ModbusAddressSpace,
+    ModbusMappingPolicy, ModbusMappingRule, ModbusMappingSource, OpcUaAliasPolicy,
+    VendorAddress, VendorAddressMetadata,
+    VendorAddressNumberBase, VendorDataKind, VendorProfile, VendorProfileError, VendorProfileId,
 };
 pub use types::{
     CanonicalAccess, CanonicalAddress, CanonicalAreaKind, CanonicalMemoryBatchChange,

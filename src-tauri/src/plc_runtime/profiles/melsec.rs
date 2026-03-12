@@ -1,9 +1,10 @@
-use crate::project::PlcManufacturer;
+use crate::project::{PlcHardwareTopology, PlcManufacturer};
 
 use super::super::{
     profile::{
         format_vendor_address, split_vendor_address, ModbusAddressSpace, ModbusMappingPolicy,
-        ModbusMappingRule, OpcUaAliasPolicy, VendorAddress, VendorAddressMetadata,
+        ModbusMappingRule, ModbusMappingSource, OpcUaAliasPolicy, VendorAddress,
+        VendorAddressMetadata,
         VendorAddressNumberBase, VendorDataKind, VendorProfile, VendorProfileError,
         VendorProfileId,
     },
@@ -16,10 +17,11 @@ const MELSEC_FAMILIES: [&str; 7] = ["X", "Y", "M", "L", "T", "C", "D"];
 pub struct MelsecFxQProfile {
     model: String,
     io_number_base: VendorAddressNumberBase,
+    hardware_topology: PlcHardwareTopology,
 }
 
 impl MelsecFxQProfile {
-    pub fn new(model: String) -> Self {
+    pub fn new(model: String, hardware_topology: PlcHardwareTopology) -> Self {
         let lowered = model.to_ascii_lowercase();
         let io_number_base = if lowered.contains('q') {
             VendorAddressNumberBase::Hexadecimal
@@ -30,6 +32,7 @@ impl MelsecFxQProfile {
         Self {
             model,
             io_number_base,
+            hardware_topology,
         }
     }
 
@@ -121,6 +124,10 @@ impl VendorProfile for MelsecFxQProfile {
 
     fn manufacturer(&self) -> PlcManufacturer {
         PlcManufacturer::Mitsubishi
+    }
+
+    fn hardware_topology(&self) -> &PlcHardwareTopology {
+        &self.hardware_topology
     }
 
     fn model_hint(&self) -> Option<&str> {
@@ -231,9 +238,40 @@ impl VendorProfile for MelsecFxQProfile {
             .collect()
     }
 
-    fn modbus_mapping_policy(&self) -> ModbusMappingPolicy {
+    fn recommended_modbus_mapping_policy(&self) -> ModbusMappingPolicy {
         ModbusMappingPolicy {
             profile_id: self.id(),
+            source: ModbusMappingSource::Recommended,
+            rules: vec![
+                ModbusMappingRule {
+                    family: "Y".to_string(),
+                    canonical_area: CanonicalAreaKind::OutputBit,
+                    address_space: ModbusAddressSpace::Coil,
+                    offset: 0,
+                    count: 2048,
+                },
+                ModbusMappingRule {
+                    family: "X".to_string(),
+                    canonical_area: CanonicalAreaKind::InputBit,
+                    address_space: ModbusAddressSpace::DiscreteInput,
+                    offset: 0,
+                    count: 2048,
+                },
+                ModbusMappingRule {
+                    family: "D".to_string(),
+                    canonical_area: CanonicalAreaKind::DataWord,
+                    address_space: ModbusAddressSpace::HoldingRegister,
+                    offset: 0,
+                    count: 10000,
+                },
+            ],
+        }
+    }
+
+    fn legacy_modbus_mapping_policy(&self) -> ModbusMappingPolicy {
+        ModbusMappingPolicy {
+            profile_id: self.id(),
+            source: ModbusMappingSource::LegacyWide,
             rules: vec![
                 ModbusMappingRule {
                     family: "X".to_string(),
@@ -302,7 +340,7 @@ mod tests {
 
     #[test]
     fn parses_fx_addresses_with_octal_io() {
-        let profile = MelsecFxQProfile::new("FX5U".to_string());
+        let profile = MelsecFxQProfile::new("FX5U".to_string(), PlcHardwareTopology::default());
 
         let x = profile.parse_address("X17").expect("X address should parse");
         assert_eq!(x.index, 0o17);
@@ -315,7 +353,8 @@ mod tests {
 
     #[test]
     fn parses_q_addresses_with_hex_io() {
-        let profile = MelsecFxQProfile::new("Q03UDE".to_string());
+        let profile =
+            MelsecFxQProfile::new("Q03UDE".to_string(), PlcHardwareTopology::default());
 
         let y = profile.parse_address("Y1F").expect("Y address should parse");
         assert_eq!(y.index, 0x1F);
@@ -324,7 +363,7 @@ mod tests {
 
     #[test]
     fn rejects_unsupported_melsec_family() {
-        let profile = MelsecFxQProfile::new(String::new());
+        let profile = MelsecFxQProfile::new(String::new(), PlcHardwareTopology::default());
         let error = profile
             .parse_address("R100")
             .expect_err("R should be out of scope");

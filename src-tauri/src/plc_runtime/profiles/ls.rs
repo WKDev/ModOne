@@ -1,9 +1,9 @@
-use crate::project::PlcManufacturer;
+use crate::project::{PlcHardwareTopology, PlcIoDirection, PlcManufacturer};
 
 use super::super::{
     profile::{
         format_vendor_address, split_vendor_address, ModbusAddressSpace, ModbusMappingPolicy,
-        ModbusMappingRule, OpcUaAliasPolicy, VendorAddress, VendorAddressMetadata,
+        ModbusMappingRule, ModbusMappingSource, OpcUaAliasPolicy, VendorAddress, VendorAddressMetadata,
         VendorAddressNumberBase, VendorDataKind, VendorProfile, VendorProfileError,
         VendorProfileId,
     },
@@ -26,10 +26,11 @@ enum LsIoTopology {
 pub struct LsProfile {
     model: String,
     io_topology: LsIoTopology,
+    hardware_topology: PlcHardwareTopology,
 }
 
 impl LsProfile {
-    pub fn new(model: String) -> Self {
+    pub fn new(model: String, hardware_topology: PlcHardwareTopology) -> Self {
         let lowered = model.to_ascii_lowercase();
         let io_topology = if lowered.starts_with("xbc") || lowered.starts_with("xec") {
             // Current parser/runtime treats P as decimal, so the first compatibility cut keeps the
@@ -44,10 +45,32 @@ impl LsProfile {
             LsIoTopology::LegacyUnifiedP
         };
 
-        Self { model, io_topology }
+        Self {
+            model,
+            io_topology,
+            hardware_topology,
+        }
     }
 
     fn canonical_area_for_p(&self, index: u32) -> CanonicalAreaKind {
+        for rack in &self.hardware_topology.racks {
+            for module in &rack.modules {
+                for window in &module.address_windows {
+                    if !window.family.eq_ignore_ascii_case("P") {
+                        continue;
+                    }
+
+                    let end = window.start.saturating_add(window.count);
+                    if index >= window.start && index < end {
+                        return match window.io_direction {
+                            Some(PlcIoDirection::Output) => CanonicalAreaKind::OutputBit,
+                            _ => CanonicalAreaKind::InputBit,
+                        };
+                    }
+                }
+            }
+        }
+
         match self.io_topology {
             LsIoTopology::FixedCpuSplit {
                 input_end_exclusive,
@@ -68,6 +91,21 @@ impl LsProfile {
     }
 
     fn supports_p_output_alias(&self, canonical_index: u32) -> bool {
+        for rack in &self.hardware_topology.racks {
+            for module in &rack.modules {
+                for window in &module.address_windows {
+                    if window.family.eq_ignore_ascii_case("P")
+                        && matches!(window.io_direction, Some(PlcIoDirection::Output))
+                    {
+                        let end = window.start.saturating_add(window.count);
+                        if canonical_index >= window.start && canonical_index < end {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
         match self.io_topology {
             LsIoTopology::FixedCpuSplit {
                 input_end_exclusive: _,
@@ -218,6 +256,10 @@ impl VendorProfile for LsProfile {
         PlcManufacturer::LS
     }
 
+    fn hardware_topology(&self) -> &PlcHardwareTopology {
+        &self.hardware_topology
+    }
+
     fn model_hint(&self) -> Option<&str> {
         if self.model.is_empty() {
             None
@@ -348,9 +390,33 @@ impl VendorProfile for LsProfile {
             .collect()
     }
 
-    fn modbus_mapping_policy(&self) -> ModbusMappingPolicy {
+    fn recommended_modbus_mapping_policy(&self) -> ModbusMappingPolicy {
         ModbusMappingPolicy {
             profile_id: self.id(),
+            source: ModbusMappingSource::Recommended,
+            rules: vec![
+                ModbusMappingRule {
+                    family: "M".to_string(),
+                    canonical_area: CanonicalAreaKind::InternalBit,
+                    address_space: ModbusAddressSpace::Coil,
+                    offset: 0,
+                    count: 8192,
+                },
+                ModbusMappingRule {
+                    family: "D".to_string(),
+                    canonical_area: CanonicalAreaKind::DataWord,
+                    address_space: ModbusAddressSpace::HoldingRegister,
+                    offset: 0,
+                    count: 10000,
+                },
+            ],
+        }
+    }
+
+    fn legacy_modbus_mapping_policy(&self) -> ModbusMappingPolicy {
+        ModbusMappingPolicy {
+            profile_id: self.id(),
+            source: ModbusMappingSource::LegacyWide,
             rules: vec![
                 ModbusMappingRule {
                     family: "M".to_string(),
@@ -454,7 +520,7 @@ mod tests {
 
     #[test]
     fn parses_and_formats_ls_addresses() {
-        let profile = LsProfile::new("XGK".to_string());
+        let profile = LsProfile::new("XGK".to_string(), PlcHardwareTopology::default());
 
         let bit = profile.parse_address("M100").expect("M address should parse");
         assert_eq!(bit.family, "M");
@@ -478,7 +544,7 @@ mod tests {
 
     #[test]
     fn translates_ls_addresses_to_canonical() {
-        let profile = LsProfile::new(String::new());
+        let profile = LsProfile::new(String::new(), PlcHardwareTopology::default());
 
         let p = profile.to_canonical(&VendorAddress::new("P", 7)).unwrap();
         assert_eq!(p.area, CanonicalAreaKind::InputBit);
@@ -492,7 +558,7 @@ mod tests {
 
     #[test]
     fn projects_xbc_xec_p_ranges_onto_split_io_areas() {
-        let profile = LsProfile::new("XBC-DN32H".to_string());
+        let profile = LsProfile::new("XBC-DN32H".to_string(), PlcHardwareTopology::default());
 
         let p_in = profile.to_canonical(&VendorAddress::new("P", 5)).unwrap();
         assert_eq!(p_in.area, CanonicalAreaKind::InputBit);
@@ -503,7 +569,7 @@ mod tests {
 
     #[test]
     fn preserves_legacy_p_projection_for_slot_based_ls_models() {
-        let profile = LsProfile::new("XGT-CPUH".to_string());
+        let profile = LsProfile::new("XGT-CPUH".to_string(), PlcHardwareTopology::default());
 
         let p = profile.to_canonical(&VendorAddress::new("P", 25)).unwrap();
         assert_eq!(p.area, CanonicalAreaKind::InputBit);
@@ -516,8 +582,36 @@ mod tests {
     }
 
     #[test]
+    fn uses_topology_windows_for_slot_based_ls_p_projection() {
+        let profile = LsProfile::new(
+            "XGT-CPUH".to_string(),
+            PlcHardwareTopology {
+                racks: vec![crate::project::PlcRackTopology {
+                    rack_id: "main".to_string(),
+                    rack_kind: crate::project::PlcRackKind::MainBase,
+                    modules: vec![crate::project::PlcHardwareModule {
+                        slot: 3,
+                        module_kind: crate::project::PlcModuleKind::DigitalOutput,
+                        model: "XBF-DO16A".to_string(),
+                        point_count: Some(16),
+                        address_windows: vec![crate::project::PlcAddressWindow {
+                            family: "P".to_string(),
+                            start: 64,
+                            count: 16,
+                            io_direction: Some(crate::project::PlcIoDirection::Output),
+                        }],
+                    }],
+                }],
+            },
+        );
+
+        let p = profile.to_canonical(&VendorAddress::new("P", 70)).unwrap();
+        assert_eq!(p.area, CanonicalAreaKind::OutputBit);
+    }
+
+    #[test]
     fn rejects_out_of_range_ls_addresses() {
-        let profile = LsProfile::new(String::new());
+        let profile = LsProfile::new(String::new(), PlcHardwareTopology::default());
         let error = profile
             .parse_address("Z16")
             .expect_err("Z16 should be out of range");

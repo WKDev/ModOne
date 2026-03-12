@@ -54,8 +54,10 @@ pub mod validation;
 pub use auto_save::{AutoSaveManager, SharedAutoSaveManager};
 pub use config::{
     AutoSaveSettings, ConfigValidationError, MemoryMapSettings as ProjectMemoryMapSettings,
-    ModbusRtuSettings, ModbusSettings, ModbusTcpSettings, Parity, PlcManufacturer, PlcSettings,
-    ProjectConfig, ProjectSettings,
+    ModbusExposureAddressSpace, ModbusExposureMode, ModbusExposureRule, ModbusExposureSettings,
+    ModbusRtuSettings, ModbusSettings, ModbusTcpSettings, Parity, PlcAddressWindow,
+    PlcHardwareModule, PlcHardwareTopology, PlcIoDirection, PlcManufacturer, PlcModuleKind,
+    PlcRackKind, PlcRackTopology, PlcSettings, ProjectConfig, ProjectSettings,
 };
 pub use folder_project::{is_folder_project, is_legacy_project, FolderProject, FolderProjectError};
 pub use manifest::{DirectoryConfig, ProjectManifest, MANIFEST_VERSION};

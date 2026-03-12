@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::project::{PlcManufacturer, PlcSettings};
+use crate::project::{
+    ModbusExposureAddressSpace, ModbusExposureMode, ModbusExposureSettings, PlcHardwareTopology,
+    PlcManufacturer, PlcSettings,
+};
 
 use super::types::{CanonicalAccess, CanonicalAddress, CanonicalAreaKind};
 
@@ -126,7 +129,15 @@ pub struct ModbusMappingRule {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModbusMappingPolicy {
     pub profile_id: VendorProfileId,
+    pub source: ModbusMappingSource,
     pub rules: Vec<ModbusMappingRule>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ModbusMappingSource {
+    Recommended,
+    LegacyWide,
+    Custom,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -177,6 +188,7 @@ pub trait VendorProfile: Send + Sync {
     fn display_name(&self) -> &'static str;
     fn manufacturer(&self) -> PlcManufacturer;
     fn model_hint(&self) -> Option<&str>;
+    fn hardware_topology(&self) -> &PlcHardwareTopology;
     fn parse_address(&self, input: &str) -> Result<VendorAddress, VendorProfileError>;
     fn format_address(&self, address: &VendorAddress) -> Result<String, VendorProfileError>;
     fn validate_address(
@@ -188,11 +200,46 @@ pub trait VendorProfile: Send + Sync {
         address: &VendorAddress,
     ) -> Result<CanonicalAddress, VendorProfileError>;
     fn canonical_aliases(&self, canonical: &CanonicalAddress) -> Vec<VendorAddress>;
-    fn modbus_mapping_policy(&self) -> ModbusMappingPolicy;
+    fn recommended_modbus_mapping_policy(&self) -> ModbusMappingPolicy;
+    fn legacy_modbus_mapping_policy(&self) -> ModbusMappingPolicy;
     fn opcua_alias_policy(&self) -> OpcUaAliasPolicy;
 
     fn preferred_alias(&self, canonical: &CanonicalAddress) -> Option<VendorAddress> {
         self.canonical_aliases(canonical).into_iter().next()
+    }
+
+    fn modbus_mapping_policy(
+        &self,
+        exposure: Option<&ModbusExposureSettings>,
+    ) -> Result<ModbusMappingPolicy, VendorProfileError> {
+        let Some(exposure) = exposure else {
+            return Ok(self.recommended_modbus_mapping_policy());
+        };
+
+        match exposure.mode {
+            ModbusExposureMode::Recommended => Ok(self.recommended_modbus_mapping_policy()),
+            ModbusExposureMode::LegacyWide => Ok(self.legacy_modbus_mapping_policy()),
+            ModbusExposureMode::Custom => {
+                let mut rules = Vec::with_capacity(exposure.rules.len());
+                for rule in &exposure.rules {
+                    let family = rule.family.trim().to_uppercase();
+                    let metadata = self.validate_address(&VendorAddress::new(&family, 0))?;
+                    rules.push(ModbusMappingRule {
+                        family,
+                        canonical_area: metadata.canonical_area,
+                        address_space: map_exposure_space(rule.address_space),
+                        offset: rule.offset,
+                        count: rule.count,
+                    });
+                }
+
+                Ok(ModbusMappingPolicy {
+                    profile_id: self.id(),
+                    source: ModbusMappingSource::Custom,
+                    rules,
+                })
+            }
+        }
     }
 }
 
@@ -202,13 +249,32 @@ pub fn resolve_vendor_profile(
     match settings.manufacturer {
         PlcManufacturer::LS => Ok(Box::new(super::profiles::LsProfile::new(
             settings.model.clone(),
+            settings.hardware_topology.clone(),
         ))),
         PlcManufacturer::Mitsubishi => Ok(Box::new(super::profiles::MelsecFxQProfile::new(
             settings.model.clone(),
+            settings.hardware_topology.clone(),
         ))),
         PlcManufacturer::Siemens => Err(VendorProfileError::UnsupportedManufacturer {
             manufacturer: settings.manufacturer.to_string(),
         }),
+    }
+}
+
+pub fn resolve_modbus_mapping_policy(
+    plc_settings: &PlcSettings,
+    exposure: Option<&ModbusExposureSettings>,
+) -> Result<ModbusMappingPolicy, VendorProfileError> {
+    let profile = resolve_vendor_profile(plc_settings)?;
+    profile.modbus_mapping_policy(exposure)
+}
+
+fn map_exposure_space(space: ModbusExposureAddressSpace) -> ModbusAddressSpace {
+    match space {
+        ModbusExposureAddressSpace::Coil => ModbusAddressSpace::Coil,
+        ModbusExposureAddressSpace::DiscreteInput => ModbusAddressSpace::DiscreteInput,
+        ModbusExposureAddressSpace::HoldingRegister => ModbusAddressSpace::HoldingRegister,
+        ModbusExposureAddressSpace::InputRegister => ModbusAddressSpace::InputRegister,
     }
 }
 
@@ -309,6 +375,7 @@ mod tests {
             manufacturer: PlcManufacturer::LS,
             model: "XGK".to_string(),
             scan_time_ms: 10,
+            hardware_topology: PlcHardwareTopology::default(),
         })
         .expect("ls profile should resolve");
         assert_eq!(ls.id(), VendorProfileId::LsXg5000);
@@ -317,6 +384,7 @@ mod tests {
             manufacturer: PlcManufacturer::Mitsubishi,
             model: "FX5U".to_string(),
             scan_time_ms: 10,
+            hardware_topology: PlcHardwareTopology::default(),
         })
         .expect("melsec profile should resolve");
         assert_eq!(melsec.id(), VendorProfileId::MelsecFxQCommon);
@@ -328,6 +396,7 @@ mod tests {
             manufacturer: PlcManufacturer::Siemens,
             model: "S7".to_string(),
             scan_time_ms: 10,
+            hardware_topology: PlcHardwareTopology::default(),
         });
 
         assert!(matches!(
@@ -336,5 +405,57 @@ mod tests {
             VendorProfileError::UnsupportedManufacturer { .. }
             )
         ));
+    }
+
+    #[test]
+    fn uses_recommended_ls_modbus_exposure_by_default() {
+        let profile = resolve_vendor_profile(&PlcSettings {
+            manufacturer: PlcManufacturer::LS,
+            model: "XBC-DN32H".to_string(),
+            scan_time_ms: 10,
+            hardware_topology: PlcHardwareTopology::default(),
+        })
+        .expect("ls profile");
+
+        let policy = profile.modbus_mapping_policy(None).expect("policy");
+        assert_eq!(policy.source, ModbusMappingSource::Recommended);
+        assert_eq!(policy.rules.len(), 2);
+        assert_eq!(policy.rules[0].family, "M");
+        assert_eq!(policy.rules[1].family, "D");
+    }
+
+    #[test]
+    fn supports_custom_modbus_exposure_rules() {
+        let profile = resolve_vendor_profile(&PlcSettings {
+            manufacturer: PlcManufacturer::LS,
+            model: "XGK".to_string(),
+            scan_time_ms: 10,
+            hardware_topology: PlcHardwareTopology::default(),
+        })
+        .expect("ls profile");
+
+        let policy = profile
+            .modbus_mapping_policy(Some(&ModbusExposureSettings {
+                mode: ModbusExposureMode::Custom,
+                rules: vec![
+                    crate::project::ModbusExposureRule {
+                        family: "P".to_string(),
+                        address_space: ModbusExposureAddressSpace::DiscreteInput,
+                        offset: 100,
+                        count: 20,
+                    },
+                    crate::project::ModbusExposureRule {
+                        family: "D".to_string(),
+                        address_space: ModbusExposureAddressSpace::HoldingRegister,
+                        offset: 0,
+                        count: 200,
+                    },
+                ],
+            }))
+            .expect("custom policy");
+
+        assert_eq!(policy.source, ModbusMappingSource::Custom);
+        assert_eq!(policy.rules[0].offset, 100);
+        assert_eq!(policy.rules[1].canonical_area, CanonicalAreaKind::DataWord);
     }
 }

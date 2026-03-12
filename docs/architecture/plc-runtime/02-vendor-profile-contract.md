@@ -68,6 +68,16 @@ Profiles must supply:
 
 The canonical runtime remains the source of truth. Profiles only describe how vendor-visible addresses are projected.
 
+Project configuration must persist two separate concerns for profiles:
+
+- `hardware_topology`
+  - racks/bases/modules/address windows
+  - shared across LS, MELSEC, and future IEC-oriented hardware backplanes
+- `modbus.exposure`
+  - whether the project uses recommended vendor defaults, legacy-wide exposure, or explicit custom mappings
+
+Recommended Modbus exposure is allowed to differ from legacy-wide exposure. For example, LS projects may recommend `M -> coil` and `D -> holding register` while still supporting broader compatibility mappings when explicitly requested.
+
 ## Unsupported-Device Policy
 
 Unsupported addresses must fail explicitly.

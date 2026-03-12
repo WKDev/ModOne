@@ -88,7 +88,18 @@ Model-specific `P` notes:
 
 ## Current Modbus Mapping Table
 
-The LS profile must preserve the current mapping policy:
+The LS profile now distinguishes two Modbus views:
+
+- recommended exposure:
+  - `M` -> coil area, offset `0`
+  - `D` -> holding register area, offset `0`
+  - rationale:
+    - this matches the common project pattern where LS Modbus server exposure is user-selected and internal relays/data words are the primary interchange surface
+    - `P` is not assumed to be a default Modbus-facing area
+- legacy-wide exposure:
+  - preserves the broader static compatibility table below
+
+Legacy-wide compatibility table:
 
 - `M` -> coil area, offset `0`
 - `K` -> coil area, offset `8192`
@@ -107,6 +118,7 @@ Important limitation:
 
 - the current rule table is still family-based and cannot yet express slot-specific LS `P` segmentation
 - when LS Modbus is rebuilt on the canonical adapter, the mapping policy must grow enough metadata to express segmented `P` windows and future slot-based projections
+- because LS Modbus exposure is user-configurable in real deployments, the runtime must treat this table as a compatibility mode rather than the only valid LS mapping
 
 ## Compatibility Invariants
 

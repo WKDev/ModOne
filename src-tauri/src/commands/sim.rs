@@ -787,7 +787,7 @@ pub fn sim_read_memory_range(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::project::PlcManufacturer;
+    use crate::project::{PlcHardwareTopology, PlcManufacturer};
 
     #[test]
     fn resolves_ls_word_bit_addresses_through_profile_bridge() {
@@ -795,6 +795,7 @@ mod tests {
             manufacturer: PlcManufacturer::LS,
             model: "XGK".to_string(),
             scan_time_ms: 10,
+            hardware_topology: PlcHardwareTopology::default(),
         };
 
         let (normalized, resolved) =
@@ -817,6 +818,7 @@ mod tests {
             manufacturer: PlcManufacturer::Mitsubishi,
             model: "FX5U".to_string(),
             scan_time_ms: 10,
+            hardware_topology: PlcHardwareTopology::default(),
         };
 
         let (_, x) = resolve_sim_address_for_settings(&settings, "X10").expect("X should map");
@@ -853,6 +855,7 @@ mod tests {
             manufacturer: PlcManufacturer::LS,
             model: "XBC-DN32H".to_string(),
             scan_time_ms: 10,
+            hardware_topology: PlcHardwareTopology::default(),
         };
 
         let (_, input) = resolve_sim_address_for_settings(&settings, "P0019").expect("P19");

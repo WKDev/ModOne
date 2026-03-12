@@ -19,6 +19,7 @@ use crate::project::{
     CanvasData,
     MemorySnapshot,
     MopIntegrityResult,
+    PlcHardwareTopology,
     PlcSettings,
     ProjectConfig,
     ProjectError,
@@ -134,6 +135,7 @@ pub async fn create_project(
         manufacturer,
         model: plc_model,
         scan_time_ms: scan_time_ms.unwrap_or(10),
+        hardware_topology: PlcHardwareTopology::default(),
     };
 
     // Acquire lock and create project
