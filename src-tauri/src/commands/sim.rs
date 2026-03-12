@@ -12,6 +12,8 @@ use tauri::{AppHandle, Emitter, State};
 
 use crate::commands::canvas_sync::CanvasSyncState;
 use crate::modbus::ModbusMemory;
+use crate::plc_runtime::{resolve_vendor_profile, CanonicalAddress, CanonicalAreaKind, VendorAddress, VendorProfileId};
+use crate::project::{PlcSettings, SharedProjectManager};
 use crate::sim::{
     counter::CounterManager,
     debugger::{SimDebugger, StepResult, StepType},
@@ -122,6 +124,23 @@ pub enum DeviceValue {
     /// Word value (16-bit unsigned)
     #[serde(rename = "word")]
     Word { value: u16 },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ResolvedSimAddress {
+    Bit {
+        device: SimBitDeviceType,
+        address: u16,
+    },
+    Word {
+        device: SimWordDeviceType,
+        address: u16,
+    },
+    WordBit {
+        device: SimWordDeviceType,
+        address: u16,
+        bit: u8,
+    },
 }
 
 /// Simulation run parameters
@@ -445,123 +464,260 @@ pub fn sim_load_program(state: State<'_, SimState>, program: LadderProgram) -> R
 // Memory Access Commands
 // ============================================================================
 
-/// Parse device address string into type and address
-fn parse_device_address(address: &str) -> Result<(String, u16), String> {
-    if address.len() < 2 {
-        return Err(format!("Invalid device address: {}", address));
-    }
+fn active_plc_settings(project_state: Option<&State<'_, SharedProjectManager>>) -> Result<PlcSettings, String> {
+    let Some(project_state) = project_state else {
+        return Ok(PlcSettings::default());
+    };
 
-    let upper = address.to_uppercase();
+    let manager = project_state
+        .lock()
+        .map_err(|e| format!("Failed to acquire project manager lock: {}", e))?;
 
-    // Check for two-letter device types first (TD, CD)
-    if upper.len() >= 3 {
-        if upper.starts_with("TD") {
-            let addr: u16 = upper[2..]
-                .parse()
-                .map_err(|_| format!("Invalid address number: {}", address))?;
-            return Ok(("TD".to_string(), addr));
+    Ok(manager
+        .get_current_project()
+        .map(|project| project.config.plc.clone())
+        .unwrap_or_default())
+}
+
+fn resolve_sim_address(
+    project_state: Option<&State<'_, SharedProjectManager>>,
+    address: &str,
+) -> Result<(String, ResolvedSimAddress), String> {
+    let plc_settings = active_plc_settings(project_state)?;
+    resolve_sim_address_for_settings(&plc_settings, address)
+}
+
+fn resolve_sim_address_for_settings(
+    plc_settings: &PlcSettings,
+    address: &str,
+) -> Result<(String, ResolvedSimAddress), String> {
+    let profile = resolve_vendor_profile(&plc_settings).map_err(|e| e.to_string())?;
+    let vendor_address = profile.parse_address(address).map_err(|e| e.to_string())?;
+    let normalized_address = profile
+        .format_address(&vendor_address)
+        .unwrap_or_else(|_| address.to_uppercase());
+    let canonical = profile
+        .to_canonical(&vendor_address)
+        .map_err(|e| e.to_string())?;
+
+    let resolved = bridge_canonical_to_legacy_device(profile.id(), &canonical)?;
+    Ok((normalized_address, resolved))
+}
+
+fn resolve_range_address(
+    project_state: Option<&State<'_, SharedProjectManager>>,
+    family: &str,
+    index: u32,
+) -> Result<ResolvedSimAddress, String> {
+    let plc_settings = active_plc_settings(project_state)?;
+    resolve_range_address_for_settings(&plc_settings, family, index)
+}
+
+fn resolve_range_address_for_settings(
+    plc_settings: &PlcSettings,
+    family: &str,
+    index: u32,
+) -> Result<ResolvedSimAddress, String> {
+    let profile = resolve_vendor_profile(&plc_settings).map_err(|e| e.to_string())?;
+    let vendor_address = VendorAddress::new(family.to_uppercase(), index);
+    profile
+        .validate_address(&vendor_address)
+        .map_err(|e| e.to_string())?;
+    let canonical = profile
+        .to_canonical(&vendor_address)
+        .map_err(|e| e.to_string())?;
+
+    bridge_canonical_to_legacy_device(profile.id(), &canonical)
+}
+
+fn bridge_canonical_to_legacy_device(
+    profile_id: VendorProfileId,
+    canonical: &CanonicalAddress,
+) -> Result<ResolvedSimAddress, String> {
+    let address = u16::try_from(canonical.index)
+        .map_err(|_| format!("Address {} exceeds legacy simulator range", canonical.index))?;
+
+    let map_word = |device| {
+        if let Some(bit) = canonical.bit_index {
+            ResolvedSimAddress::WordBit { device, address, bit }
+        } else {
+            ResolvedSimAddress::Word { device, address }
         }
-        if upper.starts_with("CD") {
-            let addr: u16 = upper[2..]
-                .parse()
-                .map_err(|_| format!("Invalid address number: {}", address))?;
-            return Ok(("CD".to_string(), addr));
+    };
+
+    let resolved = match (profile_id, canonical.area) {
+        (VendorProfileId::LsXg5000, CanonicalAreaKind::InputBit) => ResolvedSimAddress::Bit {
+            device: SimBitDeviceType::P,
+            address,
+        },
+        (VendorProfileId::LsXg5000, CanonicalAreaKind::InternalBit) => ResolvedSimAddress::Bit {
+            device: SimBitDeviceType::M,
+            address,
+        },
+        (VendorProfileId::LsXg5000, CanonicalAreaKind::RetentiveBit) => ResolvedSimAddress::Bit {
+            device: SimBitDeviceType::K,
+            address,
+        },
+        (VendorProfileId::LsXg5000, CanonicalAreaKind::SpecialBit) => ResolvedSimAddress::Bit {
+            device: SimBitDeviceType::F,
+            address,
+        },
+        (VendorProfileId::LsXg5000, CanonicalAreaKind::TimerDoneBit) => ResolvedSimAddress::Bit {
+            device: SimBitDeviceType::T,
+            address,
+        },
+        (VendorProfileId::LsXg5000, CanonicalAreaKind::CounterDoneBit) => ResolvedSimAddress::Bit {
+            device: SimBitDeviceType::C,
+            address,
+        },
+        (VendorProfileId::LsXg5000, CanonicalAreaKind::DataWord) => {
+            map_word(SimWordDeviceType::D)
+        }
+        (VendorProfileId::LsXg5000, CanonicalAreaKind::RetentiveWord) => {
+            map_word(SimWordDeviceType::R)
+        }
+        (VendorProfileId::LsXg5000, CanonicalAreaKind::IndexWord) => {
+            map_word(SimWordDeviceType::Z)
+        }
+        (VendorProfileId::LsXg5000, CanonicalAreaKind::SystemWord) => {
+            map_word(SimWordDeviceType::N)
+        }
+        (VendorProfileId::LsXg5000, CanonicalAreaKind::TimerValueWord) => {
+            map_word(SimWordDeviceType::Td)
+        }
+        (VendorProfileId::LsXg5000, CanonicalAreaKind::CounterValueWord) => {
+            map_word(SimWordDeviceType::Cd)
+        }
+        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::OutputBit) => {
+            ResolvedSimAddress::Bit {
+                device: SimBitDeviceType::P,
+                address,
+            }
+        }
+        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::InternalBit) => {
+            ResolvedSimAddress::Bit {
+                device: SimBitDeviceType::M,
+                address,
+            }
+        }
+        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::RetentiveBit) => {
+            ResolvedSimAddress::Bit {
+                device: SimBitDeviceType::K,
+                address,
+            }
+        }
+        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::TimerDoneBit) => {
+            ResolvedSimAddress::Bit {
+                device: SimBitDeviceType::T,
+                address,
+            }
+        }
+        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::CounterDoneBit) => {
+            ResolvedSimAddress::Bit {
+                device: SimBitDeviceType::C,
+                address,
+            }
+        }
+        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::DataWord) => {
+            map_word(SimWordDeviceType::D)
+        }
+        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::InputBit) => {
+            return Err(
+                "MELSEC X input addresses are not bridged to a dedicated simulator input area yet"
+                    .to_string(),
+            );
+        }
+        (_, CanonicalAreaKind::OutputBit) => {
+            return Err("OutputBit is not bridged by the active simulator profile yet".to_string());
+        }
+        (_, CanonicalAreaKind::SystemBit) => {
+            return Err("SystemBit is not bridged by the legacy simulator memory".to_string());
+        }
+        (_, area) => {
+            return Err(format!(
+                "Canonical area {:?} is not bridged to the legacy simulator memory yet",
+                area
+            ));
+        }
+    };
+
+    Ok(resolved)
+}
+
+fn read_resolved_device(
+    memory: &Arc<DeviceMemory>,
+    resolved: ResolvedSimAddress,
+) -> Result<DeviceValue, String> {
+    match resolved {
+        ResolvedSimAddress::Bit { device, address } => {
+            let value = memory.read_bit(device, address).map_err(|e| e.to_string())?;
+            Ok(DeviceValue::Bit { value })
+        }
+        ResolvedSimAddress::Word { device, address } => {
+            let value = memory.read_word(device, address).map_err(|e| e.to_string())?;
+            Ok(DeviceValue::Word { value })
+        }
+        ResolvedSimAddress::WordBit {
+            device,
+            address,
+            bit,
+        } => {
+            let value = memory
+                .read_word_bit(device, address, bit)
+                .map_err(|e| e.to_string())?;
+            Ok(DeviceValue::Bit { value })
         }
     }
+}
 
-    let device_type = &upper[0..1];
-    let addr: u16 = upper[1..]
-        .parse()
-        .map_err(|_| format!("Invalid address number: {}", address))?;
-
-    Ok((device_type.to_string(), addr))
+fn write_resolved_device(
+    memory: &Arc<DeviceMemory>,
+    resolved: ResolvedSimAddress,
+    value: &DeviceValue,
+) -> Result<(), String> {
+    match (resolved, value) {
+        (ResolvedSimAddress::Bit { device, address }, DeviceValue::Bit { value }) => memory
+            .write_bit(device, address, *value)
+            .map_err(|e| e.to_string()),
+        (ResolvedSimAddress::Word { device, address }, DeviceValue::Word { value }) => memory
+            .write_word(device, address, *value)
+            .map_err(|e| e.to_string()),
+        (
+            ResolvedSimAddress::WordBit {
+                device,
+                address,
+                bit,
+            },
+            DeviceValue::Bit { value },
+        ) => memory
+            .write_word_bit(device, address, bit, *value)
+            .map_err(|e| e.to_string()),
+        (ResolvedSimAddress::Bit { .. }, DeviceValue::Word { .. }) => {
+            Err("Bit device requires a bit value".to_string())
+        }
+        (ResolvedSimAddress::Word { .. }, DeviceValue::Bit { .. }) => {
+            Err("Word device requires a word value".to_string())
+        }
+        (ResolvedSimAddress::WordBit { .. }, DeviceValue::Word { .. }) => {
+            Err("Word-bit address requires a bit value".to_string())
+        }
+    }
 }
 
 /// Read a device value
 #[tauri::command]
-pub fn sim_read_device(state: State<'_, SimState>, address: String) -> Result<DeviceValue, String> {
+pub fn sim_read_device(
+    state: State<'_, SimState>,
+    project_state: State<'_, SharedProjectManager>,
+    address: String,
+) -> Result<DeviceValue, String> {
     let engine_guard = state.engine.lock();
 
     let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
 
     let memory = engine.memory();
-    let (device_type, addr) = parse_device_address(&address)?;
-
-    match device_type.as_str() {
-        "P" => {
-            let value = memory
-                .read_bit(SimBitDeviceType::P, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Bit { value })
-        }
-        "M" => {
-            let value = memory
-                .read_bit(SimBitDeviceType::M, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Bit { value })
-        }
-        "K" => {
-            let value = memory
-                .read_bit(SimBitDeviceType::K, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Bit { value })
-        }
-        "F" => {
-            let value = memory
-                .read_bit(SimBitDeviceType::F, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Bit { value })
-        }
-        "T" => {
-            let value = memory
-                .read_bit(SimBitDeviceType::T, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Bit { value })
-        }
-        "C" => {
-            let value = memory
-                .read_bit(SimBitDeviceType::C, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Bit { value })
-        }
-        "D" => {
-            let value = memory
-                .read_word(SimWordDeviceType::D, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Word { value })
-        }
-        "R" => {
-            let value = memory
-                .read_word(SimWordDeviceType::R, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Word { value })
-        }
-        "Z" => {
-            let value = memory
-                .read_word(SimWordDeviceType::Z, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Word { value })
-        }
-        "N" => {
-            let value = memory
-                .read_word(SimWordDeviceType::N, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Word { value })
-        }
-        "TD" => {
-            let value = memory
-                .read_word(SimWordDeviceType::Td, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Word { value })
-        }
-        "CD" => {
-            let value = memory
-                .read_word(SimWordDeviceType::Cd, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Word { value })
-        }
-        _ => Err(format!("Unknown device type: {}", device_type)),
-    }
+    let (_, resolved) = resolve_sim_address(Some(&project_state), &address)?;
+    read_resolved_device(memory, resolved)
 }
 
 /// Write a device value
@@ -569,6 +725,7 @@ pub fn sim_read_device(state: State<'_, SimState>, address: String) -> Result<De
 pub fn sim_write_device(
     app: AppHandle,
     state: State<'_, SimState>,
+    project_state: State<'_, SharedProjectManager>,
     address: String,
     value: DeviceValue,
 ) -> Result<(), String> {
@@ -577,55 +734,17 @@ pub fn sim_write_device(
     let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
 
     let memory = engine.memory();
-    let (device_type, addr) = parse_device_address(&address)?;
+    let (normalized_address, resolved) = resolve_sim_address(Some(&project_state), &address)?;
 
     // Get old value for change event
-    let old_value = sim_read_device_internal(memory, &device_type, addr)?;
-
-    match (&device_type[..], &value) {
-        ("P", DeviceValue::Bit { value }) => {
-            memory
-                .write_bit(SimBitDeviceType::P, addr, *value)
-                .map_err(|e| e.to_string())?;
-        }
-        ("M", DeviceValue::Bit { value }) => {
-            memory
-                .write_bit(SimBitDeviceType::M, addr, *value)
-                .map_err(|e| e.to_string())?;
-        }
-        ("K", DeviceValue::Bit { value }) => {
-            memory
-                .write_bit(SimBitDeviceType::K, addr, *value)
-                .map_err(|e| e.to_string())?;
-        }
-        ("D", DeviceValue::Word { value }) => {
-            memory
-                .write_word(SimWordDeviceType::D, addr, *value)
-                .map_err(|e| e.to_string())?;
-        }
-        ("R", DeviceValue::Word { value }) => {
-            memory
-                .write_word(SimWordDeviceType::R, addr, *value)
-                .map_err(|e| e.to_string())?;
-        }
-        ("Z", DeviceValue::Word { value }) => {
-            memory
-                .write_word(SimWordDeviceType::Z, addr, *value)
-                .map_err(|e| e.to_string())?;
-        }
-        ("N", DeviceValue::Word { value }) => {
-            memory
-                .write_word(SimWordDeviceType::N, addr, *value)
-                .map_err(|e| e.to_string())?;
-        }
-        _ => return Err(format!("Cannot write to device type: {}", device_type)),
-    }
+    let old_value = read_resolved_device(memory, resolved)?;
+    write_resolved_device(memory, resolved, &value)?;
 
     // Emit device change event
     let _ = app.emit(
         SIM_DEVICE_CHANGE_EVENT,
         serde_json::json!({
-            "address": address,
+            "address": normalized_address,
             "oldValue": old_value,
             "newValue": value
         }),
@@ -634,7 +753,7 @@ pub fn sim_write_device(
     // Check device breakpoints
     let debugger = state.debugger();
     if let Some(hit) = debugger.check_device_change(
-        &address,
+        &normalized_address,
         serde_json::to_value(&old_value).unwrap_or_default(),
         serde_json::to_value(&value).unwrap_or_default(),
     ) {
@@ -645,93 +764,11 @@ pub fn sim_write_device(
     Ok(())
 }
 
-/// Internal helper to read device value
-fn sim_read_device_internal(
-    memory: &Arc<DeviceMemory>,
-    device_type: &str,
-    addr: u16,
-) -> Result<DeviceValue, String> {
-    match device_type {
-        "P" => {
-            let value = memory
-                .read_bit(SimBitDeviceType::P, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Bit { value })
-        }
-        "M" => {
-            let value = memory
-                .read_bit(SimBitDeviceType::M, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Bit { value })
-        }
-        "K" => {
-            let value = memory
-                .read_bit(SimBitDeviceType::K, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Bit { value })
-        }
-        "F" => {
-            let value = memory
-                .read_bit(SimBitDeviceType::F, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Bit { value })
-        }
-        "T" => {
-            let value = memory
-                .read_bit(SimBitDeviceType::T, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Bit { value })
-        }
-        "C" => {
-            let value = memory
-                .read_bit(SimBitDeviceType::C, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Bit { value })
-        }
-        "D" => {
-            let value = memory
-                .read_word(SimWordDeviceType::D, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Word { value })
-        }
-        "R" => {
-            let value = memory
-                .read_word(SimWordDeviceType::R, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Word { value })
-        }
-        "Z" => {
-            let value = memory
-                .read_word(SimWordDeviceType::Z, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Word { value })
-        }
-        "N" => {
-            let value = memory
-                .read_word(SimWordDeviceType::N, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Word { value })
-        }
-        "TD" => {
-            let value = memory
-                .read_word(SimWordDeviceType::Td, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Word { value })
-        }
-        "CD" => {
-            let value = memory
-                .read_word(SimWordDeviceType::Cd, addr)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Word { value })
-        }
-        _ => Err(format!("Unknown device type: {}", device_type)),
-    }
-}
-
 /// Read a range of device memory
 #[tauri::command]
 pub fn sim_read_memory_range(
     state: State<'_, SimState>,
+    project_state: State<'_, SharedProjectManager>,
     device_type: String,
     start: u16,
     count: u16,
@@ -744,12 +781,82 @@ pub fn sim_read_memory_range(
     let mut values = Vec::with_capacity(count as usize);
 
     for i in 0..count {
-        let addr = start + i;
-        let value = sim_read_device_internal(memory, &device_type, addr)?;
+        let addr = start.saturating_add(i);
+        let resolved = resolve_range_address(Some(&project_state), &device_type, addr as u32)?;
+        let value = read_resolved_device(memory, resolved)?;
         values.push(value);
     }
 
     Ok(values)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::project::PlcManufacturer;
+
+    #[test]
+    fn resolves_ls_word_bit_addresses_through_profile_bridge() {
+        let settings = PlcSettings {
+            manufacturer: PlcManufacturer::LS,
+            model: "XGK".to_string(),
+            scan_time_ms: 10,
+        };
+
+        let (normalized, resolved) =
+            resolve_sim_address_for_settings(&settings, "d0100.5").expect("ls address");
+
+        assert_eq!(normalized, "D0100.5");
+        assert_eq!(
+            resolved,
+            ResolvedSimAddress::WordBit {
+                device: SimWordDeviceType::D,
+                address: 100,
+                bit: 5,
+            }
+        );
+    }
+
+    #[test]
+    fn resolves_melsec_internal_and_output_addresses() {
+        let settings = PlcSettings {
+            manufacturer: PlcManufacturer::Mitsubishi,
+            model: "FX5U".to_string(),
+            scan_time_ms: 10,
+        };
+
+        let (_, m) = resolve_sim_address_for_settings(&settings, "M100").expect("M should map");
+        assert_eq!(
+            m,
+            ResolvedSimAddress::Bit {
+                device: SimBitDeviceType::M,
+                address: 100,
+            }
+        );
+
+        let (_, y) = resolve_sim_address_for_settings(&settings, "Y17").expect("Y should map");
+        assert_eq!(
+            y,
+            ResolvedSimAddress::Bit {
+                device: SimBitDeviceType::P,
+                address: 0o17,
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_melsec_input_addresses_until_canonical_cutover() {
+        let settings = PlcSettings {
+            manufacturer: PlcManufacturer::Mitsubishi,
+            model: "FX5U".to_string(),
+            scan_time_ms: 10,
+        };
+
+        let error =
+            resolve_sim_address_for_settings(&settings, "X10").expect_err("X should fail");
+
+        assert!(error.contains("not bridged"));
+    }
 }
 
 /// Get memory snapshot
