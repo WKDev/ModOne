@@ -10,7 +10,9 @@ pub enum MemoryError {
     #[error("Address out of range: {address} (valid: {start}-{end})")]
     AddressOutOfRange { address: u16, start: u16, end: u16 },
 
-    #[error("Count exceeds available range: requested {count} from {address}, available {available}")]
+    #[error(
+        "Count exceeds available range: requested {count} from {address}, available {available}"
+    )]
     CountExceedsRange {
         address: u16,
         count: u16,
@@ -55,15 +57,23 @@ pub enum ModbusError {
 /// Configuration for Modbus memory map sizes
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryMapSettings {
+    /// Starting address for coils.
+    pub coil_start: u16,
     /// Number of coils (read/write bits, function codes 0x01, 0x05, 0x0F)
     pub coil_count: u16,
 
+    /// Starting address for discrete inputs.
+    pub discrete_input_start: u16,
     /// Number of discrete inputs (read-only bits, function code 0x02)
     pub discrete_input_count: u16,
 
+    /// Starting address for holding registers.
+    pub holding_register_start: u16,
     /// Number of holding registers (read/write 16-bit, function codes 0x03, 0x06, 0x10)
     pub holding_register_count: u16,
 
+    /// Starting address for input registers.
+    pub input_register_start: u16,
     /// Number of input registers (read-only 16-bit, function code 0x04)
     pub input_register_count: u16,
 }
@@ -71,9 +81,13 @@ pub struct MemoryMapSettings {
 impl Default for MemoryMapSettings {
     fn default() -> Self {
         Self {
+            coil_start: 0,
             coil_count: 10000,
+            discrete_input_start: 0,
             discrete_input_count: 10000,
+            holding_register_start: 0,
             holding_register_count: 10000,
+            input_register_start: 0,
             input_register_count: 10000,
         }
     }
@@ -83,9 +97,13 @@ impl MemoryMapSettings {
     /// Create settings with maximum 16-bit address space
     pub fn max() -> Self {
         Self {
+            coil_start: 0,
             coil_count: 65535,
+            discrete_input_start: 0,
             discrete_input_count: 65535,
+            holding_register_start: 0,
             holding_register_count: 65535,
+            input_register_start: 0,
             input_register_count: 65535,
         }
     }
@@ -93,9 +111,13 @@ impl MemoryMapSettings {
     /// Create settings with minimum sizes (1 element each)
     pub fn min() -> Self {
         Self {
+            coil_start: 0,
             coil_count: 1,
+            discrete_input_start: 0,
             discrete_input_count: 1,
+            holding_register_start: 0,
             holding_register_count: 1,
+            input_register_start: 0,
             input_register_count: 1,
         }
     }

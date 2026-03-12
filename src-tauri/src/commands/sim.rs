@@ -11,9 +11,14 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 
 use crate::commands::canvas_sync::CanvasSyncState;
+use crate::commands::modbus::{
+    modbus_start_project_simulation, modbus_stop_project_simulation, ModbusState,
+};
 use crate::modbus::ModbusMemory;
-use crate::plc_runtime::{resolve_vendor_profile, CanonicalAddress, CanonicalAreaKind, VendorAddress, VendorProfileId};
-use crate::project::{PlcSettings, SharedProjectManager};
+use crate::plc_runtime::{
+    resolve_vendor_profile, CanonicalAddress, CanonicalAreaKind, VendorAddress, VendorProfileId,
+};
+use crate::project::{PlcSettings, ProjectConfig, SharedProjectManager};
 use crate::sim::{
     counter::CounterManager,
     debugger::{SimDebugger, StepResult, StepType},
@@ -170,9 +175,18 @@ const SIM_BREAKPOINT_HIT_EVENT: &str = "sim:breakpoint-hit";
 pub async fn sim_run(
     app: AppHandle,
     state: State<'_, SimState>,
+    modbus_state: State<'_, ModbusState>,
+    project_state: State<'_, SharedProjectManager>,
     canvas_sync_state: State<'_, CanvasSyncState>,
     params: Option<SimRunParams>,
 ) -> Result<(), String> {
+    let project_config = current_project_config(&project_state)?;
+    if let Some(project_config) = project_config.as_ref() {
+        if project_config.modbus.simulation.enabled {
+            modbus_start_project_simulation(&modbus_state, app.clone(), project_config).await?;
+        }
+    }
+
     let mut engine_guard = state.engine.lock();
 
     // Check if already running
@@ -282,13 +296,22 @@ pub async fn sim_run(
 
 /// Stop the simulation
 #[tauri::command]
-pub fn sim_stop(app: AppHandle, state: State<'_, SimState>) -> Result<(), String> {
-    let engine_guard = state.engine.lock();
+pub async fn sim_stop(
+    app: AppHandle,
+    state: State<'_, SimState>,
+    modbus_state: State<'_, ModbusState>,
+) -> Result<(), String> {
+    let is_running = {
+        let engine_guard = state.engine.lock();
+        if let Some(ref engine) = *engine_guard {
+            engine.stop();
+            true
+        } else {
+            false
+        }
+    };
 
-    if let Some(ref engine) = *engine_guard {
-        engine.stop();
-        drop(engine_guard);
-
+    if is_running {
         if let Some(handle) = state.scan_task.lock().take() {
             handle.abort();
         }
@@ -307,6 +330,7 @@ pub fn sim_stop(app: AppHandle, state: State<'_, SimState>) -> Result<(), String
             }),
         );
 
+        modbus_stop_project_simulation(&modbus_state).await?;
         Ok(())
     } else {
         Err("Simulation is not running".to_string())
@@ -383,17 +407,22 @@ pub fn sim_resume(app: AppHandle, state: State<'_, SimState>) -> Result<(), Stri
 
 /// Reset the simulation
 #[tauri::command]
-pub fn sim_reset(app: AppHandle, state: State<'_, SimState>) -> Result<(), String> {
-    let mut engine_guard = state.engine.lock();
+pub async fn sim_reset(
+    app: AppHandle,
+    state: State<'_, SimState>,
+    modbus_state: State<'_, ModbusState>,
+) -> Result<(), String> {
+    {
+        let mut engine_guard = state.engine.lock();
 
-    // Stop if running
-    if let Some(ref engine) = *engine_guard {
-        engine.stop();
+        // Stop if running
+        if let Some(ref engine) = *engine_guard {
+            engine.stop();
+        }
+
+        // Clear the engine
+        *engine_guard = None;
     }
-
-    // Clear the engine
-    *engine_guard = None;
-    drop(engine_guard);
 
     if let Some(handle) = state.scan_task.lock().take() {
         handle.abort();
@@ -419,6 +448,7 @@ pub fn sim_reset(app: AppHandle, state: State<'_, SimState>) -> Result<(), Strin
         }),
     );
 
+    modbus_stop_project_simulation(&modbus_state).await?;
     Ok(())
 }
 
@@ -464,7 +494,9 @@ pub fn sim_load_program(state: State<'_, SimState>, program: LadderProgram) -> R
 // Memory Access Commands
 // ============================================================================
 
-fn active_plc_settings(project_state: Option<&State<'_, SharedProjectManager>>) -> Result<PlcSettings, String> {
+fn active_plc_settings(
+    project_state: Option<&State<'_, SharedProjectManager>>,
+) -> Result<PlcSettings, String> {
     let Some(project_state) = project_state else {
         return Ok(PlcSettings::default());
     };
@@ -477,6 +509,18 @@ fn active_plc_settings(project_state: Option<&State<'_, SharedProjectManager>>) 
         .get_current_project()
         .map(|project| project.config.plc.clone())
         .unwrap_or_default())
+}
+
+fn current_project_config(
+    project_state: &State<'_, SharedProjectManager>,
+) -> Result<Option<ProjectConfig>, String> {
+    let manager = project_state
+        .lock()
+        .map_err(|e| format!("Failed to acquire project manager lock: {}", e))?;
+
+    Ok(manager
+        .get_current_project()
+        .map(|project| project.config.clone()))
 }
 
 fn resolve_sim_address(
@@ -539,7 +583,11 @@ fn bridge_canonical_to_legacy_device(
 
     let map_word = |device| {
         if let Some(bit) = canonical.bit_index {
-            ResolvedSimAddress::WordBit { device, address, bit }
+            ResolvedSimAddress::WordBit {
+                device,
+                address,
+                bit,
+            }
         } else {
             ResolvedSimAddress::Word { device, address }
         }
@@ -571,15 +619,11 @@ fn bridge_canonical_to_legacy_device(
             device: SimBitDeviceType::C,
             address,
         },
-        (VendorProfileId::LsXg5000, CanonicalAreaKind::DataWord) => {
-            map_word(SimWordDeviceType::D)
-        }
+        (VendorProfileId::LsXg5000, CanonicalAreaKind::DataWord) => map_word(SimWordDeviceType::D),
         (VendorProfileId::LsXg5000, CanonicalAreaKind::RetentiveWord) => {
             map_word(SimWordDeviceType::R)
         }
-        (VendorProfileId::LsXg5000, CanonicalAreaKind::IndexWord) => {
-            map_word(SimWordDeviceType::Z)
-        }
+        (VendorProfileId::LsXg5000, CanonicalAreaKind::IndexWord) => map_word(SimWordDeviceType::Z),
         (VendorProfileId::LsXg5000, CanonicalAreaKind::SystemWord) => {
             map_word(SimWordDeviceType::N)
         }
@@ -589,14 +633,18 @@ fn bridge_canonical_to_legacy_device(
         (VendorProfileId::LsXg5000, CanonicalAreaKind::CounterValueWord) => {
             map_word(SimWordDeviceType::Cd)
         }
-        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::InputBit) => ResolvedSimAddress::Bit {
-            device: SimBitDeviceType::X,
-            address,
-        },
-        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::OutputBit) => ResolvedSimAddress::Bit {
-            device: SimBitDeviceType::Y,
-            address,
-        },
+        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::InputBit) => {
+            ResolvedSimAddress::Bit {
+                device: SimBitDeviceType::X,
+                address,
+            }
+        }
+        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::OutputBit) => {
+            ResolvedSimAddress::Bit {
+                device: SimBitDeviceType::Y,
+                address,
+            }
+        }
         (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::InternalBit) => {
             ResolvedSimAddress::Bit {
                 device: SimBitDeviceType::M,
@@ -644,11 +692,15 @@ fn read_resolved_device(
 ) -> Result<DeviceValue, String> {
     match resolved {
         ResolvedSimAddress::Bit { device, address } => {
-            let value = memory.read_bit(device, address).map_err(|e| e.to_string())?;
+            let value = memory
+                .read_bit(device, address)
+                .map_err(|e| e.to_string())?;
             Ok(DeviceValue::Bit { value })
         }
         ResolvedSimAddress::Word { device, address } => {
-            let value = memory.read_word(device, address).map_err(|e| e.to_string())?;
+            let value = memory
+                .read_word(device, address)
+                .map_err(|e| e.to_string())?;
             Ok(DeviceValue::Word { value })
         }
         ResolvedSimAddress::WordBit {

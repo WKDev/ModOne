@@ -172,8 +172,12 @@ impl ModServerSync {
     /// On the next input sync, this address will be synced to the
     /// corresponding D register.
     pub fn mark_external_write(&self, address: u16) {
-        // Only track writes within D register range
-        if address < D_SYNC_COUNT {
+        let config = self.modbus_memory.config();
+        let start = config.holding_register_start;
+        let visible_count = config.holding_register_count.min(D_SYNC_COUNT);
+        let end = start.saturating_add(visible_count.saturating_sub(1));
+
+        if visible_count > 0 && address >= start && address <= end {
             self.external_write_flags.write().insert(address);
         }
     }
@@ -207,10 +211,16 @@ impl ModServerSync {
 
     /// Sync Discrete Inputs to P (Input Relay) in DeviceMemory
     fn sync_discrete_inputs_to_p(&self) -> SyncResult<()> {
+        let config = self.modbus_memory.config();
+        let count = config.discrete_input_count.min(P_SYNC_COUNT);
+        if count == 0 {
+            return Ok(());
+        }
+
         // Read Discrete Inputs from ModServer
         let di_values = self
             .modbus_memory
-            .read_discrete_inputs(0, P_SYNC_COUNT)
+            .read_discrete_inputs(config.discrete_input_start, count)
             .map_err(|e| SyncError::ModbusMemoryError(e.to_string()))?;
 
         // Write to P (Input Relay) in DeviceMemory
@@ -228,16 +238,33 @@ impl ModServerSync {
 
     /// Sync external Holding Register writes to D registers
     fn sync_external_hr_to_d(&self) -> SyncResult<()> {
+        let config = self.modbus_memory.config();
+        let hr_start = config.holding_register_start;
+        let visible_count = config.holding_register_count.min(D_SYNC_COUNT);
+        if visible_count == 0 {
+            self.external_write_flags.write().clear();
+            self.modbus_memory.take_external_holding_writes();
+            return Ok(());
+        }
+
         // Get and clear external write flags atomically
-        let external_writes: Vec<u16> = {
+        let mut external_writes: HashSet<u16> = {
             let mut flags = self.external_write_flags.write();
-            let writes: Vec<u16> = flags.iter().copied().collect();
+            let writes: HashSet<u16> = flags.iter().copied().collect();
             flags.clear();
             writes
         };
+        external_writes.extend(self.modbus_memory.take_external_holding_writes());
 
         // Sync each externally written address
         for address in external_writes {
+            let Some(relative) = address.checked_sub(hr_start) else {
+                continue;
+            };
+            if relative >= visible_count {
+                continue;
+            }
+
             let value = self
                 .modbus_memory
                 .read_holding_registers(address, 1)
@@ -245,7 +272,7 @@ impl ModServerSync {
 
             if let Some(&hr_value) = value.first() {
                 self.sim_memory
-                    .write_word(SimWordDeviceType::D, address, hr_value)
+                    .write_word(SimWordDeviceType::D, relative, hr_value)
                     .map_err(|e| SyncError::DeviceMemoryError(e.to_string()))?;
             }
         }
@@ -268,16 +295,60 @@ impl ModServerSync {
     /// - TD registers → Holding Registers at offset 28208
     /// - CD registers → Holding Registers at offset 30256
     pub fn sync_outputs(&self) -> SyncResult<()> {
+        let config = self.modbus_memory.config();
+
         // Sync bit devices to Coils
-        self.sync_bit_device_to_coils(SimBitDeviceType::M, M_COIL_OFFSET, M_SYNC_COUNT)?;
-        self.sync_bit_device_to_coils(SimBitDeviceType::K, K_COIL_OFFSET, K_SYNC_COUNT)?;
-        self.sync_bit_device_to_coils(SimBitDeviceType::T, T_COIL_OFFSET, T_SYNC_COUNT)?;
-        self.sync_bit_device_to_coils(SimBitDeviceType::C, C_COIL_OFFSET, C_SYNC_COUNT)?;
+        self.sync_bit_device_to_coils(
+            SimBitDeviceType::M,
+            config.coil_start.saturating_add(M_COIL_OFFSET),
+            M_COIL_OFFSET,
+            config.coil_count,
+            M_SYNC_COUNT,
+        )?;
+        self.sync_bit_device_to_coils(
+            SimBitDeviceType::K,
+            config.coil_start.saturating_add(K_COIL_OFFSET),
+            K_COIL_OFFSET,
+            config.coil_count,
+            K_SYNC_COUNT,
+        )?;
+        self.sync_bit_device_to_coils(
+            SimBitDeviceType::T,
+            config.coil_start.saturating_add(T_COIL_OFFSET),
+            T_COIL_OFFSET,
+            config.coil_count,
+            T_SYNC_COUNT,
+        )?;
+        self.sync_bit_device_to_coils(
+            SimBitDeviceType::C,
+            config.coil_start.saturating_add(C_COIL_OFFSET),
+            C_COIL_OFFSET,
+            config.coil_count,
+            C_SYNC_COUNT,
+        )?;
 
         // Sync word devices to Holding Registers
-        self.sync_word_device_to_hr(SimWordDeviceType::D, D_HR_OFFSET, D_SYNC_COUNT)?;
-        self.sync_word_device_to_hr(SimWordDeviceType::Td, TD_HR_OFFSET, TD_SYNC_COUNT)?;
-        self.sync_word_device_to_hr(SimWordDeviceType::Cd, CD_HR_OFFSET, CD_SYNC_COUNT)?;
+        self.sync_word_device_to_hr(
+            SimWordDeviceType::D,
+            config.holding_register_start.saturating_add(D_HR_OFFSET),
+            D_HR_OFFSET,
+            config.holding_register_count,
+            D_SYNC_COUNT,
+        )?;
+        self.sync_word_device_to_hr(
+            SimWordDeviceType::Td,
+            config.holding_register_start.saturating_add(TD_HR_OFFSET),
+            TD_HR_OFFSET,
+            config.holding_register_count,
+            TD_SYNC_COUNT,
+        )?;
+        self.sync_word_device_to_hr(
+            SimWordDeviceType::Cd,
+            config.holding_register_start.saturating_add(CD_HR_OFFSET),
+            CD_HR_OFFSET,
+            config.holding_register_count,
+            CD_SYNC_COUNT,
+        )?;
 
         *self.output_sync_count.write() += 1;
         Ok(())
@@ -287,16 +358,26 @@ impl ModServerSync {
     fn sync_bit_device_to_coils(
         &self,
         device: SimBitDeviceType,
+        address: u16,
         offset: u16,
+        exposed_count: u16,
         count: u16,
     ) -> SyncResult<()> {
+        if offset >= exposed_count {
+            return Ok(());
+        }
+        let count = count.min(exposed_count - offset);
+        if count == 0 {
+            return Ok(());
+        }
+
         let values = self
             .sim_memory
             .read_bits(device, 0, count)
             .map_err(|e| SyncError::DeviceMemoryError(e.to_string()))?;
 
         self.modbus_memory
-            .write_coils_with_source(offset, &values, ChangeSource::Simulation)
+            .write_coils_with_source(address, &values, ChangeSource::Simulation)
             .map_err(|e| SyncError::ModbusMemoryError(e.to_string()))?;
 
         Ok(())
@@ -306,16 +387,26 @@ impl ModServerSync {
     fn sync_word_device_to_hr(
         &self,
         device: SimWordDeviceType,
+        address: u16,
         offset: u16,
+        exposed_count: u16,
         count: u16,
     ) -> SyncResult<()> {
+        if offset >= exposed_count {
+            return Ok(());
+        }
+        let count = count.min(exposed_count - offset);
+        if count == 0 {
+            return Ok(());
+        }
+
         let values = self
             .sim_memory
             .read_words(device, 0, count)
             .map_err(|e| SyncError::DeviceMemoryError(e.to_string()))?;
 
         self.modbus_memory
-            .write_holding_registers_with_source(offset, &values, ChangeSource::Simulation)
+            .write_holding_registers_with_source(address, &values, ChangeSource::Simulation)
             .map_err(|e| SyncError::ModbusMemoryError(e.to_string()))?;
 
         Ok(())
@@ -394,9 +485,13 @@ mod tests {
     fn create_test_sync() -> ModServerSync {
         let sim_memory = Arc::new(DeviceMemory::new());
         let modbus_memory = Arc::new(ModbusMemory::new(&MemoryMapSettings {
+            coil_start: 0,
             coil_count: 15000,
+            discrete_input_start: 0,
             discrete_input_count: 3000,
+            holding_register_start: 0,
             holding_register_count: 35000,
+            input_register_start: 0,
             input_register_count: 10000,
         }));
         ModServerSync::new(sim_memory, modbus_memory)
@@ -509,9 +604,13 @@ mod tests {
     fn test_sync_discrete_inputs_to_p() {
         let sim_memory = Arc::new(DeviceMemory::new());
         let modbus_memory = Arc::new(ModbusMemory::new(&MemoryMapSettings {
+            coil_start: 0,
             coil_count: 15000,
+            discrete_input_start: 0,
             discrete_input_count: 3000,
+            holding_register_start: 0,
             holding_register_count: 35000,
+            input_register_start: 0,
             input_register_count: 10000,
         }));
         let sync = ModServerSync::new(Arc::clone(&sim_memory), Arc::clone(&modbus_memory));
@@ -538,9 +637,13 @@ mod tests {
     fn test_sync_external_hr_to_d() {
         let sim_memory = Arc::new(DeviceMemory::new());
         let modbus_memory = Arc::new(ModbusMemory::new(&MemoryMapSettings {
+            coil_start: 0,
             coil_count: 15000,
+            discrete_input_start: 0,
             discrete_input_count: 3000,
+            holding_register_start: 0,
             holding_register_count: 35000,
+            input_register_start: 0,
             input_register_count: 10000,
         }));
         let sync = ModServerSync::new(Arc::clone(&sim_memory), Arc::clone(&modbus_memory));
@@ -570,16 +673,22 @@ mod tests {
     fn test_sync_m_to_coils() {
         let sim_memory = Arc::new(DeviceMemory::new());
         let modbus_memory = Arc::new(ModbusMemory::new(&MemoryMapSettings {
+            coil_start: 0,
             coil_count: 15000,
+            discrete_input_start: 0,
             discrete_input_count: 3000,
+            holding_register_start: 0,
             holding_register_count: 35000,
+            input_register_start: 0,
             input_register_count: 10000,
         }));
         let sync = ModServerSync::new(Arc::clone(&sim_memory), Arc::clone(&modbus_memory));
 
         // Set some M relays
         sim_memory.write_bit(SimBitDeviceType::M, 0, true).unwrap();
-        sim_memory.write_bit(SimBitDeviceType::M, 100, true).unwrap();
+        sim_memory
+            .write_bit(SimBitDeviceType::M, 100, true)
+            .unwrap();
 
         // Sync outputs
         sync.sync_outputs().unwrap();
@@ -597,9 +706,13 @@ mod tests {
     fn test_sync_k_to_coils() {
         let sim_memory = Arc::new(DeviceMemory::new());
         let modbus_memory = Arc::new(ModbusMemory::new(&MemoryMapSettings {
+            coil_start: 0,
             coil_count: 15000,
+            discrete_input_start: 0,
             discrete_input_count: 3000,
+            holding_register_start: 0,
             holding_register_count: 35000,
+            input_register_start: 0,
             input_register_count: 10000,
         }));
         let sync = ModServerSync::new(Arc::clone(&sim_memory), Arc::clone(&modbus_memory));
@@ -619,9 +732,13 @@ mod tests {
     fn test_sync_t_to_coils() {
         let sim_memory = Arc::new(DeviceMemory::new());
         let modbus_memory = Arc::new(ModbusMemory::new(&MemoryMapSettings {
+            coil_start: 0,
             coil_count: 15000,
+            discrete_input_start: 0,
             discrete_input_count: 3000,
+            holding_register_start: 0,
             holding_register_count: 35000,
+            input_register_start: 0,
             input_register_count: 10000,
         }));
         let sync = ModServerSync::new(Arc::clone(&sim_memory), Arc::clone(&modbus_memory));
@@ -643,9 +760,13 @@ mod tests {
     fn test_sync_c_to_coils() {
         let sim_memory = Arc::new(DeviceMemory::new());
         let modbus_memory = Arc::new(ModbusMemory::new(&MemoryMapSettings {
+            coil_start: 0,
             coil_count: 15000,
+            discrete_input_start: 0,
             discrete_input_count: 3000,
+            holding_register_start: 0,
             holding_register_count: 35000,
+            input_register_start: 0,
             input_register_count: 10000,
         }));
         let sync = ModServerSync::new(Arc::clone(&sim_memory), Arc::clone(&modbus_memory));
@@ -667,9 +788,13 @@ mod tests {
     fn test_sync_d_to_hr() {
         let sim_memory = Arc::new(DeviceMemory::new());
         let modbus_memory = Arc::new(ModbusMemory::new(&MemoryMapSettings {
+            coil_start: 0,
             coil_count: 15000,
+            discrete_input_start: 0,
             discrete_input_count: 3000,
+            holding_register_start: 0,
             holding_register_count: 35000,
+            input_register_start: 0,
             input_register_count: 10000,
         }));
         let sync = ModServerSync::new(Arc::clone(&sim_memory), Arc::clone(&modbus_memory));
@@ -701,9 +826,13 @@ mod tests {
     fn test_sync_td_to_hr() {
         let sim_memory = Arc::new(DeviceMemory::new());
         let modbus_memory = Arc::new(ModbusMemory::new(&MemoryMapSettings {
+            coil_start: 0,
             coil_count: 15000,
+            discrete_input_start: 0,
             discrete_input_count: 3000,
+            holding_register_start: 0,
             holding_register_count: 35000,
+            input_register_start: 0,
             input_register_count: 10000,
         }));
         let sync = ModServerSync::new(Arc::clone(&sim_memory), Arc::clone(&modbus_memory));
@@ -727,17 +856,19 @@ mod tests {
     fn test_sync_cd_to_hr() {
         let sim_memory = Arc::new(DeviceMemory::new());
         let modbus_memory = Arc::new(ModbusMemory::new(&MemoryMapSettings {
+            coil_start: 0,
             coil_count: 15000,
+            discrete_input_start: 0,
             discrete_input_count: 3000,
+            holding_register_start: 0,
             holding_register_count: 35000,
+            input_register_start: 0,
             input_register_count: 10000,
         }));
         let sync = ModServerSync::new(Arc::clone(&sim_memory), Arc::clone(&modbus_memory));
 
         // Set CD (Counter current value)
-        sim_memory
-            .write_word(SimWordDeviceType::Cd, 0, 42)
-            .unwrap();
+        sim_memory.write_word(SimWordDeviceType::Cd, 0, 42).unwrap();
 
         // Sync outputs
         sync.sync_outputs().unwrap();
@@ -757,9 +888,13 @@ mod tests {
     fn test_full_sync() {
         let sim_memory = Arc::new(DeviceMemory::new());
         let modbus_memory = Arc::new(ModbusMemory::new(&MemoryMapSettings {
+            coil_start: 0,
             coil_count: 15000,
+            discrete_input_start: 0,
             discrete_input_count: 3000,
+            holding_register_start: 0,
             holding_register_count: 35000,
+            input_register_start: 0,
             input_register_count: 10000,
         }));
         let sync = ModServerSync::new(Arc::clone(&sim_memory), Arc::clone(&modbus_memory));
@@ -793,9 +928,13 @@ mod tests {
     fn test_on_memory_change_immediate_mode() {
         let sim_memory = Arc::new(DeviceMemory::new());
         let modbus_memory = Arc::new(ModbusMemory::new(&MemoryMapSettings {
+            coil_start: 0,
             coil_count: 15000,
+            discrete_input_start: 0,
             discrete_input_count: 3000,
+            holding_register_start: 0,
             holding_register_count: 35000,
+            input_register_start: 0,
             input_register_count: 10000,
         }));
         let sync = ModServerSync::with_mode(
@@ -816,9 +955,13 @@ mod tests {
     fn test_on_scan_end_endofscan_mode() {
         let sim_memory = Arc::new(DeviceMemory::new());
         let modbus_memory = Arc::new(ModbusMemory::new(&MemoryMapSettings {
+            coil_start: 0,
             coil_count: 15000,
+            discrete_input_start: 0,
             discrete_input_count: 3000,
+            holding_register_start: 0,
             holding_register_count: 35000,
+            input_register_start: 0,
             input_register_count: 10000,
         }));
         let sync = ModServerSync::new(Arc::clone(&sim_memory), Arc::clone(&modbus_memory));
@@ -835,9 +978,13 @@ mod tests {
     fn test_manual_sync_works_in_any_mode() {
         let sim_memory = Arc::new(DeviceMemory::new());
         let modbus_memory = Arc::new(ModbusMemory::new(&MemoryMapSettings {
+            coil_start: 0,
             coil_count: 15000,
+            discrete_input_start: 0,
             discrete_input_count: 3000,
+            holding_register_start: 0,
             holding_register_count: 35000,
+            input_register_start: 0,
             input_register_count: 10000,
         }));
         let sync = ModServerSync::with_mode(
@@ -890,9 +1037,13 @@ mod tests {
     fn test_round_trip_discrete_to_p_to_m_to_coil() {
         let sim_memory = Arc::new(DeviceMemory::new());
         let modbus_memory = Arc::new(ModbusMemory::new(&MemoryMapSettings {
+            coil_start: 0,
             coil_count: 15000,
+            discrete_input_start: 0,
             discrete_input_count: 3000,
+            holding_register_start: 0,
             holding_register_count: 35000,
+            input_register_start: 0,
             input_register_count: 10000,
         }));
         let sync = ModServerSync::new(Arc::clone(&sim_memory), Arc::clone(&modbus_memory));
@@ -919,9 +1070,13 @@ mod tests {
     fn test_round_trip_external_hr_to_d() {
         let sim_memory = Arc::new(DeviceMemory::new());
         let modbus_memory = Arc::new(ModbusMemory::new(&MemoryMapSettings {
+            coil_start: 0,
             coil_count: 15000,
+            discrete_input_start: 0,
             discrete_input_count: 3000,
+            holding_register_start: 0,
             holding_register_count: 35000,
+            input_register_start: 0,
             input_register_count: 10000,
         }));
         let sync = ModServerSync::new(Arc::clone(&sim_memory), Arc::clone(&modbus_memory));

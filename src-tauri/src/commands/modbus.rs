@@ -11,8 +11,9 @@ use tokio::sync::Mutex;
 
 use crate::modbus::{
     list_available_ports, MemoryMapSettings, ModbusMemory, ModbusRtuServer, ModbusTcpServer,
-    PortInfo, RtuConfig, TcpConfig,
+    PortInfo, RtuConfig, RtuDataBits, RtuParity, RtuStopBits, TcpConfig,
 };
+use crate::project::{ModbusSimulationTransport, Parity as ProjectParity, ProjectConfig};
 
 /// Managed state for Modbus functionality
 pub struct ModbusState {
@@ -22,6 +23,14 @@ pub struct ModbusState {
     pub tcp_server: Mutex<Option<ModbusTcpServer>>,
     /// RTU server instance (if running)
     pub rtu_server: Mutex<Option<ModbusRtuServer>>,
+    /// Transport currently owned by project-driven simulation lifecycle.
+    project_owned_transport: Mutex<Option<ProjectOwnedTransport>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProjectOwnedTransport {
+    Tcp,
+    Rtu,
 }
 
 impl Default for ModbusState {
@@ -30,8 +39,201 @@ impl Default for ModbusState {
             memory: Arc::new(ModbusMemory::new(&MemoryMapSettings::default())),
             tcp_server: Mutex::new(None),
             rtu_server: Mutex::new(None),
+            project_owned_transport: Mutex::new(None),
         }
     }
+}
+
+fn build_project_memory_map(project_config: &ProjectConfig) -> MemoryMapSettings {
+    MemoryMapSettings {
+        coil_start: project_config.modbus.simulation.coil_start_address,
+        coil_count: project_config.memory_map.coil_count,
+        discrete_input_start: project_config.modbus.simulation.coil_start_address,
+        discrete_input_count: project_config.memory_map.discrete_input_count,
+        holding_register_start: project_config.modbus.simulation.word_start_address,
+        holding_register_count: project_config.memory_map.holding_register_count,
+        input_register_start: project_config.modbus.simulation.word_start_address,
+        input_register_count: project_config.memory_map.input_register_count,
+    }
+}
+
+fn parse_tcp_bind_address(endpoint: &str) -> Result<(String, u16), String> {
+    let endpoint = endpoint.trim();
+    if endpoint.is_empty() {
+        return Err("Modbus TCP simulation address is empty".to_string());
+    }
+
+    if let Ok(socket_addr) = endpoint.parse::<std::net::SocketAddr>() {
+        return Ok((socket_addr.ip().to_string(), socket_addr.port()));
+    }
+
+    if let Some((host, port)) = endpoint.rsplit_once(':') {
+        let port = port
+            .parse::<u16>()
+            .map_err(|_| format!("Invalid Modbus TCP port in address: {}", endpoint))?;
+        let host = host.trim();
+        if host.is_empty() {
+            return Err(format!("Invalid Modbus TCP address: {}", endpoint));
+        }
+        return Ok((host.to_string(), port));
+    }
+
+    Ok((endpoint.to_string(), 502))
+}
+
+fn map_project_parity(parity: ProjectParity) -> RtuParity {
+    match parity {
+        ProjectParity::None => RtuParity::None,
+        ProjectParity::Even => RtuParity::Even,
+        ProjectParity::Odd => RtuParity::Odd,
+    }
+}
+
+fn map_project_stop_bits(stop_bits: u8) -> Result<RtuStopBits, String> {
+    match stop_bits {
+        1 => Ok(RtuStopBits::One),
+        2 => Ok(RtuStopBits::Two),
+        other => Err(format!(
+            "Unsupported Modbus RTU stop bit count for simulation: {}",
+            other
+        )),
+    }
+}
+
+async fn stop_tcp_server_internal(state: &ModbusState) -> Result<(), String> {
+    let mut tcp_server = state.tcp_server.lock().await;
+    if let Some(mut server) = tcp_server.take() {
+        server.stop().await.map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+async fn stop_rtu_server_internal(state: &ModbusState) -> Result<(), String> {
+    let mut rtu_server = state.rtu_server.lock().await;
+    if let Some(mut server) = rtu_server.take() {
+        server.stop().await.map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+pub(crate) async fn modbus_start_project_simulation(
+    state: &ModbusState,
+    app_handle: tauri::AppHandle,
+    project_config: &ProjectConfig,
+) -> Result<(), String> {
+    let simulation = &project_config.modbus.simulation;
+    if !simulation.enabled {
+        return Ok(());
+    }
+
+    state
+        .memory
+        .reconfigure(&build_project_memory_map(project_config));
+    state.memory.set_app_handle(app_handle.clone());
+
+    match simulation.transport {
+        ModbusSimulationTransport::Tcp => {
+            let owner = *state.project_owned_transport.lock().await;
+            let rtu_running = state.rtu_server.lock().await.is_some();
+            if rtu_running {
+                if owner == Some(ProjectOwnedTransport::Rtu) {
+                    stop_rtu_server_internal(state).await?;
+                } else {
+                    return Err(
+                        "RTU server is already running manually. Stop it before enabling project-owned Modbus TCP simulation."
+                            .to_string(),
+                    );
+                }
+            }
+
+            if state.tcp_server.lock().await.is_some() {
+                if owner == Some(ProjectOwnedTransport::Tcp) {
+                    return Ok(());
+                }
+                return Err(
+                    "TCP server is already running manually. Stop it before enabling project-owned Modbus TCP simulation."
+                        .to_string(),
+                );
+            }
+
+            let (bind_address, port) = parse_tcp_bind_address(&simulation.address)?;
+            let mut server = ModbusTcpServer::new(
+                TcpConfig {
+                    bind_address,
+                    port,
+                    unit_id: simulation.unit_id,
+                    max_connections: 10,
+                    timeout_ms: 3000,
+                },
+                Arc::clone(&state.memory),
+            );
+            server.set_app_handle(app_handle);
+            server.start().await.map_err(|e| e.to_string())?;
+            *state.tcp_server.lock().await = Some(server);
+            *state.project_owned_transport.lock().await = Some(ProjectOwnedTransport::Tcp);
+            Ok(())
+        }
+        ModbusSimulationTransport::Rtu => {
+            let owner = *state.project_owned_transport.lock().await;
+            let tcp_running = state.tcp_server.lock().await.is_some();
+            if tcp_running {
+                if owner == Some(ProjectOwnedTransport::Tcp) {
+                    stop_tcp_server_internal(state).await?;
+                } else {
+                    return Err(
+                        "TCP server is already running manually. Stop it before enabling project-owned Modbus RTU simulation."
+                            .to_string(),
+                    );
+                }
+            }
+
+            if state.rtu_server.lock().await.is_some() {
+                if owner == Some(ProjectOwnedTransport::Rtu) {
+                    return Ok(());
+                }
+                return Err(
+                    "RTU server is already running manually. Stop it before enabling project-owned Modbus RTU simulation."
+                        .to_string(),
+                );
+            }
+
+            let mut server = ModbusRtuServer::new(
+                RtuConfig {
+                    com_port: simulation.com_port.clone(),
+                    baud_rate: simulation.baud_rate,
+                    parity: map_project_parity(simulation.parity),
+                    stop_bits: map_project_stop_bits(simulation.stop_bits)?,
+                    data_bits: RtuDataBits::Eight,
+                    unit_id: simulation.unit_id,
+                },
+                Arc::clone(&state.memory),
+            );
+            server.set_app_handle(app_handle);
+            server.start().await.map_err(|e| e.to_string())?;
+            *state.rtu_server.lock().await = Some(server);
+            *state.project_owned_transport.lock().await = Some(ProjectOwnedTransport::Rtu);
+            Ok(())
+        }
+        ModbusSimulationTransport::TcpAscii => Err(
+            "Modbus TCP over ASCII simulation is not implemented yet. Use TCP or RTU for now."
+                .to_string(),
+        ),
+        ModbusSimulationTransport::RtuAscii => Err(
+            "Modbus RTU over ASCII simulation is not implemented yet. Use RTU or TCP for now."
+                .to_string(),
+        ),
+    }
+}
+
+pub(crate) async fn modbus_stop_project_simulation(state: &ModbusState) -> Result<(), String> {
+    match *state.project_owned_transport.lock().await {
+        Some(ProjectOwnedTransport::Tcp) => stop_tcp_server_internal(state).await?,
+        Some(ProjectOwnedTransport::Rtu) => stop_rtu_server_internal(state).await?,
+        None => return Ok(()),
+    }
+
+    *state.project_owned_transport.lock().await = None;
+    Ok(())
 }
 
 /// Status information for Modbus servers
@@ -144,17 +346,22 @@ pub async fn modbus_start_tcp(
     server.start().await.map_err(|e| e.to_string())?;
 
     *tcp_server = Some(server);
+    *state.project_owned_transport.lock().await = None;
     Ok(())
 }
 
 /// Stop the Modbus TCP server
 #[tauri::command]
 pub async fn modbus_stop_tcp(state: State<'_, ModbusState>) -> Result<(), String> {
+    let was_owned = *state.project_owned_transport.lock().await == Some(ProjectOwnedTransport::Tcp);
     let mut tcp_server = state.tcp_server.lock().await;
 
     match tcp_server.take() {
         Some(mut server) => {
             server.stop().await.map_err(|e| e.to_string())?;
+            if was_owned {
+                *state.project_owned_transport.lock().await = None;
+            }
             Ok(())
         }
         None => Err("TCP server is not running".to_string()),
@@ -189,17 +396,22 @@ pub async fn modbus_start_rtu(
     server.start().await.map_err(|e| e.to_string())?;
 
     *rtu_server = Some(server);
+    *state.project_owned_transport.lock().await = None;
     Ok(())
 }
 
 /// Stop the Modbus RTU server
 #[tauri::command]
 pub async fn modbus_stop_rtu(state: State<'_, ModbusState>) -> Result<(), String> {
+    let was_owned = *state.project_owned_transport.lock().await == Some(ProjectOwnedTransport::Rtu);
     let mut rtu_server = state.rtu_server.lock().await;
 
     match rtu_server.take() {
         Some(mut server) => {
             server.stop().await.map_err(|e| e.to_string())?;
+            if was_owned {
+                *state.project_owned_transport.lock().await = None;
+            }
             Ok(())
         }
         None => Err("RTU server is not running".to_string()),
