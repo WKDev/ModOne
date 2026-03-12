@@ -4,6 +4,8 @@
 
 `VendorProfile` is the only place where vendor-specific address semantics are allowed to live.
 
+This is especially important for vendors whose user-visible families are not a clean match for canonical runtime semantics. `LS P` must be treated as a compatibility projection over canonical physical I/O, not as the shape of canonical memory itself.
+
 ## Responsibilities
 
 A profile is responsible for:
@@ -41,6 +43,12 @@ Reverse translation may yield:
 - multiple equivalent aliases
 
 The profile must define a preferred alias for display.
+
+If a vendor namespace collapses multiple canonical concepts into one family, the profile must own the disambiguation rule. That disambiguation may depend on:
+
+- PLC model family
+- configured hardware topology
+- fixed CPU-local I/O window rules
 
 ## Metadata Contract
 
@@ -80,6 +88,14 @@ It owns:
 - current readonly behavior
 - current retention behavior
 - current Modbus mapping behavior
+- model-specific `P` projection rules
+
+For v1, the profile must distinguish at least:
+
+- `XBC/XEC` fixed CPU-local `P` windows
+- `XGT/XGI` slot-driven `P` topology
+
+The profile is allowed to preserve legacy behavior where hardware topology is not yet available, but it must not pretend that all `P` addresses are inherently one canonical area.
 
 ## MELSEC FX/Q Common-Core Table
 
@@ -90,6 +106,8 @@ The initial MELSEC profile is intentionally narrow:
 - unsupported in v1: any family outside the frozen common-core scope
 
 This is a controlled first target, not a promise of full MELSEC coverage.
+
+MELSEC-style explicit `X`/`Y` separation is the preferred reference shape for canonical physical I/O in v1.
 
 ## Future IEC Extension Point
 

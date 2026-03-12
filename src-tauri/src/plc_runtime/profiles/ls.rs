@@ -12,21 +12,82 @@ use super::super::{
 
 const LS_FAMILIES: [&str; 12] = ["TD", "CD", "P", "M", "K", "F", "T", "C", "D", "R", "Z", "N"];
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LsIoTopology {
+    LegacyUnifiedP,
+    FixedCpuSplit {
+        input_end_exclusive: u32,
+        output_end_exclusive: u32,
+    },
+    DynamicSlotP,
+}
+
 #[derive(Debug, Clone)]
 pub struct LsProfile {
     model: String,
+    io_topology: LsIoTopology,
 }
 
 impl LsProfile {
     pub fn new(model: String) -> Self {
-        Self { model }
+        let lowered = model.to_ascii_lowercase();
+        let io_topology = if lowered.starts_with("xbc") || lowered.starts_with("xec") {
+            // Current parser/runtime treats P as decimal, so the first compatibility cut keeps the
+            // CPU-local fixed split in decimal buckets until slot/module topology is available.
+            LsIoTopology::FixedCpuSplit {
+                input_end_exclusive: 20,
+                output_end_exclusive: 40,
+            }
+        } else if lowered.starts_with("xgt") || lowered.starts_with("xgi") {
+            LsIoTopology::DynamicSlotP
+        } else {
+            LsIoTopology::LegacyUnifiedP
+        };
+
+        Self { model, io_topology }
     }
 
-    fn metadata_for(&self, family: &str) -> Result<VendorAddressMetadata, VendorProfileError> {
+    fn canonical_area_for_p(&self, index: u32) -> CanonicalAreaKind {
+        match self.io_topology {
+            LsIoTopology::FixedCpuSplit {
+                input_end_exclusive,
+                output_end_exclusive,
+            } => {
+                if index < input_end_exclusive {
+                    CanonicalAreaKind::InputBit
+                } else if index < output_end_exclusive {
+                    CanonicalAreaKind::OutputBit
+                } else {
+                    CanonicalAreaKind::InputBit
+                }
+            }
+            // XGT/XGI really need module-slot topology to do this correctly. Until the project
+            // model stores that topology, preserve the legacy P behavior instead of guessing.
+            LsIoTopology::DynamicSlotP | LsIoTopology::LegacyUnifiedP => CanonicalAreaKind::InputBit,
+        }
+    }
+
+    fn supports_p_output_alias(&self, canonical_index: u32) -> bool {
+        match self.io_topology {
+            LsIoTopology::FixedCpuSplit {
+                input_end_exclusive: _,
+                output_end_exclusive,
+            } => canonical_index < output_end_exclusive,
+            LsIoTopology::DynamicSlotP | LsIoTopology::LegacyUnifiedP => true,
+        }
+    }
+
+    fn metadata_for(
+        &self,
+        family: &str,
+        index: Option<u32>,
+    ) -> Result<VendorAddressMetadata, VendorProfileError> {
         let metadata = match family {
             "P" => VendorAddressMetadata {
-                canonical_area: CanonicalAreaKind::InputBit,
-                access: CanonicalAreaKind::InputBit.default_access(),
+                canonical_area: self.canonical_area_for_p(index.unwrap_or_default()),
+                access: self
+                    .canonical_area_for_p(index.unwrap_or_default())
+                    .default_access(),
                 retained: false,
                 data_kind: VendorDataKind::Bit,
                 supports_bit_index: false,
@@ -168,8 +229,19 @@ impl VendorProfile for LsProfile {
     fn parse_address(&self, input: &str) -> Result<VendorAddress, VendorProfileError> {
         let (family, number_part, bit_index, index_register) =
             split_vendor_address(input, &LS_FAMILIES)?;
-        let metadata = self.metadata_for(&family)?;
-        let index = metadata.number_base.parse(&number_part)?;
+        let number_base = match family.as_str() {
+            "P" => VendorAddressNumberBase::Decimal,
+            "M" | "K" | "F" | "T" | "C" | "D" | "R" | "Z" | "N" | "TD" | "CD" => {
+                self.metadata_for(&family, None)?.number_base
+            }
+            _ => {
+                return Err(VendorProfileError::UnsupportedFamily {
+                    profile_id: VendorProfileId::LsXg5000,
+                    family,
+                });
+            }
+        };
+        let index = number_base.parse(&number_part)?;
 
         let mut address = VendorAddress::new(family, index);
         if let Some(bit_index) = bit_index {
@@ -192,7 +264,7 @@ impl VendorProfile for LsProfile {
         &self,
         address: &VendorAddress,
     ) -> Result<VendorAddressMetadata, VendorProfileError> {
-        let metadata = self.metadata_for(&address.family)?;
+        let metadata = self.metadata_for(&address.family, Some(address.index))?;
 
         if address.index > metadata.max_index {
             return Err(VendorProfileError::AddressOutOfRange {
@@ -248,6 +320,9 @@ impl VendorProfile for LsProfile {
     fn canonical_aliases(&self, canonical: &CanonicalAddress) -> Vec<VendorAddress> {
         let family = match canonical.area {
             CanonicalAreaKind::InputBit => Some("P"),
+            CanonicalAreaKind::OutputBit if self.supports_p_output_alias(canonical.index) => {
+                Some("P")
+            }
             CanonicalAreaKind::InternalBit => Some("M"),
             CanonicalAreaKind::RetentiveBit => Some("K"),
             CanonicalAreaKind::SpecialBit => Some("F"),
@@ -413,6 +488,31 @@ mod tests {
 
         let cd = profile.to_canonical(&VendorAddress::new("CD", 3)).unwrap();
         assert_eq!(cd.area, CanonicalAreaKind::CounterValueWord);
+    }
+
+    #[test]
+    fn projects_xbc_xec_p_ranges_onto_split_io_areas() {
+        let profile = LsProfile::new("XBC-DN32H".to_string());
+
+        let p_in = profile.to_canonical(&VendorAddress::new("P", 5)).unwrap();
+        assert_eq!(p_in.area, CanonicalAreaKind::InputBit);
+
+        let p_out = profile.to_canonical(&VendorAddress::new("P", 25)).unwrap();
+        assert_eq!(p_out.area, CanonicalAreaKind::OutputBit);
+    }
+
+    #[test]
+    fn preserves_legacy_p_projection_for_slot_based_ls_models() {
+        let profile = LsProfile::new("XGT-CPUH".to_string());
+
+        let p = profile.to_canonical(&VendorAddress::new("P", 25)).unwrap();
+        assert_eq!(p.area, CanonicalAreaKind::InputBit);
+
+        let aliases = profile.canonical_aliases(&CanonicalAddress::new(
+            CanonicalAreaKind::OutputBit,
+            25,
+        ));
+        assert_eq!(aliases, vec![VendorAddress::new("P", 25)]);
     }
 
     #[test]

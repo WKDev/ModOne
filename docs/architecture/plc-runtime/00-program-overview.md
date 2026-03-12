@@ -27,6 +27,12 @@ The runtime will be split into four explicit layers:
    - Modbus and OPC UA both read and write through canonical runtime services
    - no protocol may mutate vendor-specific storage directly
 
+Canonical runtime design must follow explicit I/O semantics closer to `MELSEC` and future `IEC` models:
+
+- `InputBit` and `OutputBit` are first-class, distinct runtime areas
+- vendor families that collapse or blur physical I/O semantics must be projected through a compatibility layer
+- `LS P` is therefore treated as a compatibility family, not the canonical shape of the runtime
+
 ## Frozen Scope
 
 The initial program target is fixed as follows:
@@ -52,6 +58,9 @@ The following are explicitly deferred:
 
 1. Existing LS projects must continue to open and run.
 2. Existing LS address strings must remain valid through the `LsProfile`.
-3. No protocol layer is allowed to bypass canonical memory mutation paths.
-4. No new vendor support may be implemented by copying LS-specific rules into global runtime code.
-5. Documentation is part of the implementation surface. If code changes a contract, the matching architecture document must be updated in the same change.
+3. `LS` support is implemented as a compatibility projection over canonical memory, not as the shape of canonical memory itself.
+4. `MELSEC`-style explicit `X/Y` separation is the preferred reference model for physical I/O projection in v1.
+5. `XBC/XEC` fixed CPU I/O windows and `XGT/XGI` slot-based I/O assignment must be modeled explicitly in profile logic instead of flattened into one global `P` rule.
+6. No protocol layer is allowed to bypass canonical memory mutation paths.
+7. No new vendor support may be implemented by copying LS-specific rules into global runtime code.
+8. Documentation is part of the implementation surface. If code changes a contract, the matching architecture document must be updated in the same change.

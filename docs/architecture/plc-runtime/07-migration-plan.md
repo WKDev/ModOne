@@ -19,6 +19,7 @@ Exit criteria:
 - `LsProfile` fully preserves current behavior
 - `MelsecFxQProfile` supports the frozen common-core scope
 - profile selection is real runtime behavior
+- `LS P` is treated as a model-sensitive compatibility family instead of one globally fixed canonical area
 
 Rollback boundary:
 
@@ -43,6 +44,7 @@ Exit criteria:
 - Modbus reads and writes use canonical memory
 - external writes do not bypass runtime mutation rules
 - LS compatibility is preserved
+- segmented or topology-driven LS `P` projection has an explicit mapping representation instead of one family-wide assumption
 
 Rollback boundary:
 
@@ -91,3 +93,5 @@ Do not start OPC UA namespace or server behavior work until:
 - protocol mutation paths are unified
 
 The project must not solve missing runtime architecture by smuggling vendor assumptions into OPC UA or Modbus code.
+
+That rule applies directly to LS `P`: if a model requires fixed-window or slot-driven I/O projection, that logic belongs in the profile or topology layer, not in Modbus or OPC UA adapters.

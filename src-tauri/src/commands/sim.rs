@@ -546,7 +546,8 @@ fn bridge_canonical_to_legacy_device(
     };
 
     let resolved = match (profile_id, canonical.area) {
-        (VendorProfileId::LsXg5000, CanonicalAreaKind::InputBit) => ResolvedSimAddress::Bit {
+        (VendorProfileId::LsXg5000, CanonicalAreaKind::InputBit)
+        | (VendorProfileId::LsXg5000, CanonicalAreaKind::OutputBit) => ResolvedSimAddress::Bit {
             device: SimBitDeviceType::P,
             address,
         },
@@ -622,9 +623,6 @@ fn bridge_canonical_to_legacy_device(
         }
         (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::DataWord) => {
             map_word(SimWordDeviceType::D)
-        }
-        (_, CanonicalAreaKind::OutputBit) => {
-            return Err("OutputBit is not bridged by the active simulator profile yet".to_string());
         }
         (_, CanonicalAreaKind::SystemBit) => {
             return Err("SystemBit is not bridged by the legacy simulator memory".to_string());
@@ -845,6 +843,33 @@ mod tests {
             ResolvedSimAddress::Bit {
                 device: SimBitDeviceType::Y,
                 address: 0o17,
+            }
+        );
+    }
+
+    #[test]
+    fn resolves_xbc_p_output_window_through_ls_compat_layer() {
+        let settings = PlcSettings {
+            manufacturer: PlcManufacturer::LS,
+            model: "XBC-DN32H".to_string(),
+            scan_time_ms: 10,
+        };
+
+        let (_, input) = resolve_sim_address_for_settings(&settings, "P0019").expect("P19");
+        assert_eq!(
+            input,
+            ResolvedSimAddress::Bit {
+                device: SimBitDeviceType::P,
+                address: 19,
+            }
+        );
+
+        let (_, output) = resolve_sim_address_for_settings(&settings, "P0020").expect("P20");
+        assert_eq!(
+            output,
+            ResolvedSimAddress::Bit {
+                device: SimBitDeviceType::P,
+                address: 20,
             }
         );
     }

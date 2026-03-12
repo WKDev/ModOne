@@ -4,6 +4,8 @@
 
 Canonical memory is the single internal runtime truth. Vendor letters, Modbus offsets, and OPC UA nodes are all views on top of it.
 
+The canonical model intentionally follows explicit physical I/O semantics. `InputBit` and `OutputBit` are separate first-class concepts even when a vendor family presents them through one compatibility namespace.
+
 ## Canonical Area Kinds
 
 The canonical runtime defines the following area families:
@@ -29,6 +31,12 @@ Each area kind has:
 - a default access mode
 - a default retention mode
 - a configured storage size
+
+Projection examples:
+
+- `MELSEC X` -> `InputBit`
+- `MELSEC Y` -> `OutputBit`
+- `LS P` -> compatibility projection whose canonical target depends on PLC model and, for slot-based systems, hardware topology
 
 ## CanonicalAddress
 

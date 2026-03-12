@@ -8,6 +8,8 @@ The LS profile preserves the current backend device set:
 - word: `D`, `R`, `Z`, `N`
 - derived runtime words: `TD`, `CD`
 
+`LS` is treated as a compatibility projection over canonical memory. The important outlier is `P`: unlike `MELSEC X/Y`, it does not by itself encode whether the point is an input or an output.
+
 ## Sizes and Ranges
 
 The initial LS profile copies the current runtime sizes:
@@ -50,11 +52,23 @@ The LS profile must continue to support current forms such as:
 - `TD0001`
 - `CD0001`
 
+`P` parsing is model-sensitive in the compatibility layer:
+
+- `XBC/XEC`:
+  - current v1 compatibility assumption uses decimal CPU-local windows
+  - `P0000`-`P0019` -> `InputBit`
+  - `P0020`-`P0039` -> `OutputBit`
+  - above that range, legacy input-style fallback is preserved until richer topology exists
+- `XGT/XGI`:
+  - `P` assignment depends on extension-module slot and port layout
+  - because project config does not yet persist that topology, v1 preserves legacy `P -> InputBit` behavior for parse-to-canonical translation
+  - reverse aliasing from canonical `OutputBit` back to `P` remains allowed as a compatibility view
+
 ## Canonical Mapping Table
 
 Preferred mappings:
 
-- `P` -> `InputBit`
+- `P` -> model-dependent compatibility projection
 - `M` -> `InternalBit`
 - `K` -> `RetentiveBit`
 - `F` -> `SpecialBit`
@@ -66,6 +80,11 @@ Preferred mappings:
 - `N` -> `SystemWord`
 - `TD` -> `TimerValueWord`
 - `CD` -> `CounterValueWord`
+
+Model-specific `P` notes:
+
+- `XBC/XEC` fixed CPU models use `P` as a split compatibility family over canonical `InputBit` and `OutputBit`
+- `XGT/XGI` use slot-driven addressing and therefore require hardware-topology metadata for a fully correct `P` projection
 
 ## Current Modbus Mapping Table
 
@@ -83,6 +102,11 @@ The LS profile must preserve the current mapping policy:
 - `N` -> holding register area, offset `20016`
 - `TD` -> holding register area, offset `28208`
 - `CD` -> holding register area, offset `30256`
+
+Important limitation:
+
+- the current rule table is still family-based and cannot yet express slot-specific LS `P` segmentation
+- when LS Modbus is rebuilt on the canonical adapter, the mapping policy must grow enough metadata to express segmented `P` windows and future slot-based projections
 
 ## Compatibility Invariants
 
