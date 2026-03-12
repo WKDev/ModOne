@@ -41,8 +41,6 @@ import {
 } from '../components/OneCanvas/types';
 import {
   getBlockSize,
-  getDefaultPorts as getDefaultPortsFromDefs,
-  getDefaultBlockProps as getDefaultBlockPropsFromDefs,
   getPowerSourcePorts,
 } from '../components/OneCanvas/blockDefinitions';
 import { migrateLegacyBlockType } from '../components/OneCanvas/types';
@@ -61,6 +59,7 @@ import {
 import { polylineToHandles, simplifyWireHandles, enforceOrthogonalPolyline } from '../components/OneCanvas/utils/wireSimplifier';
 import { alignComponents, distributeComponents, flipComponents } from '../components/OneCanvas/utils/canvas-commands';
 import { isValidConnection } from '../components/OneCanvas/utils/connectionValidator';
+import { createBlockInstance } from '../components/OneCanvas/runtime/blockFactory';
 
 // ============================================================================
 // Wire Endpoint Promotion
@@ -423,9 +422,6 @@ function restoreSnapshot(snapshot: HistorySnapshot): {
 }
 
 /** Wrapper to get default block props from blockDefinitions */
-function getDefaultBlockProps(type: BlockType): Partial<Block> {
-  return getDefaultBlockPropsFromDefs(type) as Partial<Block>;
-}
 
 /** Type guard: returns true when a canvas component is a legacy Block (has `size`). */
 function isBlock(component: Block | ComponentInstance): component is Block {
@@ -454,9 +450,6 @@ function detectDragDirection(startPos: Position, currentPos: Position): PortPosi
 }
 
 /** Get default ports for a block type (delegates to blockDefinitions) */
-function getDefaultPorts(type: BlockType): Block['ports'] {
-  return getDefaultPortsFromDefs(type);
-}
 
 /** Sync the _selectedIdsCache from the selection state (call after any selection mutation) */
 function syncSelectedIdsCache(state: CanvasState): void {
@@ -484,24 +477,7 @@ export const useCanvasStore = create<CanvasStore>()(
           ? snapToGridPosition(position, state.gridSize)
           : position;
 
-        // For powersource, override ports based on polarity
-        let ports = getDefaultPorts(type);
-        if (type === 'powersource') {
-          const polarity = (props as Record<string, unknown>).polarity as string | undefined;
-          if (polarity === 'ground' || polarity === 'negative' || polarity === 'positive') {
-            ports = getPowerSourcePorts(polarity);
-          }
-        }
-
-        const newBlock: Block = {
-          id,
-          type,
-          position: finalPosition,
-          size: getBlockSize(type),
-          ports,
-          ...getDefaultBlockProps(type),
-          ...props,
-        } as Block;
+        const newBlock = createBlockInstance(id, type, finalPosition, props);
 
         set(
           (state) => {
@@ -1585,6 +1561,9 @@ export const useCanvasStore = create<CanvasStore>()(
               state.zoom = data.viewport.zoom;
               state.pan = { x: data.viewport.panX, y: data.viewport.panY };
             }
+            state.gridSize = data.gridSize ?? state.gridSize;
+            state.showGrid = data.showGrid ?? state.showGrid;
+            state.gridStyle = data.gridStyle ?? state.gridStyle;
           },
           false,
           'loadCircuit'
@@ -1603,6 +1582,9 @@ export const useCanvasStore = create<CanvasStore>()(
             panX: state.pan.x,
             panY: state.pan.y,
           },
+          gridSize: state.gridSize,
+          showGrid: state.showGrid,
+          gridStyle: state.gridStyle,
         };
       },
 
@@ -1761,3 +1743,5 @@ export const selectBoundingBox = (state: CanvasStore) => {
 };
 
 export default useCanvasStore;
+
+

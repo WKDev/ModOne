@@ -21,9 +21,17 @@ export const plcOutSymbol: SymbolDefinition = {
     { id: 'in', name: 'IN', number: '1', type: 'input', electricalType: 'input', functionalRole: 'plc_input', shape: 'line', position: { x: 0, y: 20 }, orientation: 'left', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
     { id: 'out', name: 'OUT', number: '2', type: 'output', electricalType: 'output', functionalRole: 'plc_output', shape: 'line', position: { x: 80, y: 20 }, orientation: 'right', length: 0, sortOrder: 2, nameVisible: true, numberVisible: true },
   ],
+  behavior: {
+    templateId: 'archetype:switch',
+    archetype: 'switch',
+    interactionMode: 'maintained',
+    deviceScoped: false,
+    terminalRoles: { in: 'IN', out: 'OUT' },
+  },
   properties: [
     { key: 'address', value: 'C:0x0000', type: 'string', visible: true, editorType: 'text' },
     { key: 'normallyOpen', value: true, type: 'boolean', visible: true, editorType: 'checkbox' },
     { key: 'inverted', value: false, type: 'boolean', visible: true, editorType: 'checkbox' },
   ],
 };
+

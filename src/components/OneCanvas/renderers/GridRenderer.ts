@@ -1,33 +1,17 @@
 /**
- * GridRenderer — Procedural GPU Grid (CAD-style, single draw call)
+ * GridRenderer - stable world-space grid rendering for Pixi v8.
  *
- * Uses a Mesh with a custom GLSL fragment shader placed inside the
- * pixi-viewport child container (world-space coordinates).
- *
- * KEY DESIGN:
- *   Pixi Mesh ignores .width/.height setters — size is determined by vertex
- *   positions. We update geometry.positions each frame via the Pixi v8
- *   positions setter so the quad always covers the visible world-space rectangle.
+ * The previous shader-based grid path was fragile across Pixi/WebGL updates and
+ * could silently fail, leaving the canvas without any visible grid. This
+ * renderer trades a bit of theoretical performance for predictable rendering by
+ * drawing the visible grid procedurally with a single Graphics instance.
  */
 
-import {
-  Mesh,
-  MeshGeometry,
-  Shader,
-  GlProgram,
-  UniformGroup,
-  type Container,
-} from 'pixi.js';
+import { Graphics, type Container } from 'pixi.js';
 import type { GridConfig, ViewportBounds } from '../types';
 import { DEFAULT_GRID, unitToPx } from '../types';
-import {
-  GRID_FRAG_GLSL,
-  GRID_VERT_GLSL,
-} from './GridShader';
 
-// ---------------------------------------------------------------------------
-// Grid Renderer options
-// ---------------------------------------------------------------------------
+export type GridUnit = 'px' | 'mil' | 'mm';
 
 export interface GridRendererOptions {
   /** The grid layer container (viewport child, world-space). */
@@ -36,195 +20,209 @@ export interface GridRendererOptions {
   config?: GridConfig;
 }
 
-// ---------------------------------------------------------------------------
-// Utility: parse CSS hex color → [r, g, b] in 0..1 range
-// ---------------------------------------------------------------------------
-function hexToRgb(hex: string): [number, number, number] {
-  const clean = hex.replace('#', '');
-  const n = parseInt(clean, 16);
-  return [(n >> 16 & 0xff) / 255, (n >> 8 & 0xff) / 255, (n & 0xff) / 255];
+const MIN_SCREEN_SPACING = 10;
+const MIN_MAJOR_SCREEN_SPACING = 26;
+const MIN_DOT_SCREEN_SPACING = 18;
+const MINOR_DOT_SCREEN_SIZE = 1;
+const MAJOR_DOT_SCREEN_SIZE = 2;
+const EPSILON = 0.0001;
+
+function hexToNumber(hex: string): number {
+  return Number.parseInt(hex.replace('#', ''), 16);
 }
 
-// ---------------------------------------------------------------------------
-// GridRenderer
-// ---------------------------------------------------------------------------
+function getMajorFactor(config: GridConfig): number {
+  return config.majorInterval ?? config.subdivisions ?? 5;
+}
+
+function getEffectiveStep(baseStep: number, zoom: number, minScreenSpacing: number): number {
+  const screenStep = Math.max(baseStep * zoom, EPSILON);
+  const multiplier = Math.max(1, Math.ceil(minScreenSpacing / screenStep));
+  return baseStep * multiplier;
+}
+
+function getAlignedStart(min: number, step: number): number {
+  return Math.floor(min / step) * step;
+}
+
+function isMajorCoordinate(value: number, majorStep: number): boolean {
+  const snapped = Math.round(value / majorStep) * majorStep;
+  return Math.abs(value - snapped) <= Math.max(EPSILON, majorStep * 0.001);
+}
+
+function drawDotCell(
+  graphics: Graphics,
+  x: number,
+  y: number,
+  zoom: number,
+  screenSize: number
+): void {
+  const worldSize = screenSize / Math.max(zoom, EPSILON);
+  const offset = worldSize / 2;
+  graphics.rect(x - offset, y - offset, worldSize, worldSize);
+}
 
 export class GridRenderer {
-  private _mesh: Mesh<MeshGeometry, Shader> | null = null;
-  private _geometry: MeshGeometry | null = null;
-  private _uniforms: UniformGroup | null = null;
-
+  private _graphics: Graphics | null = null;
   private _config: GridConfig;
   private _layer: Container;
-  private _destroyed: boolean = false;
-  private _unit: 'px' | 'mil' | 'mm' = 'mm';
-
-  // Uniform storage for direct access
-  private _uBoundsMin = new Float32Array([0, 0]);
-  private _uBoundsMax = new Float32Array([1920, 1080]);
-  private _uMinorColor = new Float32Array([0.8, 0.8, 0.8]);
-  private _uMajorColor = new Float32Array([0.6, 0.6, 0.6]);
+  private _destroyed = false;
+  private _unit: GridUnit = 'mm';
 
   constructor(options: GridRendererOptions) {
     this._config = options.config ?? DEFAULT_GRID;
     this._layer = options.layer;
-    this._unit = (this._config.unit) ?? 'mm';
-    this._initMesh();
+    this._unit = this._config.unit ?? 'mm';
+    this._initGraphics();
   }
 
-  // -----------------------------------------------------------------------
-  // Public API
-  // -----------------------------------------------------------------------
+  get config(): GridConfig {
+    return this._config;
+  }
 
-  get config(): GridConfig { return this._config; }
   set config(value: GridConfig) {
     this._config = value;
-    this._unit = (value.unit) ?? 'mm';
-    this._syncConfigUniforms();
+    this._unit = value.unit ?? 'mm';
   }
 
-  set unit(value: 'px' | 'mil' | 'mm') {
+  set unit(value: GridUnit) {
     this._unit = value;
-    this._syncConfigUniforms();
   }
 
-  /**
-   * Update per-frame. Call whenever the viewport changes.
-   *
-   * @param bounds  Visible area in WORLD coordinates (PixiViewport.visibleBounds)
-   * @param zoom    Current zoom level (viewport.state.zoom)
-   */
   render(bounds: ViewportBounds, zoom: number): void {
-    if (this._destroyed || !this._mesh || !this._geometry || !this._uniforms) return;
+    if (this._destroyed || !this._graphics) return;
 
     const visible = this._config.visible ?? true;
-    this._mesh.visible = visible;
+    this._graphics.visible = visible;
     if (!visible) return;
 
-    const { minX, minY, maxX, maxY } = bounds;
+    this._graphics.clear();
 
-    // ── 1. Stretch quad to cover visible world area ─────────────────────
-    // Pixi v8: setting positions marks the vertex buffer as dirty.
-    this._geometry.positions = new Float32Array([
-      minX, minY,   // TL
-      maxX, minY,   // TR
-      maxX, maxY,   // BR
-      minX, maxY,   // BL
-    ]);
+    const style = this._config.style ?? 'dots';
+    const baseMinorStep = Math.max(1, unitToPx(this._config.size, this._unit));
+    const baseMajorStep = Math.max(baseMinorStep, baseMinorStep * getMajorFactor(this._config));
 
-    // ── 2. Update per-frame uniforms ─────────────────────────────────────
-    this._uBoundsMin[0] = minX;
-    this._uBoundsMin[1] = minY;
-    this._uBoundsMax[0] = maxX;
-    this._uBoundsMax[1] = maxY;
+    const effectiveMinorStep = getEffectiveStep(
+      baseMinorStep,
+      zoom,
+      style === 'dots' ? MIN_DOT_SCREEN_SPACING : MIN_SCREEN_SPACING
+    );
+    const effectiveMajorStep = getEffectiveStep(baseMajorStep, zoom, MIN_MAJOR_SCREEN_SPACING);
 
-    // In Pixi v8, updating the underlying Float32Array is sufficient if it's 
-    // bound correctly, but we must mark the uniform group as dirty for scalar changes.
-    const ug = this._uniforms.uniforms;
-    ug.uZoom = zoom;
-    this._uniforms.update(); // Force uniform upload update
+    if (style === 'lines') {
+      this._renderLines(bounds, effectiveMinorStep, effectiveMajorStep, baseMajorStep);
+      return;
+    }
+
+    this._renderDots(bounds, effectiveMinorStep, effectiveMajorStep, zoom, baseMajorStep);
   }
 
   setVisible(visible: boolean): void {
     this._config = { ...this._config, visible };
-    if (this._mesh) this._mesh.visible = visible;
+    if (this._graphics) {
+      this._graphics.visible = visible;
+    }
   }
 
   destroy(): void {
     if (this._destroyed) return;
     this._destroyed = true;
-    this._mesh?.destroy();
-    this._mesh = null;
-    this._geometry = null;
-    this._uniforms = null;
+    this._graphics?.destroy();
+    this._graphics = null;
   }
 
-  // -----------------------------------------------------------------------
-  // Private helpers
-  // -----------------------------------------------------------------------
-
-  private _initMesh(): void {
-    // ── GLSL program (WebGL) ──────────────────────────────────────────────
-    const glProgram = new GlProgram({
-      vertex: GRID_VERT_GLSL,
-      fragment: GRID_FRAG_GLSL,
-    });
-
-    // Pixi v8 Note: We omit GpuProgram here to let Pixi's auto-translator 
-    // handle it, avoiding potential WGSL binding errors during debugging.
-
-    const uniforms = this._buildUniforms();
-    this._uniforms = uniforms;
-
-    const shader = new Shader({
-      glProgram,
-      resources: {
-        gridUniforms: uniforms,
-      },
-    });
-
-    // Initial geometry
-    const geometry = new MeshGeometry({
-      positions: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
-      uvs: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
-      indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
-    });
-    this._geometry = geometry;
-
-    const mesh = new Mesh<MeshGeometry, Shader>({ geometry, shader });
-    mesh.label = 'grid-shader-mesh';
-    // Mesh is a child of the grid layer (viewport child), so world coordinates 
-    // are passed to the vertex shader.
-
-    this._mesh = mesh;
-    this._layer.addChild(mesh as unknown as import('pixi.js').Container);
+  private _initGraphics(): void {
+    const graphics = new Graphics();
+    graphics.label = 'grid-graphics';
+    graphics.eventMode = 'none';
+    graphics.cullable = true;
+    this._graphics = graphics;
+    this._layer.addChild(graphics);
   }
 
-  private _buildUniforms(): UniformGroup {
-    const cfg = this._config;
-    const gridSizePx = unitToPx(cfg.size, this._unit);
-    const majorFactor = cfg.subdivisions ?? 5;
+  private _renderLines(
+    bounds: ViewportBounds,
+    minorStep: number,
+    majorStep: number,
+    baseMajorStep: number
+  ): void {
+    if (!this._graphics) return;
 
-    const [mr, mg, mb] = hexToRgb(cfg.color ?? '#cccccc');
-    const [Mr, Mg, Mb] = hexToRgb(cfg.majorColor ?? '#999999');
+    const minorColor = hexToNumber(this._config.color ?? '#cccccc');
+    const majorColor = hexToNumber(this._config.majorColor ?? '#999999');
+    const minorAlpha = this._config.alpha ?? 0.3;
+    const majorAlpha = this._config.majorAlpha ?? 0.5;
 
-    this._uMinorColor.set([mr, mg, mb]);
-    this._uMajorColor.set([Mr, Mg, Mb]);
+    const minorStartX = getAlignedStart(bounds.minX, minorStep);
+    const minorStartY = getAlignedStart(bounds.minY, minorStep);
 
-    // Use shorthand initialization for direct value access
-    return new UniformGroup({
-      uBoundsMin: { value: this._uBoundsMin, type: 'vec2<f32>' },
-      uBoundsMax: { value: this._uBoundsMax, type: 'vec2<f32>' },
-      uGridSize: { value: gridSizePx, type: 'f32' },
-      uMajorFactor: { value: majorFactor, type: 'f32' },
-      uMinorColor: { value: this._uMinorColor, type: 'vec3<f32>' },
-      uMajorColor: { value: this._uMajorColor, type: 'vec3<f32>' },
-      uMinorAlpha: { value: cfg.alpha ?? 0.4, type: 'f32' },
-      uMajorAlpha: { value: cfg.majorAlpha ?? 0.6, type: 'f32' },
-      uStyle: { value: cfg.style === 'lines' ? 0.0 : 1.0, type: 'f32' },
-      uZoom: { value: 1.0, type: 'f32' },
-      uLodMinorFade: { value: 0.02, type: 'f32' }, // More generous thresholds
-      uLodMajorFade: { value: 0.005, type: 'f32' },
-      uDotRadius: { value: 1.5, type: 'f32' },
+    for (let x = minorStartX; x <= bounds.maxX + minorStep; x += minorStep) {
+      if (isMajorCoordinate(x, baseMajorStep)) continue;
+      this._graphics.moveTo(x, bounds.minY).lineTo(x, bounds.maxY);
+    }
+    for (let y = minorStartY; y <= bounds.maxY + minorStep; y += minorStep) {
+      if (isMajorCoordinate(y, baseMajorStep)) continue;
+      this._graphics.moveTo(bounds.minX, y).lineTo(bounds.maxX, y);
+    }
+    this._graphics.stroke({
+      color: minorColor,
+      alpha: minorAlpha,
+      width: 1,
+      pixelLine: true,
+    });
+
+    const majorStartX = getAlignedStart(bounds.minX, majorStep);
+    const majorStartY = getAlignedStart(bounds.minY, majorStep);
+
+    for (let x = majorStartX; x <= bounds.maxX + majorStep; x += majorStep) {
+      this._graphics.moveTo(x, bounds.minY).lineTo(x, bounds.maxY);
+    }
+    for (let y = majorStartY; y <= bounds.maxY + majorStep; y += majorStep) {
+      this._graphics.moveTo(bounds.minX, y).lineTo(bounds.maxX, y);
+    }
+    this._graphics.stroke({
+      color: majorColor,
+      alpha: majorAlpha,
+      width: 1,
+      pixelLine: true,
     });
   }
 
-  private _syncConfigUniforms(): void {
-    if (!this._uniforms) return;
-    const cfg = this._config;
-    const ug = this._uniforms.uniforms;
+  private _renderDots(
+    bounds: ViewportBounds,
+    minorStep: number,
+    majorStep: number,
+    zoom: number,
+    baseMajorStep: number
+  ): void {
+    if (!this._graphics) return;
 
-    ug.uGridSize = unitToPx(cfg.size, this._unit);
-    ug.uMajorFactor = cfg.subdivisions ?? 5;
-    ug.uStyle = cfg.style === 'lines' ? 0.0 : 1.0;
-    ug.uMinorAlpha = cfg.alpha ?? 0.4;
-    ug.uMajorAlpha = cfg.majorAlpha ?? 0.6;
+    const minorColor = hexToNumber(this._config.color ?? '#cccccc');
+    const majorColor = hexToNumber(this._config.majorColor ?? '#999999');
+    const minorAlpha = this._config.alpha ?? 0.3;
+    const majorAlpha = this._config.majorAlpha ?? 0.5;
 
-    const [mr, mg, mb] = hexToRgb(cfg.color ?? '#cccccc');
-    const [Mr, Mg, Mb] = hexToRgb(cfg.majorColor ?? '#999999');
-    this._uMinorColor.set([mr, mg, mb]);
-    this._uMajorColor.set([Mr, Mg, Mb]);
+    const minorStartX = getAlignedStart(bounds.minX, minorStep);
+    const minorStartY = getAlignedStart(bounds.minY, minorStep);
 
-    this._uniforms.update();
+    for (let x = minorStartX; x <= bounds.maxX + minorStep; x += minorStep) {
+      for (let y = minorStartY; y <= bounds.maxY + minorStep; y += minorStep) {
+        if (isMajorCoordinate(x, baseMajorStep) && isMajorCoordinate(y, baseMajorStep)) {
+          continue;
+        }
+        drawDotCell(this._graphics, x, y, zoom, MINOR_DOT_SCREEN_SIZE);
+      }
+    }
+    this._graphics.fill({ color: minorColor, alpha: minorAlpha });
+
+    const majorStartX = getAlignedStart(bounds.minX, majorStep);
+    const majorStartY = getAlignedStart(bounds.minY, majorStep);
+
+    for (let x = majorStartX; x <= bounds.maxX + majorStep; x += majorStep) {
+      for (let y = majorStartY; y <= bounds.maxY + majorStep; y += majorStep) {
+        drawDotCell(this._graphics, x, y, zoom, MAJOR_DOT_SCREEN_SIZE);
+      }
+    }
+    this._graphics.fill({ color: majorColor, alpha: majorAlpha });
   }
 }

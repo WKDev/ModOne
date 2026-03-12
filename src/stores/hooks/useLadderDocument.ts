@@ -23,8 +23,12 @@ import type {
   CounterProperties,
   CompareProperties,
   LadderWire,
+  VerticalLinkEntity,
+  VerticalLinkPosition,
 } from '../../types/ladder';
 import {
+  getVerticalLinkRowFromMainGridRow,
+  getMainGridRowFromVerticalLinkRow,
   isContactType,
   isCoilType,
   isTimerType,
@@ -39,6 +43,7 @@ import {
   applyWireTypeUpdate,
   recalculateAllWireTypes,
   mergeWireDirections,
+  analyzeNeighborDirections,
 } from '../../components/LadderEditor/utils/wireGenerator';
 import type { WireProperties } from '../../types/ladder';
 
@@ -50,6 +55,7 @@ import type { WireProperties } from '../../types/ladder';
 export interface UseLadderDocumentReturn {
   // Data
   elements: Map<string, LadderElement>;
+  verticalLinks: Map<string, VerticalLinkEntity>;
   wires: LadderWire[];
   comment?: string;
   gridConfig: LadderGridConfig;
@@ -62,11 +68,17 @@ export interface UseLadderDocumentReturn {
   moveElement: (id: string, position: GridPosition) => void;
   updateElement: (id: string, updates: Partial<LadderElement>) => void;
   duplicateElement: (id: string) => string | null;
-  getElementAt: (row: number, col: number) => LadderElement | undefined;
+  getElementAt: (row: number, col: number, typeFilter?: 'instruction') => LadderElement | undefined;
+
+  // Vertical-link operations
+  addVerticalLink: (position: VerticalLinkPosition) => string | null;
+  removeVerticalLink: (id: string) => void;
+  moveVerticalLink: (id: string, position: VerticalLinkPosition) => void;
+  getVerticalLinkAt: (row: number, col: number) => VerticalLinkEntity | undefined;
+  placeVerticalLinkSpan: (col: number, startRow: number, endRow: number) => void;
 
   // Wire-specific operations
   mergeWireElement: (existingId: string, newWireType: 'wire_h' | 'wire_v') => void;
-  placeVerticalWireSpan: (col: number, startRow: number, endRow: number) => void;
 
   // Comment & Labels
   updateComment: (comment: string) => void;
@@ -133,11 +145,12 @@ function getDefaultProperties(type: LadderElementType): ElementProperties {
   return {};
 }
 
-/** Check if a position is valid */
+/** Check if a position is valid (within grid bounds and not occupied) */
 function isValidPosition(
   elements: Map<string, LadderElement>,
   position: GridPosition,
   gridConfig: LadderGridConfig,
+  type?: LadderElementType,
   excludeId?: string
 ): boolean {
   if (position.col < 0 || position.col >= gridConfig.columns) {
@@ -150,11 +163,53 @@ function isValidPosition(
   for (const [id, element] of elements) {
     if (excludeId && id === excludeId) continue;
     if (element.position.row === position.row && element.position.col === position.col) {
+      if (type === 'wire_v' && element.type !== 'wire_v') continue;
+      if (element.type === 'wire_v' && type !== 'wire_v' && type !== undefined) continue;
+
       return false;
     }
   }
 
   return true;
+}
+
+function isValidVerticalLinkPosition(
+  verticalLinks: Map<string, VerticalLinkEntity>,
+  position: VerticalLinkPosition,
+  gridConfig: LadderGridConfig,
+  excludeId?: string
+): boolean {
+  if (position.col < 0 || position.col > gridConfig.columns) {
+    return false;
+  }
+  if (position.row < 1) {
+    return false;
+  }
+
+  for (const [id, verticalLink] of verticalLinks) {
+    if (excludeId && id === excludeId) continue;
+    if (verticalLink.position.row === position.row && verticalLink.position.col === position.col) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function findElementAt(elements: Map<string, LadderElement>, row: number, col: number): LadderElement | undefined {
+  for (const element of elements.values()) {
+    if (element.position.row === row && element.position.col === col) {
+      return element;
+    }
+  }
+  return undefined;
+}
+
+function getAffectedCellPositionsForVerticalLink(position: VerticalLinkPosition): GridPosition[] {
+  return [
+    { row: getMainGridRowFromVerticalLinkRow(position.row), col: position.col },
+    { row: position.row, col: position.col },
+  ].filter((cellPosition) => cellPosition.row >= 0);
 }
 
 /** Convert AST nodes to ladder elements (stub - full implementation in Task 79) */
@@ -193,29 +248,139 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
   const ladderDoc = document && isLadderDocument(document) ? document : null;
   const data = ladderDoc?.data;
 
+  const refreshVerticalLinkNeighbors = useCallback((docData: NonNullable<typeof data>, positions: VerticalLinkPosition[]) => {
+    const visited = new Set<string>();
+
+    for (const verticalPosition of positions) {
+      for (const cellPosition of getAffectedCellPositionsForVerticalLink(verticalPosition)) {
+        if (cellPosition.col < 0 || cellPosition.col >= docData.gridConfig.columns || cellPosition.row < 0) {
+          continue;
+        }
+
+        const key = `${cellPosition.row}-${cellPosition.col}`;
+        if (visited.has(key)) {
+          continue;
+        }
+        visited.add(key);
+
+        const currentElement = findElementAt(docData.elements, cellPosition.row, cellPosition.col);
+        if (currentElement) {
+          if (isWireType(currentElement.type)) {
+            const selfUpdate = recalculateWireType(currentElement, docData.elements, docData.gridConfig, undefined, docData.verticalLinks);
+            if (selfUpdate) {
+              applyWireTypeUpdate(currentElement, selfUpdate);
+            }
+          } else {
+            currentElement.properties.connectedDirections = analyzeNeighborDirections(
+              cellPosition,
+              docData.elements,
+              docData.gridConfig,
+              undefined,
+              docData.verticalLinks
+            );
+          }
+        }
+
+        const adjacentUpdates = updateAdjacentWires(
+          cellPosition,
+          docData.elements,
+          docData.gridConfig,
+          undefined,
+          docData.verticalLinks
+        );
+        for (const update of adjacentUpdates) {
+          const adjacentElement = docData.elements.get(update.elementId);
+          if (!adjacentElement) continue;
+          if (isWireType(adjacentElement.type)) {
+            applyWireTypeUpdate(adjacentElement, update);
+          } else if (update.newDirections !== undefined) {
+            adjacentElement.properties.connectedDirections = update.newDirections;
+          }
+        }
+      }
+    }
+  }, []);
+
   // Element operations
+  const getVerticalLinkAt = useCallback(
+    (row: number, col: number): VerticalLinkEntity | undefined => {
+      if (!data) return undefined;
+
+      for (const verticalLink of data.verticalLinks.values()) {
+        if (verticalLink.position.row === row && verticalLink.position.col === col) {
+          return verticalLink;
+        }
+      }
+
+      return undefined;
+    },
+    [data]
+  );
+
+  const addVerticalLink = useCallback(
+    (position: VerticalLinkPosition): string | null => {
+      if (!documentId || !data) return null;
+      if (!isValidVerticalLinkPosition(data.verticalLinks, position, data.gridConfig)) {
+        return null;
+      }
+
+      const id = generateId('vertical-link');
+      const verticalLink: VerticalLinkEntity = {
+        id,
+        position: { ...position },
+        properties: {
+          isValid: true,
+        },
+      };
+
+      pushHistoryAction(documentId);
+      updateLadderData(documentId, (docData) => {
+        docData.verticalLinks.set(id, verticalLink);
+        refreshVerticalLinkNeighbors(docData, [position]);
+      });
+
+      return id;
+    },
+    [documentId, data, pushHistoryAction, refreshVerticalLinkNeighbors, updateLadderData]
+  );
+
   const addElement = useCallback(
     (type: LadderElementType, position: GridPosition, props: Partial<LadderElement> = {}): string | null => {
       if (!documentId || !data) return null;
 
-      if (!isValidPosition(data.elements, position, data.gridConfig)) {
-        return null;
+      if (type === 'wire_v') {
+        return addVerticalLink({
+          row: getVerticalLinkRowFromMainGridRow(position.row),
+          col: position.col,
+        });
       }
 
       // Phase 1.7: Auto-resolve wire type based on neighbors
-      let resolvedType = type;
+      let resolvedType: LadderElementType = type;
       let wireDirection: string | undefined;
-      if (type === 'wire_h' || type === 'wire_v') {
-        const resolved = resolveWireElementType(position, type, data.elements, data.gridConfig);
+      let wireDirections: number | undefined;
+      if (type === 'wire_h') {
+        const resolved = resolveWireElementType(position, type, data.elements, data.gridConfig, undefined, data.verticalLinks);
         resolvedType = resolved.type;
         wireDirection = resolved.direction;
+        wireDirections = resolved.directions;
+      }
+
+      if (!isValidPosition(data.elements, position, data.gridConfig, resolvedType)) {
+        return null;
       }
 
       const id = generateId(resolvedType);
       const defaultProps = getDefaultProperties(resolvedType);
-      const finalProperties = wireDirection
-        ? { ...defaultProps, direction: wireDirection } as WireProperties
-        : defaultProps;
+      const finalProperties = (
+        wireDirection !== undefined || wireDirections !== undefined
+          ? {
+              ...defaultProps,
+              ...(wireDirection !== undefined ? { direction: wireDirection } : {}),
+              ...(wireDirections !== undefined ? { connectedDirections: wireDirections } : {}),
+            }
+          : defaultProps
+      ) as WireProperties;
 
       const newElement: LadderElement = {
         id,
@@ -231,7 +396,7 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
         docData.elements.set(id, newElement);
 
         // Auto-update adjacent wire elements
-        const adjacentUpdates = updateAdjacentWires(position, docData.elements, docData.gridConfig);
+        const adjacentUpdates = updateAdjacentWires(position, docData.elements, docData.gridConfig, undefined, docData.verticalLinks);
         for (const update of adjacentUpdates) {
           const adjElement = docData.elements.get(update.elementId);
           if (adjElement && isWireType(adjElement.type)) {
@@ -242,7 +407,7 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
 
       return id;
     },
-    [documentId, data, pushHistoryAction, updateLadderData]
+    [addVerticalLink, documentId, data, pushHistoryAction, updateLadderData]
   );
 
   const duplicateElement = useCallback(
@@ -264,7 +429,7 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
       ];
 
       const availablePosition = candidatePositions.find((position) =>
-        isValidPosition(data.elements, position, data.gridConfig)
+        isValidPosition(data.elements, position, data.gridConfig, element.type)
       );
       if (!availablePosition) return null;
 
@@ -279,7 +444,7 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
         docData.elements.set(newId, newElement);
 
         // Recalculate the duplicated element's own wire type at its new position
-        const selfUpdate = recalculateWireType(newElement, docData.elements, docData.gridConfig);
+        const selfUpdate = recalculateWireType(newElement, docData.elements, docData.gridConfig, undefined, docData.verticalLinks);
         if (selfUpdate) {
           applyWireTypeUpdate(newElement, selfUpdate);
         }
@@ -300,16 +465,15 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
   );
 
   const getElementAt = useCallback(
-    (row: number, col: number): LadderElement | undefined => {
+    (row: number, col: number, typeFilter?: 'instruction'): LadderElement | undefined => {
       if (!data) return undefined;
 
-      for (const element of data.elements.values()) {
-        if (element.position.row === row && element.position.col === col) {
-          return element;
-        }
+      const element = findElementAt(data.elements, row, col);
+      if (!element) return undefined;
+      if (typeFilter === 'instruction' && element.type === 'wire_v') {
+        return undefined;
       }
-
-      return undefined;
+      return element;
     },
     [data]
   );
@@ -317,6 +481,11 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
   const removeElement = useCallback(
     (id: string) => {
       if (!documentId || !data) return;
+
+      if (data.verticalLinks.has(id)) {
+        removeVerticalLink(id);
+        return;
+      }
 
       // Phase 1.8: Record position before deletion for adjacent wire updates
       const elementToRemove = data.elements.get(id);
@@ -332,7 +501,7 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
 
         // Auto-update adjacent wire elements after deletion
         if (removedPosition) {
-          const adjacentUpdates = updateAdjacentWires(removedPosition, docData.elements, docData.gridConfig);
+          const adjacentUpdates = updateAdjacentWires(removedPosition, docData.elements, docData.gridConfig, undefined, docData.verticalLinks);
           for (const update of adjacentUpdates) {
             const adjElement = docData.elements.get(update.elementId);
             if (adjElement && isWireType(adjElement.type)) {
@@ -349,13 +518,18 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
     (id: string, position: GridPosition) => {
       if (!documentId || !data) return;
 
-      if (!isValidPosition(data.elements, position, data.gridConfig, id)) {
+      if (data.verticalLinks.has(id)) {
+        moveVerticalLink(id, { row: getVerticalLinkRowFromMainGridRow(position.row), col: position.col });
         return;
       }
 
       // Record the old position before moving for adjacent wire updates
       const elementToMove = data.elements.get(id);
       const oldPosition = elementToMove ? { ...elementToMove.position } : null;
+
+      if (!isValidPosition(data.elements, position, data.gridConfig, elementToMove?.type, id)) {
+        return;
+      }
 
       pushHistoryAction(documentId);
       updateLadderData(documentId, (docData) => {
@@ -364,14 +538,14 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
           element.position = { ...position };
 
           // Recalculate the moved element's own wire type at its new position
-          const selfUpdate = recalculateWireType(element, docData.elements, docData.gridConfig);
+          const selfUpdate = recalculateWireType(element, docData.elements, docData.gridConfig, undefined, docData.verticalLinks);
           if (selfUpdate) {
             applyWireTypeUpdate(element, selfUpdate);
           }
 
           // Update adjacent wires around the OLD position (now vacated)
           if (oldPosition) {
-            const oldUpdates = updateAdjacentWires(oldPosition, docData.elements, docData.gridConfig);
+            const oldUpdates = updateAdjacentWires(oldPosition, docData.elements, docData.gridConfig, undefined, docData.verticalLinks);
             for (const update of oldUpdates) {
               const adjElement = docData.elements.get(update.elementId);
               if (adjElement && isWireType(adjElement.type)) {
@@ -381,7 +555,7 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
           }
 
           // Update adjacent wires around the NEW position (now occupied)
-          const newUpdates = updateAdjacentWires(position, docData.elements, docData.gridConfig);
+          const newUpdates = updateAdjacentWires(position, docData.elements, docData.gridConfig, undefined, docData.verticalLinks);
           for (const update of newUpdates) {
             const adjElement = docData.elements.get(update.elementId);
             if (adjElement && isWireType(adjElement.type)) {
@@ -417,7 +591,7 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
           if (typeChanged || positionChanged) {
             // Update wires around old position if position changed
             if (positionChanged && oldPosition) {
-              const oldUpdates = updateAdjacentWires(oldPosition, docData.elements, docData.gridConfig);
+              const oldUpdates = updateAdjacentWires(oldPosition, docData.elements, docData.gridConfig, undefined, docData.verticalLinks);
               for (const update of oldUpdates) {
                 const adjElement = docData.elements.get(update.elementId);
                 if (adjElement && isWireType(adjElement.type)) {
@@ -427,7 +601,7 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
             }
 
             // Update wires around current position
-            const adjacentUpdates = updateAdjacentWires(element.position, docData.elements, docData.gridConfig);
+            const adjacentUpdates = updateAdjacentWires(element.position, docData.elements, docData.gridConfig, undefined, docData.verticalLinks);
             for (const update of adjacentUpdates) {
               const adjElement = docData.elements.get(update.elementId);
               if (adjElement && isWireType(adjElement.type)) {
@@ -436,7 +610,7 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
             }
 
             // Recalculate the element's own wire type if it's a wire
-            const selfUpdate = recalculateWireType(element, docData.elements, docData.gridConfig);
+            const selfUpdate = recalculateWireType(element, docData.elements, docData.gridConfig, undefined, docData.verticalLinks);
             if (selfUpdate) {
               applyWireTypeUpdate(element, selfUpdate);
             }
@@ -466,13 +640,13 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
         if (!el) return;
 
         // Merge directions: existing + new tool + neighbors
-        const mergeUpdate = mergeWireDirections(el, newWireType, docData.elements, docData.gridConfig);
+        const mergeUpdate = mergeWireDirections(el, newWireType, docData.elements, docData.gridConfig, undefined, docData.verticalLinks);
         if (mergeUpdate) {
           applyWireTypeUpdate(el, mergeUpdate);
         }
 
         // Update adjacent wires after merge
-        const adjacentUpdates = updateAdjacentWires(el.position, docData.elements, docData.gridConfig);
+        const adjacentUpdates = updateAdjacentWires(el.position, docData.elements, docData.gridConfig, undefined, docData.verticalLinks);
         for (const update of adjacentUpdates) {
           const adjElement = docData.elements.get(update.elementId);
           if (adjElement && isWireType(adjElement.type)) {
@@ -489,90 +663,78 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
    * Auto-merges with existing wire elements at each cell.
    * Creates junctions at endpoints where vertical meets horizontal.
    */
-  const placeVerticalWireSpan = useCallback(
+  const removeVerticalLink = useCallback(
+    (id: string) => {
+      if (!documentId || !data) return;
+
+      const verticalLink = data.verticalLinks.get(id);
+      if (!verticalLink) return;
+
+      pushHistoryAction(documentId);
+      updateLadderData(documentId, (docData) => {
+        docData.verticalLinks.delete(id);
+        refreshVerticalLinkNeighbors(docData, [verticalLink.position]);
+      });
+    },
+    [documentId, data, pushHistoryAction, refreshVerticalLinkNeighbors, updateLadderData]
+  );
+
+  const moveVerticalLink = useCallback(
+    (id: string, position: VerticalLinkPosition) => {
+      if (!documentId || !data) return;
+
+      const existing = data.verticalLinks.get(id);
+      if (!existing) return;
+      if (!isValidVerticalLinkPosition(data.verticalLinks, position, data.gridConfig, id)) {
+        return;
+      }
+
+      const oldPosition = { ...existing.position };
+      pushHistoryAction(documentId);
+      updateLadderData(documentId, (docData) => {
+        const verticalLink = docData.verticalLinks.get(id);
+        if (!verticalLink) return;
+
+        verticalLink.position = { ...position };
+        refreshVerticalLinkNeighbors(docData, [oldPosition, position]);
+      });
+    },
+    [documentId, data, pushHistoryAction, refreshVerticalLinkNeighbors, updateLadderData]
+  );
+
+  const placeVerticalLinkSpan = useCallback(
     (col: number, startRow: number, endRow: number) => {
       if (!documentId || !data) return;
 
       const minRow = Math.min(startRow, endRow);
       const maxRow = Math.max(startRow, endRow);
-      if (minRow === maxRow) return; // Need at least 2 rows
+      if (minRow === maxRow) return;
 
-      pushHistoryAction(documentId, `Place vertical wire span row ${minRow}-${maxRow} col ${col}`);
+      pushHistoryAction(documentId, 'Place vertical link span row ' + minRow + '-' + maxRow + ' col ' + col);
       updateLadderData(documentId, (docData) => {
-        const placedPositions: GridPosition[] = [];
+        const placed: VerticalLinkPosition[] = [];
 
         for (let row = minRow; row <= maxRow; row++) {
-          const position: GridPosition = { row, col };
-
-          // Check if cell is occupied
-          let existingElement: LadderElement | undefined;
-          for (const el of docData.elements.values()) {
-            if (el.position.row === row && el.position.col === col) {
-              existingElement = el;
-              break;
-            }
+          const position: VerticalLinkPosition = { row, col };
+          if (!isValidVerticalLinkPosition(docData.verticalLinks, position, docData.gridConfig)) {
+            continue;
           }
 
-          if (existingElement) {
-            if (isWireType(existingElement.type)) {
-              // Merge wire_v onto existing wire element (auto-junction)
-              const mergeUpdate = mergeWireDirections(
-                existingElement, 'wire_v', docData.elements, docData.gridConfig
-              );
-              if (mergeUpdate) {
-                applyWireTypeUpdate(existingElement, mergeUpdate);
-              }
-              placedPositions.push(position);
-            }
-            // Non-wire element: skip (can't overwrite contacts/coils)
-          } else {
-            // Empty cell: place wire_v
-            if (col >= 0 && col < docData.gridConfig.columns && row >= 0) {
-              const resolved = resolveWireElementType(
-                position, 'wire_v', docData.elements, docData.gridConfig
-              );
-              const id = generateId(resolved.type);
-              const props = resolved.direction
-                ? { direction: resolved.direction } as WireProperties
-                : {} as WireProperties;
-
-              const newElement: LadderElement = {
-                id,
-                type: resolved.type,
-                position: { ...position },
-                properties: props,
-              } as LadderElement;
-
-              docData.elements.set(id, newElement);
-              placedPositions.push(position);
-            }
-          }
+          const id = generateId('vertical-link');
+          docData.verticalLinks.set(id, {
+            id,
+            position: { ...position },
+            properties: { isValid: true },
+          });
+          placed.push(position);
         }
 
-        // After all elements placed/merged, recalculate all affected wires
-        for (const pos of placedPositions) {
-          // Recalculate self
-          for (const el of docData.elements.values()) {
-            if (el.position.row === pos.row && el.position.col === pos.col && isWireType(el.type)) {
-              const selfUpdate = recalculateWireType(el, docData.elements, docData.gridConfig);
-              if (selfUpdate) {
-                applyWireTypeUpdate(el, selfUpdate);
-              }
-              break;
-            }
-          }
-          // Update adjacent wires
-          const adjacentUpdates = updateAdjacentWires(pos, docData.elements, docData.gridConfig);
-          for (const update of adjacentUpdates) {
-            const adjElement = docData.elements.get(update.elementId);
-            if (adjElement && isWireType(adjElement.type)) {
-              applyWireTypeUpdate(adjElement, update);
-            }
-          }
+        if (placed.length > 0) {
+          refreshVerticalLinkNeighbors(docData, placed);
         }
       });
     },
-    [documentId, data, pushHistoryAction, updateLadderData]
+    [documentId, data, pushHistoryAction, refreshVerticalLinkNeighbors, updateLadderData]
   );
 
   // Comment & Labels
@@ -642,7 +804,7 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
         docData.comment = ast.networks[0]?.comment;
 
         // Recalculate all wire types based on neighbors after bulk load
-        recalculateAllWireTypes(docData.elements, docData.gridConfig);
+        recalculateAllWireTypes(docData.elements, docData.gridConfig, docData.verticalLinks);
       });
     },
     [documentId, updateLadderData]
@@ -732,6 +894,7 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
     return {
       // Data
       elements: data.elements,
+      verticalLinks: data.verticalLinks,
       wires: data.wires,
       comment: data.comment,
       rungLabels: data.rungLabels,
@@ -746,9 +909,15 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
       duplicateElement,
       getElementAt,
 
+      // Vertical-link operations
+      addVerticalLink,
+      removeVerticalLink,
+      moveVerticalLink,
+      getVerticalLinkAt,
+      placeVerticalLinkSpan,
+
       // Wire-specific operations
       mergeWireElement,
-      placeVerticalWireSpan,
 
       // Comment & Labels
       updateComment,
@@ -776,13 +945,17 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
     ladderDoc,
     data,
     addElement,
+    addVerticalLink,
     duplicateElement,
     getElementAt,
+    getVerticalLinkAt,
     removeElement,
+    removeVerticalLink,
     moveElement,
+    moveVerticalLink,
     updateElement,
     mergeWireElement,
-    placeVerticalWireSpan,
+    placeVerticalLinkSpan,
     updateComment,
     updateRungLabel,
     setGridConfig,
@@ -797,5 +970,3 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
     markSavedCallback,
   ]);
 }
-
-export default useLadderDocument;

@@ -15,6 +15,7 @@ import type {
   LadderGridConfig,
   LadderElement,
   LadderWire,
+  VerticalLinkEntity,
 } from './ladder';
 import type {
   Scenario,
@@ -128,6 +129,7 @@ export interface CanvasDocumentState extends DocumentMeta {
 /** Snapshot data for ladder history */
 export interface LadderHistoryData {
   elements: Array<[string, LadderElement]>;
+  verticalLinks: Array<[string, VerticalLinkEntity]>;
   wires: LadderWire[];
   comment?: string;
   rungLabels?: Array<[number, string]>;
@@ -137,6 +139,8 @@ export interface LadderHistoryData {
 export interface LadderDocumentData {
   /** Elements by ID */
   elements: Map<string, LadderElement>;
+  /** Standalone vertical links keyed by ID */
+  verticalLinks: Map<string, VerticalLinkEntity>;
   /** Wire connections */
   wires: LadderWire[];
   /** Ladder comment (overall) */
@@ -266,6 +270,7 @@ export const DEFAULT_CANVAS_DATA: CanvasDocumentData = {
 /** Default ladder document data */
 export const DEFAULT_LADDER_DATA: LadderDocumentData = {
   elements: new Map(),
+  verticalLinks: new Map(),
   wires: [],
   comment: undefined,
   rungLabels: new Map(),
@@ -354,6 +359,7 @@ export function createEmptyLadderDocument(
     data: {
       ...DEFAULT_LADDER_DATA,
       elements: new Map(),
+      verticalLinks: new Map(),
       wires: [],
     },
     history: [],

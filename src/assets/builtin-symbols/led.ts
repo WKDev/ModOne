@@ -23,9 +23,17 @@ export const ledSymbol: SymbolDefinition = {
     { id: 'anode', name: '+', number: 'A', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 20, y: 0 }, orientation: 'up', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
     { id: 'cathode', name: '-', number: 'K', type: 'output', electricalType: 'output', functionalRole: 'general', shape: 'line', position: { x: 20, y: 60 }, orientation: 'down', length: 0, sortOrder: 2, nameVisible: true, numberVisible: true },
   ],
+  behavior: {
+    templateId: 'archetype:lamp',
+    archetype: 'lamp',
+    interactionMode: 'none',
+    deviceScoped: true,
+    terminalRoles: { anode: 'L+', cathode: 'L-' },
+  },
   properties: [
     { key: 'color', value: 'red', type: 'string', visible: true, editorType: 'text' },
     { key: 'forwardVoltage', value: 2, type: 'number', visible: true, editorType: 'number' },
     { key: 'lit', value: false, type: 'boolean', visible: true, editorType: 'checkbox' },
   ],
 };
+

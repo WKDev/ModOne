@@ -26,6 +26,13 @@ export const motorSymbol: SymbolDefinition = {
     { id: 'l3', name: 'W', number: 'W', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 60, y: 0 }, orientation: 'up', length: 0, sortOrder: 3, nameVisible: true, numberVisible: true },
     { id: 'pe', name: 'PE', number: 'PE', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 40, y: 80 }, orientation: 'down', length: 0, sortOrder: 4, nameVisible: true, numberVisible: true },
   ],
+  behavior: {
+    templateId: 'archetype:motor',
+    archetype: 'motor',
+    interactionMode: 'none',
+    deviceScoped: true,
+    terminalRoles: { l1: 'L1', l2: 'L2', l3: 'L3', pe: 'PE' },
+  },
   properties: [
     { key: 'designation', value: 'M1', type: 'string', visible: true, editorType: 'text' },
     { key: 'powerKw', value: 1.5, type: 'number', visible: true, editorType: 'number' },
@@ -33,3 +40,4 @@ export const motorSymbol: SymbolDefinition = {
     { key: 'running', value: false, type: 'boolean', visible: true, editorType: 'checkbox' },
   ],
 };
+

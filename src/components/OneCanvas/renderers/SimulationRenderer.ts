@@ -1,13 +1,14 @@
 /**
  * SimulationRenderer — Applies live simulation state to Pixi symbols.
  *
- * Listens to Tauri `sim:plc-outputs` events and updates block/wire tint state.
+ * Supports both Tauri PLC events and local behavior-template-driven simulation snapshots.
  */
 
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { Container, Ticker } from 'pixi.js';
 import type { BlockRenderer } from './BlockRenderer';
 import type { WireRenderer } from './WireRenderer';
+import type { ComponentBehaviorState } from '@/types/behavior';
 import { getBuiltinSymbolForBlockType } from '@/assets/builtin-symbols';
 
 const COLOR_DEFAULT = 0xffffff;
@@ -19,12 +20,12 @@ const COLOR_WARNING = 0xeab308;
 type TintBehavior = 'active' | 'running' | 'warning' | 'led' | 'static' | 'default';
 
 const TINT_BEHAVIOR_BY_CATEGORY: ReadonlyMap<string, TintBehavior> = new Map([
-  ['plc',       'active'],   // plc_in, plc_out, timers, counters → blue when on
-  ['control',   'warning'],  // button, emergency_stop → yellow when on
-  ['switching', 'running'],  // contacts, switches, relay_coil → green when on
-  ['actuator',  'running'],  // motor, solenoid_valve → green when on
-  ['indicator', 'led'],      // led, pilot_lamp → LED color when on
-  ['power',     'static'],   // powersource, transformer → always default
+  ['plc', 'active'],
+  ['control', 'warning'],
+  ['switching', 'running'],
+  ['actuator', 'running'],
+  ['indicator', 'led'],
+  ['power', 'static'],
 ]);
 
 interface PlcOutputUpdateRaw {
@@ -124,6 +125,32 @@ export class SimulationRenderer {
     this.resetAllVisualState();
   }
 
+  applySimulationSnapshot(
+    behaviorStates: Map<string, ComponentBehaviorState>,
+    wireIds: Set<string>
+  ): void {
+    if (this._destroyed || !this._config) return;
+
+    const nextBlocks = new Set(behaviorStates.keys());
+
+    for (const blockId of this._energizedBlocks) {
+      if (nextBlocks.has(blockId)) continue;
+      const graphics = this._config.blockRenderer.getBlockGraphics(blockId);
+      if (graphics) {
+        graphics.tint = COLOR_DEFAULT;
+      }
+    }
+
+    for (const [blockId, behaviorState] of behaviorStates) {
+      const graphics = this._config.blockRenderer.getBlockGraphics(blockId);
+      if (!graphics) continue;
+      graphics.tint = this._resolveBehaviorTint(behaviorState, blockId);
+    }
+
+    this._energizedBlocks = nextBlocks;
+    this.setEnergizedWires(wireIds);
+  }
+
   setEnergizedWires(wireIds: Set<string>): void {
     if (this._destroyed || !this._config) return;
 
@@ -210,17 +237,40 @@ export class SimulationRenderer {
     graphics.tint = this._resolveTint(blockType, state, blockId, value);
   }
 
+  private _resolveBehaviorTint(behaviorState: ComponentBehaviorState, blockId: string): number {
+    switch (behaviorState.archetype) {
+      case 'lamp':
+        return behaviorState.lit ? this._resolveLedColor(blockId) : COLOR_DEFAULT;
+      case 'motor':
+        return behaviorState.running ? COLOR_RUNNING : COLOR_DEFAULT;
+      case 'relay':
+        if (behaviorState.conducting) return COLOR_RUNNING;
+        return behaviorState.energized ? COLOR_ACTIVE : COLOR_DEFAULT;
+      case 'switch':
+        if (behaviorState.visualState === 'pressed') return COLOR_WARNING;
+        return behaviorState.conducting ? COLOR_WARNING : COLOR_DEFAULT;
+      default:
+        return COLOR_DEFAULT;
+    }
+  }
+
   private _resolveTint(blockType: string, state: boolean, blockId: string, _value: string | null): number {
     if (!state) return COLOR_DEFAULT;
     const symbol = getBuiltinSymbolForBlockType(blockType);
     const behavior: TintBehavior = TINT_BEHAVIOR_BY_CATEGORY.get(symbol?.category ?? '') ?? 'default';
     switch (behavior) {
-      case 'active':  return COLOR_ACTIVE;
-      case 'running': return COLOR_RUNNING;
-      case 'warning': return COLOR_WARNING;
-      case 'led':     return this._resolveLedColor(blockId);
-      case 'static':  return COLOR_DEFAULT;
-      default:        return COLOR_ACTIVE;
+      case 'active':
+        return COLOR_ACTIVE;
+      case 'running':
+        return COLOR_RUNNING;
+      case 'warning':
+        return COLOR_WARNING;
+      case 'led':
+        return this._resolveLedColor(blockId);
+      case 'static':
+        return COLOR_DEFAULT;
+      default:
+        return COLOR_ACTIVE;
     }
   }
 

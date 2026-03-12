@@ -56,6 +56,13 @@ export const relaySymbol: SymbolDefinition = {
       ],
     },
   ],
+  behavior: {
+    templateId: 'archetype:relay',
+    archetype: 'relay',
+    interactionMode: 'none',
+    deviceScoped: true,
+    terminalRoles: { coil_in: 'A1', coil_out: 'A2', com: 'COM', no: 'NO', nc: 'NC' },
+  },
   properties: [
     { key: 'designation', value: 'K1', type: 'string', visible: true, editorType: 'text' },
     { key: 'coilVoltage', value: 24, type: 'number', visible: true, editorType: 'number' },
@@ -63,3 +70,4 @@ export const relaySymbol: SymbolDefinition = {
     { key: 'energized', value: false, type: 'boolean', visible: true, editorType: 'checkbox' },
   ],
 };
+

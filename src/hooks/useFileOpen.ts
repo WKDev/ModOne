@@ -47,6 +47,10 @@ function circuitStateToSerializable(state: CircuitState): SerializableCircuitSta
     wires: state.wires,
     metadata: state.metadata,
     viewport: state.viewport,
+    gridSize: state.gridSize,
+    showGrid: state.showGrid,
+    gridStyle: state.gridStyle,
+    gridUnit: state.gridUnit,
   };
 }
 

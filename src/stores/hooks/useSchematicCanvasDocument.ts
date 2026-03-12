@@ -16,12 +16,7 @@ import type {
   SerializableCircuitState,
 } from '../../components/OneCanvas/types';
 import { isPortEndpoint, isFloatingEndpoint, isJunctionEndpoint } from '../../components/OneCanvas/types';
-import {
-  getBlockSize,
-  getDefaultPorts as getDefaultPortsFromDefs,
-  getDefaultBlockProps as getDefaultBlockPropsFromDefs,
-  getPowerSourcePorts,
-} from '../../components/OneCanvas/blockDefinitions';
+import { createBlockInstance } from '../../components/OneCanvas/runtime/blockFactory';
 import {
   generateId,
   snapToGridPosition,
@@ -82,13 +77,6 @@ interface WorkingCircuitData {
   gridUnit: 'px' | 'mil' | 'mm';
 }
 
-function getDefaultPorts(type: BlockType): Block['ports'] {
-  return getDefaultPortsFromDefs(type);
-}
-
-function getDefaultBlockProps(type: BlockType): Partial<Block> {
-  return getDefaultBlockPropsFromDefs(type) as Partial<Block>;
-}
 
 function circuitToWorkingData(circuit: SerializableCircuitState): WorkingCircuitData {
   return {
@@ -113,11 +101,11 @@ function circuitToWorkingData(circuit: SerializableCircuitState): WorkingCircuit
       x: circuit.viewport?.panX ?? 0,
       y: circuit.viewport?.panY ?? 0,
     },
-    gridSize: DEFAULT_GRID_SIZE,
+    gridSize: circuit.gridSize ?? DEFAULT_GRID_SIZE,
     snapToGrid: true,
-    showGrid: true,
-    gridStyle: 'dots',
-    gridUnit: 'px',
+    showGrid: circuit.showGrid ?? true,
+    gridStyle: circuit.gridStyle ?? 'dots',
+    gridUnit: circuit.gridUnit ?? 'px',
   };
 }
 
@@ -142,6 +130,10 @@ function workingDataToCircuit(data: WorkingCircuitData): SerializableCircuitStat
       panX: data.pan.x,
       panY: data.pan.y,
     },
+    gridSize: data.gridSize,
+    showGrid: data.showGrid,
+    gridStyle: data.gridStyle,
+    gridUnit: data.gridUnit,
   };
 }
 
@@ -200,29 +192,7 @@ export function useSchematicCanvasDocument(
         ? snapToGridPosition(position, data.gridSize)
         : position;
 
-      let ports = getDefaultPorts(type);
-      if (type === 'powersource') {
-        const polarity = (props as Record<string, unknown>).polarity as
-          | string
-          | undefined;
-        if (
-          polarity === 'ground' ||
-          polarity === 'negative' ||
-          polarity === 'positive'
-        ) {
-          ports = getPowerSourcePorts(polarity);
-        }
-      }
-
-      const newBlock: Block = {
-        id,
-        type,
-        position: finalPosition,
-        size: getBlockSize(type),
-        ports,
-        ...getDefaultBlockProps(type),
-        ...props,
-      } as Block;
+      const newBlock = createBlockInstance(id, type, finalPosition, props);
 
       pushHistory(documentId);
       updateActivePageCircuit((working) => {
@@ -1007,3 +977,6 @@ export function useSchematicCanvasDocument(
 }
 
 export default useSchematicCanvasDocument;
+
+
+

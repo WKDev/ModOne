@@ -18,8 +18,8 @@ import {
   setPlcOutput as updatePlcOutput,
   setManualOverride as updateManualOverride,
   syncFromModbus,
-  type RuntimeState,
 } from '../utils/switchEvaluator';
+import type { RuntimeState } from '@/types/behavior';
 import { useModbusStore } from '../../../stores/modbusStore';
 import { useLayoutStore } from '../../../stores/layoutStore';
 import { simulationService } from '../../../services/simulationService';
@@ -252,3 +252,5 @@ export function useSimulation(
 }
 
 export default useSimulation;
+
+

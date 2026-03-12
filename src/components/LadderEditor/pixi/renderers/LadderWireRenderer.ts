@@ -15,6 +15,7 @@
 import { Container, Graphics } from 'pixi.js';
 import type { WireElement } from '../../../../types/ladder';
 import { WireDirection } from '../../../../types/ladder';
+import { getElementDirections } from '../../utils/wireGenerator';
 
 
 const WIRE_COLOR = 0x6b7280;  // neutral-500
@@ -49,103 +50,27 @@ export class LadderWireRenderer {
   // ---------------------------------------------------------------------------
 
   private drawWire(gfx: Graphics, element: WireElement, w: number, h: number): void {
-    const midX = w / 2;
     const midY = h * 0.65; // Shifted down for label space
 
     // Stroke styles: 'butt' for horizontal to join seamlessly, 'round' for vertical/internal
     const strokeH = { width: WIRE_WIDTH, color: WIRE_COLOR, cap: 'butt' } as const;
     const strokeV = { width: WIRE_WIDTH, color: WIRE_COLOR, cap: 'round' } as const;
 
-    const props = element.properties;
-    const connected = props.connectedDirections;
+    const connected = element.properties.connectedDirections;
 
     // Shared drawing helpers
     const drawH = () => gfx.moveTo(0, midY).lineTo(w, midY).stroke(strokeH);
-    const drawVUp = () => gfx.moveTo(midX, 0).lineTo(midX, midY).stroke(strokeV);
-    const drawVDown = () => gfx.moveTo(midX, midY).lineTo(midX, h).stroke(strokeV);
-    const drawVFull = () => gfx.moveTo(midX, 0).lineTo(midX, h).stroke(strokeV);
+    const drawVUp = () => gfx.moveTo(0, midY - h).lineTo(0, midY).stroke(strokeV);
+    const drawVDown = () => gfx.moveTo(0, midY).lineTo(0, midY + h).stroke(strokeV);
 
-    // A. Use precise connectedDirections if available
-    if (connected !== undefined) {
-      if (connected & WireDirection.TOP) drawVUp();
-      if (connected & WireDirection.BOTTOM) drawVDown();
-      if (connected & (WireDirection.LEFT | WireDirection.RIGHT) || element.type === 'wire_h') {
-        drawH();
-      }
-      return;
+    const directions = connected ?? getElementDirections(element);
+
+    if (directions & WireDirection.TOP) drawVUp();
+    if (directions & WireDirection.BOTTOM) drawVDown();
+    if (directions & (WireDirection.LEFT | WireDirection.RIGHT) || element.type === 'wire_h') {
+      drawH();
     }
 
-    // B. Fallback to type-based logic
-    switch (element.type) {
-      case 'wire_h':
-        drawH();
-        break;
-
-      case 'wire_v':
-        drawVFull();
-        break;
-
-      case 'wire_corner': {
-        const dir = props.direction;
-        switch (dir) {
-          case 'corner_tl':
-            drawVDown();
-            gfx.moveTo(midX, midY).lineTo(w, midY).stroke(strokeH);
-            break;
-          case 'corner_tr':
-            gfx.moveTo(0, midY).lineTo(midX, midY).stroke(strokeH);
-            drawVDown();
-            break;
-          case 'corner_bl':
-            drawVUp();
-            gfx.moveTo(midX, midY).lineTo(w, midY).stroke(strokeH);
-            break;
-          case 'corner_br':
-            gfx.moveTo(0, midY).lineTo(midX, midY).stroke(strokeH);
-            drawVUp();
-            break;
-          default:
-            drawVFull();
-            break;
-        }
-        break;
-      }
-
-      case 'wire_junction': {
-        const dir = props.direction;
-        switch (dir) {
-          case 'junction_t':
-            drawVFull();
-            gfx.moveTo(midX, midY).lineTo(w, midY).stroke(strokeH);
-            break;
-          case 'junction_b':
-            drawVFull();
-            gfx.moveTo(0, midY).lineTo(midX, midY).stroke(strokeH);
-            break;
-          case 'junction_l':
-            drawH();
-            drawVDown();
-            break;
-          case 'junction_r':
-            drawH();
-            drawVUp();
-            break;
-          case 'cross':
-            drawH();
-            drawVFull();
-            break;
-          default:
-            drawVFull();
-            drawH();
-            break;
-        }
-        break;
-      }
-
-      default:
-        drawH();
-        break;
-    }
   }
 }
 

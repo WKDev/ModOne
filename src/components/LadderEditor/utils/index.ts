@@ -41,3 +41,33 @@ export {
   collectValidationErrors,
   type ValidationResult,
 } from './validation';
+
+// Dual-grid utilities
+export {
+  DEFAULT_DUAL_GRID_CONFIG,
+  buildDualGridTopology,
+  isHalfStepCoordinate,
+  isIntegerCoordinate,
+  projectHorizontalSegmentToPixels,
+  projectPointToPixels,
+  projectVerticalLinkToPixels,
+  resolveDualGridSelection,
+  snapPointerToDualGrid,
+  snapToComponentGrid,
+  snapToVerticalLinkGrid,
+  type ComponentCell,
+  type DualGridConfig,
+  type DualGridEdge,
+  type DualGridIssue,
+  type DualGridNode,
+  type DualGridSelection,
+  type DualGridTopology,
+  type DualGridTopologyInput,
+  type HorizontalSegment,
+  type RowLinkState,
+  type SelectableDualGridEntity,
+  type SnapResult,
+  type UnitPoint,
+  type VerticalContinuityChain,
+  type VerticalLink,
+} from './dualGrid';

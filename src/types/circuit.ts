@@ -5,6 +5,7 @@
  */
 
 import type { PinElectricalTypeV2, PinFunctionalRole } from './symbol';
+import type { BlockBehaviorBinding, BlockRuntimeState, BehaviorVisualState } from './behavior';
 
 // ============================================================================
 // Core primitives
@@ -137,6 +138,9 @@ export interface BaseBlock<T extends string = BlockType> {
   visible?: boolean;
   layer?: string;
   selected?: boolean;
+  behavior?: BlockBehaviorBinding;
+  runtimeState?: BlockRuntimeState;
+  visualState?: BehaviorVisualState;
 }
 
 export type PowerPolarity = 'positive' | 'negative' | 'ground';
@@ -658,3 +662,5 @@ const LEGACY_BLOCK_TYPE_MAP: Readonly<Record<LegacyBlockType, BlockType>> = {
 export function migrateLegacyBlockType(blockType: string): BlockType | string {
   return LEGACY_BLOCK_TYPE_MAP[blockType as LegacyBlockType] ?? blockType;
 }
+
+

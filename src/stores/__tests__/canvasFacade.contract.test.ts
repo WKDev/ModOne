@@ -33,6 +33,10 @@ function emptyCircuit(components: Record<string, Block> = {}): SerializableCircu
       panX: 0,
       panY: 0,
     },
+    gridSize: 20,
+    showGrid: true,
+    gridStyle: 'dots',
+    gridUnit: 'mm',
   };
 }
 
@@ -72,6 +76,10 @@ beforeEach(() => {
     components: new Map(),
     junctions: new Map(),
     wires: [],
+    gridSize: 20,
+    snapToGrid: true,
+    showGrid: true,
+    gridStyle: 'dots',
   }));
 });
 
@@ -111,6 +119,25 @@ describe.each(adapters)('CanvasFacade (%s)', (_adapterName, setupFn) => {
     });
 
     expect(result.current.components.get('a')?.position).toEqual({ x: 80, y: 40 });
+  });
+
+  it('loads grid settings from serialized circuit data', () => {
+    const documentId = setupFn();
+    const { result } = renderHook(() => useCanvasFacade(documentId));
+
+    act(() => {
+      result.current.loadCircuit({
+        ...emptyCircuit(),
+        gridSize: 24,
+        showGrid: false,
+        gridStyle: 'lines',
+        gridUnit: 'mm',
+      });
+    });
+
+    expect(result.current.gridSize).toBe(24);
+    expect(result.current.showGrid).toBe(false);
+    expect(result.current.gridStyle).toBe('lines');
   });
 
   it('updateComponent updates properties while preserving shape', () => {
@@ -301,6 +328,8 @@ describe.each(adapters)('CanvasFacade (%s)', (_adapterName, setupFn) => {
     const seed = emptyCircuit({ a: makeBlock('a', 10, 10, 10, 10) });
     act(() => {
       result.current.loadCircuit(seed);
+    });
+    act(() => {
       result.current.moveComponent('a', { x: 90, y: 30 });
     });
 
@@ -460,3 +489,8 @@ describe('CanvasFacade (schematic documents)', () => {
     expect(globalFacade.current.components.size).toBe(0);
   });
 });
+
+
+
+
+

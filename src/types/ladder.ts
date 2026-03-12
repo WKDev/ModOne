@@ -402,6 +402,37 @@ export interface WireEndpoint {
   port: PortPosition;
 }
 
+export interface VerticalLinkPosition {
+  /** Vertical-link grid row, using origin (0, -0.5) in main-grid space */
+  row: number;
+  /** Boundary column index shared with the main grid */
+  col: number;
+}
+
+export interface VerticalLinkProperties {
+  /** Whether this standalone vertical path is currently electrically valid */
+  isValid?: boolean;
+}
+
+export interface VerticalLinkEntity {
+  /** Unique identifier */
+  id: string;
+  /** Vertical-link grid position */
+  position: VerticalLinkPosition;
+  /** Whether link is selected */
+  selected?: boolean;
+  /** Link-specific metadata */
+  properties: VerticalLinkProperties;
+}
+
+export function getVerticalLinkRowFromMainGridRow(mainRow: number): number {
+  return mainRow + 1;
+}
+
+export function getMainGridRowFromVerticalLinkRow(verticalRow: number): number {
+  return verticalRow - 1;
+}
+
 /** Wire connection between elements */
 export interface LadderWire {
   /** Unique identifier */

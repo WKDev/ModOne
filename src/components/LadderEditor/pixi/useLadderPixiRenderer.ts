@@ -16,9 +16,11 @@ import type { LadderPixiCanvasHostRef } from './LadderPixiCanvasHost';
 import { LadderSyncEngine } from './LadderSyncEngine';
 import { LadderDragHandler } from './interactions/LadderDragHandler';
 import type { LadderPointerEvent } from './LadderEventBridge';
+import type { LadderElement, VerticalLinkEntity } from '../../../types/ladder';
 import type { UseLadderDocumentReturn } from '../../../stores/hooks/useLadderDocument';
 import { useLadderUIStore } from '../../../stores/ladderUIStore';
 import { handlePlacement } from '../utils/ladderPlacement';
+import { getVerticalWireSegmentDistance, resolveVerticalWireHitTarget } from './verticalWireInteraction';
 
 // ============================================================================
 // Types
@@ -104,12 +106,13 @@ export function useLadderPixiRenderer({
 
     engine.fullSync(
       ladderDoc.elements,
+      ladderDoc.verticalLinks,
       ladderDoc.wires,
       ladderDoc.gridConfig,
       selectedElementIds,
       cursorCell,
     );
-  }, [ladderDoc?.elements, ladderDoc?.wires, ladderDoc?.gridConfig, ladderDoc, selectedElementIds, cursorCell]);
+  }, [hostRef, ladderDoc?.elements, ladderDoc?.verticalLinks, ladderDoc?.wires, ladderDoc?.gridConfig, ladderDoc, selectedElementIds, cursorCell]);
 
   // ===========================================================================
   // Monitoring visualization sync
@@ -124,7 +127,7 @@ export function useLadderPixiRenderer({
     } else {
       engine.clearMonitoring();
     }
-  }, [mode, monitoringState, ladderDoc?.elements, ladderDoc]);
+  }, [hostRef, mode, monitoringState, ladderDoc?.elements, ladderDoc]);
 
   // ===========================================================================
   // Auto-scroll when cursor cell changes (keyboard navigation)
@@ -201,19 +204,39 @@ export function useLadderPixiRenderer({
     if (dragHandlerRef.current?.isActive) return;
 
     const tool = activeToolRef.current;
-    const { gridRow, gridCol, shiftKey, ctrlKey } = event;
+    const { gridRow, gridCol, shiftKey, ctrlKey, worldX } = event;
     const uiStore = useLadderUIStore.getState();
+
+    // --- Edge Hit Testing for Vertical Wires ---
+    const cellWidth = doc.gridConfig.cellWidth;
+    const cellHeight = doc.gridConfig.cellHeight;
+    const { targetCol, targetRow, isEdgeClick } = resolveVerticalWireHitTarget(
+      worldX,
+      event.worldY,
+      gridCol,
+      gridRow,
+      cellWidth,
+      cellHeight,
+    );
 
     // --- Click-to-place: active tool is set ---
     if (tool) {
-      handlePlacement(doc, tool, gridRow, gridCol, shiftKey);
-      // Set cursor to placed position
-      uiStore.setCursorCell({ row: gridRow, col: gridCol });
-      uiStore.setSelectionAnchor({ row: gridRow, col: gridCol });
+      if (tool === 'wire_v') {
+        // Force placement on nearest edge if using vertical wire tool
+        handlePlacement(doc, tool, gridRow, targetCol, shiftKey, targetRow);
+        uiStore.setCursorCell({ row: gridRow, col: targetCol });
+        uiStore.setSelectionAnchor({ row: gridRow, col: targetCol });
+      } else {
+        handlePlacement(doc, tool, gridRow, gridCol, shiftKey);
+        uiStore.setCursorCell({ row: gridRow, col: gridCol });
+        uiStore.setSelectionAnchor({ row: gridRow, col: gridCol });
+      }
       return;
     }
 
     // --- Always update cursor cell on click ---
+    // If it's a clear edge click, we might want to move cursor to that boundary?
+    // For now, keep standard cell cursor but prioritize selection.
     uiStore.setCursorCell({ row: gridRow, col: gridCol });
 
     // --- Range selection via Shift+Click ---
@@ -241,19 +264,37 @@ export function useLadderPixiRenderer({
     }
 
     // --- Selection: no active tool ---
-    const existingElement = doc.getElementAt(gridRow, gridCol);
+    // 1. Try to find a vertical wire if click was near an edge
+    let targetElement: LadderElement | undefined;
+    let targetVerticalLink: VerticalLinkEntity | undefined;
+    if (isEdgeClick) {
+      let bestDistance = Number.POSITIVE_INFINITY;
+      for (const verticalLink of doc.verticalLinks.values()) {
+        if (verticalLink.position.col !== targetCol) continue;
+        if (Math.abs(verticalLink.position.row - targetRow) > 1) continue;
 
-    if (existingElement) {
+        const distance = getVerticalWireSegmentDistance(event.worldY, verticalLink.position.row, cellHeight);
+        if (distance <= cellHeight * 0.4 && distance < bestDistance) {
+          targetVerticalLink = verticalLink;
+          bestDistance = distance;
+        }
+      }
+    }
+
+    if (!targetVerticalLink) {
+      targetElement = doc.getElementAt(gridRow, gridCol, 'instruction');
+    }
+
+    const selectedId = targetVerticalLink?.id ?? targetElement?.id;
+
+    if (selectedId) {
       if (ctrlKey) {
-        // Toggle selection (Ctrl)
-        uiStore.toggleSelection(existingElement.id);
-        // Keep anchor where it was (or set it if this is first selection)
+        uiStore.toggleSelection(selectedId);
         if (!uiStore.selectionAnchor) {
           uiStore.setSelectionAnchor({ row: gridRow, col: gridCol });
         }
       } else {
-        // Replace selection — set new anchor
-        uiStore.setSelection([existingElement.id]);
+        uiStore.setSelection([selectedId]);
         uiStore.setSelectionAnchor({ row: gridRow, col: gridCol });
       }
     } else {
@@ -265,6 +306,7 @@ export function useLadderPixiRenderer({
     }
   }, []);
 
+
   const handleCellRightClick = useCallback((event: LadderPointerEvent) => {
     const doc = ladderDocRef.current;
     if (!doc) return;
@@ -272,14 +314,24 @@ export function useLadderPixiRenderer({
     // Cancel drag on right-click
     dragHandlerRef.current?.cancel();
 
-    const { gridRow, gridCol } = event;
-    const existingElement = doc.getElementAt(gridRow, gridCol);
+    const { gridRow, gridCol, worldX, worldY } = event;
+    const { targetCol, targetRow, isEdgeClick } = resolveVerticalWireHitTarget(
+      worldX,
+      worldY,
+      gridCol,
+      gridRow,
+      doc.gridConfig.cellWidth,
+      doc.gridConfig.cellHeight,
+    );
 
-    if (existingElement) {
-      // Select the right-clicked element if not already selected
+    const existingVerticalLink = isEdgeClick ? doc.getVerticalLinkAt(targetRow, targetCol) : undefined;
+    const existingElement = existingVerticalLink ? undefined : doc.getElementAt(gridRow, gridCol);
+
+    if (existingVerticalLink || existingElement) {
       const state = useLadderUIStore.getState();
-      if (!state.selectedElementIds.has(existingElement.id)) {
-        state.setSelection([existingElement.id]);
+      const id = existingVerticalLink?.id ?? existingElement?.id;
+      if (id && !state.selectedElementIds.has(id)) {
+        state.setSelection([id]);
       }
     }
 

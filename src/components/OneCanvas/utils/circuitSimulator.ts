@@ -2,12 +2,14 @@
  * Circuit Simulator
  *
  * Main simulation engine that combines graph building, switch evaluation,
- * path finding, and voltage propagation to determine which components are powered.
+ * path finding, voltage propagation, and behavior-template-driven live states.
  */
 
 import type { Block, Wire, Junction } from '../types';
+import type { ComponentBehaviorState, RuntimeState } from '@/types/behavior';
 import {
   buildCircuitGraph,
+  getAdjacentNodes,
   type CircuitGraph,
 } from './circuitGraph';
 import {
@@ -21,62 +23,44 @@ import {
 import {
   evaluateSwitchStates,
   applySwitchStatesToGraph,
-  type RuntimeState,
   type SwitchStateMap,
 } from './switchEvaluator';
 import { buildNets, type Net } from './netBuilder';
+import {
+  deriveComponentBehaviorState,
+  mergeRuntimeDeviceState,
+  resolveBehaviorBinding,
+} from '../runtime/behaviorTemplates';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-/**
- * A detected short circuit in the simulation.
- */
 export interface ShortCircuit {
-  /** Path from power to ground */
   path: string[];
-  /** Power source node ID */
   powerSource: string;
-  /** Voltage level */
   voltage: number;
 }
 
-/**
- * Complete simulation result.
- */
 export interface SimulationResult {
-  /** Voltage at each node (nodeId -> voltage) */
   nodeVoltages: Map<string, number>;
-  /** All current paths found */
   currentPaths: CurrentPath[];
-  /** Component IDs that are powered */
   poweredComponents: Set<string>;
-  /** Wire IDs that have current flowing */
   poweredWires: Set<string>;
-  /** Wire directions for animation (wireId -> direction) */
   wireDirections: Map<string, 'forward' | 'reverse'>;
-  /** Detected short circuits */
   shortCircuits: ShortCircuit[];
-  /** Switch states used in this simulation */
   switchStates: SwitchStateMap;
-  /** Electrical nets (groups of connected endpoints) */
   nets: Net[];
-  /** The circuit graph used */
   graph: CircuitGraph;
-  /** Whether simulation completed successfully */
+  reachableNodes: Set<string>;
+  behaviorStates: Map<string, ComponentBehaviorState>;
+  resolvedRuntimeState: RuntimeState;
   success: boolean;
-  /** Error message if simulation failed */
   error?: string;
 }
 
-/**
- * Options for simulation.
- */
 export interface SimulationOptions {
-  /** Maximum path length (default: 100) */
   maxPathLength?: number;
-  /** Whether to detect short circuits (default: true) */
   detectShortCircuits?: boolean;
 }
 
@@ -84,26 +68,16 @@ export interface SimulationOptions {
 // Voltage Propagation
 // ============================================================================
 
-/**
- * Propagate voltage through the circuit based on current paths.
- * Each node in a complete path gets voltage from its power source.
- *
- * @param graph - The circuit graph
- * @param paths - Current paths found
- * @returns Map of node ID to voltage
- */
 export function propagateVoltage(
   graph: CircuitGraph,
   paths: CurrentPath[]
 ): Map<string, number> {
   const nodeVoltages = new Map<string, number>();
 
-  // Initialize all nodes to 0V
   for (const nodeId of graph.nodes.keys()) {
     nodeVoltages.set(nodeId, 0);
   }
 
-  // Set power source voltages
   for (const powerNodeId of graph.powerNodes) {
     const node = graph.nodes.get(powerNodeId);
     if (node?.sourceVoltage) {
@@ -111,16 +85,13 @@ export function propagateVoltage(
     }
   }
 
-  // Propagate voltage through complete paths
   for (const path of paths) {
     if (!path.isComplete || path.isShortCircuit) {
       continue;
     }
 
-    // Each node in the path gets the path voltage
     for (const nodeId of path.nodes) {
       const currentVoltage = nodeVoltages.get(nodeId) ?? 0;
-      // Keep the higher voltage if multiple paths converge
       if (path.voltage > currentVoltage) {
         nodeVoltages.set(nodeId, path.voltage);
       }
@@ -130,34 +101,22 @@ export function propagateVoltage(
   return nodeVoltages;
 }
 
-/**
- * Apply net-based voltage equalization.
- * All nodes in the same net should share the highest voltage found among them.
- *
- * @param nodeVoltages - Current voltage map (mutated in place)
- * @param nets - Nets from buildNets
- */
 export function equalizeNetVoltages(
   nodeVoltages: Map<string, number>,
   nets: Net[]
 ): void {
   for (const net of nets) {
-    // Find the highest voltage among all members of this net
     let maxVoltage = 0;
     for (const memberKey of net.members) {
-      // Convert endpoint key to node ID format
-      // endpoint key: "port:compId:portId" → node ID: "compId:portId"
-      // endpoint key: "junction:juncId" → node ID: "junction:juncId"
       const nodeId = memberKey.startsWith('port:')
-        ? memberKey.substring(5) // remove "port:" prefix → "compId:portId"
-        : memberKey; // junction keys stay as-is
+        ? memberKey.substring(5)
+        : memberKey;
       const voltage = nodeVoltages.get(nodeId) ?? 0;
       if (voltage > maxVoltage) {
         maxVoltage = voltage;
       }
     }
 
-    // Assign the max voltage to all members
     if (maxVoltage > 0) {
       for (const memberKey of net.members) {
         const nodeId = memberKey.startsWith('port:')
@@ -173,38 +132,23 @@ export function equalizeNetVoltages(
   }
 }
 
-/**
- * Determine which load components are actually powered.
- * A component is powered if it has voltage on input AND is part of a complete path.
- *
- * @param nodeVoltages - Voltage at each node
- * @param paths - Current paths found
- * @param components - All components
- * @returns Set of powered component IDs
- */
 export function determinePoweredComponents(
   nodeVoltages: Map<string, number>,
   paths: CurrentPath[],
   components: Block[]
 ): Set<string> {
   const powered = new Set<string>();
-
-  // Get components that are in complete paths
   const componentsInPaths = getPoweredComponents(paths);
 
-  // For load components, verify they have voltage and are in a path
   for (const component of components) {
-    // Skip power source components for powered check
-    if (component.type === 'powersource') {
+    if (component.type === 'powersource' || component.type === 'power_source') {
       continue;
     }
 
-    // Check if component is in a complete path
     if (!componentsInPaths.has(component.id)) {
       continue;
     }
 
-    // Check if component has voltage on any port
     let hasVoltage = false;
     for (const port of component.ports) {
       const nodeId = `${component.id}:${port.id}`;
@@ -223,12 +167,6 @@ export function determinePoweredComponents(
   return powered;
 }
 
-/**
- * Detect short circuits from current paths.
- *
- * @param paths - Current paths found
- * @returns Array of short circuit info
- */
 export function detectShortCircuits(paths: CurrentPath[]): ShortCircuit[] {
   const shortCircuits: ShortCircuit[] = [];
 
@@ -245,19 +183,115 @@ export function detectShortCircuits(paths: CurrentPath[]): ShortCircuit[] {
 }
 
 // ============================================================================
+// Behavior Helpers
+// ============================================================================
+
+export function findReachableNodesFromPower(graph: CircuitGraph): Set<string> {
+  const visited = new Set<string>();
+  const queue = [...graph.powerNodes];
+
+  while (queue.length > 0) {
+    const nodeId = queue.shift();
+    if (!nodeId || visited.has(nodeId)) continue;
+    visited.add(nodeId);
+
+    for (const adjacent of getAdjacentNodes(graph, nodeId, true)) {
+      if (!visited.has(adjacent)) {
+        queue.push(adjacent);
+      }
+    }
+  }
+
+  return visited;
+}
+
+function countReachablePorts(block: Block, reachableNodes: Set<string>): number {
+  return block.ports.reduce((count, port) => {
+    if (port.id.toLowerCase() === 'pe') {
+      return count;
+    }
+    return reachableNodes.has(`${block.id}:${port.id}`) ? count + 1 : count;
+  }, 0);
+}
+
+function deriveRuntimeDeviceStates(
+  components: Block[],
+  poweredComponents: Set<string>,
+  reachableNodes: Set<string>,
+  runtimeState: RuntimeState
+): RuntimeState {
+  let nextRuntimeState = runtimeState;
+
+  for (const component of components) {
+    const binding = resolveBehaviorBinding(component);
+    if (!binding?.deviceId) continue;
+
+    const componentType = String(component.type);
+    if (binding.archetype === 'relay' && (componentType === 'relay_coil' || componentType === 'relay')) {
+      nextRuntimeState = mergeRuntimeDeviceState(nextRuntimeState, binding.deviceId, {
+        energized: poweredComponents.has(component.id),
+      });
+      continue;
+    }
+
+    if (binding.archetype === 'lamp') {
+      nextRuntimeState = mergeRuntimeDeviceState(nextRuntimeState, binding.deviceId, {
+        lit: poweredComponents.has(component.id),
+      });
+      continue;
+    }
+
+    if (binding.archetype === 'motor') {
+      nextRuntimeState = mergeRuntimeDeviceState(nextRuntimeState, binding.deviceId, {
+        running: poweredComponents.has(component.id) || countReachablePorts(component, reachableNodes) >= 2,
+      });
+    }
+  }
+
+  return nextRuntimeState;
+}
+
+function deriveBehaviorStates(
+  components: Block[],
+  runtimeState: RuntimeState,
+  poweredComponents: Set<string>,
+  reachableNodes: Set<string>,
+  switchStates: SwitchStateMap
+): Map<string, ComponentBehaviorState> {
+  const states = new Map<string, ComponentBehaviorState>();
+
+  for (const component of components) {
+    const switchState = switchStates.states.get(component.id);
+    const derived = deriveComponentBehaviorState(
+      component,
+      runtimeState,
+      poweredComponents.has(component.id),
+      countReachablePorts(component, reachableNodes) >= 2,
+      switchState
+        ? {
+            componentId: component.id,
+            deviceId: component.behavior?.deviceId,
+            stateSource: switchState.stateSource,
+            energized: switchState.isEnergized,
+            isNormallyOpen: switchState.isNormallyOpen,
+            conducting: !switchState.isOpen,
+            visualState: !switchState.isOpen ? 'closed' : 'open',
+          }
+        : null
+    );
+
+    if (derived) {
+      states.set(component.id, derived);
+    }
+  }
+
+  return states;
+}
+
+// ============================================================================
 // Main Simulation Function
 // ============================================================================
 
-/**
- * Run a complete circuit simulation.
- *
- * @param components - Array of circuit blocks
- * @param wires - Array of wire connections
- * @param junctions - Array of junction points
- * @param runtimeState - Runtime state from PLC and user interaction
- * @param options - Simulation options
- * @returns Complete simulation result
- */
 export function simulateCircuit(
   components: Block[],
   wires: Wire[],
@@ -266,47 +300,64 @@ export function simulateCircuit(
   options: SimulationOptions = {}
 ): SimulationResult {
   try {
-    // 1. Build the circuit graph (including junction nodes)
     const baseGraph = buildCircuitGraph(components, wires, junctions);
 
-    // 2. Evaluate switch states
-    const switchStates = evaluateSwitchStates(components, runtimeState);
+    const switchStatesPre = evaluateSwitchStates(components, runtimeState);
+    const graphPre = applySwitchStatesToGraph(baseGraph, switchStatesPre);
+    const currentPathsPre = findAllCircuitPaths(graphPre, {
+      maxPathLength: options.maxPathLength,
+      detectShortCircuits: options.detectShortCircuits,
+    });
+    const nodeVoltagesPre = propagateVoltage(graphPre, currentPathsPre);
+    const poweredComponentsPre = determinePoweredComponents(
+      nodeVoltagesPre,
+      currentPathsPre,
+      components
+    );
+    const reachableNodesPre = findReachableNodesFromPower(graphPre);
 
-    // 3. Apply switch states to graph (update edge conductance)
+    const runtimeWithDerivedDevices = deriveRuntimeDeviceStates(
+      components,
+      poweredComponentsPre,
+      reachableNodesPre,
+      runtimeState
+    );
+
+    const switchStates = evaluateSwitchStates(components, runtimeWithDerivedDevices);
     const graph = applySwitchStatesToGraph(baseGraph, switchStates);
-
-    // 4. Find all current paths
     const currentPaths = findAllCircuitPaths(graph, {
       maxPathLength: options.maxPathLength,
       detectShortCircuits: options.detectShortCircuits,
     });
-
-    // 5. Propagate voltage (path-based)
     const nodeVoltages = propagateVoltage(graph, currentPaths);
 
-    // 6. Build nets (union-find grouping of connected endpoints)
     const componentsMap = new Map(components.map((c) => [c.id, c]));
     const junctionsMap = new Map(junctions.map((j) => [j.id, j]));
     const nets = buildNets(wires, componentsMap, junctionsMap);
 
-    // 7. Equalize voltages within each net
-    // DISABLED: This was causing LEDs to light up without a complete circuit to ground.
-    // Only complete paths (power → load → ground) should have voltage propagation.
-    // equalizeNetVoltages(nodeVoltages, nets);
-
-    // 8. Determine powered components
     const poweredComponents = determinePoweredComponents(
       nodeVoltages,
       currentPaths,
       components
     );
 
-    // 9. Get powered wires and directions
     const poweredWires = getPoweredWires(currentPaths);
     const wireDirections = getWireDirections(currentPaths, graph);
-
-    // 10. Detect short circuits
     const shortCircuits = detectShortCircuits(currentPaths);
+    const reachableNodes = findReachableNodesFromPower(graph);
+    const resolvedRuntimeState = deriveRuntimeDeviceStates(
+      components,
+      poweredComponents,
+      reachableNodes,
+      runtimeWithDerivedDevices
+    );
+    const behaviorStates = deriveBehaviorStates(
+      components,
+      resolvedRuntimeState,
+      poweredComponents,
+      reachableNodes,
+      switchStates
+    );
 
     return {
       nodeVoltages,
@@ -318,10 +369,13 @@ export function simulateCircuit(
       nets,
       switchStates,
       graph,
+      reachableNodes,
+      behaviorStates,
+      resolvedRuntimeState,
       success: true,
     };
   } catch (error) {
-    // Return error result
+    const fallbackGraph = buildCircuitGraph(components, wires, junctions);
     return {
       nodeVoltages: new Map(),
       currentPaths: [],
@@ -331,98 +385,16 @@ export function simulateCircuit(
       shortCircuits: [],
       nets: [],
       switchStates: { states: new Map() },
-      graph: {
-        nodes: new Map(),
-        edges: new Map(),
-        powerNodes: [],
-        groundNodes: [],
-        switchNodes: [],
-        loadNodes: [],
-      },
+      graph: fallbackGraph,
+      reachableNodes: new Set(),
+      behaviorStates: new Map(),
+      resolvedRuntimeState: runtimeState,
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown simulation error',
+      error: error instanceof Error ? error.message : String(error),
     };
   }
 }
 
-/**
- * Get the voltage at a specific component's port.
- *
- * @param result - Simulation result
- * @param componentId - Component ID
- * @param portId - Port ID
- * @returns Voltage at the port, or 0 if not found
- */
-export function getPortVoltage(
-  result: SimulationResult,
-  componentId: string,
-  portId: string
-): number {
-  const nodeId = `${componentId}:${portId}`;
-  return result.nodeVoltages.get(nodeId) ?? 0;
-}
-
-/**
- * Check if a specific component is powered.
- *
- * @param result - Simulation result
- * @param componentId - Component ID
- * @returns True if component is powered
- */
-export function checkComponentPowered(
-  result: SimulationResult,
-  componentId: string
-): boolean {
-  return result.poweredComponents.has(componentId);
-}
-
-/**
- * Check if a specific wire has current flowing.
- *
- * @param result - Simulation result
- * @param wireId - Wire ID
- * @returns True if wire has current
- */
-export function isWirePowered(result: SimulationResult, wireId: string): boolean {
-  return result.poweredWires.has(wireId);
-}
-
-/**
- * Get the current direction for a wire.
- *
- * @param result - Simulation result
- * @param wireId - Wire ID
- * @returns Direction or null if not powered
- */
-export function getWireDirection(
-  result: SimulationResult,
-  wireId: string
-): 'forward' | 'reverse' | null {
-  return result.wireDirections.get(wireId) ?? null;
-}
-
-/**
- * Get all voltages for a component's ports.
- *
- * @param result - Simulation result
- * @param componentId - Component ID
- * @param component - The component block
- * @returns Map of port ID to voltage
- */
-export function getComponentVoltages(
-  result: SimulationResult,
-  componentId: string,
-  component: Block
-): Map<string, number> {
-  const voltages = new Map<string, number>();
-
-  for (const port of component.ports) {
-    const nodeId = `${componentId}:${port.id}`;
-    voltages.set(port.id, result.nodeVoltages.get(nodeId) ?? 0);
-  }
-
-  return voltages;
-}
 
 export default {
   simulateCircuit,
@@ -430,9 +402,7 @@ export default {
   equalizeNetVoltages,
   determinePoweredComponents,
   detectShortCircuits,
-  getPortVoltage,
-  checkComponentPowered,
-  isWirePowered,
-  getWireDirection,
-  getComponentVoltages,
+  findReachableNodesFromPower,
 };
+
+

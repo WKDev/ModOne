@@ -55,6 +55,10 @@ export function mergeCanvasDocumentData(
     wires: remote.wires,
     metadata: remote.metadata,
     viewport: remote.viewport ?? local.viewport,
+    gridSize: remote.gridSize ?? local.gridSize,
+    showGrid: remote.showGrid ?? local.showGrid,
+    gridStyle: remote.gridStyle ?? local.gridStyle,
+    gridUnit: remote.gridUnit ?? local.gridUnit,
   };
 }
 

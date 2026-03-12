@@ -2,7 +2,7 @@ import { enableMapSet } from 'immer';
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
-import type { LadderElement, LadderElementType, LadderMonitoringState, GridPosition } from '../types/ladder';
+import type { LadderElement, LadderElementType, LadderMonitoringState, GridPosition, VerticalLinkPosition } from '../types/ladder';
 import { createEmptyMonitoringState } from '../types/ladder';
 
 enableMapSet();
@@ -38,7 +38,7 @@ export interface LadderUIActions {
   setActiveTool: (type: LadderElementType) => void;
   clearActiveTool: () => void;
 
-  setLastWireVPlacement: (position: GridPosition | null) => void;
+  setLastWireVPlacement: (position: VerticalLinkPosition | null) => void;
 
   /** Set the active cursor cell (Excel-style current cell) */
   setCursorCell: (position: GridPosition | null) => void;

@@ -16,7 +16,7 @@ import { ProjectDialogProvider } from './contexts/ProjectDialogContext';
 import { UnsavedChangesDialog } from './components/project/UnsavedChangesDialog';
 import { Toaster, toast } from 'sonner';
 import { useMacosNativeMenu } from "./hooks/useMacosNativeMenu";
-import { useCliProject } from "./hooks/useCliProject";
+import { useStartupProject } from "./hooks/useStartupProject";
 
 /**
  * Parse URL parameters to detect floating window mode
@@ -67,7 +67,7 @@ function MainWindowContent() {
   // Unified global keyboard shortcuts (reads overrides from settings)
   useGlobalShortcuts();
 
-  useCliProject(isInitialized);
+  const isStartupProjectResolved = useStartupProject(isInitialized);
 
   // Register all commands on mount
   useEffect(() => {
@@ -114,7 +114,7 @@ function MainWindowContent() {
   // because the IPC call was still in-flight when the window was destroyed.
 
   // Show loading state while initializing
-  if (!isInitialized) {
+  if (!isInitialized || !isStartupProjectResolved) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-[var(--bg-primary)]">
         <div className="text-[var(--text-secondary)]">Loading...</div>

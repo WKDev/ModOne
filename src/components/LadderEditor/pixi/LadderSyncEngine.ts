@@ -18,8 +18,9 @@ import type {
   LadderWire,
   LadderGridConfig,
   WireElement,
+  VerticalLinkEntity,
 } from '../../../types/ladder';
-import { isWireType } from '../../../types/ladder';
+import { getMainGridRowFromVerticalLinkRow, isWireType, WireDirection } from '../../../types/ladder';
 import { LadderGridRenderer } from './renderers/LadderGridRenderer';
 import { LadderRailRenderer } from './renderers/LadderRailRenderer';
 import { LadderWireRenderer } from './renderers/LadderWireRenderer';
@@ -27,6 +28,7 @@ import { LadderSelectionRenderer } from './renderers/LadderSelectionRenderer';
 import { LadderElementFactory } from './renderers/LadderElementFactory';
 import { LadderMonitoringRenderer } from './renderers/LadderMonitoringRenderer';
 import type { LadderMonitoringState } from '../../../types/ladder';
+import { getElementDirections } from '../utils/wireGenerator';
 
 /** Default grid config fallback */
 const DEFAULT_CONFIG: LadderGridConfig = {
@@ -50,6 +52,10 @@ export class LadderSyncEngine {
   private elementContainers = new Map<string, Container>();
   /** Map of wire element id → Pixi Container */
   private wireContainers = new Map<string, Container>();
+  /** Map of wire element id → latest wire element data */
+  private wireElements = new Map<string, WireElement>();
+  /** Map of vertical-link id → latest vertical-link data */
+  private verticalLinkElements = new Map<string, VerticalLinkEntity>();
 
   private currentConfig: LadderGridConfig = DEFAULT_CONFIG;
   private currentRowCount = 20;
@@ -73,6 +79,7 @@ export class LadderSyncEngine {
    */
   fullSync(
     elements: Map<string, LadderElement>,
+    verticalLinks: Map<string, VerticalLinkEntity>,
     _wires: LadderWire[],
     config: LadderGridConfig,
     selectedIds: Set<string>,
@@ -85,6 +92,11 @@ export class LadderSyncEngine {
     for (const el of elements.values()) {
       if (el.position.row + 1 > maxRow) {
         maxRow = el.position.row + 1;
+      }
+    }
+    for (const verticalLink of verticalLinks.values()) {
+      if (verticalLink.position.row + 1 > maxRow) {
+        maxRow = verticalLink.position.row + 1;
       }
     }
     // Add some buffer rows
@@ -114,7 +126,12 @@ export class LadderSyncEngine {
       }
     }
 
-    // 5. Selection
+    // 5. Render standalone vertical links
+    for (const verticalLink of verticalLinks.values()) {
+      this.addVerticalLinkContainer(verticalLink);
+    }
+
+    // 6. Selection
     this.syncSelection(selectedIds, cursorCell, config);
   }
 
@@ -148,6 +165,7 @@ export class LadderSyncEngine {
     if (wireContainer) {
       wireContainer.destroy({ children: true });
       this.wireContainers.delete(id);
+      this.wireElements.delete(id);
     }
   }
 
@@ -159,7 +177,7 @@ export class LadderSyncEngine {
       const container = this.wireContainers.get(element.id);
       if (container) {
         this.wireRenderer.update(container, element as WireElement, this.currentConfig.cellWidth, this.currentConfig.cellHeight);
-
+        this.wireElements.set(element.id, element as WireElement);
       }
     } else {
       const container = this.elementContainers.get(element.id);
@@ -204,19 +222,45 @@ export class LadderSyncEngine {
     }
 
     const cells: Array<{ row: number; col: number }> = [];
+    const verticalCells: Array<{ row: number; col: number }> = [];
 
     // Find grid positions for selected elements
     for (const id of selectedIds) {
-      const container = this.elementContainers.get(id);
-      if (container) {
+      // 1. Regular logic elements (Contacts, Coils, etc.)
+      const elContainer = this.elementContainers.get(id);
+      if (elContainer) {
         cells.push({
-          row: Math.round(container.position.y / cfg.cellHeight),
-          col: Math.round(container.position.x / cfg.cellWidth),
+          row: Math.round(elContainer.position.y / cfg.cellHeight),
+          col: Math.round(elContainer.position.x / cfg.cellWidth),
         });
+        continue;
+      }
+
+      // 2. Wires (Horizontal/Vertical)
+      const wireContainer = this.wireContainers.get(id);
+      if (wireContainer) {
+        const verticalLink = this.verticalLinkElements.get(id);
+        if (verticalLink) {
+          verticalCells.push({ row: verticalLink.position.row, col: verticalLink.position.col });
+          continue;
+        }
+
+        const row = Math.round(wireContainer.position.y / cfg.cellHeight);
+        const col = Math.round(wireContainer.position.x / cfg.cellWidth);
+
+        const wireElement = this.wireElements.get(id);
+        const directions = wireElement?.properties.connectedDirections ?? (wireElement ? getElementDirections(wireElement) : WireDirection.NONE);
+
+        if ((directions & (WireDirection.TOP | WireDirection.BOTTOM)) !== 0) {
+          verticalCells.push({ row, col });
+        } else {
+          cells.push({ row, col });
+        }
       }
     }
 
-    this.selectionRenderer.renderSelection(cells, cursorCell ?? null, cfg.cellWidth, cfg.cellHeight);
+    this.selectionRenderer.renderSelection(cells, verticalCells, cursorCell ?? null, cfg.cellWidth, cfg.cellHeight);
+
   }
 
   /**
@@ -308,6 +352,28 @@ export class LadderSyncEngine {
     );
     this.layers.wireLayer.addChild(container);
     this.wireContainers.set(element.id, container);
+    this.wireElements.set(element.id, element);
+  }
+
+  private addVerticalLinkContainer(verticalLink: VerticalLinkEntity): void {
+    const container = this.wireRenderer.create(
+      {
+        id: verticalLink.id,
+        type: 'wire_v',
+        position: {
+          row: getMainGridRowFromVerticalLinkRow(verticalLink.position.row),
+          col: verticalLink.position.col,
+        },
+        properties: {
+          connectedDirections: WireDirection.TOP | WireDirection.BOTTOM,
+        },
+      } as WireElement,
+      this.currentConfig.cellWidth,
+      this.currentConfig.cellHeight,
+    );
+    this.layers.wireLayer.addChild(container);
+    this.wireContainers.set(verticalLink.id, container);
+    this.verticalLinkElements.set(verticalLink.id, verticalLink);
   }
 
   private clearElements(): void {
@@ -322,6 +388,8 @@ export class LadderSyncEngine {
       container.destroy({ children: true });
     }
     this.wireContainers.clear();
+    this.wireElements.clear();
+    this.verticalLinkElements.clear();
   }
 
   // ===========================================================================

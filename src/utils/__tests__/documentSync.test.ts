@@ -59,6 +59,30 @@ describe('shouldAcceptRemoteUpdate', () => {
   it('rejects equal timestamp when revisions are equal', () => {
     expect(shouldAcceptRemoteUpdate(2, 100, 2, 100)).toBe(false);
   });
+
+  it('preserves grid settings when remote payload omits them', () => {
+    const local = makeCircuit({ gridSize: 16, showGrid: false, gridStyle: 'lines', gridUnit: 'mm' });
+    const remote = makeCircuit({});
+
+    const merged = mergeCanvasDocumentData(local, remote);
+
+    expect(merged.gridSize).toBe(16);
+    expect(merged.showGrid).toBe(false);
+    expect(merged.gridStyle).toBe('lines');
+    expect(merged.gridUnit).toBe('mm');
+  });
+
+  it('uses remote grid settings when provided', () => {
+    const local = makeCircuit({ gridSize: 16, showGrid: false, gridStyle: 'dots', gridUnit: 'px' });
+    const remote = makeCircuit({ gridSize: 20, showGrid: true, gridStyle: 'lines', gridUnit: 'mm' });
+
+    const merged = mergeCanvasDocumentData(local, remote);
+
+    expect(merged.gridSize).toBe(20);
+    expect(merged.showGrid).toBe(true);
+    expect(merged.gridStyle).toBe('lines');
+    expect(merged.gridUnit).toBe('mm');
+  });
 });
 
 describe('mergeCanvasData', () => {

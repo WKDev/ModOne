@@ -3,14 +3,14 @@ import { useLadderUIStore } from '../../../stores/ladderUIStore';
 import { isLadderDocument } from '../../../types/document';
 import type { LadderElement, GridPosition, LadderGridConfig } from '../../../types/ladder';
 import { isWireType } from '../../../types/ladder';
-import { updateAdjacentWires, recalculateWireType, applyWireTypeUpdate } from './wireGenerator';
+import { analyzeNeighborDirections, updateAdjacentWires, recalculateWireType, applyWireTypeUpdate } from './wireGenerator';
 
 function cloneElementDeep(element: LadderElement): LadderElement {
     return JSON.parse(JSON.stringify(element)) as LadderElement;
 }
 
 function generateElementId(prefix: string): string {
-    return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return prefix + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 }
 
 function isValidPosition(
@@ -34,6 +34,55 @@ function isValidPosition(
     return true;
 }
 
+function refreshVerticalLinkNeighbors(
+    data: { elements: Map<string, LadderElement>; verticalLinks: Map<string, { position: { row: number; col: number } }>; gridConfig: LadderGridConfig },
+    positions: Array<{ row: number; col: number }>
+): void {
+    const visited = new Set<string>();
+
+    for (const pos of positions) {
+        const affectedCells = [
+            { row: pos.row - 1, col: pos.col },
+            { row: pos.row, col: pos.col },
+        ].filter((cell) => cell.row >= 0 && cell.col >= 0 && cell.col < data.gridConfig.columns);
+
+        for (const cell of affectedCells) {
+            const key = cell.row + '-' + cell.col;
+            if (visited.has(key)) continue;
+            visited.add(key);
+
+            const current = Array.from(data.elements.values()).find(
+                (element) => element.position.row === cell.row && element.position.col === cell.col
+            );
+
+            if (current) {
+                if (isWireType(current.type)) {
+                    const selfUpdate = recalculateWireType(current, data.elements, data.gridConfig, undefined, data.verticalLinks as any);
+                    if (selfUpdate) {
+                        applyWireTypeUpdate(current, selfUpdate);
+                    }
+                } else {
+                    current.properties.connectedDirections = analyzeNeighborDirections(
+                        cell,
+                        data.elements,
+                        data.gridConfig,
+                        undefined,
+                        data.verticalLinks as any
+                    );
+                }
+            }
+
+            const adjacentUpdates = updateAdjacentWires(cell, data.elements, data.gridConfig, undefined, data.verticalLinks as any);
+            for (const update of adjacentUpdates) {
+                const adjElement = data.elements.get(update.elementId);
+                if (adjElement && isWireType(adjElement.type)) {
+                    applyWireTypeUpdate(adjElement, update);
+                }
+            }
+        }
+    }
+}
+
 export const ladderActions = {
     deleteSelected: (documentId: string) => {
         const uiStore = useLadderUIStore.getState();
@@ -50,30 +99,42 @@ export const ladderActions = {
         if (!doc || !isLadderDocument(doc)) return;
 
         const deletedPositions: GridPosition[] = [];
+        const deletedVerticalPositions: Array<{ row: number; col: number }> = [];
         idsToDelete.forEach((id) => {
             const el = doc.data.elements.get(id);
             if (el) {
                 deletedPositions.push({ ...el.position });
+                return;
+            }
+
+            const verticalLink = doc.data.verticalLinks.get(id);
+            if (verticalLink) {
+                deletedVerticalPositions.push({ ...verticalLink.position });
             }
         });
 
-        registry.pushHistory(documentId, `Delete ${idsToDelete.length} element(s)`);
+        registry.pushHistory(documentId, 'Delete ' + idsToDelete.length + ' element(s)');
         registry.updateLadderData(documentId, (data) => {
             idsToDelete.forEach((id) => {
                 data.elements.delete(id);
+                data.verticalLinks.delete(id);
             });
             data.wires = data.wires.filter(
                 (wire) => !idsToDelete.includes(wire.from.elementId) && !idsToDelete.includes(wire.to.elementId)
             );
 
             for (const pos of deletedPositions) {
-                const adjacentUpdates = updateAdjacentWires(pos, data.elements, data.gridConfig);
+                const adjacentUpdates = updateAdjacentWires(pos, data.elements, data.gridConfig, undefined, data.verticalLinks as any);
                 for (const update of adjacentUpdates) {
                     const adjElement = data.elements.get(update.elementId);
                     if (adjElement && isWireType(adjElement.type)) {
                         applyWireTypeUpdate(adjElement, update);
                     }
                 }
+            }
+
+            if (deletedVerticalPositions.length > 0) {
+                refreshVerticalLinkNeighbors(data as any, deletedVerticalPositions);
             }
         });
         uiStore.clearSelection();
@@ -133,7 +194,7 @@ export const ladderActions = {
         }
 
         const newIds: string[] = [];
-        registry.pushHistory(documentId, `Paste ${clipboard.length} element(s)`);
+        registry.pushHistory(documentId, 'Paste ' + clipboard.length + ' element(s)');
         registry.updateLadderData(documentId, (data) => {
             const pastedPositions: GridPosition[] = [];
 
@@ -157,13 +218,13 @@ export const ladderActions = {
             for (const newId of newIds) {
                 const pastedEl = data.elements.get(newId);
                 if (pastedEl && isWireType(pastedEl.type)) {
-                    const selfUpdate = recalculateWireType(pastedEl, data.elements, data.gridConfig);
+                    const selfUpdate = recalculateWireType(pastedEl, data.elements, data.gridConfig, undefined, data.verticalLinks as any);
                     if (selfUpdate) applyWireTypeUpdate(pastedEl, selfUpdate);
                 }
             }
 
             for (const pos of pastedPositions) {
-                const adjacentUpdates = updateAdjacentWires(pos, data.elements, data.gridConfig);
+                const adjacentUpdates = updateAdjacentWires(pos, data.elements, data.gridConfig, undefined, data.verticalLinks as any);
                 for (const update of adjacentUpdates) {
                     const adjElement = data.elements.get(update.elementId);
                     if (adjElement && isWireType(adjElement.type)) {
@@ -209,14 +270,14 @@ export const ladderActions = {
             cloned.position = availablePosition;
             cloned.selected = false;
 
-            registry.pushHistory(documentId, `Duplicate ${element.type}`);
+            registry.pushHistory(documentId, 'Duplicate ' + element.type);
             registry.updateLadderData(documentId, (data) => {
                 data.elements.set(newId, cloned);
                 if (isWireType(cloned.type)) {
-                    const selfUpdate = recalculateWireType(cloned, data.elements, data.gridConfig);
+                    const selfUpdate = recalculateWireType(cloned, data.elements, data.gridConfig, undefined, data.verticalLinks as any);
                     if (selfUpdate) applyWireTypeUpdate(cloned, selfUpdate);
                 }
-                const adjacentUpdates = updateAdjacentWires(availablePosition, data.elements, data.gridConfig);
+                const adjacentUpdates = updateAdjacentWires(availablePosition, data.elements, data.gridConfig, undefined, data.verticalLinks as any);
                 for (const update of adjacentUpdates) {
                     const adjElement = data.elements.get(update.elementId);
                     if (adjElement && isWireType(adjElement.type)) {
@@ -233,6 +294,9 @@ export const ladderActions = {
         const doc = registry.getDocument(documentId);
         if (!doc || !isLadderDocument(doc)) return;
 
-        useLadderUIStore.getState().selectAll(Array.from(doc.data.elements.keys()));
+        useLadderUIStore.getState().selectAll([
+            ...Array.from(doc.data.elements.keys()),
+            ...Array.from(doc.data.verticalLinks.keys()),
+        ]);
     },
 };

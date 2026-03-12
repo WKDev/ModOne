@@ -99,15 +99,15 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
     return null;
   }, [document, canvasDocumentState, schematicDocumentState]);
 
-  // Project-wide settings overrides
+  // Project defaults for new/global canvases. Loaded document state remains authoritative.
   const projectCanvasSettings = useProjectStore((s) => s.currentProject?.config.canvas);
   const updateProjectConfig = useProjectStore((s) => s.updateConfig);
 
-  const gridSize = projectCanvasSettings?.grid_size ?? activeDocumentState?.gridSize ?? 4;
-  const snapToGrid = projectCanvasSettings?.snap_to_grid ?? activeDocumentState?.snapToGrid ?? true;
-  const showGrid = projectCanvasSettings?.show_grid ?? activeDocumentState?.showGrid ?? true;
-  const gridStyle = projectCanvasSettings?.grid_style ?? activeDocumentState?.gridStyle ?? 'dots';
-  const gridUnit = projectCanvasSettings?.grid_unit ?? (activeDocumentState as any)?.gridUnit ?? 'mm';
+  const gridSize = activeDocumentState?.gridSize ?? projectCanvasSettings?.grid_size ?? 4;
+  const snapToGrid = activeDocumentState?.snapToGrid ?? projectCanvasSettings?.snap_to_grid ?? true;
+  const showGrid = activeDocumentState?.showGrid ?? projectCanvasSettings?.show_grid ?? true;
+  const gridStyle = activeDocumentState?.gridStyle ?? projectCanvasSettings?.grid_style ?? 'dots';
+  const gridUnit = (activeDocumentState as any)?.gridUnit ?? projectCanvasSettings?.grid_unit ?? 'mm';
 
   const setGridSize = useCallback((size: number) => {
     updateProjectConfig({
@@ -194,30 +194,8 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
     activeDocumentState?.toggleSnap();
   }, [snapToGrid, updateProjectConfig, projectCanvasSettings, activeDocumentState]);
 
-  // Synchronize document state with project settings when they change
-  useEffect(() => {
-    if (!activeDocumentState || !projectCanvasSettings) return;
-
-    if (projectCanvasSettings.grid_size !== activeDocumentState.gridSize) {
-      activeDocumentState.setGridSize(projectCanvasSettings.grid_size);
-    }
-    if (projectCanvasSettings.snap_to_grid !== activeDocumentState.snapToGrid) {
-      activeDocumentState.toggleSnap(); // toggleSnap doesn't take value, it just toggles. 
-      // Wait, toggleSnap might be problematic if we want a specific value.
-    }
-    if (projectCanvasSettings.show_grid !== activeDocumentState.showGrid) {
-      activeDocumentState.toggleGrid();
-    }
-    if (projectCanvasSettings.grid_style !== activeDocumentState.gridStyle) {
-      activeDocumentState.setGridStyle(projectCanvasSettings.grid_style as 'dots' | 'lines');
-    }
-  }, [
-    projectCanvasSettings?.grid_size,
-    projectCanvasSettings?.snap_to_grid,
-    projectCanvasSettings?.show_grid,
-    projectCanvasSettings?.grid_style,
-    activeDocumentState,
-  ]);
+  // Document-mode canvases keep their own persisted grid state. Mutations still
+  // mirror into project config via the setters above so future canvases inherit it.
 
   // Reset interaction state when document changes
   useEffect(() => {
@@ -441,8 +419,12 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
         panX: activeDocumentState.pan.x,
         panY: activeDocumentState.pan.y,
       },
+      gridSize,
+      showGrid,
+      gridStyle,
+      gridUnit,
     };
-  }, [activeDocumentState]);
+  }, [activeDocumentState, gridSize, showGrid, gridStyle, gridUnit]);
 
   const loadDocumentCircuit = useCallback(
     (data: SerializableCircuitState) => {
@@ -459,6 +441,10 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
             docData.zoom = data.viewport.zoom;
             docData.pan = { x: data.viewport.panX, y: data.viewport.panY };
           }
+          docData.gridSize = data.gridSize ?? docData.gridSize;
+          docData.showGrid = data.showGrid ?? docData.showGrid;
+          docData.gridStyle = data.gridStyle ?? docData.gridStyle;
+          docData.gridUnit = data.gridUnit ?? docData.gridUnit;
         });
         return;
       }
@@ -491,6 +477,10 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
                 panY: data.viewport.panY,
               }
               : { zoom: 1, panX: 0, panY: 0 },
+            gridSize: data.gridSize,
+            showGrid: data.showGrid,
+            gridStyle: data.gridStyle,
+            gridUnit: data.gridUnit,
           };
           page.updatedAt = new Date().toISOString();
           docData.schematic.updatedAt = new Date().toISOString();
@@ -707,3 +697,5 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
     setGridUnit,
   ]);
 }
+
+

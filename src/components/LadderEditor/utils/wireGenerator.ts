@@ -13,6 +13,7 @@ import type {
   GridPosition,
   WireType,
   WireProperties,
+  VerticalLinkEntity,
 } from '../../../types/ladder';
 import { isCoilType, isRailType, isWireType, WireDirection } from '../../../types/ladder';
 import type { WireType as WireComponentType } from '../elements/Wire';
@@ -575,15 +576,29 @@ function getElementAtPosition(
   col: number,
   elements: Map<string, LadderElement>
 ): LadderElement | undefined {
-  // If elements is already a position index (key format "row-col"), use O(1) lookup
   const key = `${row}-${col}`;
   const directHit = elements.get(key);
   if (directHit) return directHit;
 
-  // Fallback: linear scan for when elements is the id-keyed Map
   for (const el of elements.values()) {
     if (el.position.row === row && el.position.col === col) return el;
   }
+  return undefined;
+}
+
+function getVerticalLinkAtPosition(
+  row: number,
+  col: number,
+  verticalLinks?: Map<string, VerticalLinkEntity>
+): VerticalLinkEntity | undefined {
+  if (!verticalLinks) return undefined;
+
+  for (const verticalLink of verticalLinks.values()) {
+    if (verticalLink.position.row === row && verticalLink.position.col === col) {
+      return verticalLink;
+    }
+  }
+
   return undefined;
 }
 
@@ -592,22 +607,21 @@ function getElementAtPosition(
  * of which directions have incoming connections to this cell.
  *
  * Also handles implicit rail connections at grid edges (Phase 2.5):
- * - col === 0 → LEFT (PowerRail)
- * - col === columns-1 → RIGHT (NeutralRail)
+ * - col === 0 -> LEFT (PowerRail)
+ * - col === columns-1 -> RIGHT (NeutralRail)
  *
- * When a ConnectivityGraph is provided (Phase 5), delegates to O(1) lookups
- * instead of iterating all elements.
+ * Vertical links use their own coordinate system with origin (0, -0.5):
+ * - a link at (col, row) connects main-grid cells (row-1, col) and (row, col)
  */
 export function analyzeNeighborDirections(
   position: GridPosition,
   elements: Map<string, LadderElement>,
   gridConfig: LadderGridConfig,
-  graph?: ConnectivityGraph
+  graph?: ConnectivityGraph,
+  verticalLinks?: Map<string, VerticalLinkEntity>
 ): number {
-  // Phase 5: Use graph for O(1) lookups when available
   if (graph) {
     let graphResult = graph.getConnectedDirections(position);
-    // Row 0 has no row above — suppress TOP direction
     if (position.row === 0) {
       graphResult &= ~TOP;
     }
@@ -617,35 +631,30 @@ export function analyzeNeighborDirections(
   let result = WireDirection.NONE;
   const { row, col } = position;
 
-  // 1. Vertical Connectivity (Row-to-Row)
-  // ---------------------------------------------------------------------------
-
-  // A cell gets TOP direction if the cell ABOVE it has a BOTTOM connection.
   if (row > 0) {
-    const topEl = getElementAtPosition(row - 1, col, elements);
-    if (topEl) {
-      const topDirs = getElementDirections(topEl);
-      if (topDirs & WireDirection.BOTTOM) {
+    const topLink = getVerticalLinkAtPosition(row, col, verticalLinks);
+    if (topLink) {
+      result |= WireDirection.TOP;
+    } else {
+      const topEl = getElementAtPosition(row - 1, col, elements);
+      if (topEl && (getElementDirections(topEl) & WireDirection.BOTTOM)) {
         result |= WireDirection.TOP;
       }
     }
   }
 
-  // A cell gets BOTTOM direction if the cell BELOW it has a TOP connection.
   {
-    const bottomEl = getElementAtPosition(row + 1, col, elements);
-    if (bottomEl) {
-      const bottomDirs = getElementDirections(bottomEl);
-      if (bottomDirs & WireDirection.TOP) {
+    const bottomLink = getVerticalLinkAtPosition(row + 1, col, verticalLinks);
+    if (bottomLink) {
+      result |= WireDirection.BOTTOM;
+    } else {
+      const bottomEl = getElementAtPosition(row + 1, col, elements);
+      if (bottomEl && (getElementDirections(bottomEl) & WireDirection.TOP)) {
         result |= WireDirection.BOTTOM;
       }
     }
   }
 
-  // 2. Horizontal Connectivity (Col-to-Col)
-  // ---------------------------------------------------------------------------
-
-  // Check left neighbor (row, col-1): if it has RIGHT direction → we get LEFT
   if (col > 0) {
     const leftEl = getElementAtPosition(row, col - 1, elements);
     if (leftEl && (getElementDirections(leftEl) & WireDirection.RIGHT)) {
@@ -653,7 +662,6 @@ export function analyzeNeighborDirections(
     }
   }
 
-  // Check right neighbor (row, col+1): if it has LEFT direction → we get RIGHT
   if (col < gridConfig.columns - 1) {
     const rightEl = getElementAtPosition(row, col + 1, elements);
     if (rightEl && (getElementDirections(rightEl) & WireDirection.LEFT)) {
@@ -661,22 +669,19 @@ export function analyzeNeighborDirections(
     }
   }
 
-  // Phase 2.5: Rail edge implicit connections
   if (col === 0) {
-    result |= WireDirection.LEFT;  // PowerRail
+    result |= WireDirection.LEFT;
   }
   if (col === gridConfig.columns - 1) {
-    result |= WireDirection.RIGHT; // NeutralRail
+    result |= WireDirection.RIGHT;
   }
 
-  // Row 0 has no row above — suppress TOP direction to prevent upward branch connections
   if (row === 0) {
     result &= ~WireDirection.TOP;
   }
 
   return result;
 }
-
 
 // ============================================================================
 // Phase 1.5: resolveWireElementType()
@@ -686,6 +691,7 @@ export function analyzeNeighborDirections(
 export interface ResolvedWireType {
   type: WireType;
   direction?: string;
+  directions: number;
 }
 
 /**
@@ -698,44 +704,35 @@ export function resolveWireElementType(
   intendedType: 'wire_h' | 'wire_v',
   elements: Map<string, LadderElement>,
   gridConfig: LadderGridConfig,
-  graph?: ConnectivityGraph
+  graph?: ConnectivityGraph,
+  verticalLinks?: Map<string, VerticalLinkEntity>
 ): ResolvedWireType {
-  // Get the user's intended directions
   const intendedDirections = intendedType === 'wire_h'
     ? (WireDirection.LEFT | WireDirection.RIGHT)
     : (WireDirection.TOP | WireDirection.BOTTOM);
 
-  // Get incoming directions from neighbors
-  const neighborDirections = analyzeNeighborDirections(position, elements, gridConfig, graph);
-
-  // Combine: the directions this wire would connect
+  const neighborDirections = analyzeNeighborDirections(position, elements, gridConfig, graph, verticalLinks);
   const combined = intendedDirections | neighborDirections;
-
-  // Count active direction bits
   const bitCount = countBits(combined);
 
   if (bitCount <= 1) {
-    // Only 0 or 1 direction — keep as intended simple wire
-    return { type: intendedType };
+    return { type: intendedType, directions: combined };
   }
 
-  // Look up the combined directions in the mapping table
   const wireComponentType = DIRECTION_TO_WIRE_TYPE[combined];
 
   if (!wireComponentType) {
-    // No mapping found — keep as intended
-    return { type: intendedType };
+    return { type: intendedType, directions: combined };
   }
 
-  // Map the WireComponentType back to a WireType + direction
-  if (wireComponentType === 'horizontal') return { type: 'wire_h' };
-  if (wireComponentType === 'vertical') return { type: 'wire_v' };
-  if (wireComponentType.startsWith('corner_')) return { type: 'wire_corner', direction: wireComponentType };
+  if (wireComponentType === 'horizontal') return { type: 'wire_h', directions: combined };
+  if (wireComponentType === 'vertical') return { type: 'wire_v', directions: combined };
+  if (wireComponentType.startsWith('corner_')) return { type: 'wire_corner', direction: wireComponentType, directions: combined };
   if (wireComponentType.startsWith('junction_') || wireComponentType === 'cross') {
-    return { type: 'wire_junction', direction: wireComponentType };
+    return { type: 'wire_junction', direction: wireComponentType, directions: combined };
   }
 
-  return { type: intendedType };
+  return { type: intendedType, directions: combined };
 }
 
 /** Count set bits in a number */
@@ -774,7 +771,8 @@ export function updateAdjacentWires(
   position: GridPosition,
   elements: Map<string, LadderElement>,
   gridConfig: LadderGridConfig,
-  graph?: ConnectivityGraph
+  graph?: ConnectivityGraph,
+  verticalLinks?: Map<string, VerticalLinkEntity>
 ): WireTypeUpdate[] {
   const updates: WireTypeUpdate[] = [];
   const { row, col } = position;
@@ -802,7 +800,8 @@ export function updateAdjacentWires(
       { row: r, col: c },
       elements,
       gridConfig,
-      graph
+      graph,
+      verticalLinks
     );
 
     if (isWireType(neighbor.type)) {
@@ -868,13 +867,23 @@ function getBaseWireDirections(wireType: WireType): number {
  * Convert a WireComponentType back to a WireType + optional direction property.
  */
 function componentTypeToWireType(componentType: WireComponentType): ResolvedWireType {
-  if (componentType === 'horizontal') return { type: 'wire_h' };
-  if (componentType === 'vertical') return { type: 'wire_v' };
-  if (componentType.startsWith('corner_')) return { type: 'wire_corner', direction: componentType };
-  if (componentType.startsWith('junction_') || componentType === 'cross') {
-    return { type: 'wire_junction', direction: componentType };
+  if (componentType === 'horizontal') return { type: 'wire_h', directions: LEFT | RIGHT };
+  if (componentType === 'vertical') return { type: 'wire_v', directions: TOP | BOTTOM };
+  if (componentType.startsWith('corner_')) {
+    return {
+      type: 'wire_corner',
+      direction: componentType,
+      directions: WIRE_DIRECTION_PROPERTY_MAP[componentType as keyof typeof WIRE_DIRECTION_PROPERTY_MAP] ?? (LEFT | BOTTOM),
+    };
   }
-  return { type: 'wire_h' };
+  if (componentType.startsWith('junction_') || componentType === 'cross') {
+    return {
+      type: 'wire_junction',
+      direction: componentType,
+      directions: WIRE_DIRECTION_PROPERTY_MAP[componentType as keyof typeof WIRE_DIRECTION_PROPERTY_MAP] ?? (LEFT | RIGHT | BOTTOM),
+    };
+  }
+  return { type: 'wire_h', directions: LEFT | RIGHT };
 }
 
 // ============================================================================
@@ -1044,12 +1053,13 @@ export function generateJunctionAtBranchPoint(
   branchPoint: GridPosition,
   elements: Map<string, LadderElement>,
   gridConfig: LadderGridConfig,
-  graph?: ConnectivityGraph
+  graph?: ConnectivityGraph,
+  verticalLinks?: Map<string, VerticalLinkEntity>
 ): ResolvedWireType | null {
   const existing = getElementAtPosition(branchPoint.row, branchPoint.col, elements);
 
   // Analyze what directions connect at this point
-  const neighborDirs = analyzeNeighborDirections(branchPoint, elements, gridConfig, graph);
+  const neighborDirs = analyzeNeighborDirections(branchPoint, elements, gridConfig, graph, verticalLinks);
 
   // If the cell has an existing element, combine its base directions with neighbors
   let combined: number;
@@ -1098,7 +1108,8 @@ export function mergeWireDirections(
   newIntendedType: 'wire_h' | 'wire_v',
   elements: Map<string, LadderElement>,
   gridConfig: LadderGridConfig,
-  graph?: ConnectivityGraph
+  graph?: ConnectivityGraph,
+  verticalLinks?: Map<string, VerticalLinkEntity>
 ): WireTypeUpdate | null {
   if (!isWireType(existingElement.type)) return null;
 
@@ -1112,7 +1123,7 @@ export function mergeWireDirections(
 
   // Also consider neighbor directions at this position
   const neighborDirs = analyzeNeighborDirections(
-    existingElement.position, elements, gridConfig, graph
+    existingElement.position, elements, gridConfig, graph, verticalLinks
   );
 
   // Combine all directions
@@ -1126,7 +1137,8 @@ export function mergeWireDirections(
 
   // Check if actually changed
   const currentDirection = (existingElement.properties as WireProperties)?.direction;
-  if (resolved.type === existingElement.type && resolved.direction === currentDirection) {
+  const currentDirs = (existingElement.properties as WireProperties)?.connectedDirections;
+  if (resolved.type === existingElement.type && resolved.direction === currentDirection && currentDirs === combined) {
     return null;
   }
 
@@ -1134,6 +1146,7 @@ export function mergeWireDirections(
     elementId: existingElement.id,
     newType: resolved.type,
     newDirection: resolved.direction,
+    newDirections: combined,
   };
 }
 
@@ -1153,11 +1166,12 @@ export function recalculateWireType(
   element: LadderElement,
   elements: Map<string, LadderElement>,
   gridConfig: LadderGridConfig,
-  graph?: ConnectivityGraph
+  graph?: ConnectivityGraph,
+  verticalLinks?: Map<string, VerticalLinkEntity>
 ): WireTypeUpdate | null {
   if (!isWireType(element.type)) return null;
 
-  const neighborDirs = analyzeNeighborDirections(element.position, elements, gridConfig, graph);
+  const neighborDirs = analyzeNeighborDirections(element.position, elements, gridConfig, graph, verticalLinks);
   const ownBase = getBaseWireDirections(element.type);
   const combined = ownBase | neighborDirs;
 
@@ -1212,11 +1226,12 @@ export function applyWireTypeUpdate(element: LadderElement, update: WireTypeUpda
  */
 export function recalculateAllWireTypes(
   elements: Map<string, LadderElement>,
-  gridConfig: LadderGridConfig
+  gridConfig: LadderGridConfig,
+  verticalLinks?: Map<string, VerticalLinkEntity>
 ): void {
   const wireElements = Array.from(elements.values()).filter(el => isWireType(el.type));
   for (const wireEl of wireElements) {
-    const update = recalculateWireType(wireEl, elements, gridConfig);
+    const update = recalculateWireType(wireEl, elements, gridConfig, undefined, verticalLinks);
     if (update) {
       applyWireTypeUpdate(wireEl, update);
     }

@@ -5,6 +5,7 @@
  * simulation state, and YAML serialization schema.
  */
 import type { CustomSymbolBlock } from '../../types/symbol';
+import type { BlockBehaviorBinding, BlockRuntimeState, BehaviorVisualState } from '../../types/behavior';
 import type { BlockType } from '../../types/circuit';
 export type { BlockType } from '../../types/circuit';
 
@@ -240,6 +241,9 @@ export interface BaseBlock<T extends BlockType = BlockType> {
   visible?: boolean;
   flip?: { horizontal: boolean; vertical: boolean };
   designation?: string;
+  behavior?: BlockBehaviorBinding;
+  runtimeState?: BlockRuntimeState;
+  visualState?: BehaviorVisualState;
 }
 
 // ============================================================================
@@ -1217,3 +1221,5 @@ export function circuitStateToYaml(state: CircuitState): YamlCircuitSchema {
     })),
   };
 }
+
+

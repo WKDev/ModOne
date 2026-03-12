@@ -16,6 +16,10 @@ import type {
   AutoSaveSettings,
 } from '../types/project';
 
+interface ProjectServiceOptions {
+  suppressErrorToast?: boolean;
+}
+
 /**
  * Project service for interacting with the Tauri backend
  */
@@ -65,13 +69,18 @@ export const projectService = {
    * Open an existing project from a .mop file
    * @param path - Path to the .mop file
    */
-  async openProject(path: string): Promise<ProjectData> {
+  async openProject(
+    path: string,
+    options: ProjectServiceOptions = {}
+  ): Promise<ProjectData> {
     try {
       return await invoke('open_project', { path });
     } catch (error) {
-      toast.error('Failed to open project', {
-        description: error instanceof Error ? error.message : String(error),
-      });
+      if (!options.suppressErrorToast) {
+        toast.error('Failed to open project', {
+          description: error instanceof Error ? error.message : String(error),
+        });
+      }
       throw error;
     }
   },
@@ -108,13 +117,15 @@ export const projectService = {
   /**
    * Close the current project without saving (discards changes)
    */
-  async closeProjectForce(): Promise<void> {
+  async closeProjectForce(options: ProjectServiceOptions = {}): Promise<void> {
     try {
       await invoke('close_project_force');
     } catch (error) {
-      toast.error('Failed to force close project', {
-        description: error instanceof Error ? error.message : String(error),
-      });
+      if (!options.suppressErrorToast) {
+        toast.error('Failed to force close project', {
+          description: error instanceof Error ? error.message : String(error),
+        });
+      }
       throw error;
     }
   },
@@ -122,13 +133,17 @@ export const projectService = {
   /**
    * Get the list of recently opened projects
    */
-  async getRecentProjects(): Promise<RecentProject[]> {
+  async getRecentProjects(
+    options: ProjectServiceOptions = {}
+  ): Promise<RecentProject[]> {
     try {
       return await invoke('get_recent_projects');
     } catch (error) {
-      toast.error('Failed to load recent projects', {
-        description: error instanceof Error ? error.message : String(error),
-      });
+      if (!options.suppressErrorToast) {
+        toast.error('Failed to load recent projects', {
+          description: error instanceof Error ? error.message : String(error),
+        });
+      }
       throw error;
     }
   },

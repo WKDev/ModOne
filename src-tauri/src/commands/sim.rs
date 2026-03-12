@@ -796,7 +796,8 @@ pub fn sim_set_breakpoint_enabled(
     state
         .debugger
         .set_breakpoint_enabled(&id, enabled)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 /// Get all breakpoints

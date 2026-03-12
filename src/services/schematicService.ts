@@ -128,6 +128,10 @@ function serializePage(page: SchematicPage, index: number): PageSaveData {
     description: page.description,
     created_at: page.createdAt,
     updated_at: page.updatedAt,
+    grid_size: page.circuit.gridSize,
+    show_grid: page.circuit.showGrid,
+    grid_style: page.circuit.gridStyle,
+    grid_unit: page.circuit.gridUnit,
     references: page.references.map((ref) => ({
       page_id: ref.pageId,
       page_number: ref.pageNumber,
@@ -211,12 +215,29 @@ function parsePage(content: string): SchematicPage {
     components: {},
     wires: [],
     metadata: { name: '', description: '', tags: [] },
+    gridSize: 20,
+    showGrid: true,
+    gridStyle: 'dots',
+    gridUnit: 'px',
   };
 
-  const circuit =
+  const circuitSource =
     typeof data.circuit === 'string'
       ? deserializePageCircuit(data.circuit)
       : ((data.circuit as SerializableCircuitState | undefined) ?? fallbackCircuit);
+
+  const circuit: SerializableCircuitState = {
+    ...fallbackCircuit,
+    ...circuitSource,
+    gridSize: Number(data.grid_size ?? circuitSource.gridSize ?? fallbackCircuit.gridSize),
+    showGrid: Boolean(data.show_grid ?? circuitSource.showGrid ?? fallbackCircuit.showGrid),
+    gridStyle: (data.grid_style as SerializableCircuitState['gridStyle'] | undefined)
+      ?? circuitSource.gridStyle
+      ?? fallbackCircuit.gridStyle,
+    gridUnit: (data.grid_unit as SerializableCircuitState['gridUnit'] | undefined)
+      ?? circuitSource.gridUnit
+      ?? fallbackCircuit.gridUnit,
+  };
 
   return {
     id: String(data.page_id ?? ''),

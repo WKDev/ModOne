@@ -14,6 +14,7 @@ import type { LadderPointerEvent } from '../LadderEventBridge';
 import type { LadderSyncEngine } from '../LadderSyncEngine';
 import type { UseLadderDocumentReturn } from '../../../../stores/hooks/useLadderDocument';
 import type { LadderGridConfig } from '../../../../types/ladder';
+import { getVerticalWireHighlightWidth, getVerticalWireMidline, resolveVerticalWireHitTarget } from '../verticalWireInteraction';
 
 // ============================================================================
 // Types
@@ -22,6 +23,8 @@ import type { LadderGridConfig } from '../../../../types/ladder';
 interface DragState {
   /** ID of the element being dragged */
   elementId: string;
+  /** Which coordinate system this drag belongs to */
+  kind: 'element' | 'verticalLink';
   /** Starting grid position */
   startRow: number;
   startCol: number;
@@ -66,16 +69,26 @@ export class LadderDragHandler {
   onPointerDown(
     event: LadderPointerEvent,
     doc: UseLadderDocumentReturn,
-    _config: LadderGridConfig,
+    config: LadderGridConfig,
   ): boolean {
     // Only left-click starts drag
     if (event.button !== 0) return false;
 
-    const element = doc.getElementAt(event.gridRow, event.gridCol);
-    if (!element) return false;
+    const verticalHit = resolveVerticalWireHitTarget(
+      event.worldX,
+      event.worldY,
+      event.gridCol,
+      event.gridRow,
+      config.cellWidth,
+      config.cellHeight,
+    );
+    const verticalLink = verticalHit.isEdgeClick ? doc.getVerticalLinkAt(verticalHit.targetRow, verticalHit.targetCol) : undefined;
+    const element = verticalLink ? undefined : doc.getElementAt(event.gridRow, event.gridCol);
+    const target = verticalLink ?? element;
+    if (!target) return false;
 
     // Record potential drag start
-    this.pendingElementId = element.id;
+    this.pendingElementId = target.id;
     this.pointerDownWorldX = event.worldX;
     this.pointerDownWorldY = event.worldY;
     this.isDragActive = false;
@@ -104,33 +117,62 @@ export class LadderDragHandler {
       }
 
       // Activate drag
-      const element = doc.elements.get(this.pendingElementId);
-      if (!element) {
+      const verticalLink = doc.verticalLinks.get(this.pendingElementId);
+      const element = verticalLink ? undefined : doc.elements.get(this.pendingElementId);
+      if (!verticalLink && !element) {
         this.cancel();
         return false;
       }
 
       this.isDragActive = true;
-      this.dragState = {
-        elementId: this.pendingElementId,
-        startRow: element.position.row,
-        startCol: element.position.col,
-        currentRow: element.position.row,
-        currentCol: element.position.col,
-      };
+      this.dragState = verticalLink
+        ? {
+            elementId: this.pendingElementId,
+            kind: 'verticalLink',
+            startRow: verticalLink.position.row,
+            startCol: verticalLink.position.col,
+            currentRow: verticalLink.position.row,
+            currentCol: verticalLink.position.col,
+          }
+        : {
+            elementId: this.pendingElementId,
+            kind: 'element',
+            startRow: element!.position.row,
+            startCol: element!.position.col,
+            currentRow: element!.position.row,
+            currentCol: element!.position.col,
+          };
 
       this.createGhost(config);
     }
 
     // Update ghost position
     if (this.isDragActive && this.dragState && this.ghostGraphics) {
-      this.dragState.currentRow = event.gridRow;
-      this.dragState.currentCol = event.gridCol;
+      if (this.dragState.kind === 'verticalLink') {
+        const target = resolveVerticalWireHitTarget(
+          event.worldX,
+          event.worldY,
+          event.gridCol,
+          event.gridRow,
+          config.cellWidth,
+          config.cellHeight,
+        );
+        this.dragState.currentRow = target.targetRow;
+        this.dragState.currentCol = target.targetCol;
 
-      this.ghostGraphics.position.set(
-        event.gridCol * config.cellWidth,
-        event.gridRow * config.cellHeight,
-      );
+        this.ghostGraphics.position.set(
+          target.targetCol * config.cellWidth,
+          (target.targetRow - 1) * config.cellHeight + getVerticalWireMidline(config.cellHeight),
+        );
+      } else {
+        this.dragState.currentRow = event.gridRow;
+        this.dragState.currentCol = event.gridCol;
+
+        this.ghostGraphics.position.set(
+          event.gridCol * config.cellWidth,
+          event.gridRow * config.cellHeight,
+        );
+      }
     }
 
     return true; // Consume during active drag
@@ -153,7 +195,11 @@ export class LadderDragHandler {
 
     // Only move if position actually changed
     if (currentRow !== startRow || currentCol !== startCol) {
-      doc.moveElement(elementId, { row: currentRow, col: currentCol });
+      if (this.dragState.kind === 'verticalLink') {
+        doc.moveVerticalLink(elementId, { row: currentRow, col: currentCol });
+      } else {
+        doc.moveElement(elementId, { row: currentRow, col: currentCol });
+      }
     }
 
     this.cleanup();
@@ -195,15 +241,30 @@ export class LadderDragHandler {
     const h = config.cellHeight;
     const padding = 2;
 
-    ghost.rect(padding, padding, w - padding * 2, h - padding * 2);
-    ghost.fill({ color: DRAG_GHOST_COLOR, alpha: DRAG_GHOST_ALPHA });
-    ghost.stroke({ color: DRAG_GHOST_COLOR, width: 1, alpha: 0.8 });
+    if (this.dragState?.kind === 'verticalLink') {
+      const highlightWidth = getVerticalWireHighlightWidth();
+      const halfWidth = highlightWidth / 2;
+      ghost.rect(-halfWidth, 0, highlightWidth, h);
+      ghost.fill({ color: DRAG_GHOST_COLOR, alpha: DRAG_GHOST_ALPHA });
+      ghost.stroke({ color: DRAG_GHOST_COLOR, width: 1, alpha: 0.8 });
+    } else {
+      ghost.rect(padding, padding, w - padding * 2, h - padding * 2);
+      ghost.fill({ color: DRAG_GHOST_COLOR, alpha: DRAG_GHOST_ALPHA });
+      ghost.stroke({ color: DRAG_GHOST_COLOR, width: 1, alpha: 0.8 });
+    }
 
     if (this.dragState) {
-      ghost.position.set(
-        this.dragState.currentCol * config.cellWidth,
-        this.dragState.currentRow * config.cellHeight,
-      );
+      if (this.dragState.kind === 'verticalLink') {
+        ghost.position.set(
+          this.dragState.currentCol * config.cellWidth,
+          (this.dragState.currentRow - 1) * config.cellHeight + getVerticalWireMidline(config.cellHeight),
+        );
+      } else {
+        ghost.position.set(
+          this.dragState.currentCol * config.cellWidth,
+          this.dragState.currentRow * config.cellHeight,
+        );
+      }
     }
 
     this.overlayContainer.addChild(ghost);

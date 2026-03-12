@@ -40,7 +40,7 @@ import {
 } from '../types/document';
 import type { SerializableCircuitState } from '../components/OneCanvas/types';
 import type { MultiPageSchematic } from '../components/OneCanvas/utils/multiPageSchematic';
-import type { LadderElement, LadderWire } from '../types/ladder';
+import type { LadderElement, LadderWire, VerticalLinkEntity } from '../types/ladder';
 import type { Scenario, ScenarioExecutionState } from '../types/scenario';
 import {
   broadcastDocumentSync,
@@ -231,6 +231,10 @@ function canvasDataToSerializable(data: CanvasDocumentData): SerializableCircuit
       panX: data.pan.x,
       panY: data.pan.y,
     },
+    gridSize: data.gridSize,
+    showGrid: data.showGrid,
+    gridStyle: data.gridStyle,
+    gridUnit: data.gridUnit,
   };
 }
 
@@ -253,6 +257,10 @@ function applySerializableToCanvasData(doc: CanvasDocumentState, circuit: Serial
       y: circuit.viewport.panY,
     };
   }
+  doc.data.gridSize = circuit.gridSize ?? doc.data.gridSize;
+  doc.data.showGrid = circuit.showGrid ?? doc.data.showGrid;
+  doc.data.gridStyle = circuit.gridStyle ?? doc.data.gridStyle;
+  doc.data.gridUnit = circuit.gridUnit ?? doc.data.gridUnit;
 }
 
 /** Create ladder history snapshot */
@@ -262,8 +270,14 @@ function createLadderHistorySnapshot(data: LadderDocumentData): LadderHistoryDat
     elements.push([id, JSON.parse(JSON.stringify(element))]);
   });
 
+  const verticalLinks: Array<[string, VerticalLinkEntity]> = [];
+  data.verticalLinks.forEach((verticalLink, id) => {
+    verticalLinks.push([id, JSON.parse(JSON.stringify(verticalLink))]);
+  });
+
   return {
     elements,
+    verticalLinks,
     wires: data.wires.map((wire: LadderWire) => ({
       ...wire,
       from: { ...wire.from },
@@ -275,14 +289,20 @@ function createLadderHistorySnapshot(data: LadderDocumentData): LadderHistoryDat
 }
 
 /** Restore ladder data from history snapshot */
-function restoreLadderFromHistory(snapshot: LadderHistoryData): Pick<LadderDocumentData, 'elements' | 'wires' | 'comment' | 'rungLabels'> {
+function restoreLadderFromHistory(snapshot: LadderHistoryData): Pick<LadderDocumentData, 'elements' | 'verticalLinks' | 'wires' | 'comment' | 'rungLabels'> {
   const elements = new Map<string, LadderElement>();
   snapshot.elements.forEach(([id, element]) => {
     elements.set(id, JSON.parse(JSON.stringify(element)));
   });
 
+  const verticalLinks = new Map<string, VerticalLinkEntity>();
+  (snapshot.verticalLinks ?? []).forEach(([id, verticalLink]) => {
+    verticalLinks.set(id, JSON.parse(JSON.stringify(verticalLink)));
+  });
+
   return {
     elements,
+    verticalLinks,
     wires: snapshot.wires.map((wire: LadderWire) => ({
       ...wire,
       from: { ...wire.from },

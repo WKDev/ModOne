@@ -8,6 +8,7 @@
  */
 
 import { Container, Graphics } from 'pixi.js';
+import { getVerticalWireHighlightWidth } from '../verticalWireInteraction';
 
 // Excel-style blue palette
 const SELECTION_FILL_COLOR = 0x4f8de8;    // Slightly vivid blue fill
@@ -16,6 +17,8 @@ const CURSOR_BORDER_COLOR = 0x2563eb;     // blue-600 — active cell border
 const RANGE_BORDER_COLOR = 0x3b82f6;      // blue-500 — range outer border
 const CURSOR_STROKE_WIDTH = 2.5;
 const RANGE_STROKE_WIDTH = 1.5;
+const VERTICAL_SELECTION_BORDER_COLOR = CURSOR_BORDER_COLOR;
+const VERTICAL_SELECTION_STROKE_WIDTH = 2;
 
 // Rubber-band (drag-select preview)
 const RUBBER_BAND_FILL_ALPHA = 0.08;
@@ -24,6 +27,7 @@ const RUBBER_BAND_STROKE_COLOR = 0x60a5fa; // blue-400
 export class LadderSelectionRenderer {
   private layer: Container;
   private rangeFill: Graphics;
+  private verticalSelection: Graphics;
   private cursorBorder: Graphics;
   private rubberBand: Graphics;
 
@@ -34,6 +38,11 @@ export class LadderSelectionRenderer {
     this.rangeFill = new Graphics();
     this.rangeFill.label = 'selectionRangeFill';
     this.layer.addChild(this.rangeFill);
+
+    // Vertical selection
+    this.verticalSelection = new Graphics();
+    this.verticalSelection.label = 'verticalSelection';
+    this.layer.addChild(this.verticalSelection);
 
     // Cursor cell on top (thick border, no fill)
     this.cursorBorder = new Graphics();
@@ -51,20 +60,28 @@ export class LadderSelectionRenderer {
    * Render selection: all selected cells as a highlighted range, plus the cursor cell.
    *
    * @param selectedCells - All selected grid cells (may form a rectangular range)
+   * @param verticalCells - Cells with selected vertical wires
    * @param cursorCell    - The active cursor cell (null = no cursor)
    * @param cellWidth     - Cell width in pixels
    * @param cellHeight    - Cell height in pixels
    */
   renderSelection(
     selectedCells: Array<{ row: number; col: number }>,
+    verticalCells: Array<{ row: number; col: number }>,
     cursorCell: { row: number; col: number } | null,
     cellWidth: number,
     cellHeight: number,
   ): void {
     this.rangeFill.clear();
+    this.verticalSelection.clear();
     this.cursorBorder.clear();
 
-    if (selectedCells.length === 0 && !cursorCell) return;
+    if (selectedCells.length === 0 && verticalCells.length === 0 && !cursorCell) return;
+
+    // ---------- Vertical wire selection highlights ----------
+    for (const { row, col } of verticalCells) {
+      this.drawVerticalHighlight(row, col, cellWidth, cellHeight);
+    }
 
     // ---------- Range fill for all selected cells ----------
     if (selectedCells.length > 0) {
@@ -82,7 +99,7 @@ export class LadderSelectionRenderer {
     }
 
     // ---------- Cursor cell (active cell, Excel-style) ----------
-    const cursor = cursorCell ?? (selectedCells.length === 1 ? selectedCells[0] : null);
+    const cursor = cursorCell ?? (selectedCells.length === 1 && verticalCells.length === 0 ? selectedCells[0] : null);
     if (cursor) {
       this.drawCursorCell(cursor.row, cursor.col, cellWidth, cellHeight);
     }
@@ -98,6 +115,7 @@ export class LadderSelectionRenderer {
     cellHeight: number,
   ): void {
     this.rangeFill.clear();
+    this.verticalSelection.clear();
     this.cursorBorder.clear();
     this.drawCursorCell(row, col, cellWidth, cellHeight);
   }
@@ -125,22 +143,52 @@ export class LadderSelectionRenderer {
   /** Clear all selection visuals. */
   clear(): void {
     this.rangeFill.clear();
+    this.verticalSelection.clear();
     this.cursorBorder.clear();
     this.hideRubberBand();
   }
 
   destroy(): void {
     this.rangeFill.destroy();
+    this.verticalSelection.destroy();
     this.cursorBorder.destroy();
     this.rubberBand.destroy();
   }
+
 
   // ===========================================================================
   // Internal helpers
   // ===========================================================================
 
   /**
+   * Draw a narrow vertical highlight at the left edge of the cell,
+   * spanning from this row's midline to the next row's midline.
+   */
+  private drawVerticalHighlight(
+    row: number,
+    col: number,
+    cellWidth: number,
+    cellHeight: number,
+  ): void {
+    const midY = cellHeight * 0.65;
+    const x = col * cellWidth;
+    const y = (row - 1) * cellHeight + midY;
+
+    const highlightWidth = getVerticalWireHighlightWidth();
+    const halfWidth = highlightWidth / 2;
+
+    this.verticalSelection
+      .rect(x - halfWidth, y, highlightWidth, cellHeight)
+      .fill({ color: SELECTION_FILL_COLOR, alpha: SELECTION_FILL_ALPHA * 2.5 }); // More visible for narrow lines
+
+    this.verticalSelection
+      .rect(x - halfWidth, y, highlightWidth, cellHeight)
+      .stroke({ width: VERTICAL_SELECTION_STROKE_WIDTH, color: VERTICAL_SELECTION_BORDER_COLOR });
+  }
+
+  /**
    * Draw thick blue border (no fill) for the active cursor cell, Excel-style.
+
    * Inset by half stroke-width so it doesn't bleed outside the cell.
    */
   private drawCursorCell(

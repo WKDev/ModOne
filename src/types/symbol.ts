@@ -6,6 +6,7 @@
  * and library management.
  */
 import type { BaseBlock } from '../components/OneCanvas/types';
+import type { SymbolBehaviorBinding } from './behavior';
 
 // ============================================================================
 // Pin Types (PLC-Optimized)
@@ -191,6 +192,8 @@ export interface SymbolDefinition {
   units?: SymbolUnit[];
   /** Configurable properties */
   properties: SymbolProperty[];
+  /** Optional behavior template binding for live symbols */
+  behavior?: SymbolBehaviorBinding;
   /** Optional runtime state schema (JSON Schema) */
   runtimeStateSchema?: Record<string, unknown>;
 }
@@ -299,3 +302,5 @@ export interface CustomSymbolBlock extends BaseBlock<'custom_symbol'> {
   /** Instance-specific property overrides */
   instanceProperties?: Record<string, string | number | boolean>;
 }
+
+

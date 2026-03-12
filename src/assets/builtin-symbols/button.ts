@@ -21,9 +21,17 @@ export const buttonSymbol: SymbolDefinition = {
     { id: 'in', name: 'IN', number: '1', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 0, y: 20 }, orientation: 'left', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
     { id: 'out', name: 'OUT', number: '2', type: 'output', electricalType: 'output', functionalRole: 'general', shape: 'line', position: { x: 40, y: 20 }, orientation: 'right', length: 0, sortOrder: 2, nameVisible: true, numberVisible: true },
   ],
+  behavior: {
+    templateId: 'archetype:switch',
+    archetype: 'switch',
+    interactionMode: 'momentary',
+    deviceScoped: false,
+    terminalRoles: { in: 'IN', out: 'OUT' },
+  },
   properties: [
     { key: 'mode', value: 'momentary', type: 'string', visible: true, editorType: 'text' },
     { key: 'contactConfig', value: '1a', type: 'string', visible: true, editorType: 'text' },
     { key: 'pressed', value: false, type: 'boolean', visible: true, editorType: 'checkbox' },
   ],
 };
+
