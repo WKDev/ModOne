@@ -3,11 +3,13 @@
 //! This module provides Modbus memory management and protocol handling
 //! for the ModOne PLC simulator.
 
+pub mod adapter;
 pub mod memory;
 pub mod rtu;
 pub mod tcp;
 pub mod types;
 
+pub use adapter::{ModbusAdapter, ModbusAdapterError, ModbusAdapterResult};
 pub use memory::ModbusMemory;
 pub use rtu::{
     list_available_ports, ModbusRtuServer, PortInfo, RtuConfig, RtuDataBits, RtuParity,
