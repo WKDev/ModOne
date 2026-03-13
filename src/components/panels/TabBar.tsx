@@ -29,7 +29,7 @@ export function TabBar({
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const { setActiveTab, reorderTabs } = usePanelStore();
-  const { onTabDragStart, onTabDrag, onTabDragEnd } = useTabDragOut();
+  const { onTabDragStart, onTabDragEnd } = useTabDragOut();
 
   // Tab close handling with unsaved changes support
   const {
@@ -84,8 +84,8 @@ export function TabBar({
     onContextMenu?.(tabId, e);
   };
 
-  // Track whether the current drag was torn off (skip reorder on drop)
-  const tornOffRef = useRef(false);
+  // Track whether drop landed on a valid target (drop fires before dragend)
+  const droppedOnTargetRef = useRef(false);
 
   // Drag and drop handlers
   const handleDragStart = (e: React.DragEvent, index: number, tabId: string) => {
@@ -93,7 +93,7 @@ export function TabBar({
     e.dataTransfer.setData('panel-id', panelId);
     e.dataTransfer.setData('tab-id', tabId);
     e.dataTransfer.setData('application/x-tab-tearoff', JSON.stringify({ panelId, tabId }));
-    tornOffRef.current = false;
+    droppedOnTargetRef.current = false;
     onTabDragStart(panelId, tabId);
   };
 
@@ -101,21 +101,19 @@ export function TabBar({
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     setDragOverIndex(index);
-    onTabDrag(e);
   };
 
   const handleDragEnd = async (e: React.DragEvent) => {
-    const wasTornOff = await onTabDragEnd(e);
-    tornOffRef.current = wasTornOff;
+    // If drop already handled the reorder, skip tear-off detection
+    if (!droppedOnTargetRef.current) {
+      await onTabDragEnd(e);
+    }
     setDragOverIndex(null);
   };
 
   const handleDrop = (e: React.DragEvent, toIndex: number) => {
     e.preventDefault();
-    if (tornOffRef.current) {
-      setDragOverIndex(null);
-      return;
-    }
+    droppedOnTargetRef.current = true;
 
     const fromIndex = parseInt(e.dataTransfer.getData('tab-index'), 10);
     const sourcePanelId = e.dataTransfer.getData('panel-id');

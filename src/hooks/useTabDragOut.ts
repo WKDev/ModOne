@@ -18,14 +18,16 @@ interface DragState {
   windowBounds: WindowBounds | null;
 }
 
-const EDGE_THRESHOLD = 0; // px outside window boundary to trigger tear-off
-
 /**
  * Hook that detects when a tab is dragged outside the window boundary
  * and automatically tears it off into a floating window.
+ *
+ * Uses a document-level dragover listener to track cursor position
+ * continuously, even when the cursor is over non-drop-target areas.
  */
 export function useTabDragOut() {
   const dragStateRef = useRef<DragState | null>(null);
+  const globalHandlerRef = useRef<((e: DragEvent) => void) | null>(null);
   const moveTabToFloatingWindow = usePanelStore((s) => s.moveTabToFloatingWindow);
 
   const cacheWindowBounds = useCallback(async () => {
@@ -46,6 +48,13 @@ export function useTabDragOut() {
     }
   }, []);
 
+  const cleanupGlobalListener = useCallback(() => {
+    if (globalHandlerRef.current) {
+      document.removeEventListener('dragover', globalHandlerRef.current);
+      globalHandlerRef.current = null;
+    }
+  }, []);
+
   const onTabDragStart = useCallback(
     async (panelId: string, tabId: string) => {
       const bounds = await cacheWindowBounds();
@@ -56,25 +65,28 @@ export function useTabDragOut() {
         lastScreenY: 0,
         windowBounds: bounds,
       };
-    },
-    [cacheWindowBounds]
-  );
 
-  const onTabDrag = useCallback((e: React.DragEvent) => {
-    // Track last known screen position (fallback for dragend reporting 0,0)
-    if (dragStateRef.current && (e.screenX !== 0 || e.screenY !== 0)) {
-      dragStateRef.current.lastScreenX = e.screenX;
-      dragStateRef.current.lastScreenY = e.screenY;
-    }
-  }, []);
+      // Track cursor position globally during drag
+      cleanupGlobalListener();
+      const handler = (e: DragEvent) => {
+        if (dragStateRef.current && (e.screenX !== 0 || e.screenY !== 0)) {
+          dragStateRef.current.lastScreenX = e.screenX;
+          dragStateRef.current.lastScreenY = e.screenY;
+        }
+      };
+      document.addEventListener('dragover', handler);
+      globalHandlerRef.current = handler;
+    },
+    [cacheWindowBounds, cleanupGlobalListener]
+  );
 
   const isOutsideWindow = useCallback(
     (screenX: number, screenY: number, bounds: WindowBounds): boolean => {
       return (
-        screenX < bounds.x - EDGE_THRESHOLD ||
-        screenX > bounds.x + bounds.width + EDGE_THRESHOLD ||
-        screenY < bounds.y - EDGE_THRESHOLD ||
-        screenY > bounds.y + bounds.height + EDGE_THRESHOLD
+        screenX < bounds.x ||
+        screenX > bounds.x + bounds.width ||
+        screenY < bounds.y ||
+        screenY > bounds.y + bounds.height
       );
     },
     []
@@ -85,6 +97,8 @@ export function useTabDragOut() {
    */
   const onTabDragEnd = useCallback(
     async (e: React.DragEvent): Promise<boolean> => {
+      cleanupGlobalListener();
+
       const state = dragStateRef.current;
       dragStateRef.current = null;
 
@@ -101,7 +115,6 @@ export function useTabDragOut() {
       if (screenX === 0 && screenY === 0) return false;
 
       if (isOutsideWindow(screenX, screenY, state.windowBounds)) {
-        // Tear off: create floating window at the drop position
         await moveTabToFloatingWindow(state.panelId, state.tabId, {
           x: screenX - DEFAULT_FLOATING_WINDOW_SIZE.width / 2,
           y: screenY - 20, // offset so title bar is near cursor
@@ -113,8 +126,8 @@ export function useTabDragOut() {
 
       return false;
     },
-    [isOutsideWindow, moveTabToFloatingWindow]
+    [cleanupGlobalListener, isOutsideWindow, moveTabToFloatingWindow]
   );
 
-  return { onTabDragStart, onTabDrag, onTabDragEnd };
+  return { onTabDragStart, onTabDragEnd };
 }
