@@ -7,7 +7,13 @@
 use bitvec::prelude::*;
 use parking_lot::RwLock;
 use std::collections::HashMap;
+use std::sync::Arc;
 use thiserror::Error;
+
+use crate::plc_runtime::{
+    CanonicalAddress, CanonicalAreaKind, CanonicalMemory, CanonicalValue, CanonicalWriteSource,
+    VendorAddress, VendorProfile, VendorProfileId,
+};
 
 use super::types::{MemorySnapshot, SimBitDeviceType, SimWordDeviceType};
 
@@ -115,6 +121,13 @@ pub struct DeviceMemory {
 
     /// Previous bit states for edge detection
     previous_bits: RwLock<HashMap<String, bool>>,
+    /// Optional canonical runtime mirror attached during the Wave 3/4 migration.
+    canonical_mirror: RwLock<Option<Arc<CanonicalMirror>>>,
+}
+
+struct CanonicalMirror {
+    canonical: Arc<RwLock<CanonicalMemory>>,
+    profile: Box<dyn VendorProfile>,
 }
 
 impl DeviceMemory {
@@ -141,6 +154,42 @@ impl DeviceMemory {
 
             // Edge detection
             previous_bits: RwLock::new(HashMap::new()),
+            canonical_mirror: RwLock::new(None),
+        }
+    }
+
+    /// Attach a canonical runtime mirror to the legacy simulator memory.
+    ///
+    /// This is a migration bridge, not the final architecture. The simulator
+    /// still executes against `DeviceMemory`, but every supported mutation is
+    /// mirrored into `CanonicalMemory` so Modbus/OPC UA can converge on the
+    /// canonical runtime surface.
+    pub fn attach_canonical_mirror(
+        &self,
+        profile: Box<dyn VendorProfile>,
+        canonical: Arc<RwLock<CanonicalMemory>>,
+    ) {
+        *self.canonical_mirror.write() = Some(Arc::new(CanonicalMirror { canonical, profile }));
+        self.resync_canonical_mirror();
+    }
+
+    pub fn detach_canonical_mirror(&self) {
+        *self.canonical_mirror.write() = None;
+    }
+
+    pub fn canonical_mirror(&self) -> Option<Arc<RwLock<CanonicalMemory>>> {
+        self.canonical_mirror
+            .read()
+            .as_ref()
+            .map(|mirror| Arc::clone(&mirror.canonical))
+    }
+
+    pub fn resync_canonical_mirror(&self) {
+        let mirror = self.canonical_mirror.read().clone();
+        if let Some(mirror) = mirror {
+            if let Err(error) = mirror.resync_from_legacy(self) {
+                log::warn!("Failed to resync canonical mirror from legacy memory: {}", error);
+            }
         }
     }
 
@@ -252,6 +301,16 @@ impl DeviceMemory {
         address: u16,
         value: bool,
     ) -> SimMemoryResult<()> {
+        self.write_bit_with_source(device, address, value, CanonicalWriteSource::Simulation)
+    }
+
+    pub fn write_bit_with_source(
+        &self,
+        device: SimBitDeviceType,
+        address: u16,
+        value: bool,
+        source: CanonicalWriteSource,
+    ) -> SimMemoryResult<()> {
         self.validate_bit_address(device, address)?;
 
         // Check if device is read-only
@@ -273,6 +332,7 @@ impl DeviceMemory {
                 unreachable!()
             }
         }
+        self.sync_bit_to_canonical(device, address, value, source);
         Ok(())
     }
 
@@ -298,6 +358,7 @@ impl DeviceMemory {
             SimBitDeviceType::T => self.t_contacts.write().set(idx, value),
             SimBitDeviceType::C => self.c_contacts.write().set(idx, value),
         }
+        self.sync_bit_to_canonical(device, address, value, CanonicalWriteSource::InternalRuntime);
         Ok(())
     }
 
@@ -408,6 +469,16 @@ impl DeviceMemory {
         address: u16,
         value: u16,
     ) -> SimMemoryResult<()> {
+        self.write_word_with_source(device, address, value, CanonicalWriteSource::Simulation)
+    }
+
+    pub fn write_word_with_source(
+        &self,
+        device: SimWordDeviceType,
+        address: u16,
+        value: u16,
+        source: CanonicalWriteSource,
+    ) -> SimMemoryResult<()> {
         self.validate_word_address(device, address)?;
 
         let idx = address as usize;
@@ -419,6 +490,7 @@ impl DeviceMemory {
             SimWordDeviceType::Td => self.td_values.write()[idx] = value,
             SimWordDeviceType::Cd => self.cd_values.write()[idx] = value,
         }
+        self.sync_word_to_canonical(device, address, value, source);
         Ok(())
     }
 
@@ -533,7 +605,49 @@ impl DeviceMemory {
                 }
             }
         }
+        let word = self.read_word(device, address)?;
+        self.sync_word_to_canonical(device, address, word, CanonicalWriteSource::Simulation);
         Ok(())
+    }
+
+    fn sync_bit_to_canonical(
+        &self,
+        device: SimBitDeviceType,
+        address: u16,
+        value: bool,
+        source: CanonicalWriteSource,
+    ) {
+        let mirror = self.canonical_mirror.read().clone();
+        if let Some(mirror) = mirror {
+            if let Err(error) = mirror.sync_legacy_bit(device, address, value, source) {
+                log::warn!(
+                    "Failed to mirror legacy bit {}{} into canonical memory: {}",
+                    device.as_str(),
+                    address,
+                    error
+                );
+            }
+        }
+    }
+
+    fn sync_word_to_canonical(
+        &self,
+        device: SimWordDeviceType,
+        address: u16,
+        value: u16,
+        source: CanonicalWriteSource,
+    ) {
+        let mirror = self.canonical_mirror.read().clone();
+        if let Some(mirror) = mirror {
+            if let Err(error) = mirror.sync_legacy_word(device, address, value, source) {
+                log::warn!(
+                    "Failed to mirror legacy word {}{} into canonical memory: {}",
+                    device.as_str(),
+                    address,
+                    error
+                );
+            }
+        }
     }
 
     // ========================================================================
@@ -769,6 +883,7 @@ impl DeviceMemory {
 
         // Clear edge detection state
         self.previous_bits.write().clear();
+        self.resync_canonical_mirror();
     }
 
     /// Clear volatile memory (all except K relays which are persistent)
@@ -793,6 +908,7 @@ impl DeviceMemory {
 
         // Clear edge detection state
         self.previous_bits.write().clear();
+        self.resync_canonical_mirror();
     }
 
     /// Restore memory from a snapshot
@@ -899,6 +1015,8 @@ impl DeviceMemory {
                 }
             }
         }
+
+        self.resync_canonical_mirror();
     }
 }
 
@@ -908,13 +1026,155 @@ impl Default for DeviceMemory {
     }
 }
 
+impl CanonicalMirror {
+    fn sync_legacy_bit(
+        &self,
+        device: SimBitDeviceType,
+        address: u16,
+        value: bool,
+        source: CanonicalWriteSource,
+    ) -> Result<(), String> {
+        let Some(canonical_address) = self.map_legacy_bit_address(device, address) else {
+            return Ok(());
+        };
+
+        self.canonical
+            .write()
+            .write(canonical_address, CanonicalValue::Bool(value), source)
+            .map_err(|e| e.to_string())
+    }
+
+    fn sync_legacy_word(
+        &self,
+        device: SimWordDeviceType,
+        address: u16,
+        value: u16,
+        source: CanonicalWriteSource,
+    ) -> Result<(), String> {
+        let Some(canonical_address) = self.map_legacy_word_address(device, address) else {
+            return Ok(());
+        };
+
+        self.canonical
+            .write()
+            .write(canonical_address, CanonicalValue::U16(value), source)
+            .map_err(|e| e.to_string())
+    }
+
+    fn resync_from_legacy(&self, memory: &DeviceMemory) -> Result<(), String> {
+        let mut writes = Vec::new();
+
+        for device in [
+            SimBitDeviceType::X,
+            SimBitDeviceType::Y,
+            SimBitDeviceType::P,
+            SimBitDeviceType::M,
+            SimBitDeviceType::K,
+            SimBitDeviceType::F,
+            SimBitDeviceType::T,
+            SimBitDeviceType::C,
+        ] {
+            let values = memory
+                .read_bits(device, 0, device.default_size() as u16)
+                .map_err(|e| e.to_string())?;
+            for (index, value) in values.into_iter().enumerate() {
+                if let Some(address) = self.map_legacy_bit_address(device, index as u16) {
+                    writes.push((address, CanonicalValue::Bool(value)));
+                }
+            }
+        }
+
+        for device in [
+            SimWordDeviceType::D,
+            SimWordDeviceType::R,
+            SimWordDeviceType::Z,
+            SimWordDeviceType::N,
+            SimWordDeviceType::Td,
+            SimWordDeviceType::Cd,
+        ] {
+            let values = memory
+                .read_words(device, 0, device.default_size() as u16)
+                .map_err(|e| e.to_string())?;
+            for (index, value) in values.into_iter().enumerate() {
+                if let Some(address) = self.map_legacy_word_address(device, index as u16) {
+                    writes.push((address, CanonicalValue::U16(value)));
+                }
+            }
+        }
+
+        let mut canonical = self.canonical.write();
+        canonical.clear_all();
+        canonical
+            .write_batch(writes, CanonicalWriteSource::Migration)
+            .map_err(|e| e.to_string())
+    }
+
+    fn map_legacy_bit_address(
+        &self,
+        device: SimBitDeviceType,
+        address: u16,
+    ) -> Option<CanonicalAddress> {
+        match self.profile.id() {
+            VendorProfileId::LsXg5000 => match device {
+                SimBitDeviceType::P => self
+                    .profile
+                    .to_canonical(&VendorAddress::new("P", address as u32))
+                    .ok(),
+                SimBitDeviceType::M => Some(CanonicalAddress::new(CanonicalAreaKind::InternalBit, address as u32)),
+                SimBitDeviceType::K => Some(CanonicalAddress::new(CanonicalAreaKind::RetentiveBit, address as u32)),
+                SimBitDeviceType::F => Some(CanonicalAddress::new(CanonicalAreaKind::SpecialBit, address as u32)),
+                SimBitDeviceType::T => Some(CanonicalAddress::new(CanonicalAreaKind::TimerDoneBit, address as u32)),
+                SimBitDeviceType::C => Some(CanonicalAddress::new(CanonicalAreaKind::CounterDoneBit, address as u32)),
+                SimBitDeviceType::X | SimBitDeviceType::Y => None,
+            },
+            VendorProfileId::MelsecFxQCommon => match device {
+                SimBitDeviceType::X => Some(CanonicalAddress::new(CanonicalAreaKind::InputBit, address as u32)),
+                SimBitDeviceType::Y => Some(CanonicalAddress::new(CanonicalAreaKind::OutputBit, address as u32)),
+                SimBitDeviceType::M => Some(CanonicalAddress::new(CanonicalAreaKind::InternalBit, address as u32)),
+                SimBitDeviceType::K => Some(CanonicalAddress::new(CanonicalAreaKind::RetentiveBit, address as u32)),
+                SimBitDeviceType::T => Some(CanonicalAddress::new(CanonicalAreaKind::TimerDoneBit, address as u32)),
+                SimBitDeviceType::C => Some(CanonicalAddress::new(CanonicalAreaKind::CounterDoneBit, address as u32)),
+                SimBitDeviceType::P | SimBitDeviceType::F => None,
+            },
+        }
+    }
+
+    fn map_legacy_word_address(
+        &self,
+        device: SimWordDeviceType,
+        address: u16,
+    ) -> Option<CanonicalAddress> {
+        match self.profile.id() {
+            VendorProfileId::LsXg5000 => match device {
+                SimWordDeviceType::D => Some(CanonicalAddress::new(CanonicalAreaKind::DataWord, address as u32)),
+                SimWordDeviceType::R => Some(CanonicalAddress::new(CanonicalAreaKind::RetentiveWord, address as u32)),
+                SimWordDeviceType::Z => Some(CanonicalAddress::new(CanonicalAreaKind::IndexWord, address as u32)),
+                SimWordDeviceType::N => Some(CanonicalAddress::new(CanonicalAreaKind::SystemWord, address as u32)),
+                SimWordDeviceType::Td => Some(CanonicalAddress::new(CanonicalAreaKind::TimerValueWord, address as u32)),
+                SimWordDeviceType::Cd => Some(CanonicalAddress::new(CanonicalAreaKind::CounterValueWord, address as u32)),
+            },
+            VendorProfileId::MelsecFxQCommon => match device {
+                SimWordDeviceType::D => Some(CanonicalAddress::new(CanonicalAreaKind::DataWord, address as u32)),
+                SimWordDeviceType::Td => Some(CanonicalAddress::new(CanonicalAreaKind::TimerValueWord, address as u32)),
+                SimWordDeviceType::Cd => Some(CanonicalAddress::new(CanonicalAreaKind::CounterValueWord, address as u32)),
+                SimWordDeviceType::R | SimWordDeviceType::Z | SimWordDeviceType::N => None,
+            },
+        }
+    }
+}
+
 // ============================================================================
 // Unit Tests
 // ============================================================================
 
 #[cfg(test)]
 mod tests {
+    use parking_lot::RwLock;
+    use std::sync::Arc;
+
     use super::*;
+    use crate::plc_runtime::resolve_vendor_profile;
+    use crate::project::{PlcHardwareTopology, PlcManufacturer, PlcSettings};
 
     #[test]
     fn test_new_creates_correct_sizes() {
@@ -1146,5 +1406,67 @@ mod tests {
         assert!(mem.read_bit(SimBitDeviceType::Y, 20).unwrap());
         assert!(mem.read_bit(SimBitDeviceType::M, 100).unwrap());
         assert_eq!(mem.read_word(SimWordDeviceType::D, 50).unwrap(), 12345);
+    }
+
+    #[test]
+    fn test_ls_canonical_mirror_tracks_p_input_output_split() {
+        let mem = DeviceMemory::new();
+        let canonical = Arc::new(RwLock::new(CanonicalMemory::new()));
+        let profile = resolve_vendor_profile(&PlcSettings {
+            manufacturer: PlcManufacturer::LS,
+            model: "XBC-DN32H".to_string(),
+            scan_time_ms: 10,
+            hardware_topology: PlcHardwareTopology::default(),
+        })
+        .expect("ls profile should resolve");
+
+        mem.attach_canonical_mirror(profile, Arc::clone(&canonical));
+        mem.write_bit(SimBitDeviceType::P, 5, true).unwrap();
+        mem.write_bit(SimBitDeviceType::P, 25, true).unwrap();
+
+        let canonical = canonical.read();
+        assert_eq!(
+            canonical
+                .read(CanonicalAddress::new(CanonicalAreaKind::InputBit, 5))
+                .unwrap(),
+            CanonicalValue::Bool(true)
+        );
+        assert_eq!(
+            canonical
+                .read(CanonicalAddress::new(CanonicalAreaKind::OutputBit, 25))
+                .unwrap(),
+            CanonicalValue::Bool(true)
+        );
+    }
+
+    #[test]
+    fn test_melsec_canonical_mirror_tracks_retentive_and_word_state() {
+        let mem = DeviceMemory::new();
+        let canonical = Arc::new(RwLock::new(CanonicalMemory::new()));
+        let profile = resolve_vendor_profile(&PlcSettings {
+            manufacturer: PlcManufacturer::Mitsubishi,
+            model: "FX5U".to_string(),
+            scan_time_ms: 10,
+            hardware_topology: PlcHardwareTopology::default(),
+        })
+        .expect("melsec profile should resolve");
+
+        mem.attach_canonical_mirror(profile, Arc::clone(&canonical));
+        mem.write_bit(SimBitDeviceType::K, 7, true).unwrap();
+        mem.write_word(SimWordDeviceType::D, 9, 3210).unwrap();
+
+        let canonical = canonical.read();
+        assert_eq!(
+            canonical
+                .read(CanonicalAddress::new(CanonicalAreaKind::RetentiveBit, 7))
+                .unwrap(),
+            CanonicalValue::Bool(true)
+        );
+        assert_eq!(
+            canonical
+                .read(CanonicalAddress::new(CanonicalAreaKind::DataWord, 9))
+                .unwrap(),
+            CanonicalValue::U16(3210)
+        );
     }
 }

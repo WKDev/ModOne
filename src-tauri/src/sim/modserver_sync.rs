@@ -12,7 +12,7 @@ use thiserror::Error;
 use crate::modbus::{ChangeSource, ModbusMemory};
 use crate::plc_runtime::{
     CanonicalAreaKind, ModbusAddressSpace, ModbusMappingPolicy, ModbusMappingRule,
-    ModbusMappingSource, VendorProfileId,
+    ModbusMappingSource, CanonicalWriteSource, VendorProfileId,
 };
 
 use super::memory::DeviceMemory;
@@ -563,7 +563,7 @@ impl ModServerSync {
         value: bool,
     ) -> SyncResult<()> {
         self.sim_memory
-            .write_bit(device, address, value)
+            .write_bit_with_source(device, address, value, CanonicalWriteSource::ExternalProtocol)
             .map_err(|e| SyncError::DeviceMemoryError(e.to_string()))
     }
 
@@ -574,7 +574,12 @@ impl ModServerSync {
         value: u16,
     ) -> SyncResult<()> {
         self.sim_memory
-            .write_word(device, address, value)
+            .write_word_with_source(
+                device,
+                address,
+                value,
+                CanonicalWriteSource::ExternalProtocol,
+            )
             .map_err(|e| SyncError::DeviceMemoryError(e.to_string()))
     }
 

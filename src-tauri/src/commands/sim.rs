@@ -17,7 +17,7 @@ use crate::commands::modbus::{
 use crate::modbus::ModbusMemory;
 use crate::plc_runtime::{
     resolve_modbus_mapping_policy, resolve_vendor_profile, CanonicalAddress, CanonicalAreaKind,
-    VendorAddress, VendorProfileId,
+    CanonicalMemory, VendorAddress, VendorProfileId,
 };
 use crate::project::{PlcSettings, ProjectConfig, SharedProjectManager};
 use crate::sim::{
@@ -51,6 +51,7 @@ pub struct SimState {
     /// The debugger instance
     debugger: Arc<SimDebugger>,
     memory: Arc<DeviceMemory>,
+    canonical_memory: Arc<parking_lot::RwLock<CanonicalMemory>>,
     /// Shared Modbus memory for ModServerSync
     modbus_memory: Option<Arc<ModbusMemory>>,
     program: Arc<Mutex<Option<LadderProgram>>>,
@@ -71,6 +72,7 @@ impl SimState {
             engine: Arc::new(Mutex::new(None)),
             debugger: Arc::new(SimDebugger::default()),
             memory,
+            canonical_memory: Arc::new(parking_lot::RwLock::new(CanonicalMemory::new())),
             modbus_memory: None,
             program: Arc::new(Mutex::new(None)),
             scan_task: Arc::new(Mutex::new(None)),
@@ -88,6 +90,7 @@ impl SimState {
             engine: Arc::new(Mutex::new(None)),
             debugger: Arc::new(SimDebugger::default()),
             memory,
+            canonical_memory: Arc::new(parking_lot::RwLock::new(CanonicalMemory::new())),
             modbus_memory: Some(modbus_memory),
             program: Arc::new(Mutex::new(None)),
             scan_task: Arc::new(Mutex::new(None)),
@@ -108,6 +111,10 @@ impl SimState {
 
     pub fn memory(&self) -> &Arc<DeviceMemory> {
         &self.memory
+    }
+
+    pub fn canonical_memory(&self) -> &Arc<parking_lot::RwLock<CanonicalMemory>> {
+        &self.canonical_memory
     }
 
     /// Get the debugger
@@ -182,6 +189,16 @@ pub async fn sim_run(
     params: Option<SimRunParams>,
 ) -> Result<(), String> {
     let project_config = current_project_config(&project_state)?;
+    let plc_settings = project_config
+        .as_ref()
+        .map(|config| config.plc.clone())
+        .unwrap_or_default();
+    let profile = resolve_vendor_profile(&plc_settings).map_err(|e| e.to_string())?;
+    state.memory().attach_canonical_mirror(
+        profile,
+        Arc::clone(state.canonical_memory()),
+    );
+
     if let Some(project_config) = project_config.as_ref() {
         if project_config.modbus.simulation.enabled {
             modbus_start_project_simulation(&modbus_state, app.clone(), project_config).await?;
