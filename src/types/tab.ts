@@ -77,7 +77,8 @@ export type TabContextAction =
   | 'closeAll'
   | 'closeToRight'
   | 'duplicate'
-  | 'moveToNewPanel';
+  | 'moveToNewPanel'
+  | 'openInNewWindow';
 
 /**
  * Context menu item for tab actions
@@ -99,5 +100,6 @@ export const TAB_CONTEXT_MENU_ITEMS: TabContextMenuItem[] = [
   { action: 'closeToRight', label: 'Close to the Right' },
   { action: 'closeAll', label: 'Close All', separator: true },
   { action: 'duplicate', label: 'Duplicate Tab' },
-  { action: 'moveToNewPanel', label: 'Move to New Panel' },
+  { action: 'moveToNewPanel', label: 'Move to New Panel', separator: true },
+  { action: 'openInNewWindow', label: 'Open in New Window' },
 ];

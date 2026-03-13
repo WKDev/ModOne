@@ -4,6 +4,7 @@ import { Tab } from './Tab';
 import { TabState } from '../../types/tab';
 import { usePanelStore } from '../../stores/panelStore';
 import { useTabClose } from '../../hooks/useTabClose';
+import { useTabDragOut } from '../../hooks/useTabDragOut';
 import { UnsavedChangesDialog } from '../project/UnsavedChangesDialog';
 
 export interface TabBarProps {
@@ -28,6 +29,7 @@ export function TabBar({
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const { setActiveTab, reorderTabs } = usePanelStore();
+  const { onTabDragStart, onTabDrag, onTabDragEnd } = useTabDragOut();
 
   // Tab close handling with unsaved changes support
   const {
@@ -82,24 +84,39 @@ export function TabBar({
     onContextMenu?.(tabId, e);
   };
 
+  // Track whether the current drag was torn off (skip reorder on drop)
+  const tornOffRef = useRef(false);
+
   // Drag and drop handlers
-  const handleDragStart = (e: React.DragEvent, index: number) => {
+  const handleDragStart = (e: React.DragEvent, index: number, tabId: string) => {
     e.dataTransfer.setData('tab-index', String(index));
     e.dataTransfer.setData('panel-id', panelId);
+    e.dataTransfer.setData('tab-id', tabId);
+    e.dataTransfer.setData('application/x-tab-tearoff', JSON.stringify({ panelId, tabId }));
+    tornOffRef.current = false;
+    onTabDragStart(panelId, tabId);
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     setDragOverIndex(index);
+    onTabDrag(e);
   };
 
-  const handleDragEnd = () => {
+  const handleDragEnd = async (e: React.DragEvent) => {
+    const wasTornOff = await onTabDragEnd(e);
+    tornOffRef.current = wasTornOff;
     setDragOverIndex(null);
   };
 
   const handleDrop = (e: React.DragEvent, toIndex: number) => {
     e.preventDefault();
+    if (tornOffRef.current) {
+      setDragOverIndex(null);
+      return;
+    }
+
     const fromIndex = parseInt(e.dataTransfer.getData('tab-index'), 10);
     const sourcePanelId = e.dataTransfer.getData('panel-id');
 
@@ -169,7 +186,7 @@ export function TabBar({
               onActivate={() => handleTabActivate(tab.id)}
               onClose={() => handleTabClose(tab.id)}
               onContextMenu={(e) => handleTabContextMenu(tab.id, e)}
-              onDragStart={(e) => handleDragStart(e, index)}
+              onDragStart={(e) => handleDragStart(e, index, tab.id)}
               onDragEnd={handleDragEnd}
             />
           </div>

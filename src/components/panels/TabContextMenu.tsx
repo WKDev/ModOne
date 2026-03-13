@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { X, XCircle, Trash2, ArrowRight, Copy, ExternalLink } from 'lucide-react';
+import { X, XCircle, Trash2, ArrowRight, Copy, ExternalLink, AppWindow } from 'lucide-react';
 import { TabContextAction, TAB_CONTEXT_MENU_ITEMS } from '../../types/tab';
 import { usePanelStore } from '../../stores/panelStore';
 import { useTabClose } from '../../hooks/useTabClose';
@@ -21,6 +21,7 @@ const ACTION_ICONS: Record<TabContextAction, React.ReactNode> = {
   closeToRight: <ArrowRight size={14} />,
   duplicate: <Copy size={14} />,
   moveToNewPanel: <ExternalLink size={14} />,
+  openInNewWindow: <AppWindow size={14} />,
 };
 
 export function TabContextMenu({
@@ -32,7 +33,7 @@ export function TabContextMenu({
   onClose,
 }: TabContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
-  const { closeOtherTabs, closeAllTabs, closeTabsToRight, duplicateTab, moveTabToNewPanel } =
+  const { closeOtherTabs, closeAllTabs, closeTabsToRight, duplicateTab, moveTabToNewPanel, moveTabToFloatingWindow } =
     usePanelStore();
 
   // Tab close handling with unsaved changes support
@@ -113,6 +114,9 @@ export function TabContextMenu({
         break;
       case 'moveToNewPanel':
         moveTabToNewPanel(panelId, tabId);
+        break;
+      case 'openInNewWindow':
+        moveTabToFloatingWindow(panelId, tabId);
         break;
     }
     onClose();

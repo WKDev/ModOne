@@ -56,6 +56,8 @@ interface PanelStoreActions {
     dropPosition: DropPosition
   ) => boolean;
   removePanelFromGrid: (panelId: string) => void;
+  // Tab tear-off actions
+  moveTabToFloatingWindow: (panelId: string, tabId: string, bounds?: Bounds) => Promise<string | null>;
   // File-based tab helpers
   findTabByFilePath: (filePath: string) => { panelId: string; tab: TabState } | null;
   getOrCreateEditorPanel: (preferredType?: PanelType) => string;
@@ -492,6 +494,28 @@ export const usePanelStore = create<PanelStore>()(
 
         // Remove tab from original panel
         removeTab(panelId, tabId);
+
+        return newPanelId;
+      },
+
+      // Tab tear-off: move a tab to a new floating window
+      moveTabToFloatingWindow: async (panelId, tabId, bounds) => {
+        const newPanelId = get().moveTabToNewPanel(panelId, tabId);
+        if (!newPanelId) return null;
+
+        const windowId = await get().undockPanel(newPanelId, bounds);
+        if (!windowId) return null;
+
+        // If source panel has no tabs left and other docked panels exist, remove it
+        const sourcePanel = get().panels.find((p) => p.id === panelId);
+        if (sourcePanel && (!sourcePanel.tabs || sourcePanel.tabs.length === 0)) {
+          const otherDocked = get().panels.filter(
+            (p) => p.id !== panelId && !p.isFloating
+          );
+          if (otherDocked.length > 0) {
+            get().removePanelFromGrid(panelId);
+          }
+        }
 
         return newPanelId;
       },
