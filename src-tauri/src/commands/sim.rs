@@ -24,7 +24,7 @@ use crate::sim::{
     counter::CounterManager,
     debugger::{SimDebugger, StepResult, StepType},
     engine::OneSimEngine,
-    executor::LadderProgram,
+    executor::{compile_program, CompiledProgram, LadderProgram},
     memory::CanonicalRuntimeFacade,
     timer::TimerManager,
     types::{
@@ -52,7 +52,7 @@ pub struct SimState {
     runtime: Arc<CanonicalRuntimeFacade>,
     /// Shared Modbus memory for ModbusAdapter
     modbus_memory: Option<Arc<ModbusMemory>>,
-    program: Arc<Mutex<Option<LadderProgram>>>,
+    program: Arc<Mutex<Option<CompiledProgram>>>,
     scan_task: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
     monitoring_active: Arc<AtomicBool>,
     forced_devices: Arc<parking_lot::RwLock<HashMap<String, serde_json::Value>>>,
@@ -254,7 +254,7 @@ pub async fn sim_run(
         .program
         .lock()
         .clone()
-        .unwrap_or_else(|| LadderProgram {
+        .unwrap_or_else(|| CompiledProgram {
             name: "Default Program".to_string(),
             networks: vec![],
         });
@@ -488,8 +488,15 @@ pub fn sim_get_scan_info(state: State<'_, SimState>) -> Result<ScanCycleInfo, St
 
 /// Load a ladder program for simulation
 #[tauri::command]
-pub fn sim_load_program(state: State<'_, SimState>, program: LadderProgram) -> Result<(), String> {
-    *state.program.lock() = Some(program);
+pub fn sim_load_program(
+    state: State<'_, SimState>,
+    project_state: State<'_, SharedProjectManager>,
+    program: LadderProgram,
+) -> Result<(), String> {
+    let plc_settings = active_plc_settings(Some(&project_state))?;
+    let profile = resolve_vendor_profile(&plc_settings).map_err(|e| e.to_string())?;
+    let compiled = compile_program(&program, profile.as_ref()).map_err(|e| e.to_string())?;
+    *state.program.lock() = Some(compiled);
     Ok(())
 }
 

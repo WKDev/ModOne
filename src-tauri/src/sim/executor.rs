@@ -10,6 +10,8 @@ use std::sync::Arc;
 use std::time::Instant;
 use thiserror::Error;
 
+use crate::plc_runtime::{CanonicalAddress, VendorProfile};
+
 use super::counter::CounterManager;
 use super::memory::{CanonicalRuntimeFacade, SimMemoryError};
 use super::timer::TimerManager;
@@ -535,7 +537,137 @@ pub struct ProgramExecutor {
     /// Last execution scan count
     scan_count: RwLock<u64>,
     /// Previous states for positive/negative edge contacts.
-    edge_state: RwLock<HashMap<String, bool>>,
+    edge_state: RwLock<HashMap<CanonicalAddress, bool>>,
+}
+
+pub fn compile_program(
+    program: &LadderProgram,
+    profile: &dyn VendorProfile,
+) -> ExecutionResult<CompiledProgram> {
+    let networks = program
+        .networks
+        .iter()
+        .map(|network| compile_network(network, profile))
+        .collect::<ExecutionResult<Vec<_>>>()?;
+
+    Ok(CompiledProgram {
+        name: program.name.clone(),
+        networks,
+    })
+}
+
+fn compile_network(
+    network: &LadderNetwork,
+    profile: &dyn VendorProfile,
+) -> ExecutionResult<CompiledNetwork> {
+    let nodes = network
+        .nodes
+        .iter()
+        .map(|node| compile_node(node, profile))
+        .collect::<ExecutionResult<Vec<_>>>()?;
+
+    Ok(CompiledNetwork {
+        id: network.id,
+        nodes,
+        comment: network.comment.clone(),
+    })
+}
+
+fn compile_node(node: &LadderNode, profile: &dyn VendorProfile) -> ExecutionResult<CompiledNode> {
+    let children = node
+        .children
+        .iter()
+        .map(|child| compile_node(child, profile))
+        .collect::<ExecutionResult<Vec<_>>>()?;
+
+    Ok(CompiledNode {
+        node_type: node.node_type,
+        address: compile_optional_address(node.address.as_deref(), profile)?,
+        children,
+        preset: node.preset,
+        time_base: node.time_base,
+        operand1: compile_operand(node.operand1.as_deref(), profile)?,
+        operand2: compile_operand(node.operand2.as_deref(), profile)?,
+        destination: compile_optional_address(node.destination.as_deref(), profile)?,
+    })
+}
+
+fn compile_operand(
+    operand: Option<&str>,
+    profile: &dyn VendorProfile,
+) -> ExecutionResult<Option<CompiledOperand>> {
+    let Some(operand) = operand else {
+        return Ok(None);
+    };
+
+    if let Ok(value) = operand.trim().parse::<i32>() {
+        return Ok(Some(CompiledOperand::Constant(value)));
+    }
+
+    let address = compile_address(operand, profile)?;
+    Ok(Some(CompiledOperand::Address(address)))
+}
+
+fn compile_optional_address(
+    address: Option<&str>,
+    profile: &dyn VendorProfile,
+) -> ExecutionResult<Option<CanonicalAddress>> {
+    address
+        .map(|value| compile_address(value, profile))
+        .transpose()
+}
+
+fn compile_address(address: &str, profile: &dyn VendorProfile) -> ExecutionResult<CanonicalAddress> {
+    let vendor_address = profile
+        .parse_address(address)
+        .map_err(|_| ExecutionError::InvalidAddress(address.to_string()))?;
+
+    profile
+        .to_canonical(&vendor_address)
+        .map_err(|_| ExecutionError::InvalidAddress(address.to_string()))
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CompiledOperand {
+    Constant(i32),
+    Address(CanonicalAddress),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompiledNode {
+    pub node_type: NodeType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub address: Option<CanonicalAddress>,
+    #[serde(default)]
+    pub children: Vec<CompiledNode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preset: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub time_base: Option<SimTimeBase>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operand1: Option<CompiledOperand>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operand2: Option<CompiledOperand>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub destination: Option<CanonicalAddress>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompiledNetwork {
+    pub id: u32,
+    pub nodes: Vec<CompiledNode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompiledProgram {
+    pub name: String,
+    pub networks: Vec<CompiledNetwork>,
 }
 
 impl ProgramExecutor {
@@ -555,7 +687,7 @@ impl ProgramExecutor {
     }
 
     /// Execute a full ladder program
-    pub fn execute_program(&self, program: &LadderProgram) -> ProgramExecutionResult {
+    pub fn execute_program(&self, program: &CompiledProgram) -> ProgramExecutionResult {
         let start = Instant::now();
         let mut network_results = Vec::with_capacity(program.networks.len());
         let mut all_success = true;
@@ -582,7 +714,7 @@ impl ProgramExecutor {
     }
 
     /// Execute a single network
-    pub fn execute_network(&self, network: &LadderNetwork) -> NetworkExecutionResult {
+    pub fn execute_network(&self, network: &CompiledNetwork) -> NetworkExecutionResult {
         let start = Instant::now();
 
         for node in &network.nodes {
@@ -619,35 +751,33 @@ impl ProgramExecutor {
     }
 
     /// Evaluate a ladder node and return power flow state
-    pub fn evaluate_node(&self, node: &LadderNode) -> ExecutionResult<bool> {
+    pub fn evaluate_node(&self, node: &CompiledNode) -> ExecutionResult<bool> {
         match node.node_type {
             // Contacts
             NodeType::ContactNo => {
-                let addr = self.parse_address(&node.address)?;
-                self.read_device_bool(&addr)
+                let addr = self.require_address(node.address)?;
+                self.read_device_bool(addr)
             }
             NodeType::ContactNc => {
-                let addr = self.parse_address(&node.address)?;
-                Ok(!self.read_device_bool(&addr)?)
+                let addr = self.require_address(node.address)?;
+                Ok(!self.read_device_bool(addr)?)
             }
             NodeType::ContactP => {
-                let addr = self.parse_address(&node.address)?;
-                let current = self.read_device_bool(&addr)?;
-                let addr_str = addr.to_string();
+                let addr = self.require_address(node.address)?;
+                let current = self.read_device_bool(addr)?;
                 let mut edge_state = self.edge_state.write();
-                let previous = edge_state.get(&addr_str).copied().unwrap_or(false);
+                let previous = edge_state.get(&addr).copied().unwrap_or(false);
                 let result = current && !previous;
-                edge_state.insert(addr_str, current);
+                edge_state.insert(addr, current);
                 Ok(result)
             }
             NodeType::ContactN => {
-                let addr = self.parse_address(&node.address)?;
-                let current = self.read_device_bool(&addr)?;
-                let addr_str = addr.to_string();
+                let addr = self.require_address(node.address)?;
+                let current = self.read_device_bool(addr)?;
                 let mut edge_state = self.edge_state.write();
-                let previous = edge_state.get(&addr_str).copied().unwrap_or(false);
+                let previous = edge_state.get(&addr).copied().unwrap_or(false);
                 let result = !current && previous;
-                edge_state.insert(addr_str, current);
+                edge_state.insert(addr, current);
                 Ok(result)
             }
 
@@ -681,9 +811,9 @@ impl ProgramExecutor {
 
             // Timers - read done bit
             NodeType::TimerTon | NodeType::TimerTof | NodeType::TimerTmr => {
-                let addr = self.parse_address(&node.address)?;
-                if addr.device == 'T' {
-                    if let Some(state) = self.timer_mgr.get_state(addr.address) {
+                let addr = self.require_address(node.address)?;
+                if addr.area == crate::plc_runtime::CanonicalAreaKind::TimerDoneBit {
+                    if let Some(state) = self.timer_mgr.get_state(addr.index as u16) {
                         return Ok(state.done);
                     }
                 }
@@ -692,9 +822,9 @@ impl ProgramExecutor {
 
             // Counters - read done bit
             NodeType::CounterCtu | NodeType::CounterCtd | NodeType::CounterCtud => {
-                let addr = self.parse_address(&node.address)?;
-                if addr.device == 'C' {
-                    if let Some(state) = self.counter_mgr.get_state(addr.address) {
+                let addr = self.require_address(node.address)?;
+                if addr.area == crate::plc_runtime::CanonicalAreaKind::CounterDoneBit {
+                    if let Some(state) = self.counter_mgr.get_state(addr.index as u16) {
                         return Ok(state.done);
                     }
                 }
@@ -715,23 +845,23 @@ impl ProgramExecutor {
     }
 
     /// Execute output operations
-    pub fn execute_output(&self, node: &LadderNode, input: bool) -> ExecutionResult<()> {
+    pub fn execute_output(&self, node: &CompiledNode, input: bool) -> ExecutionResult<()> {
         match node.node_type {
             // Coils
             NodeType::CoilOut => {
-                let addr = self.parse_address(&node.address)?;
-                self.write_device_bool(&addr, input)?;
+                let addr = self.require_address(node.address)?;
+                self.write_device_bool(addr, input)?;
             }
             NodeType::CoilSet => {
                 if input {
-                    let addr = self.parse_address(&node.address)?;
-                    self.write_device_bool(&addr, true)?;
+                    let addr = self.require_address(node.address)?;
+                    self.write_device_bool(addr, true)?;
                 }
             }
             NodeType::CoilRst => {
                 if input {
-                    let addr = self.parse_address(&node.address)?;
-                    self.write_device_bool(&addr, false)?;
+                    let addr = self.require_address(node.address)?;
+                    self.write_device_bool(addr, false)?;
                 }
             }
 
@@ -808,131 +938,63 @@ impl ProgramExecutor {
     // Helper Methods
     // ========================================================================
 
-    /// Parse address option to DeviceAddress
-    fn parse_address(&self, address: &Option<String>) -> ExecutionResult<DeviceAddress> {
-        let addr_str = address
-            .as_ref()
-            .ok_or_else(|| ExecutionError::InvalidAddress("Missing address".to_string()))?;
-
-        DeviceAddress::parse(addr_str)
-            .ok_or_else(|| ExecutionError::InvalidAddress(addr_str.clone()))
+    fn require_address(&self, address: Option<CanonicalAddress>) -> ExecutionResult<CanonicalAddress> {
+        address.ok_or_else(|| ExecutionError::InvalidAddress("Missing address".to_string()))
     }
 
-    /// Read bool value from device
-    fn read_device_bool(&self, addr: &DeviceAddress) -> ExecutionResult<bool> {
-        if addr.is_bit_device() {
-            let device = addr.as_bit_device().ok_or_else(|| {
-                ExecutionError::InvalidAddress(format!(
-                    "Expected bit device, got {}",
-                    addr.to_string()
-                ))
-            })?;
-            Ok(self.runtime.read_bit(device, addr.address)?)
-        } else if let Some(bit_idx) = addr.bit_index {
-            let device = addr.as_word_device().ok_or_else(|| {
-                ExecutionError::InvalidAddress(format!(
-                    "Expected word device for bit access, got {}",
-                    addr.to_string()
-                ))
-            })?;
-            Ok(self.runtime.read_word_bit(device, addr.address, bit_idx)?)
+    fn read_device_bool(&self, addr: CanonicalAddress) -> ExecutionResult<bool> {
+        if addr.area.is_bit_area() {
+            Ok(self.runtime.read_bool(addr)?)
+        } else if addr.bit_index.is_some() {
+            Ok(self.runtime.read_bool(addr)?)
         } else {
-            // Word device without bit index - read as bool (non-zero = true)
-            let device = addr.as_word_device().ok_or_else(|| {
-                ExecutionError::InvalidAddress(format!(
-                    "Expected word device, got {}",
-                    addr.to_string()
-                ))
-            })?;
-            Ok(self.runtime.read_word(device, addr.address)? != 0)
+            Ok(self.runtime.read_word_value(addr)? != 0)
         }
     }
 
-    /// Write bool value to device
-    fn write_device_bool(&self, addr: &DeviceAddress, value: bool) -> ExecutionResult<()> {
-        if addr.is_bit_device() {
-            let device = addr.as_bit_device().ok_or_else(|| {
-                ExecutionError::InvalidAddress(format!(
-                    "Expected bit device, got {}",
-                    addr.to_string()
-                ))
-            })?;
-            Ok(self.runtime.write_bit(device, addr.address, value)?)
-        } else if let Some(bit_idx) = addr.bit_index {
-            let device = addr.as_word_device().ok_or_else(|| {
-                ExecutionError::InvalidAddress(format!(
-                    "Expected word device for bit access, got {}",
-                    addr.to_string()
-                ))
-            })?;
+    fn write_device_bool(&self, addr: CanonicalAddress, value: bool) -> ExecutionResult<()> {
+        if addr.area.is_bit_area() || addr.bit_index.is_some() {
             Ok(self
                 .runtime
-                .write_word_bit(device, addr.address, bit_idx, value)?)
+                .write_bool(addr, value, crate::plc_runtime::CanonicalWriteSource::Simulation)?)
         } else {
-            // Word device without bit index
-            let device = addr.as_word_device().ok_or_else(|| {
-                ExecutionError::InvalidAddress(format!(
-                    "Expected word device, got {}",
-                    addr.to_string()
-                ))
-            })?;
-            Ok(self
-                .runtime
-                .write_word(device, addr.address, if value { 1 } else { 0 })?)
+            Ok(self.runtime.write_word_value(
+                addr,
+                if value { 1 } else { 0 },
+                crate::plc_runtime::CanonicalWriteSource::Simulation,
+            )?)
         }
     }
 
-    /// Read word value from device or parse as constant
-    fn read_operand(&self, operand: &str) -> ExecutionResult<i32> {
-        // Try to parse as constant first
-        if let Ok(value) = operand.parse::<i32>() {
-            return Ok(value);
-        }
-
-        // Parse as device address
-        let addr = DeviceAddress::parse(operand)
-            .ok_or_else(|| ExecutionError::InvalidAddress(operand.to_string()))?;
-
-        if addr.is_word_device() {
-            let device = addr.as_word_device().ok_or_else(|| {
-                ExecutionError::InvalidAddress(format!(
-                    "Expected word device operand, got {}",
-                    addr.to_string()
-                ))
-            })?;
-            Ok(self.runtime.read_word(device, addr.address)? as i16 as i32)
-        } else {
-            // Bit device - return 0 or 1
-            let device = addr.as_bit_device().ok_or_else(|| {
-                ExecutionError::InvalidAddress(format!(
-                    "Expected bit device operand, got {}",
-                    addr.to_string()
-                ))
-            })?;
-            Ok(if self.runtime.read_bit(device, addr.address)? {
-                1
-            } else {
-                0
-            })
+    fn read_operand(&self, operand: &CompiledOperand) -> ExecutionResult<i32> {
+        match operand {
+            CompiledOperand::Constant(value) => Ok(*value),
+            CompiledOperand::Address(address) => {
+                if address.area.is_word_area() && address.bit_index.is_none() {
+                    Ok(self.runtime.read_word_value(*address)? as i16 as i32)
+                } else {
+                    Ok(if self.runtime.read_bool(*address)? { 1 } else { 0 })
+                }
+            }
         }
     }
 
     /// Compare two operands
-    fn compare<F>(&self, node: &LadderNode, op: F) -> ExecutionResult<bool>
+    fn compare<F>(&self, node: &CompiledNode, op: F) -> ExecutionResult<bool>
     where
         F: Fn(i32, i32) -> bool,
     {
-        let op1_str = node
+        let op1 = node
             .operand1
             .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing operand1".to_string()))?;
-        let op2_str = node
+        let op2 = node
             .operand2
             .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing operand2".to_string()))?;
 
-        let op1 = self.read_operand(op1_str)?;
-        let op2 = self.read_operand(op2_str)?;
+        let op1 = self.read_operand(op1)?;
+        let op2 = self.read_operand(op2)?;
 
         Ok(op(op1, op2))
     }
@@ -940,15 +1002,15 @@ impl ProgramExecutor {
     /// Execute timer operation
     fn execute_timer(
         &self,
-        node: &LadderNode,
+        node: &CompiledNode,
         input: bool,
         timer_type: SimTimerType,
     ) -> ExecutionResult<()> {
-        let addr = self.parse_address(&node.address)?;
-        if addr.device != 'T' {
+        let addr = self.require_address(node.address)?;
+        if addr.area != crate::plc_runtime::CanonicalAreaKind::TimerDoneBit {
             return Err(ExecutionError::InvalidAddress(format!(
-                "Timer must use T device, got {}",
-                addr.device
+                "Timer must use TimerDoneBit, got {:?}",
+                addr.area
             )));
         }
 
@@ -957,14 +1019,22 @@ impl ProgramExecutor {
 
         let (done, _elapsed) =
             self.timer_mgr
-                .update(addr.address, timer_type, input, preset, time_base);
+                .update(addr.index as u16, timer_type, input, preset, time_base);
 
         // Update T contact
         let _ = self
             .runtime
-            .write_bit_internal(SimBitDeviceType::T, addr.address, done);
+            .write_bool(
+                addr,
+                done,
+                crate::plc_runtime::CanonicalWriteSource::InternalRuntime,
+            );
         self.runtime
-            .write_word_internal(SimWordDeviceType::Td, addr.address, _elapsed as u16)?;
+            .write_word_value(
+                CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::TimerValueWord, addr.index),
+                _elapsed as u16,
+                crate::plc_runtime::CanonicalWriteSource::InternalRuntime,
+            )?;
 
         Ok(())
     }
@@ -972,22 +1042,22 @@ impl ProgramExecutor {
     /// Execute counter operation
     fn execute_counter(
         &self,
-        node: &LadderNode,
+        node: &CompiledNode,
         input: bool,
         counter_type: SimCounterType,
     ) -> ExecutionResult<()> {
-        let addr = self.parse_address(&node.address)?;
-        if addr.device != 'C' {
+        let addr = self.require_address(node.address)?;
+        if addr.area != crate::plc_runtime::CanonicalAreaKind::CounterDoneBit {
             return Err(ExecutionError::InvalidAddress(format!(
-                "Counter must use C device, got {}",
-                addr.device
+                "Counter must use CounterDoneBit, got {:?}",
+                addr.area
             )));
         }
 
         let preset = node.preset.unwrap_or(10) as i32;
 
         let done = self.counter_mgr.update(
-            addr.address,
+            addr.index as u16,
             counter_type,
             input,
             None, // down_input for CTUD - could be passed via node.operand1 in future
@@ -997,12 +1067,19 @@ impl ProgramExecutor {
         // Update C contact
         let _ = self
             .runtime
-            .write_bit_internal(SimBitDeviceType::C, addr.address, done);
-        if let Some(state) = self.counter_mgr.get_state(addr.address) {
-            self.runtime.write_word_internal(
-                SimWordDeviceType::Cd,
-                addr.address,
+            .write_bool(
+                addr,
+                done,
+                crate::plc_runtime::CanonicalWriteSource::InternalRuntime,
+            )?;
+        if let Some(state) = self.counter_mgr.get_state(addr.index as u16) {
+            self.runtime.write_word_value(
+                CanonicalAddress::new(
+                    crate::plc_runtime::CanonicalAreaKind::CounterValueWord,
+                    addr.index,
+                ),
                 state.current_value.clamp(0, u16::MAX as i32) as u16,
+                crate::plc_runtime::CanonicalWriteSource::InternalRuntime,
             )?;
         }
 
@@ -1010,61 +1087,50 @@ impl ProgramExecutor {
     }
 
     /// Execute math operation
-    fn execute_math<F>(&self, node: &LadderNode, op: F) -> ExecutionResult<()>
+    fn execute_math<F>(&self, node: &CompiledNode, op: F) -> ExecutionResult<()>
     where
         F: Fn(i32, i32) -> i32,
     {
-        let op1_str = node
+        let op1 = node
             .operand1
             .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing operand1".to_string()))?;
-        let op2_str = node
+        let op2 = node
             .operand2
             .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing operand2".to_string()))?;
-        let dest_str = node
+        let dest = node
             .destination
-            .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing destination".to_string()))?;
 
-        let op1 = self.read_operand(op1_str)?;
-        let op2 = self.read_operand(op2_str)?;
+        let op1 = self.read_operand(op1)?;
+        let op2 = self.read_operand(op2)?;
         let result = op(op1, op2);
 
-        let dest = DeviceAddress::parse(dest_str)
-            .ok_or_else(|| ExecutionError::InvalidAddress(dest_str.clone()))?;
-
-        if dest.is_word_device() {
-            let device = dest.as_word_device().ok_or_else(|| {
-                ExecutionError::InvalidAddress(format!(
-                    "Expected word destination device, got {}",
-                    dest.to_string()
-                ))
-            })?;
+        if dest.area.is_word_area() && dest.bit_index.is_none() {
             self.runtime
-                .write_word(device, dest.address, result as u16)?;
+                .write_word_value(dest, result as u16, crate::plc_runtime::CanonicalWriteSource::Simulation)?;
         }
 
         Ok(())
     }
 
     /// Execute division with zero check
-    fn execute_math_div(&self, node: &LadderNode) -> ExecutionResult<()> {
-        let op1_str = node
+    fn execute_math_div(&self, node: &CompiledNode) -> ExecutionResult<()> {
+        let op1 = node
             .operand1
             .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing operand1".to_string()))?;
-        let op2_str = node
+        let op2 = node
             .operand2
             .as_ref()
-            .ok_or_else(|| ExecutionError::InvalidAddress("Missing operand2".to_string()))?;
-        let dest_str = node
+            .ok_or_else(|| ExecutionError::InvalidAddress("Missing destination".to_string()))?;
+        let dest = node
             .destination
             .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing destination".to_string()))?;
-
-        let op1 = self.read_operand(op1_str)?;
-        let op2 = self.read_operand(op2_str)?;
+        let op1 = self.read_operand(op1)?;
+        let op2 = self.read_operand(op2)?;
 
         if op2 == 0 {
             // Division by zero - keep destination unchanged
@@ -1073,40 +1139,33 @@ impl ProgramExecutor {
 
         let result = op1 / op2;
 
-        let dest = DeviceAddress::parse(dest_str)
-            .ok_or_else(|| ExecutionError::InvalidAddress(dest_str.clone()))?;
-
-        if dest.is_word_device() {
-            let device = dest.as_word_device().ok_or_else(|| {
-                ExecutionError::InvalidAddress(format!(
-                    "Expected word destination device, got {}",
-                    dest.to_string()
-                ))
-            })?;
-            self.runtime
-                .write_word(device, dest.address, result as u16)?;
+        if dest.area.is_word_area() && dest.bit_index.is_none() {
+            self.runtime.write_word_value(
+                *dest,
+                result as u16,
+                crate::plc_runtime::CanonicalWriteSource::Simulation,
+            )?;
         }
 
         Ok(())
     }
 
     /// Execute modulo with zero check
-    fn execute_math_mod(&self, node: &LadderNode) -> ExecutionResult<()> {
-        let op1_str = node
+    fn execute_math_mod(&self, node: &CompiledNode) -> ExecutionResult<()> {
+        let op1 = node
             .operand1
             .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing operand1".to_string()))?;
-        let op2_str = node
+        let op2 = node
             .operand2
             .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing operand2".to_string()))?;
-        let dest_str = node
+        let dest = node
             .destination
             .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing destination".to_string()))?;
-
-        let op1 = self.read_operand(op1_str)?;
-        let op2 = self.read_operand(op2_str)?;
+        let op1 = self.read_operand(op1)?;
+        let op2 = self.read_operand(op2)?;
 
         if op2 == 0 {
             return Ok(());
@@ -1114,46 +1173,35 @@ impl ProgramExecutor {
 
         let result = op1 % op2;
 
-        let dest = DeviceAddress::parse(dest_str)
-            .ok_or_else(|| ExecutionError::InvalidAddress(dest_str.clone()))?;
-
-        if dest.is_word_device() {
-            let device = dest.as_word_device().ok_or_else(|| {
-                ExecutionError::InvalidAddress(format!(
-                    "Expected word destination device, got {}",
-                    dest.to_string()
-                ))
-            })?;
-            self.runtime
-                .write_word(device, dest.address, result as u16)?;
+        if dest.area.is_word_area() && dest.bit_index.is_none() {
+            self.runtime.write_word_value(
+                *dest,
+                result as u16,
+                crate::plc_runtime::CanonicalWriteSource::Simulation,
+            )?;
         }
 
         Ok(())
     }
 
     /// Execute move operation
-    fn execute_move(&self, node: &LadderNode) -> ExecutionResult<()> {
-        let op1_str = node.operand1.as_ref().ok_or_else(|| {
+    fn execute_move(&self, node: &CompiledNode) -> ExecutionResult<()> {
+        let op1 = node.operand1.as_ref().ok_or_else(|| {
             ExecutionError::InvalidAddress("Missing operand1 (source)".to_string())
         })?;
-        let dest_str = node
+        let dest = node
             .destination
             .as_ref()
             .ok_or_else(|| ExecutionError::InvalidAddress("Missing destination".to_string()))?;
 
-        let value = self.read_operand(op1_str)?;
+        let value = self.read_operand(op1)?;
 
-        let dest = DeviceAddress::parse(dest_str)
-            .ok_or_else(|| ExecutionError::InvalidAddress(dest_str.clone()))?;
-
-        if dest.is_word_device() {
-            let device = dest.as_word_device().ok_or_else(|| {
-                ExecutionError::InvalidAddress(format!(
-                    "Expected word destination device, got {}",
-                    dest.to_string()
-                ))
-            })?;
-            self.runtime.write_word(device, dest.address, value as u16)?;
+        if dest.area.is_word_area() && dest.bit_index.is_none() {
+            self.runtime.write_word_value(
+                *dest,
+                value as u16,
+                crate::plc_runtime::CanonicalWriteSource::Simulation,
+            )?;
         }
 
         Ok(())
@@ -1187,6 +1235,8 @@ impl Default for ProgramExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::plc_runtime::profiles::LsProfile;
+    use crate::project::PlcHardwareTopology;
 
     fn create_executor() -> (
         ProgramExecutor,
@@ -1203,6 +1253,40 @@ mod tests {
             Arc::clone(&counter_mgr),
         );
         (executor, memory, timer_mgr, counter_mgr)
+    }
+
+    fn test_profile() -> LsProfile {
+        LsProfile::new("XGK".to_string(), PlcHardwareTopology::default())
+    }
+
+    fn compile_test_node(node: &LadderNode) -> CompiledNode {
+        compile_node(node, &test_profile()).expect("node should compile")
+    }
+
+    fn compile_test_program(program: &LadderProgram) -> CompiledProgram {
+        compile_program(program, &test_profile()).expect("program should compile")
+    }
+
+    fn evaluate(executor: &ProgramExecutor, node: &LadderNode) -> ExecutionResult<bool> {
+        let compiled = compile_test_node(node);
+        executor.evaluate_node(&compiled)
+    }
+
+    fn execute_output(
+        executor: &ProgramExecutor,
+        node: &LadderNode,
+        input: bool,
+    ) -> ExecutionResult<()> {
+        let compiled = compile_test_node(node);
+        executor.execute_output(&compiled, input)
+    }
+
+    fn execute_program(
+        executor: &ProgramExecutor,
+        program: &LadderProgram,
+    ) -> ProgramExecutionResult {
+        let compiled = compile_test_program(program);
+        executor.execute_program(&compiled)
     }
 
     #[test]
@@ -1224,11 +1308,11 @@ mod tests {
 
         // M0 is false
         let node = LadderNode::contact(NodeType::ContactNo, "M0");
-        assert!(!executor.evaluate_node(&node).unwrap());
+        assert!(!evaluate(&executor, &node).unwrap());
 
         // Set M0 true
         memory.write_bit(SimBitDeviceType::M, 0, true).unwrap();
-        assert!(executor.evaluate_node(&node).unwrap());
+        assert!(evaluate(&executor, &node).unwrap());
     }
 
     #[test]
@@ -1237,11 +1321,11 @@ mod tests {
 
         // M0 is false, NC returns true
         let node = LadderNode::contact(NodeType::ContactNc, "M0");
-        assert!(executor.evaluate_node(&node).unwrap());
+        assert!(evaluate(&executor, &node).unwrap());
 
         // Set M0 true, NC returns false
         memory.write_bit(SimBitDeviceType::M, 0, true).unwrap();
-        assert!(!executor.evaluate_node(&node).unwrap());
+        assert!(!evaluate(&executor, &node).unwrap());
     }
 
     #[test]
@@ -1251,14 +1335,14 @@ mod tests {
         let node = LadderNode::contact(NodeType::ContactP, "M0");
 
         // First scan with false - no edge
-        assert!(!executor.evaluate_node(&node).unwrap());
+        assert!(!evaluate(&executor, &node).unwrap());
 
         // Set M0 true - rising edge
         memory.write_bit(SimBitDeviceType::M, 0, true).unwrap();
-        assert!(executor.evaluate_node(&node).unwrap());
+        assert!(evaluate(&executor, &node).unwrap());
 
         // Second scan with true - no edge
-        assert!(!executor.evaluate_node(&node).unwrap());
+        assert!(!evaluate(&executor, &node).unwrap());
     }
 
     #[test]
@@ -1269,14 +1353,14 @@ mod tests {
 
         // Set M0 true first
         memory.write_bit(SimBitDeviceType::M, 0, true).unwrap();
-        executor.evaluate_node(&node).unwrap(); // Update previous state
+        evaluate(&executor, &node).unwrap(); // Update previous state
 
         // Set M0 false - falling edge
         memory.write_bit(SimBitDeviceType::M, 0, false).unwrap();
-        assert!(executor.evaluate_node(&node).unwrap());
+        assert!(evaluate(&executor, &node).unwrap());
 
         // Second scan with false - no edge
-        assert!(!executor.evaluate_node(&node).unwrap());
+        assert!(!evaluate(&executor, &node).unwrap());
     }
 
     #[test]
@@ -1289,15 +1373,15 @@ mod tests {
         ]);
 
         // Both false - series is false
-        assert!(!executor.evaluate_node(&node).unwrap());
+        assert!(!evaluate(&executor, &node).unwrap());
 
         // M0 true, M1 false - still false
         memory.write_bit(SimBitDeviceType::M, 0, true).unwrap();
-        assert!(!executor.evaluate_node(&node).unwrap());
+        assert!(!evaluate(&executor, &node).unwrap());
 
         // Both true - series is true
         memory.write_bit(SimBitDeviceType::M, 1, true).unwrap();
-        assert!(executor.evaluate_node(&node).unwrap());
+        assert!(evaluate(&executor, &node).unwrap());
     }
 
     #[test]
@@ -1310,15 +1394,15 @@ mod tests {
         ]);
 
         // Both false - parallel is false
-        assert!(!executor.evaluate_node(&node).unwrap());
+        assert!(!evaluate(&executor, &node).unwrap());
 
         // M0 true, M1 false - parallel is true
         memory.write_bit(SimBitDeviceType::M, 0, true).unwrap();
-        assert!(executor.evaluate_node(&node).unwrap());
+        assert!(evaluate(&executor, &node).unwrap());
 
         // Both true - still true
         memory.write_bit(SimBitDeviceType::M, 1, true).unwrap();
-        assert!(executor.evaluate_node(&node).unwrap());
+        assert!(evaluate(&executor, &node).unwrap());
     }
 
     #[test]
@@ -1328,11 +1412,11 @@ mod tests {
         let node = LadderNode::coil(NodeType::CoilOut, "P0");
 
         // Execute with true input
-        executor.execute_output(&node, true).unwrap();
+        execute_output(&executor, &node, true).unwrap();
         assert!(memory.read_bit(SimBitDeviceType::P, 0).unwrap());
 
         // Execute with false input
-        executor.execute_output(&node, false).unwrap();
+        execute_output(&executor, &node, false).unwrap();
         assert!(!memory.read_bit(SimBitDeviceType::P, 0).unwrap());
     }
 
@@ -1343,11 +1427,11 @@ mod tests {
         let node = LadderNode::coil(NodeType::CoilSet, "P0");
 
         // Execute with true input - latches on
-        executor.execute_output(&node, true).unwrap();
+        execute_output(&executor, &node, true).unwrap();
         assert!(memory.read_bit(SimBitDeviceType::P, 0).unwrap());
 
         // Execute with false input - stays latched
-        executor.execute_output(&node, false).unwrap();
+        execute_output(&executor, &node, false).unwrap();
         assert!(memory.read_bit(SimBitDeviceType::P, 0).unwrap());
     }
 
@@ -1361,11 +1445,11 @@ mod tests {
         let node = LadderNode::coil(NodeType::CoilRst, "P0");
 
         // Execute with false input - stays on
-        executor.execute_output(&node, false).unwrap();
+        execute_output(&executor, &node, false).unwrap();
         assert!(memory.read_bit(SimBitDeviceType::P, 0).unwrap());
 
         // Execute with true input - unlatches
-        executor.execute_output(&node, true).unwrap();
+        execute_output(&executor, &node, true).unwrap();
         assert!(!memory.read_bit(SimBitDeviceType::P, 0).unwrap());
     }
 
@@ -1378,17 +1462,17 @@ mod tests {
         memory.write_word(SimWordDeviceType::D, 1, 5).unwrap();
 
         let eq = LadderNode::compare(NodeType::CompareEq, "D0", "D1");
-        assert!(!executor.evaluate_node(&eq).unwrap());
+        assert!(!evaluate(&executor, &eq).unwrap());
 
         let gt = LadderNode::compare(NodeType::CompareGt, "D0", "D1");
-        assert!(executor.evaluate_node(&gt).unwrap());
+        assert!(evaluate(&executor, &gt).unwrap());
 
         let lt = LadderNode::compare(NodeType::CompareLt, "D0", "D1");
-        assert!(!executor.evaluate_node(&lt).unwrap());
+        assert!(!evaluate(&executor, &lt).unwrap());
 
         // Compare with constant
         let eq_const = LadderNode::compare(NodeType::CompareEq, "D0", "10");
-        assert!(executor.evaluate_node(&eq_const).unwrap());
+        assert!(evaluate(&executor, &eq_const).unwrap());
     }
 
     #[test]
@@ -1399,7 +1483,7 @@ mod tests {
         memory.write_word(SimWordDeviceType::D, 1, 5).unwrap();
 
         let node = LadderNode::math(NodeType::MathAdd, "D0", "D1", "D2");
-        executor.execute_output(&node, true).unwrap();
+        execute_output(&executor, &node, true).unwrap();
 
         assert_eq!(memory.read_word(SimWordDeviceType::D, 2).unwrap(), 15);
     }
@@ -1412,7 +1496,7 @@ mod tests {
         memory.write_word(SimWordDeviceType::D, 1, 3).unwrap();
 
         let node = LadderNode::math(NodeType::MathSub, "D0", "D1", "D2");
-        executor.execute_output(&node, true).unwrap();
+        execute_output(&executor, &node, true).unwrap();
 
         assert_eq!(memory.read_word(SimWordDeviceType::D, 2).unwrap(), 7);
     }
@@ -1427,7 +1511,7 @@ mod tests {
 
         let node = LadderNode::math(NodeType::MathDiv, "D0", "D1", "D2");
         // Should not panic, just keep destination unchanged
-        executor.execute_output(&node, true).unwrap();
+        execute_output(&executor, &node, true).unwrap();
 
         assert_eq!(memory.read_word(SimWordDeviceType::D, 2).unwrap(), 999);
     }
@@ -1441,7 +1525,7 @@ mod tests {
         let mut node = LadderNode::math(NodeType::MathMov, "D0", "0", "D1");
         node.operand2 = None; // MOV doesn't need operand2
 
-        executor.execute_output(&node, true).unwrap();
+        execute_output(&executor, &node, true).unwrap();
 
         assert_eq!(memory.read_word(SimWordDeviceType::D, 1).unwrap(), 42);
     }
@@ -1457,11 +1541,11 @@ mod tests {
         let node = LadderNode::math(NodeType::MathAdd, "D0", "D1", "D2");
 
         // Execute with false input - should not change D2
-        executor.execute_output(&node, false).unwrap();
+        execute_output(&executor, &node, false).unwrap();
         assert_eq!(memory.read_word(SimWordDeviceType::D, 2).unwrap(), 0);
 
         // Execute with true input - should update D2
-        executor.execute_output(&node, true).unwrap();
+        execute_output(&executor, &node, true).unwrap();
         assert_eq!(memory.read_word(SimWordDeviceType::D, 2).unwrap(), 15);
     }
 
@@ -1479,15 +1563,15 @@ mod tests {
         ]);
 
         // All false - false
-        assert!(!executor.evaluate_node(&node).unwrap());
+        assert!(!evaluate(&executor, &node).unwrap());
 
         // M0=true, M1/M2=false - false
         memory.write_bit(SimBitDeviceType::M, 0, true).unwrap();
-        assert!(!executor.evaluate_node(&node).unwrap());
+        assert!(!evaluate(&executor, &node).unwrap());
 
         // M0=true, M1=true - true
         memory.write_bit(SimBitDeviceType::M, 1, true).unwrap();
-        assert!(executor.evaluate_node(&node).unwrap());
+        assert!(evaluate(&executor, &node).unwrap());
     }
 
     #[test]
@@ -1507,13 +1591,13 @@ mod tests {
         };
 
         // M0 false - P0 should stay false
-        let result = executor.execute_program(&program);
+        let result = execute_program(&executor, &program);
         assert!(result.success);
         assert!(!memory.read_bit(SimBitDeviceType::P, 0).unwrap());
 
         // M0 true - P0 should become true
         memory.write_bit(SimBitDeviceType::M, 0, true).unwrap();
-        let result = executor.execute_program(&program);
+        let result = execute_program(&executor, &program);
         assert!(result.success);
         assert!(memory.read_bit(SimBitDeviceType::P, 0).unwrap());
     }
@@ -1529,10 +1613,10 @@ mod tests {
             networks: vec![],
         };
 
-        executor.execute_program(&program);
+        execute_program(&executor, &program);
         assert_eq!(executor.scan_count(), 1);
 
-        executor.execute_program(&program);
+        execute_program(&executor, &program);
         assert_eq!(executor.scan_count(), 2);
 
         executor.reset_scan_count();

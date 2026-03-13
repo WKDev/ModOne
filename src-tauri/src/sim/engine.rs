@@ -17,7 +17,7 @@ use crate::modbus::ModbusAdapter;
 
 use super::counter::CounterManager;
 use super::canvas_sync::CanvasSync;
-use super::executor::{LadderProgram, ProgramExecutor};
+use super::executor::{CompiledProgram, ProgramExecutor};
 use super::memory::CanonicalRuntimeFacade;
 use super::timer::TimerManager;
 use super::types::{
@@ -137,7 +137,7 @@ pub struct OneSimEngine {
     /// Engine state (stopped=0, running=1, paused=2, error=3)
     state: AtomicU8,
     /// Loaded program
-    program: RwLock<Option<LadderProgram>>,
+    program: RwLock<Option<CompiledProgram>>,
     /// Whether scan loop should exit
     should_stop: AtomicBool,
 
@@ -500,7 +500,7 @@ impl OneSimEngine {
     // ========================================================================
 
     /// Start the simulation with a loaded program
-    pub fn start(&self, program: LadderProgram) -> EngineResult<()> {
+    pub fn start(&self, program: CompiledProgram) -> EngineResult<()> {
         let current_state = self.state.load(Ordering::Relaxed);
         if current_state == STATE_RUNNING {
             return Err(EngineError::AlreadyRunning);
@@ -905,7 +905,9 @@ impl Default for OneSimEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sim::executor::{LadderNetwork, LadderNode, NodeType};
+    use crate::plc_runtime::profiles::LsProfile;
+    use crate::project::PlcHardwareTopology;
+    use crate::sim::executor::{compile_program, CompiledProgram, LadderNetwork, LadderNode, LadderProgram, NodeType};
     use crate::sim::types::SimBitDeviceType;
 
     fn create_test_program() -> LadderProgram {
@@ -922,6 +924,11 @@ mod tests {
         }
     }
 
+    fn compile_test_program() -> CompiledProgram {
+        let profile = LsProfile::new("XGK".to_string(), PlcHardwareTopology::default());
+        compile_program(&create_test_program(), &profile).expect("test program should compile")
+    }
+
     #[test]
     fn test_engine_creation() {
         let engine = OneSimEngine::new();
@@ -932,14 +939,14 @@ mod tests {
     #[test]
     fn test_start_stop() {
         let engine = OneSimEngine::new();
-        let program = create_test_program();
+        let program = compile_test_program();
 
         // Start
         assert!(engine.start(program).is_ok());
         assert_eq!(engine.state.load(Ordering::Relaxed), STATE_RUNNING);
 
         // Can't start again
-        let program2 = create_test_program();
+        let program2 = compile_test_program();
         assert!(engine.start(program2).is_err());
 
         // Stop
@@ -950,7 +957,7 @@ mod tests {
     #[test]
     fn test_pause_resume() {
         let engine = OneSimEngine::new();
-        let program = create_test_program();
+        let program = compile_test_program();
 
         // Can't pause when stopped
         assert!(engine.pause().is_err());
@@ -978,7 +985,7 @@ mod tests {
         assert!(engine.single_scan().is_err());
 
         // Load program
-        let program = create_test_program();
+        let program = compile_test_program();
         *engine.program.write() = Some(program);
 
         // Single scan
@@ -993,7 +1000,7 @@ mod tests {
     #[test]
     fn test_statistics_update() {
         let engine = OneSimEngine::new();
-        let program = create_test_program();
+        let program = compile_test_program();
         *engine.program.write() = Some(program);
 
         // Run a few scans
@@ -1009,7 +1016,7 @@ mod tests {
     #[test]
     fn test_program_execution() {
         let engine = OneSimEngine::new();
-        let program = create_test_program();
+        let program = compile_test_program();
         *engine.program.write() = Some(program);
 
         // Set M0 true
@@ -1030,7 +1037,7 @@ mod tests {
         assert_eq!(status.state, SimulationState::Stopped);
         assert_eq!(status.scan_count, 0);
 
-        let program = create_test_program();
+        let program = compile_test_program();
         engine.start(program).unwrap();
 
         let status = engine.get_status();
@@ -1044,7 +1051,7 @@ mod tests {
     #[test]
     fn test_get_scan_info() {
         let engine = OneSimEngine::new();
-        let program = create_test_program();
+        let program = compile_test_program();
         *engine.program.write() = Some(program);
 
         engine.single_scan().unwrap();
@@ -1079,7 +1086,7 @@ mod tests {
     #[test]
     fn test_reset_on_start() {
         let engine = OneSimEngine::new();
-        let program = create_test_program();
+        let program = compile_test_program();
 
         // Load and run some scans
         *engine.program.write() = Some(program.clone());

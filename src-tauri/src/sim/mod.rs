@@ -20,6 +20,7 @@ pub use engine::{
     EngineError, EngineResult, OneSimEngine, ScanCompleteEvent, StateChangeEvent, WatchdogEvent,
 };
 pub use executor::{
+    compile_program, CompiledNetwork, CompiledNode, CompiledOperand, CompiledProgram,
     DeviceAddress, ExecutionError, ExecutionResult, LadderNetwork, LadderNode, LadderProgram,
     NetworkExecutionResult, NodeType, ProgramExecutionResult, ProgramExecutor,
 };
