@@ -13,6 +13,9 @@ use tokio::process::Command;
 /// Default subnet mask when none is configured.
 const DEFAULT_SUBNET_MASK: &str = "255.255.255.0";
 
+/// IPs that must never be assigned as aliases.
+const FORBIDDEN_IPS: &[&str] = &["0.0.0.0", "255.255.255.255"];
+
 #[derive(Debug, Error)]
 pub enum IpAliasError {
     #[error("invalid IP address: {0}")]
@@ -39,6 +42,10 @@ pub enum IpAliasError {
     ElevationRequired,
     #[error("IP alias management is not supported on this platform")]
     UnsupportedPlatform,
+    #[error("IP address {0} cannot be used as a PLC alias (reserved/loopback/multicast)")]
+    ForbiddenIp(String),
+    #[error("IP address {0} is already assigned on this system")]
+    AlreadyAssigned(String),
 }
 
 /// Information about a network interface.
@@ -100,9 +107,20 @@ impl SimulatorNetworkManager {
             return Ok(None);
         }
 
-        // Validate IP
-        ip.parse::<Ipv4Addr>()
+        // Validate IP format
+        let parsed_ip: Ipv4Addr = ip
+            .parse()
             .map_err(|_| IpAliasError::InvalidIp(ip.to_string()))?;
+
+        // Reject reserved/dangerous IPs
+        if FORBIDDEN_IPS.contains(&ip)
+            || parsed_ip.is_loopback()
+            || parsed_ip.is_multicast()
+            || parsed_ip.is_unspecified()
+            || parsed_ip.is_broadcast()
+        {
+            return Err(IpAliasError::ForbiddenIp(ip.to_string()));
+        }
 
         let subnet = subnet_mask.unwrap_or(DEFAULT_SUBNET_MASK);
         subnet
@@ -121,6 +139,28 @@ impl SimulatorNetworkManager {
             .any(|a| a.ip == ip && a.interface_name == iface)
         {
             return Ok(Some(ip.to_string()));
+        }
+
+        // Check if the IP is already assigned on the system (e.g. leftover from crash)
+        match is_ip_assigned(ip).await {
+            Ok(true) => {
+                log::warn!(
+                    "IP {} is already assigned on this system — skipping alias add, assuming leftover",
+                    ip
+                );
+                // Track it so we clean it up on stop
+                self.active_aliases.push(ActiveAlias {
+                    ip: ip.to_string(),
+                    interface_name: iface,
+                    subnet_mask: subnet.to_string(),
+                });
+                return Ok(Some(ip.to_string()));
+            }
+            Ok(false) => {} // Not yet assigned, proceed
+            Err(e) => {
+                log::debug!("Could not check if IP {} is assigned: {}", ip, e);
+                // Proceed anyway — add will fail if truly conflicting
+            }
         }
 
         add_ip_alias(ip, &iface, subnet).await?;
@@ -297,7 +337,10 @@ async fn remove_ip_alias(ip: &str, interface_name: &str) -> Result<(), IpAliasEr
         let combined = format!("{}{}", stdout.trim(), stderr.trim());
 
         // If the address is already gone, that's fine
-        if combined.contains("not found") || combined.contains("Object already exists") {
+        if combined.contains("not found")
+            || combined.contains("element not found")
+            || combined.contains("not present")
+        {
             return Ok(());
         }
 
@@ -357,44 +400,30 @@ async fn list_interfaces_windows() -> Result<Vec<NetworkInterfaceInfo>, IpAliasE
     let mut interfaces = Vec::new();
 
     // Parse `netsh interface show interface` output.
-    // Format: Admin State    State          Type             Interface Name
-    //         -------------------------------------------------------------------------
-    //         Enabled        Connected      Dedicated        Ethernet
-    for line in stdout.lines().skip(3) {
-        let parts: Vec<&str> = line.splitn(4, char::is_whitespace).collect();
-        if parts.len() < 4 {
-            // Try parsing with multiple whitespace
-            let trimmed = line.trim();
-            if trimmed.is_empty() || trimmed.starts_with('-') {
-                continue;
-            }
-
-            let fields: Vec<&str> = trimmed.split_whitespace().collect();
-            if fields.len() >= 4 {
-                interfaces.push(NetworkInterfaceInfo {
-                    name: fields[3..].join(" "),
-                    status: fields[1].to_string(),
-                    interface_type: fields[2].to_string(),
-                });
-            }
+    // Format (column-aligned, separated by multiple spaces):
+    //   Admin State    State          Type             Interface Name
+    //   -------------------------------------------------------------------------
+    //   Enabled        Connected      Dedicated        Ethernet
+    //   Enabled        Disconnected   Dedicated        Wi-Fi
+    //
+    // Interface names may contain spaces (e.g. "Local Area Connection"),
+    // so we split on whitespace and rejoin from field 3 onward.
+    for line in stdout.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty()
+            || trimmed.starts_with('-')
+            || trimmed.starts_with("Admin")
+        {
+            continue;
         }
-    }
 
-    // Fallback: re-parse more robustly if we got nothing
-    if interfaces.is_empty() {
-        for line in stdout.lines() {
-            let trimmed = line.trim();
-            if trimmed.is_empty() || trimmed.starts_with('-') || trimmed.starts_with("Admin") {
-                continue;
-            }
-            let fields: Vec<&str> = trimmed.split_whitespace().collect();
-            if fields.len() >= 4 {
-                interfaces.push(NetworkInterfaceInfo {
-                    name: fields[3..].join(" "),
-                    status: fields[1].to_string(),
-                    interface_type: fields[2].to_string(),
-                });
-            }
+        let fields: Vec<&str> = trimmed.split_whitespace().collect();
+        if fields.len() >= 4 {
+            interfaces.push(NetworkInterfaceInfo {
+                name: fields[3..].join(" "),
+                status: fields[1].to_string(),
+                interface_type: fields[2].to_string(),
+            });
         }
     }
 
@@ -410,7 +439,17 @@ async fn check_ip_assigned_windows(ip: &str) -> Result<bool, IpAliasError> {
         .map_err(|e| IpAliasError::ListFailed(e.to_string()))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    Ok(stdout.contains(ip))
+
+    // Match the IP as a whole token, not as a substring.
+    // This prevents "10.0.0.1" matching "10.0.0.10".
+    for line in stdout.lines() {
+        for token in line.split_whitespace() {
+            if token == ip {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
 }
 
 // ============================================================================
@@ -475,6 +514,36 @@ mod tests {
             .ensure_alias(Some("192.168.1.100"), Some("eth0"), Some("bad-mask"))
             .await;
         assert!(matches!(result, Err(IpAliasError::InvalidSubnetMask(_))));
+    }
+
+    #[tokio::test]
+    async fn ensure_alias_rejects_loopback() {
+        let mut mgr = SimulatorNetworkManager::new();
+        let result = mgr.ensure_alias(Some("127.0.0.1"), Some("eth0"), None).await;
+        assert!(matches!(result, Err(IpAliasError::ForbiddenIp(_))));
+    }
+
+    #[tokio::test]
+    async fn ensure_alias_rejects_unspecified() {
+        let mut mgr = SimulatorNetworkManager::new();
+        let result = mgr.ensure_alias(Some("0.0.0.0"), Some("eth0"), None).await;
+        assert!(matches!(result, Err(IpAliasError::ForbiddenIp(_))));
+    }
+
+    #[tokio::test]
+    async fn ensure_alias_rejects_multicast() {
+        let mut mgr = SimulatorNetworkManager::new();
+        let result = mgr.ensure_alias(Some("224.0.0.1"), Some("eth0"), None).await;
+        assert!(matches!(result, Err(IpAliasError::ForbiddenIp(_))));
+    }
+
+    #[tokio::test]
+    async fn ensure_alias_rejects_broadcast() {
+        let mut mgr = SimulatorNetworkManager::new();
+        let result = mgr
+            .ensure_alias(Some("255.255.255.255"), Some("eth0"), None)
+            .await;
+        assert!(matches!(result, Err(IpAliasError::ForbiddenIp(_))));
     }
 
     #[tokio::test]

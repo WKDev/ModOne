@@ -190,7 +190,16 @@ pub(crate) async fn modbus_start_project_simulation(
                 Arc::clone(&state.memory),
             );
             server.set_app_handle(app_handle);
-            server.start().await.map_err(|e| e.to_string())?;
+
+            // If TCP bind fails after alias was added, clean up the alias
+            if let Err(e) = server.start().await {
+                if plc_bind_ip.is_some() {
+                    let mut net_mgr = network_state.manager.lock().await;
+                    let _ = net_mgr.cleanup().await;
+                }
+                return Err(e.to_string());
+            }
+
             *state.tcp_server.lock().await = Some(server);
             *state.project_owned_transport.lock().await = Some(ProjectOwnedTransport::Tcp);
             Ok(())

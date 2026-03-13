@@ -250,15 +250,29 @@ pub fn run() {
                         if let Some(state) = window.try_state::<FloatingWindowState>() {
                             close_all_floating_windows(window.app_handle(), &state);
                         }
-                        // Clean up IP aliases (best-effort synchronous via Drop)
+                        // Clean up IP aliases synchronously — we cannot rely on
+                        // tokio::spawn completing before the process exits.
+                        // The Drop impl on SimulatorNetworkManager also does
+                        // best-effort sync cleanup as a safety net.
                         if let Some(state) = window.try_state::<NetworkState>() {
                             let mgr = state.manager.clone();
-                            tokio::spawn(async move {
-                                let warnings = mgr.lock().await.cleanup().await;
-                                for w in &warnings {
-                                    log::warn!("Exit network cleanup: {}", w);
+                            // Use block_on inside a std::thread to avoid
+                            // "cannot block inside async" if we're on a tokio thread.
+                            std::thread::spawn(move || {
+                                let rt = tokio::runtime::Builder::new_current_thread()
+                                    .enable_io()
+                                    .build();
+                                if let Ok(rt) = rt {
+                                    rt.block_on(async {
+                                        let warnings = mgr.lock().await.cleanup().await;
+                                        for w in &warnings {
+                                            log::warn!("Exit network cleanup: {}", w);
+                                        }
+                                    });
                                 }
-                            });
+                            })
+                            .join()
+                            .ok();
                         }
                     }
                 }
