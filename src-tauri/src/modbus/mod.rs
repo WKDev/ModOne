@@ -9,7 +9,7 @@ pub mod rtu;
 pub mod tcp;
 pub mod types;
 
-pub use adapter::{ModbusAdapter, ModbusAdapterError, ModbusAdapterResult};
+pub use adapter::{DirtyPublishWindow, ModbusAdapter, ModbusAdapterError, ModbusAdapterResult};
 pub use memory::ModbusMemory;
 pub use rtu::{
     list_available_ports, ModbusRtuServer, PortInfo, RtuConfig, RtuDataBits, RtuParity,

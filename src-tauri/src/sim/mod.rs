@@ -8,6 +8,9 @@ pub mod debugger;
 pub mod engine;
 pub mod executor;
 pub mod memory;
+pub mod monitoring;
+pub mod protocol_runtime;
+pub mod runtime_host;
 pub mod timer;
 pub mod types;
 

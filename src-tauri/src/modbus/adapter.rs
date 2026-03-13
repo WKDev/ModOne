@@ -21,6 +21,32 @@ pub enum ModbusAdapterError {
 
 pub type ModbusAdapterResult<T> = Result<T, ModbusAdapterError>;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DirtyPublishWindow {
+    pub area: CanonicalAreaKind,
+    pub start_index: u32,
+    pub end_index: u32,
+}
+
+impl DirtyPublishWindow {
+    pub fn single(address: CanonicalAddress) -> Self {
+        Self {
+            area: address.area,
+            start_index: address.index,
+            end_index: address.index,
+        }
+    }
+
+    fn intersects_rule(&self, rule: &ModbusMappingRule) -> bool {
+        if self.area != rule.canonical_area {
+            return false;
+        }
+
+        let rule_end = rule.count.saturating_sub(1) as u32;
+        self.start_index <= rule_end && self.end_index <= rule_end
+    }
+}
+
 /// Canonical-runtime-first Modbus adapter.
 ///
 /// This is the canonical Modbus runtime boundary: Modbus reads/writes operate on
@@ -97,6 +123,34 @@ impl ModbusAdapter {
         let policy = self.policy();
 
         for rule in &policy.rules {
+            match rule.address_space {
+                ModbusAddressSpace::Coil => self.publish_bit_rule_to_coils(rule)?,
+                ModbusAddressSpace::DiscreteInput => self.publish_bit_rule_to_discrete_inputs(rule)?,
+                ModbusAddressSpace::HoldingRegister => {
+                    self.publish_word_rule_to_holding_registers(rule)?
+                }
+                ModbusAddressSpace::InputRegister => self.publish_word_rule_to_input_registers(rule)?,
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Publish only rules intersecting the dirty canonical windows.
+    pub fn publish_dirty_state(
+        &self,
+        dirty_windows: &[DirtyPublishWindow],
+    ) -> ModbusAdapterResult<()> {
+        if dirty_windows.is_empty() {
+            return Ok(());
+        }
+
+        let policy = self.policy();
+        for rule in &policy.rules {
+            if !dirty_windows.iter().any(|window| window.intersects_rule(rule)) {
+                continue;
+            }
+
             match rule.address_space {
                 ModbusAddressSpace::Coil => self.publish_bit_rule_to_coils(rule)?,
                 ModbusAddressSpace::DiscreteInput => self.publish_bit_rule_to_discrete_inputs(rule)?,

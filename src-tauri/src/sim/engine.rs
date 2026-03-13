@@ -5,25 +5,17 @@
 
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Emitter};
 use thiserror::Error;
-use tokio::sync::oneshot;
-
-use crate::commands::sim::ForcedDeviceValue;
-use crate::modbus::ModbusAdapter;
+use tokio::sync::{broadcast, oneshot};
 
 use super::counter::CounterManager;
-use super::canvas_sync::CanvasSync;
 use super::executor::{CompiledProgram, ProgramExecutor};
 use super::memory::CanonicalRuntimeFacade;
 use super::timer::TimerManager;
-use super::types::{
-    ScanCycleInfo, SimulationConfig, SimulationState, SimulationStatus,
-};
+use super::types::{ScanCycleInfo, SimulationConfig, SimulationState, SimulationStatus};
 
 // ============================================================================
 // Error Types
@@ -81,6 +73,18 @@ pub struct ScanCompleteEvent {
     pub state: SimulationState,
     /// Timestamp (ISO 8601)
     pub timestamp: String,
+}
+
+/// Internal engine event bus payload.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", tag = "type")]
+pub enum EngineEvent {
+    #[serde(rename = "scanComplete")]
+    ScanComplete(ScanCompleteEvent),
+    #[serde(rename = "stateChange")]
+    StateChange(StateChangeEvent),
+    #[serde(rename = "watchdog")]
+    Watchdog(WatchdogEvent),
 }
 
 /// Event emitted on state change
@@ -160,25 +164,10 @@ pub struct OneSimEngine {
     /// Last error message
     last_error: RwLock<Option<String>>,
 
-    // Tauri app handle
-    app_handle: RwLock<Option<AppHandle>>,
-
     // Shutdown signal
     shutdown_tx: RwLock<Option<oneshot::Sender<()>>>,
-
-    // Monitoring
-    /// Whether monitoring is active (shared with command handler)
-    monitoring_active: RwLock<Option<Arc<AtomicBool>>>,
-    /// Forced device values (shared with command handler)
-    forced_devices: RwLock<Option<Arc<parking_lot::RwLock<HashMap<String, ForcedDeviceValue>>>>>,
-
-    // Canvas synchronization
-    /// Canvas sync for PLC output -> circuit block state updates
-    canvas_sync: RwLock<Option<Arc<CanvasSync>>>,
-
-    // Modbus synchronization
-    /// Canonical-runtime-first Modbus bridge
-    modbus_adapter: RwLock<Option<Arc<ModbusAdapter>>>,
+    /// Internal event bus for orchestration and protocol/monitoring services.
+    event_tx: broadcast::Sender<EngineEvent>,
 }
 
 impl OneSimEngine {
@@ -192,6 +181,7 @@ impl OneSimEngine {
             Arc::clone(&timer_mgr),
             Arc::clone(&counter_mgr),
         ));
+        let (event_tx, _) = broadcast::channel::<EngineEvent>(256);
 
         Self {
             runtime,
@@ -209,12 +199,8 @@ impl OneSimEngine {
             min_scan_time_us: AtomicU64::new(u64::MAX),
             total_scan_time_us: AtomicU64::new(0),
             last_error: RwLock::new(None),
-            app_handle: RwLock::new(None),
             shutdown_tx: RwLock::new(None),
-            monitoring_active: RwLock::new(None),
-            forced_devices: RwLock::new(None),
-            canvas_sync: RwLock::new(None),
-            modbus_adapter: RwLock::new(None),
+            event_tx,
         }
     }
 
@@ -229,6 +215,7 @@ impl OneSimEngine {
             Arc::clone(&timer_mgr),
             Arc::clone(&counter_mgr),
         ));
+        let (event_tx, _) = broadcast::channel::<EngineEvent>(256);
 
         Self {
             runtime,
@@ -246,12 +233,8 @@ impl OneSimEngine {
             min_scan_time_us: AtomicU64::new(u64::MAX),
             total_scan_time_us: AtomicU64::new(0),
             last_error: RwLock::new(None),
-            app_handle: RwLock::new(None),
             shutdown_tx: RwLock::new(None),
-            monitoring_active: RwLock::new(None),
-            forced_devices: RwLock::new(None),
-            canvas_sync: RwLock::new(None),
-            modbus_adapter: RwLock::new(None),
+            event_tx,
         }
     }
 
@@ -279,231 +262,23 @@ impl OneSimEngine {
         &self.executor
     }
 
+    /// Subscribe to internal engine lifecycle/scan events.
+    pub fn subscribe_events(&self) -> broadcast::Receiver<EngineEvent> {
+        self.event_tx.subscribe()
+    }
+
     // ========================================================================
     // Configuration
     // ========================================================================
-
-    /// Set the Tauri app handle
-    pub fn set_app_handle(&self, handle: AppHandle) {
-        *self.app_handle.write() = Some(handle);
-    }
 
     /// Set simulation configuration
     pub fn set_config(&self, config: SimulationConfig) {
         *self.config.write() = config;
     }
 
-    /// Set monitoring references from command state
-    pub fn set_monitoring_state(
-        &self,
-        active: Arc<AtomicBool>,
-        forced: Arc<parking_lot::RwLock<HashMap<String, ForcedDeviceValue>>>,
-    ) {
-        *self.monitoring_active.write() = Some(active);
-        *self.forced_devices.write() = Some(forced);
-    }
-
-    /// Apply forced device values after each scan cycle
-    fn apply_forced_devices(&self) {
-        let forced_guard = self.forced_devices.read();
-        let forced = match forced_guard.as_ref() {
-            Some(f) => f.read(),
-            None => return,
-        };
-
-        if forced.is_empty() {
-            return;
-        }
-
-        for forced_value in forced.values() {
-            match forced_value.binding.canonical_address() {
-                Some(canonical) if canonical.area.is_bit_area() || canonical.bit_index.is_some() => {
-                    if let Some(v) = forced_value.value.as_bool() {
-                        if let Err(err) = self.runtime.write_bool(
-                            canonical,
-                            v,
-                            crate::plc_runtime::CanonicalWriteSource::Simulation,
-                        ) {
-                            self.emit_monitoring_error(format!(
-                                "Failed forcing {}: {}",
-                                forced_value.display_address, err
-                            ));
-                        }
-                    }
-                }
-                Some(canonical) => {
-                    if let Some(v) = forced_value.value.as_u64() {
-                        if let Err(err) = self.runtime.write_word_value(
-                            canonical,
-                            v as u16,
-                            crate::plc_runtime::CanonicalWriteSource::Simulation,
-                        ) {
-                            self.emit_monitoring_error(format!(
-                                "Failed forcing {}: {}",
-                                forced_value.display_address, err
-                            ));
-                        }
-                    }
-                }
-                None => self.emit_monitoring_error(format!(
-                    "Tag-bound forced device is not implemented yet: {}",
-                    forced_value.display_address
-                )),
-            }
-        }
-    }
-
-    /// Emit monitoring update event with device states
-    fn emit_monitoring_update(&self) {
-        let active_guard = self.monitoring_active.read();
-        let is_active = match active_guard.as_ref() {
-            Some(a) => a.load(Ordering::Relaxed),
-            None => false,
-        };
-
-        if !is_active {
-            return;
-        }
-
-        if let Some(handle) = self.app_handle.read().as_ref() {
-            let mut devices = Vec::new();
-
-            for (area, dev_name, limit) in &[
-                (crate::plc_runtime::CanonicalAreaKind::InputBit, "InputBit", 256u32),
-                (crate::plc_runtime::CanonicalAreaKind::OutputBit, "OutputBit", 256u32),
-                (crate::plc_runtime::CanonicalAreaKind::InternalBit, "InternalBit", 256u32),
-                (crate::plc_runtime::CanonicalAreaKind::RetentiveBit, "RetentiveBit", 256u32),
-            ] {
-                for addr in 0..*limit {
-                    if let Ok(val) = self.runtime.read_bool(crate::plc_runtime::CanonicalAddress::new(*area, addr)) {
-                        if val {
-                            devices.push(serde_json::json!({
-                                "address": format!("{}:{}", dev_name, addr),
-                                "binding": crate::sim::RuntimeBinding::canonical(
-                                    crate::plc_runtime::CanonicalAddress::new(*area, addr)
-                                ),
-                                "value": val
-                            }));
-                        }
-                    }
-                }
-            }
-
-            for (area, dev_name) in &[
-                (crate::plc_runtime::CanonicalAreaKind::TimerDoneBit, "TimerDoneBit"),
-                (crate::plc_runtime::CanonicalAreaKind::CounterDoneBit, "CounterDoneBit"),
-            ] {
-                for addr in 0u32..256 {
-                    if let Ok(val) = self.runtime.read_bool(crate::plc_runtime::CanonicalAddress::new(*area, addr)) {
-                        if val {
-                            devices.push(serde_json::json!({
-                                "address": format!("{}:{}", dev_name, addr),
-                                "binding": crate::sim::RuntimeBinding::canonical(
-                                    crate::plc_runtime::CanonicalAddress::new(*area, addr)
-                                ),
-                                "value": val
-                            }));
-                        }
-                    }
-                }
-            }
-
-            for addr in 0u32..100 {
-                if let Ok(val) = self.runtime.read_word_value(crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::DataWord, addr)) {
-                    if val != 0 {
-                        devices.push(serde_json::json!({
-                            "address": format!("DataWord:{}", addr),
-                            "binding": crate::sim::RuntimeBinding::canonical(
-                                crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::DataWord, addr)
-                            ),
-                            "value": val
-                        }));
-                    }
-                }
-            }
-
-            let timer_states = self.timer_mgr.get_all_states();
-            let timers: Vec<serde_json::Value> = timer_states
-                .iter()
-                .map(|(addr, state)| {
-                    serde_json::json!({
-                        "address": format!("T{}", addr),
-                        "binding": crate::sim::RuntimeBinding::canonical(
-                                crate::plc_runtime::CanonicalAddress::new(
-                                    crate::plc_runtime::CanonicalAreaKind::TimerValueWord,
-                                    (*addr).into(),
-                                )
-                        ),
-                        "state": state
-                    })
-                })
-                .collect();
-
-            let counter_states = self.counter_mgr.get_all_states();
-            let counters: Vec<serde_json::Value> = counter_states
-                .iter()
-                .map(|(addr, state)| {
-                    serde_json::json!({
-                        "address": format!("C{}", addr),
-                        "binding": crate::sim::RuntimeBinding::canonical(
-                                crate::plc_runtime::CanonicalAddress::new(
-                                    crate::plc_runtime::CanonicalAreaKind::CounterValueWord,
-                                    (*addr).into(),
-                                )
-                        ),
-                        "state": state
-                    })
-                })
-                .collect();
-
-            let forced_devices: Vec<serde_json::Value> = self
-                .forced_devices
-                .read()
-                .as_ref()
-                .map(|devices| {
-                    devices
-                        .read()
-                        .values()
-                        .map(|forced| {
-                            serde_json::json!({
-                                "address": forced.display_address,
-                                "binding": forced.binding,
-                                "value": forced.value,
-                            })
-                        })
-                        .collect()
-                })
-                .unwrap_or_default();
-
-            let payload = serde_json::json!({
-                "devices": devices,
-                "timers": timers,
-                "counters": counters,
-                "forcedDevices": forced_devices,
-            });
-
-            let _ = handle.emit("ladder:monitoring-update", &payload);
-        }
-    }
-
     /// Get simulation configuration
     pub fn get_config(&self) -> SimulationConfig {
         self.config.read().clone()
-    }
-
-    /// Set the canvas sync for PLC output synchronization
-    pub fn set_canvas_sync(&self, sync: Arc<CanvasSync>) {
-        *self.canvas_sync.write() = Some(sync);
-    }
-
-    /// Set the Modbus adapter for canonical runtime synchronization
-    pub fn set_modbus_adapter(&self, adapter: Arc<ModbusAdapter>) {
-        *self.modbus_adapter.write() = Some(adapter);
-    }
-
-    /// Clear the Modbus adapter from the engine lifecycle.
-    pub fn clear_modbus_adapter(&self) {
-        *self.modbus_adapter.write() = None;
     }
 
     // ========================================================================
@@ -675,10 +450,7 @@ impl OneSimEngine {
     fn execute_scan_cycle(&self) {
         let start = Instant::now();
 
-        // Phase 1: Input Scan
-        self.input_scan();
-
-        // Phase 2: Program Execution
+        // Phase 1: Program Execution
         if let Some(ref program) = *self.program.read() {
             // Update timer tick
             let delta_ms = self.config.read().scan_time_ms;
@@ -694,12 +466,6 @@ impl OneSimEngine {
             }
         }
 
-        // Phase 3: Output Scan
-        self.output_scan();
-
-        // Apply forced device values (override after scan)
-        self.apply_forced_devices();
-
         // Update statistics
         let elapsed = start.elapsed();
         self.update_statistics(elapsed);
@@ -709,49 +475,7 @@ impl OneSimEngine {
             self.handle_watchdog_timeout(elapsed);
         }
 
-        // Emit scan complete event (throttled)
-        let count = self.scan_count.load(Ordering::Relaxed);
-        if count % 10 == 0 {
-            // Emit every 10 scans to reduce overhead
-            self.emit_scan_complete();
-        }
-
-        // Emit monitoring update (every 5 scans)
-        if count % 5 == 0 {
-            self.emit_monitoring_update();
-        }
-    }
-
-    // ========================================================================
-    // Scan Phases
-    // ========================================================================
-
-    /// Input scan phase - sync from external sources
-    fn input_scan(&self) {
-        // Canvas inputs (plc_in blocks) write directly to the shared canonical runtime
-        // via CanvasSync::handle_plc_input_change(), so no explicit read is needed here.
-
-        if let Some(ref adapter) = *self.modbus_adapter.read() {
-            if let Err(e) = adapter.apply_external_writes() {
-                log::warn!("Modbus input sync failed: {}", e);
-            }
-        }
-    }
-
-    /// Output scan phase - sync to external destinations
-    fn output_scan(&self) {
-        // Sync PLC outputs to canvas circuit blocks
-        if let Some(ref sync) = *self.canvas_sync.read() {
-            if let Err(e) = sync.update_plc_outputs() {
-                log::warn!("Canvas sync output update failed: {}", e);
-            }
-        }
-
-        if let Some(ref adapter) = *self.modbus_adapter.read() {
-            if let Err(e) = adapter.publish_runtime_state() {
-                log::warn!("Modbus output sync failed: {}", e);
-            }
-        }
+        self.emit_scan_complete();
     }
 
     // ========================================================================
@@ -812,17 +536,13 @@ impl OneSimEngine {
             elapsed_ms, limit_ms
         );
         log::warn!("{}", error_msg);
-
-        // Emit watchdog event
-        if let Some(handle) = self.app_handle.read().as_ref() {
-            let event = WatchdogEvent {
-                elapsed_ms,
-                limit_ms,
-                scan_count: self.scan_count.load(Ordering::Relaxed),
-                timestamp: chrono::Utc::now().to_rfc3339(),
-            };
-            let _ = handle.emit("sim:watchdog", &event);
-        }
+        let event = WatchdogEvent {
+            elapsed_ms,
+            limit_ms,
+            scan_count: self.scan_count.load(Ordering::Relaxed),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+        };
+        let _ = self.event_tx.send(EngineEvent::Watchdog(event));
     }
 
     // ========================================================================
@@ -838,68 +558,45 @@ impl OneSimEngine {
         // For now, we just log and continue
     }
 
-    // ========================================================================
-    // Event Emission
-    // ========================================================================
-
-    /// Emit state change event
     fn emit_state_change(&self, prev_state: u8, new_state: u8) {
-        if let Some(handle) = self.app_handle.read().as_ref() {
-            let prev = match prev_state {
-                STATE_RUNNING => SimulationState::Running,
-                STATE_PAUSED => SimulationState::Paused,
-                STATE_ERROR => SimulationState::Error,
-                _ => SimulationState::Stopped,
-            };
-            let new = match new_state {
-                STATE_RUNNING => SimulationState::Running,
-                STATE_PAUSED => SimulationState::Paused,
-                STATE_ERROR => SimulationState::Error,
-                _ => SimulationState::Stopped,
-            };
+        let prev = match prev_state {
+            STATE_RUNNING => SimulationState::Running,
+            STATE_PAUSED => SimulationState::Paused,
+            STATE_ERROR => SimulationState::Error,
+            _ => SimulationState::Stopped,
+        };
+        let new = match new_state {
+            STATE_RUNNING => SimulationState::Running,
+            STATE_PAUSED => SimulationState::Paused,
+            STATE_ERROR => SimulationState::Error,
+            _ => SimulationState::Stopped,
+        };
 
-            let event = StateChangeEvent {
-                previous_state: prev,
-                new_state: new,
-                timestamp: chrono::Utc::now().to_rfc3339(),
-            };
+        let event = StateChangeEvent {
+            previous_state: prev,
+            new_state: new,
+            timestamp: chrono::Utc::now().to_rfc3339(),
+        };
 
-            let _ = handle.emit("sim:state-change", &event);
-        }
+        let _ = self.event_tx.send(EngineEvent::StateChange(event));
     }
 
-    /// Emit scan complete event
     fn emit_scan_complete(&self) {
-        if let Some(handle) = self.app_handle.read().as_ref() {
-            let state = match self.state.load(Ordering::Relaxed) {
-                STATE_RUNNING => SimulationState::Running,
-                STATE_PAUSED => SimulationState::Paused,
-                STATE_ERROR => SimulationState::Error,
-                _ => SimulationState::Stopped,
-            };
+        let state = match self.state.load(Ordering::Relaxed) {
+            STATE_RUNNING => SimulationState::Running,
+            STATE_PAUSED => SimulationState::Paused,
+            STATE_ERROR => SimulationState::Error,
+            _ => SimulationState::Stopped,
+        };
 
-            let event = ScanCompleteEvent {
-                scan_count: self.scan_count.load(Ordering::Relaxed),
-                scan_time_us: self.last_scan_time_us.load(Ordering::Relaxed),
-                state,
-                timestamp: chrono::Utc::now().to_rfc3339(),
-            };
+        let event = ScanCompleteEvent {
+            scan_count: self.scan_count.load(Ordering::Relaxed),
+            scan_time_us: self.last_scan_time_us.load(Ordering::Relaxed),
+            state,
+            timestamp: chrono::Utc::now().to_rfc3339(),
+        };
 
-            let _ = handle.emit("sim:scan-complete", &event);
-        }
-    }
-
-    /// Emit monitoring error event
-    fn emit_monitoring_error(&self, message: String) {
-        if let Some(handle) = self.app_handle.read().as_ref() {
-            let _ = handle.emit(
-                "ladder:monitoring-error",
-                &serde_json::json!({
-                    "message": message,
-                    "timestamp": chrono::Utc::now().to_rfc3339()
-                }),
-            );
-        }
+        let _ = self.event_tx.send(EngineEvent::ScanComplete(event));
     }
 }
 

@@ -419,6 +419,15 @@ impl RuntimeBinding {
     }
 }
 
+/// Forced runtime override stored outside the scan engine.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ForcedDeviceValue {
+    pub binding: RuntimeBinding,
+    pub display_address: String,
+    pub value: serde_json::Value,
+}
+
 /// Breakpoint types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

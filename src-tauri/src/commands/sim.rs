@@ -3,10 +3,7 @@
 //! Tauri command handlers for PLC simulation control, memory access,
 //! and debugging operations.
 
-use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 
@@ -14,22 +11,20 @@ use crate::commands::canvas_sync::CanvasSyncState;
 use crate::commands::modbus::{
     modbus_start_project_simulation, modbus_stop_project_simulation, ModbusState,
 };
-use crate::modbus::{ModbusAdapter, ModbusMemory};
+use crate::modbus::ModbusMemory;
 use crate::plc_runtime::{
-    resolve_modbus_mapping_policy, resolve_vendor_profile, CanonicalAddress, CanonicalAreaKind,
+    resolve_vendor_profile, CanonicalAddress, CanonicalAreaKind,
     CanonicalValue, CanonicalWriteSource, VendorAddress,
 };
 use crate::project::{PlcSettings, ProjectConfig, SharedProjectManager};
 use crate::sim::{
-    counter::CounterManager,
     debugger::{SimDebugger, StepResult, StepType},
-    engine::OneSimEngine,
-    executor::{compile_program, CompiledProgram, LadderProgram},
+    executor::{compile_program, LadderProgram},
     memory::CanonicalRuntimeFacade,
-    timer::TimerManager,
+    runtime_host::SimulationRuntimeHost,
     types::{
-        Breakpoint, MemorySnapshot, ScanCycleInfo, SimulationConfig, SimulationStatus,
-        RuntimeBinding, WatchVariable,
+        Breakpoint, ForcedDeviceValue, MemorySnapshot, RuntimeBinding, ScanCycleInfo,
+        SimulationConfig, SimulationStatus, WatchVariable,
     },
 };
 
@@ -37,27 +32,9 @@ use crate::sim::{
 // Simulation State
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ForcedDeviceValue {
-    pub binding: RuntimeBinding,
-    pub display_address: String,
-    pub value: serde_json::Value,
-}
-
 /// Managed state for the simulation engine
 pub struct SimState {
-    /// The simulation engine instance
-    engine: Arc<Mutex<Option<Arc<OneSimEngine>>>>,
-    /// The debugger instance
-    debugger: Arc<SimDebugger>,
-    runtime: Arc<CanonicalRuntimeFacade>,
-    /// Shared Modbus memory for ModbusAdapter
-    modbus_memory: Option<Arc<ModbusMemory>>,
-    program: Arc<Mutex<Option<CompiledProgram>>>,
-    scan_task: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
-    monitoring_active: Arc<AtomicBool>,
-    forced_devices: Arc<parking_lot::RwLock<HashMap<String, ForcedDeviceValue>>>,
+    host: Arc<SimulationRuntimeHost>,
 }
 
 impl Default for SimState {
@@ -69,14 +46,7 @@ impl Default for SimState {
 impl SimState {
     pub fn with_runtime(runtime: Arc<CanonicalRuntimeFacade>) -> Self {
         Self {
-            engine: Arc::new(Mutex::new(None)),
-            debugger: Arc::new(SimDebugger::default()),
-            runtime,
-            modbus_memory: None,
-            program: Arc::new(Mutex::new(None)),
-            scan_task: Arc::new(Mutex::new(None)),
-            monitoring_active: Arc::new(AtomicBool::new(false)),
-            forced_devices: Arc::new(parking_lot::RwLock::new(HashMap::new())),
+            host: Arc::new(SimulationRuntimeHost::with_runtime(runtime)),
         }
     }
 
@@ -86,14 +56,7 @@ impl SimState {
         modbus_memory: Arc<ModbusMemory>,
     ) -> Self {
         Self {
-            engine: Arc::new(Mutex::new(None)),
-            debugger: Arc::new(SimDebugger::default()),
-            runtime,
-            modbus_memory: Some(modbus_memory),
-            program: Arc::new(Mutex::new(None)),
-            scan_task: Arc::new(Mutex::new(None)),
-            monitoring_active: Arc::new(AtomicBool::new(false)),
-            forced_devices: Arc::new(parking_lot::RwLock::new(HashMap::new())),
+            host: Arc::new(SimulationRuntimeHost::with_runtime_and_modbus(runtime, modbus_memory)),
         }
     }
 
@@ -103,17 +66,21 @@ impl SimState {
     }
 
     /// Get the engine (if running)
-    pub fn engine(&self) -> Arc<Mutex<Option<Arc<OneSimEngine>>>> {
-        self.engine.clone()
+    pub fn engine(&self) -> Arc<parking_lot::Mutex<Option<Arc<crate::sim::engine::OneSimEngine>>>> {
+        self.host.engine()
     }
 
     pub fn runtime(&self) -> &Arc<CanonicalRuntimeFacade> {
-        &self.runtime
+        self.host.runtime()
     }
 
     /// Get the debugger
     pub fn debugger(&self) -> Arc<SimDebugger> {
-        self.debugger.clone()
+        self.host.debugger()
+    }
+
+    pub fn host(&self) -> Arc<SimulationRuntimeHost> {
+        Arc::clone(&self.host)
     }
 }
 
@@ -196,128 +163,13 @@ pub async fn sim_run(
         }
     }
 
-    let mut engine_guard = state.engine.lock();
-
-    // Check if already running
-    if let Some(ref engine) = *engine_guard {
-        if engine.is_running() {
-            return Err("Simulation is already running".to_string());
-        }
-    }
-
-    // Create new engine if needed
-    if engine_guard.is_none() {
-        let engine = Arc::new(OneSimEngine::with_components(
-            Arc::clone(state.runtime()),
-            Arc::new(TimerManager::new()),
-            Arc::new(CounterManager::new()),
-        ));
-        engine.set_app_handle(app.clone());
-
-        // Apply config if provided
-        if let Some(ref params) = params {
-            if let Some(ref config) = params.config {
-                engine.set_config(config.clone());
-            }
-        }
-
-        *engine_guard = Some(engine);
-    }
-
-    // Wire monitoring state into engine
-    if let Some(ref engine) = *engine_guard {
-        engine.set_monitoring_state(
-            Arc::clone(&state.monitoring_active),
-            Arc::clone(&state.forced_devices),
-        );
-    }
-
-    // Get engine reference
-    let engine = engine_guard
-        .as_ref()
-        .cloned()
-        .ok_or("Failed to create engine")?;
-
-    // Wire canvas sync into engine
-    if let Some(ref engine) = *engine_guard {
-        if let Some(sync) = canvas_sync_state.canvas_sync() {
-            engine.set_canvas_sync(sync);
-        }
-    }
-
-    // Wire Modbus adapter into engine
-    if let Some(ref engine) = *engine_guard {
-        if let Some(ref modbus_mem) = state.modbus_memory {
-            let adapter = if let Some(project_config) = project_config.as_ref() {
-                let policy =
-                    resolve_modbus_mapping_policy(&project_config.plc, Some(&project_config.modbus.exposure))
-                        .map_err(|e| e.to_string())?;
-                Arc::new(ModbusAdapter::new(
-                    state.runtime().handle(),
-                    Arc::clone(modbus_mem),
-                    policy,
-                ))
-            } else {
-                let policy =
-                    resolve_modbus_mapping_policy(&plc_settings, None).map_err(|e| e.to_string())?;
-                Arc::new(ModbusAdapter::new(
-                    state.runtime().handle(),
-                    Arc::clone(modbus_mem),
-                    policy,
-                ))
-            };
-            adapter.full_sync().map_err(|e| e.to_string())?;
-            engine.set_modbus_adapter(adapter);
-        } else {
-            engine.clear_modbus_adapter();
-        }
-    }
-
-    let program = state
-        .program
-        .lock()
-        .clone()
-        .unwrap_or_else(|| CompiledProgram {
-            name: "Default Program".to_string(),
-            networks: vec![],
-        });
-
-    // Start the engine
-    engine.start(program).map_err(|e| e.to_string())?;
-
-    drop(engine_guard);
-
-    if let Some(handle) = state.scan_task.lock().take() {
-        handle.abort();
-    }
-
-    let engine_clone = Arc::clone(&engine);
-    let scan_task = tokio::spawn(async move {
-        engine_clone.run_scan_loop().await;
-    });
-    *state.scan_task.lock() = Some(scan_task);
-
-    // Emit status update
-    let status = engine.get_status();
-    let _ = app.emit(
-        SIM_STATUS_UPDATE_EVENT,
-        serde_json::json!({
-            "status": status.state,
-            "stats": {
-                "scanCount": status.scan_count,
-                "currentNetworkId": null,
-                "timing": {
-                    "current": status.last_scan_time_us as f64 / 1000.0,
-                    "average": status.avg_scan_time_us as f64 / 1000.0,
-                    "min": status.min_scan_time_us as f64 / 1000.0,
-                    "max": status.max_scan_time_us as f64 / 1000.0
-                },
-                "watchdogTriggered": false
-            }
-        }),
-    );
-
-    Ok(())
+    state.host().run(
+        app,
+        project_config,
+        plc_settings,
+        canvas_sync_state.canvas_sync(),
+        params.and_then(|p| p.config),
+    )
 }
 
 /// Stop the simulation
@@ -327,109 +179,20 @@ pub async fn sim_stop(
     state: State<'_, SimState>,
     modbus_state: State<'_, ModbusState>,
 ) -> Result<(), String> {
-    let is_running = {
-        let engine_guard = state.engine.lock();
-        if let Some(ref engine) = *engine_guard {
-            engine.stop();
-            engine.clear_modbus_adapter();
-            true
-        } else {
-            false
-        }
-    };
-
-    if is_running {
-        if let Some(handle) = state.scan_task.lock().take() {
-            handle.abort();
-        }
-
-        // Emit status update
-        let _ = app.emit(
-            SIM_STATUS_UPDATE_EVENT,
-            serde_json::json!({
-                "status": "stopped",
-                "stats": {
-                    "scanCount": 0,
-                    "currentNetworkId": null,
-                    "timing": { "current": 0.0, "average": 0.0, "min": 0.0, "max": 0.0 },
-                    "watchdogTriggered": false
-                }
-            }),
-        );
-
-        modbus_stop_project_simulation(&modbus_state).await?;
-        Ok(())
-    } else {
-        Err("Simulation is not running".to_string())
-    }
+    state.host().stop(&app)?;
+    modbus_stop_project_simulation(&modbus_state).await
 }
 
 /// Pause the simulation
 #[tauri::command]
 pub fn sim_pause(app: AppHandle, state: State<'_, SimState>) -> Result<(), String> {
-    let engine_guard = state.engine.lock();
-
-    if let Some(ref engine) = *engine_guard {
-        engine.pause().map_err(|e| e.to_string())?;
-
-        // Emit status update
-        let status = engine.get_status();
-        let _ = app.emit(
-            SIM_STATUS_UPDATE_EVENT,
-            serde_json::json!({
-                "status": "paused",
-                "stats": {
-                    "scanCount": status.scan_count,
-                    "currentNetworkId": null,
-                    "timing": {
-                        "current": status.last_scan_time_us as f64 / 1000.0,
-                        "average": status.avg_scan_time_us as f64 / 1000.0,
-                        "min": status.min_scan_time_us as f64 / 1000.0,
-                        "max": status.max_scan_time_us as f64 / 1000.0
-                    },
-                    "watchdogTriggered": false
-                }
-            }),
-        );
-
-        Ok(())
-    } else {
-        Err("Simulation is not running".to_string())
-    }
+    state.host().pause(&app)
 }
 
 /// Resume the simulation
 #[tauri::command]
 pub fn sim_resume(app: AppHandle, state: State<'_, SimState>) -> Result<(), String> {
-    let engine_guard = state.engine.lock();
-
-    if let Some(ref engine) = *engine_guard {
-        engine.resume().map_err(|e| e.to_string())?;
-
-        // Emit status update
-        let status = engine.get_status();
-        let _ = app.emit(
-            SIM_STATUS_UPDATE_EVENT,
-            serde_json::json!({
-                "status": "running",
-                "stats": {
-                    "scanCount": status.scan_count,
-                    "currentNetworkId": null,
-                    "timing": {
-                        "current": status.last_scan_time_us as f64 / 1000.0,
-                        "average": status.avg_scan_time_us as f64 / 1000.0,
-                        "min": status.min_scan_time_us as f64 / 1000.0,
-                        "max": status.max_scan_time_us as f64 / 1000.0
-                    },
-                    "watchdogTriggered": false
-                }
-            }),
-        );
-
-        Ok(())
-    } else {
-        Err("Simulation is not running".to_string())
-    }
+    state.host().resume(&app)
 }
 
 /// Reset the simulation
@@ -439,43 +202,7 @@ pub async fn sim_reset(
     state: State<'_, SimState>,
     modbus_state: State<'_, ModbusState>,
 ) -> Result<(), String> {
-    {
-        let mut engine_guard = state.engine.lock();
-
-        // Stop if running
-        if let Some(ref engine) = *engine_guard {
-            engine.stop();
-            engine.clear_modbus_adapter();
-        }
-
-        // Clear the engine
-        *engine_guard = None;
-    }
-
-    if let Some(handle) = state.scan_task.lock().take() {
-        handle.abort();
-    }
-
-    state.forced_devices.write().clear();
-    state.monitoring_active.store(false, Ordering::SeqCst);
-
-    // Reset debugger
-    state.debugger.reset();
-
-    // Emit status update
-    let _ = app.emit(
-        SIM_STATUS_UPDATE_EVENT,
-        serde_json::json!({
-            "status": "stopped",
-            "stats": {
-                "scanCount": 0,
-                "currentNetworkId": null,
-                "timing": { "current": 0.0, "average": 0.0, "min": 0.0, "max": 0.0 },
-                "watchdogTriggered": false
-            }
-        }),
-    );
-
+    state.host().reset(&app);
     modbus_stop_project_simulation(&modbus_state).await?;
     Ok(())
 }
@@ -483,32 +210,13 @@ pub async fn sim_reset(
 /// Get simulation status
 #[tauri::command]
 pub fn sim_get_status(state: State<'_, SimState>) -> Result<SimulationStatus, String> {
-    let engine_guard = state.engine.lock();
-
-    if let Some(ref engine) = *engine_guard {
-        Ok(engine.get_status())
-    } else {
-        // Return default stopped status
-        Ok(SimulationStatus::default())
-    }
+    Ok(state.host().status())
 }
 
 /// Get scan cycle info
 #[tauri::command]
 pub fn sim_get_scan_info(state: State<'_, SimState>) -> Result<ScanCycleInfo, String> {
-    let engine_guard = state.engine.lock();
-
-    if let Some(ref engine) = *engine_guard {
-        Ok(engine.get_scan_info())
-    } else {
-        Ok(ScanCycleInfo {
-            cycle_count: 0,
-            last_scan_time: 0,
-            average_scan_time: 0,
-            max_scan_time: 0,
-            timestamp: 0,
-        })
-    }
+    Ok(state.host().scan_info())
 }
 
 /// Load a ladder program for simulation
@@ -521,7 +229,7 @@ pub fn sim_load_program(
     let plc_settings = active_plc_settings(Some(&project_state))?;
     let profile = resolve_vendor_profile(&plc_settings).map_err(|e| e.to_string())?;
     let compiled = compile_program(&program, profile.as_ref()).map_err(|e| e.to_string())?;
-    *state.program.lock() = Some(compiled);
+    state.host().load_program(compiled);
     Ok(())
 }
 
@@ -631,28 +339,6 @@ fn resolve_sim_address_for_settings(
     Ok((normalized_address, canonical))
 }
 
-fn resolve_range_address(
-    project_state: Option<&State<'_, SharedProjectManager>>,
-    family: &str,
-    index: u32,
-) -> Result<CanonicalAddress, String> {
-    let plc_settings = active_plc_settings(project_state)?;
-    resolve_range_address_for_settings(&plc_settings, family, index)
-}
-
-fn resolve_range_address_for_settings(
-    plc_settings: &PlcSettings,
-    family: &str,
-    index: u32,
-) -> Result<CanonicalAddress, String> {
-    let profile = resolve_vendor_profile(&plc_settings).map_err(|e| e.to_string())?;
-    let vendor_address = VendorAddress::new(family.to_uppercase(), index);
-    profile
-        .validate_address(&vendor_address)
-        .map_err(|e| e.to_string())?;
-    profile.to_canonical(&vendor_address).map_err(|e| e.to_string())
-}
-
 fn read_canonical_device(
     runtime: &Arc<CanonicalRuntimeFacade>,
     address: CanonicalAddress,
@@ -678,29 +364,14 @@ fn write_canonical_device(
     }
 }
 
-/// Read a device value
-#[tauri::command]
-pub fn sim_read_device(
-    state: State<'_, SimState>,
-    project_state: State<'_, SharedProjectManager>,
-    address: String,
-) -> Result<DeviceValue, String> {
-    let engine_guard = state.engine.lock();
-
-    let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
-
-    let runtime = engine.runtime();
-    let (_, canonical) = resolve_sim_address(Some(&project_state), &address)?;
-    read_canonical_device(runtime, canonical)
-}
-
 #[tauri::command]
 pub fn sim_read_binding(
     state: State<'_, SimState>,
     project_state: State<'_, SharedProjectManager>,
     request: WatchBindingRequest,
 ) -> Result<DeviceValue, String> {
-    let engine_guard = state.engine.lock();
+    let engine_arc = state.engine();
+    let engine_guard = engine_arc.lock();
     let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
     let runtime = engine.runtime();
     let (binding, _) = resolve_runtime_binding(Some(&project_state), &request)?;
@@ -708,53 +379,6 @@ pub fn sim_read_binding(
         .canonical_address()
         .ok_or_else(|| "Tag binding reads are not implemented yet".to_string())?;
     read_canonical_device(runtime, canonical)
-}
-
-/// Write a device value
-#[tauri::command]
-pub fn sim_write_device(
-    app: AppHandle,
-    state: State<'_, SimState>,
-    project_state: State<'_, SharedProjectManager>,
-    address: String,
-    value: DeviceValue,
-) -> Result<(), String> {
-    let engine_guard = state.engine.lock();
-
-    let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
-
-    let runtime = engine.runtime();
-    let (normalized_address, canonical) = resolve_sim_address(Some(&project_state), &address)?;
-    let binding = RuntimeBinding::canonical(canonical);
-
-    // Get old value for change event
-    let old_value = read_canonical_device(runtime, canonical)?;
-    write_canonical_device(runtime, canonical, &value)?;
-
-    // Emit device change event
-    let _ = app.emit(
-        SIM_DEVICE_CHANGE_EVENT,
-        serde_json::json!({
-            "address": normalized_address,
-            "binding": binding,
-            "oldValue": old_value,
-            "newValue": value
-        }),
-    );
-
-    // Check device breakpoints
-    let debugger = state.debugger();
-    if let Some(hit) = debugger.check_device_change(
-        &binding,
-        &normalized_address,
-        serde_json::to_value(&old_value).unwrap_or_default(),
-        serde_json::to_value(&value).unwrap_or_default(),
-    ) {
-        debugger.pause(hit.clone());
-        let _ = app.emit(SIM_BREAKPOINT_HIT_EVENT, serde_json::json!({ "hit": hit }));
-    }
-
-    Ok(())
 }
 
 #[tauri::command]
@@ -765,7 +389,8 @@ pub fn sim_write_binding(
     request: WatchBindingRequest,
     value: DeviceValue,
 ) -> Result<(), String> {
-    let engine_guard = state.engine.lock();
+    let engine_arc = state.engine();
+    let engine_guard = engine_arc.lock();
     let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
     let runtime = engine.runtime();
     let (binding, display_address) = resolve_runtime_binding(Some(&project_state), &request)?;
@@ -797,31 +422,6 @@ pub fn sim_write_binding(
     }
 
     Ok(())
-}
-
-/// Read a range of device memory
-#[tauri::command]
-pub fn sim_read_memory_range(
-    state: State<'_, SimState>,
-    project_state: State<'_, SharedProjectManager>,
-    device_type: String,
-    start: u16,
-    count: u16,
-) -> Result<Vec<DeviceValue>, String> {
-    let engine_guard = state.engine.lock();
-
-    let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
-
-    let mut values = Vec::with_capacity(count as usize);
-
-    for i in 0..count {
-        let addr = start.saturating_add(i);
-        let canonical = resolve_range_address(Some(&project_state), &device_type, addr as u32)?;
-        let value = read_canonical_device(engine.runtime(), canonical)?;
-        values.push(value);
-    }
-
-    Ok(values)
 }
 
 #[cfg(test)]
@@ -887,7 +487,8 @@ mod tests {
 /// Get memory snapshot
 #[tauri::command]
 pub fn sim_get_memory_snapshot(state: State<'_, SimState>) -> Result<MemorySnapshot, String> {
-    let engine_guard = state.engine.lock();
+    let engine_arc = state.engine();
+    let engine_guard = engine_arc.lock();
 
     let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
 
@@ -920,7 +521,7 @@ pub fn sim_add_breakpoint(
         }
     }
 
-    let id = state.debugger.add_breakpoint(breakpoint);
+    let id = state.debugger().add_breakpoint(breakpoint);
     Ok(id)
 }
 
@@ -928,7 +529,7 @@ pub fn sim_add_breakpoint(
 #[tauri::command]
 pub fn sim_remove_breakpoint(state: State<'_, SimState>, id: String) -> Result<(), String> {
     state
-        .debugger
+        .debugger()
         .remove_breakpoint(&id)
         .map_err(|e| e.to_string())
 }
@@ -941,7 +542,7 @@ pub fn sim_set_breakpoint_enabled(
     enabled: bool,
 ) -> Result<(), String> {
     state
-        .debugger
+        .debugger()
         .set_breakpoint_enabled(&id, enabled)
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -950,7 +551,7 @@ pub fn sim_set_breakpoint_enabled(
 /// Get all breakpoints
 #[tauri::command]
 pub fn sim_get_breakpoints(state: State<'_, SimState>) -> Result<Vec<Breakpoint>, String> {
-    Ok(state.debugger.get_breakpoints())
+    Ok(state.debugger().get_breakpoints())
 }
 
 /// Add a watch variable
@@ -961,18 +562,19 @@ pub fn sim_add_watch(
     request: WatchBindingRequest,
 ) -> Result<(), String> {
     let (binding, display_address) = resolve_runtime_binding(Some(&project_state), &request)?;
-    let engine_guard = state.engine.lock();
+    let engine_arc = state.engine();
+    let engine_guard = engine_arc.lock();
 
     if let Some(ref engine) = *engine_guard {
         state
-            .debugger
+            .debugger()
             .add_watch_binding(binding, display_address, engine.runtime());
         Ok(())
     } else {
         // Add watch without initial value
         let runtime = CanonicalRuntimeFacade::new();
         state
-            .debugger
+            .debugger()
             .add_watch_binding(binding, display_address, &runtime);
         Ok(())
     }
@@ -986,13 +588,16 @@ pub fn sim_remove_watch(
     request: WatchBindingRequest,
 ) -> Result<(), String> {
     let (binding, _) = resolve_runtime_binding(Some(&project_state), &request)?;
-    state.debugger.remove_watch_binding(&binding).map_err(|e| e.to_string())
+    state
+        .debugger()
+        .remove_watch_binding(&binding)
+        .map_err(|e| e.to_string())
 }
 
 /// Get all watch variables
 #[tauri::command]
 pub fn sim_get_watches(state: State<'_, SimState>) -> Result<Vec<WatchVariable>, String> {
-    Ok(state.debugger.get_watches())
+    Ok(state.debugger().get_watches())
 }
 
 /// Step execution (network or scan)
@@ -1002,12 +607,13 @@ pub fn sim_step(
     state: State<'_, SimState>,
     step_type: StepType,
 ) -> Result<StepResult, String> {
-    let engine_guard = state.engine.lock();
+    let engine_arc = state.engine();
+    let engine_guard = engine_arc.lock();
 
     let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
 
     // Enable step mode
-    state.debugger.enable_step_mode(step_type);
+    state.debugger().enable_step_mode(step_type);
 
     // Execute single scan (step type determines granularity in future)
     engine.single_scan().map_err(|e| e.to_string())?;
@@ -1021,7 +627,7 @@ pub fn sim_step(
         step_type,
         network_id: None, // Would need to track current network
         scan_count: status.scan_count,
-        breakpoint_hit: state.debugger.get_pause_state(),
+        breakpoint_hit: state.debugger().get_pause_state(),
     };
 
     // Emit status update
@@ -1049,7 +655,7 @@ pub fn sim_step(
 /// Continue execution after pause
 #[tauri::command]
 pub fn sim_continue(app: AppHandle, state: State<'_, SimState>) -> Result<(), String> {
-    state.debugger.continue_execution();
+    state.debugger().continue_execution();
 
     // Resume the engine
     sim_resume(app, state)
@@ -1059,11 +665,11 @@ pub fn sim_continue(app: AppHandle, state: State<'_, SimState>) -> Result<(), St
 #[tauri::command]
 pub fn sim_get_debugger_state(state: State<'_, SimState>) -> Result<serde_json::Value, String> {
     Ok(serde_json::json!({
-        "stepMode": state.debugger.is_step_mode(),
-        "stepType": state.debugger.get_step_type(),
-        "pausedAt": state.debugger.get_pause_state(),
-        "breakpoints": state.debugger.get_breakpoints(),
-        "watches": state.debugger.get_watches()
+        "stepMode": state.debugger().is_step_mode(),
+        "stepType": state.debugger().get_step_type(),
+        "pausedAt": state.debugger().get_pause_state(),
+        "breakpoints": state.debugger().get_breakpoints(),
+        "watches": state.debugger().get_watches()
     }))
 }
 
@@ -1074,14 +680,14 @@ pub fn sim_get_debugger_state(state: State<'_, SimState>) -> Result<serde_json::
 /// Start ladder monitoring mode
 #[tauri::command]
 pub fn ladder_start_monitoring(state: State<'_, SimState>) -> Result<(), String> {
-    state.monitoring_active.store(true, Ordering::SeqCst);
+    state.host().monitoring().set_active(true);
     Ok(())
 }
 
 /// Stop ladder monitoring mode
 #[tauri::command]
 pub fn ladder_stop_monitoring(state: State<'_, SimState>) -> Result<(), String> {
-    state.monitoring_active.store(false, Ordering::SeqCst);
+    state.host().monitoring().set_active(false);
     Ok(())
 }
 
@@ -1094,14 +700,11 @@ pub fn ladder_force_device(
     value: serde_json::Value,
 ) -> Result<(), String> {
     let (binding, display_address) = resolve_runtime_binding(Some(&project_state), &request)?;
-    state.forced_devices.write().insert(
-        display_address.clone(),
-        ForcedDeviceValue {
-            binding,
-            display_address,
-            value,
-        },
-    );
+    state.host().monitoring().force_device(ForcedDeviceValue {
+        binding,
+        display_address,
+        value,
+    });
     Ok(())
 }
 
@@ -1113,6 +716,6 @@ pub fn ladder_release_force(
     request: WatchBindingRequest,
 ) -> Result<(), String> {
     let (_, display_address) = resolve_runtime_binding(Some(&project_state), &request)?;
-    state.forced_devices.write().remove(&display_address);
+    state.host().monitoring().release_force(&display_address);
     Ok(())
 }
