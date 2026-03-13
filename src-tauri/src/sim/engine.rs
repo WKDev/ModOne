@@ -13,15 +13,15 @@ use tauri::{AppHandle, Emitter};
 use thiserror::Error;
 use tokio::sync::oneshot;
 
+use crate::modbus::ModbusAdapter;
+
 use super::counter::CounterManager;
 use super::canvas_sync::CanvasSync;
 use super::executor::{LadderProgram, ProgramExecutor};
-use super::memory::DeviceMemory;
-use super::modserver_sync::ModServerSync;
+use super::memory::CanonicalRuntimeFacade;
 use super::timer::TimerManager;
 use super::types::{
-    ScanCycleInfo, SimBitDeviceType, SimWordDeviceType, SimulationConfig, SimulationState,
-    SimulationStatus,
+    ScanCycleInfo, SimulationConfig, SimulationState, SimulationStatus,
 };
 
 // ============================================================================
@@ -120,8 +120,8 @@ pub struct WatchdogEvent {
 /// 3. Output Scan - Write outputs to external destinations
 pub struct OneSimEngine {
     // Components
-    /// Device memory
-    memory: Arc<DeviceMemory>,
+    /// Canonical runtime
+    runtime: Arc<CanonicalRuntimeFacade>,
     /// Program executor
     executor: Arc<ProgramExecutor>,
     /// Timer manager
@@ -175,25 +175,25 @@ pub struct OneSimEngine {
     /// Canvas sync for PLC output -> circuit block state updates
     canvas_sync: RwLock<Option<Arc<CanvasSync>>>,
 
-    // ModServer synchronization
-    /// Bidirectional sync between DeviceMemory and ModbusMemory
-    modserver_sync: RwLock<Option<Arc<ModServerSync>>>,
+    // Modbus synchronization
+    /// Canonical-runtime-first Modbus bridge
+    modbus_adapter: RwLock<Option<Arc<ModbusAdapter>>>,
 }
 
 impl OneSimEngine {
     /// Create a new OneSimEngine
     pub fn new() -> Self {
-        let memory = Arc::new(DeviceMemory::new());
+        let runtime = Arc::new(CanonicalRuntimeFacade::new());
         let timer_mgr = Arc::new(TimerManager::new());
         let counter_mgr = Arc::new(CounterManager::new());
         let executor = Arc::new(ProgramExecutor::new(
-            Arc::clone(&memory),
+            Arc::clone(&runtime),
             Arc::clone(&timer_mgr),
             Arc::clone(&counter_mgr),
         ));
 
         Self {
-            memory,
+            runtime,
             executor,
             timer_mgr,
             counter_mgr,
@@ -213,24 +213,24 @@ impl OneSimEngine {
             monitoring_active: RwLock::new(None),
             forced_devices: RwLock::new(None),
             canvas_sync: RwLock::new(None),
-            modserver_sync: RwLock::new(None),
+            modbus_adapter: RwLock::new(None),
         }
     }
 
     /// Create with custom components (for testing)
     pub fn with_components(
-        memory: Arc<DeviceMemory>,
+        runtime: Arc<CanonicalRuntimeFacade>,
         timer_mgr: Arc<TimerManager>,
         counter_mgr: Arc<CounterManager>,
     ) -> Self {
         let executor = Arc::new(ProgramExecutor::new(
-            Arc::clone(&memory),
+            Arc::clone(&runtime),
             Arc::clone(&timer_mgr),
             Arc::clone(&counter_mgr),
         ));
 
         Self {
-            memory,
+            runtime,
             executor,
             timer_mgr,
             counter_mgr,
@@ -250,7 +250,7 @@ impl OneSimEngine {
             monitoring_active: RwLock::new(None),
             forced_devices: RwLock::new(None),
             canvas_sync: RwLock::new(None),
-            modserver_sync: RwLock::new(None),
+            modbus_adapter: RwLock::new(None),
         }
     }
 
@@ -258,9 +258,9 @@ impl OneSimEngine {
     // Accessors
     // ========================================================================
 
-    /// Get device memory
-    pub fn memory(&self) -> &Arc<DeviceMemory> {
-        &self.memory
+    /// Get canonical runtime facade
+    pub fn runtime(&self) -> &Arc<CanonicalRuntimeFacade> {
+        &self.runtime
     }
 
     /// Get timer manager
@@ -335,34 +335,38 @@ impl OneSimEngine {
             match dev_type {
                 "P" | "M" | "K" => {
                     if let Some(v) = value.as_bool() {
-                        let device = match dev_type {
-                            "P" => SimBitDeviceType::P,
-                            "M" => SimBitDeviceType::M,
-                            "K" => SimBitDeviceType::K,
+                        let canonical = match dev_type {
+                            "P" => crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::OutputBit, addr as u32),
+                            "M" => crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::InternalBit, addr as u32),
+                            "K" => crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::RetentiveBit, addr as u32),
                             _ => continue,
                         };
-                        if let Err(err) = self.memory.write_bit(device, addr, v) {
+                        if let Err(err) = self.runtime.write_bool(canonical, v, crate::plc_runtime::CanonicalWriteSource::Simulation) {
                             self.emit_monitoring_error(format!("Failed forcing {}: {}", address, err));
                         }
                     }
                 }
                 "D" | "R" | "Z" | "N" => {
                     if let Some(v) = value.as_u64() {
-                        let device = match dev_type {
-                            "D" => SimWordDeviceType::D,
-                            "R" => SimWordDeviceType::R,
-                            "Z" => SimWordDeviceType::Z,
-                            "N" => SimWordDeviceType::N,
+                        let canonical = match dev_type {
+                            "D" => crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::DataWord, addr as u32),
+                            "R" => crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::RetentiveWord, addr as u32),
+                            "Z" => crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::IndexWord, addr as u32),
+                            "N" => crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::SystemWord, addr as u32),
                             _ => continue,
                         };
-                        if let Err(err) = self.memory.write_word(device, addr, v as u16) {
+                        if let Err(err) = self.runtime.write_word_value(canonical, v as u16, crate::plc_runtime::CanonicalWriteSource::Simulation) {
                             self.emit_monitoring_error(format!("Failed forcing {}: {}", address, err));
                         }
                     }
                 }
                 "TD" => {
                     if let Some(v) = value.as_u64() {
-                        if let Err(err) = self.memory.write_word(SimWordDeviceType::Td, addr, v as u16)
+                        if let Err(err) = self.runtime.write_word_value(
+                            crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::TimerValueWord, addr as u32),
+                            v as u16,
+                            crate::plc_runtime::CanonicalWriteSource::Simulation,
+                        )
                         {
                             self.emit_monitoring_error(format!("Failed forcing {}: {}", address, err));
                         }
@@ -370,7 +374,11 @@ impl OneSimEngine {
                 }
                 "CD" => {
                     if let Some(v) = value.as_u64() {
-                        if let Err(err) = self.memory.write_word(SimWordDeviceType::Cd, addr, v as u16)
+                        if let Err(err) = self.runtime.write_word_value(
+                            crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::CounterValueWord, addr as u32),
+                            v as u16,
+                            crate::plc_runtime::CanonicalWriteSource::Simulation,
+                        )
                         {
                             self.emit_monitoring_error(format!("Failed forcing {}: {}", address, err));
                         }
@@ -396,17 +404,16 @@ impl OneSimEngine {
         if let Some(handle) = self.app_handle.read().as_ref() {
             let mut devices = Vec::new();
 
-            for (dev_type, dev_name) in &[
-                (SimBitDeviceType::P, "P"),
-                (SimBitDeviceType::M, "M"),
-                (SimBitDeviceType::K, "K"),
+            for (area, dev_name, limit) in &[
+                (crate::plc_runtime::CanonicalAreaKind::OutputBit, "OutputBit", 256u32),
+                (crate::plc_runtime::CanonicalAreaKind::InternalBit, "InternalBit", 256u32),
+                (crate::plc_runtime::CanonicalAreaKind::RetentiveBit, "RetentiveBit", 256u32),
             ] {
-                let max_addr = dev_type.default_size().min(256) as u16;
-                for addr in 0..max_addr {
-                    if let Ok(val) = self.memory.read_bit(*dev_type, addr) {
+                for addr in 0..*limit {
+                    if let Ok(val) = self.runtime.read_bool(crate::plc_runtime::CanonicalAddress::new(*area, addr)) {
                         if val {
                             devices.push(serde_json::json!({
-                                "address": format!("{}{}", dev_name, addr),
+                                "address": format!("{}:{}", dev_name, addr),
                                 "value": val
                             }));
                         }
@@ -414,13 +421,15 @@ impl OneSimEngine {
                 }
             }
 
-            for (dev_type, dev_name) in &[(SimBitDeviceType::T, "T"), (SimBitDeviceType::C, "C")] {
-                let max_addr = 256u16.min(dev_type.default_size() as u16);
-                for addr in 0..max_addr {
-                    if let Ok(val) = self.memory.read_bit(*dev_type, addr) {
+            for (area, dev_name) in &[
+                (crate::plc_runtime::CanonicalAreaKind::TimerDoneBit, "TimerDoneBit"),
+                (crate::plc_runtime::CanonicalAreaKind::CounterDoneBit, "CounterDoneBit"),
+            ] {
+                for addr in 0u32..256 {
+                    if let Ok(val) = self.runtime.read_bool(crate::plc_runtime::CanonicalAddress::new(*area, addr)) {
                         if val {
                             devices.push(serde_json::json!({
-                                "address": format!("{}{}", dev_name, addr),
+                                "address": format!("{}:{}", dev_name, addr),
                                 "value": val
                             }));
                         }
@@ -428,11 +437,11 @@ impl OneSimEngine {
                 }
             }
 
-            for addr in 0u16..100 {
-                if let Ok(val) = self.memory.read_word(SimWordDeviceType::D, addr) {
+            for addr in 0u32..100 {
+                if let Ok(val) = self.runtime.read_word_value(crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::DataWord, addr)) {
                     if val != 0 {
                         devices.push(serde_json::json!({
-                            "address": format!("D{}", addr),
+                            "address": format!("DataWord:{}", addr),
                             "value": val
                         }));
                     }
@@ -481,9 +490,9 @@ impl OneSimEngine {
         *self.canvas_sync.write() = Some(sync);
     }
 
-    /// Set the ModServer sync for DeviceMemory ↔ ModbusMemory synchronization
-    pub fn set_modserver_sync(&self, sync: Arc<ModServerSync>) {
-        *self.modserver_sync.write() = Some(sync);
+    /// Set the Modbus adapter for canonical runtime synchronization
+    pub fn set_modbus_adapter(&self, adapter: Arc<ModbusAdapter>) {
+        *self.modbus_adapter.write() = Some(adapter);
     }
 
     // ========================================================================
@@ -708,14 +717,12 @@ impl OneSimEngine {
 
     /// Input scan phase - sync from external sources
     fn input_scan(&self) {
-        // Canvas inputs (plc_in blocks) write directly to shared DeviceMemory
+        // Canvas inputs (plc_in blocks) write directly to the shared canonical runtime
         // via CanvasSync::handle_plc_input_change(), so no explicit read is needed here.
 
-        // ModServer input sync: Modbus Discrete Inputs → P relays,
-        // External HR writes → D registers
-        if let Some(ref sync) = *self.modserver_sync.read() {
-            if let Err(e) = sync.sync_inputs() {
-                log::warn!("ModServer input sync failed: {}", e);
+        if let Some(ref adapter) = *self.modbus_adapter.read() {
+            if let Err(e) = adapter.apply_external_writes() {
+                log::warn!("Modbus input sync failed: {}", e);
             }
         }
     }
@@ -729,10 +736,9 @@ impl OneSimEngine {
             }
         }
 
-        // ModServer output sync: M/K/T/C → Coils, D/TD/CD → Holding Registers
-        if let Some(ref sync) = *self.modserver_sync.read() {
-            if let Err(e) = sync.sync_outputs() {
-                log::warn!("ModServer output sync failed: {}", e);
+        if let Some(ref adapter) = *self.modbus_adapter.read() {
+            if let Err(e) = adapter.publish_runtime_state() {
+                log::warn!("Modbus output sync failed: {}", e);
             }
         }
     }
@@ -1007,13 +1013,13 @@ mod tests {
         *engine.program.write() = Some(program);
 
         // Set M0 true
-        engine.memory.write_bit(SimBitDeviceType::M, 0, true).unwrap();
+        engine.runtime.write_bit(SimBitDeviceType::M, 0, true).unwrap();
 
         // Execute scan
         engine.single_scan().unwrap();
 
         // P0 should be true
-        assert!(engine.memory.read_bit(SimBitDeviceType::P, 0).unwrap());
+        assert!(engine.runtime.read_bit(SimBitDeviceType::P, 0).unwrap());
     }
 
     #[test]

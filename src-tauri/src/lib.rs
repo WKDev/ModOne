@@ -21,7 +21,7 @@ pub use error::{ModOneError, ModOneResult};
 pub use logging::{ErrorLogger, SharedErrorLogger, LogEntry};
 
 use project::{AutoSaveManager, ProjectManager};
-use sim::DeviceMemory;
+use sim::CanonicalRuntimeFacade;
 use std::sync::{Arc, Mutex};
 
 /// Holds the `--project` CLI argument value (consumed once by the frontend on startup).
@@ -140,10 +140,10 @@ pub fn run() {
     let scenario_executor_state = ScenarioExecutorState::new(modbus_state.memory.clone());
 
     // Initialize Canvas Sync and Simulation states with shared memory
-    let shared_device_memory = Arc::new(DeviceMemory::new());
-    let canvas_sync_state = CanvasSyncState::with_memory(Arc::clone(&shared_device_memory));
-    let sim_state = SimState::with_memory_and_modbus(
-        Arc::clone(&shared_device_memory),
+    let shared_runtime = Arc::new(CanonicalRuntimeFacade::new());
+    let canvas_sync_state = CanvasSyncState::with_runtime(Arc::clone(&shared_runtime));
+    let sim_state = SimState::with_runtime_and_modbus(
+        Arc::clone(&shared_runtime),
         Arc::clone(&modbus_state.memory),
     );
 

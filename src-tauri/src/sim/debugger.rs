@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use super::memory::DeviceMemory;
+use super::memory::CanonicalRuntimeFacade;
 use super::types::{Breakpoint, BreakpointType, SimBitDeviceType, SimWordDeviceType, WatchVariable};
 
 // ============================================================================
@@ -206,7 +206,7 @@ impl SimDebugger {
         &self,
         network_id: u32,
         scan_count: u64,
-        memory: &DeviceMemory,
+        memory: &CanonicalRuntimeFacade,
     ) -> Option<BreakpointHit> {
         let mut breakpoints = self.breakpoints.write();
 
@@ -287,7 +287,7 @@ impl SimDebugger {
     /// - "D0001 > 100"
     /// - "M0000 == 1"
     /// - "D0010 != 0"
-    fn evaluate_condition(&self, condition: &str, memory: &DeviceMemory) -> bool {
+    fn evaluate_condition(&self, condition: &str, memory: &CanonicalRuntimeFacade) -> bool {
         // Parse condition: DEVICE OP VALUE
         let parts: Vec<&str> = condition.split_whitespace().collect();
         if parts.len() != 3 {
@@ -377,7 +377,7 @@ impl SimDebugger {
     }
 
     /// Read a device value from memory as i32
-    fn read_device_value(&self, address: &str, memory: &DeviceMemory) -> i32 {
+    fn read_device_value(&self, address: &str, memory: &CanonicalRuntimeFacade) -> i32 {
         // Parse address (e.g., "M0000", "D0001")
         if address.is_empty() {
             return 0;
@@ -405,7 +405,7 @@ impl SimDebugger {
     // ========================================================================
 
     /// Add a watch variable
-    pub fn add_watch(&self, address: &str, memory: &DeviceMemory) {
+    pub fn add_watch(&self, address: &str, memory: &CanonicalRuntimeFacade) {
         let initial_value = self.read_device_json_value(address, memory);
         let watch = WatchVariable::new(
             address.to_string(),
@@ -430,7 +430,7 @@ impl SimDebugger {
     }
 
     /// Update a single watch variable
-    pub fn update_watch(&self, address: &str, memory: &DeviceMemory) {
+    pub fn update_watch(&self, address: &str, memory: &CanonicalRuntimeFacade) {
         if let Some(watch) = self.watches.write().get_mut(address) {
             let new_value = self.read_device_json_value(address, memory);
             watch.update(new_value);
@@ -438,7 +438,7 @@ impl SimDebugger {
     }
 
     /// Update all watch variables
-    pub fn update_all_watches(&self, memory: &DeviceMemory) {
+    pub fn update_all_watches(&self, memory: &CanonicalRuntimeFacade) {
         let mut watches = self.watches.write();
         for (address, watch) in watches.iter_mut() {
             let new_value = self.read_device_json_value(address, memory);
@@ -452,7 +452,7 @@ impl SimDebugger {
     }
 
     /// Read device value as JSON for watch variables
-    fn read_device_json_value(&self, address: &str, memory: &DeviceMemory) -> serde_json::Value {
+    fn read_device_json_value(&self, address: &str, memory: &CanonicalRuntimeFacade) -> serde_json::Value {
         if address.is_empty() {
             return serde_json::Value::Null;
         }
@@ -908,7 +908,7 @@ mod tests {
     #[test]
     fn test_debugger_watch_management() {
         let debugger = SimDebugger::new(100);
-        let memory = DeviceMemory::new();
+        let memory = CanonicalRuntimeFacade::new();
 
         // Add watches
         debugger.add_watch("M0000", &memory);
@@ -941,7 +941,7 @@ mod tests {
     #[test]
     fn test_clear_watches() {
         let debugger = SimDebugger::new(100);
-        let memory = DeviceMemory::new();
+        let memory = CanonicalRuntimeFacade::new();
 
         debugger.add_watch("M0000", &memory);
         debugger.add_watch("D0001", &memory);

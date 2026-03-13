@@ -8,7 +8,6 @@ pub mod debugger;
 pub mod engine;
 pub mod executor;
 pub mod memory;
-pub mod modserver_sync;
 pub mod timer;
 pub mod types;
 
@@ -24,7 +23,6 @@ pub use executor::{
     DeviceAddress, ExecutionError, ExecutionResult, LadderNetwork, LadderNode, LadderProgram,
     NetworkExecutionResult, NodeType, ProgramExecutionResult, ProgramExecutor,
 };
-pub use memory::{DeviceMemory, SimMemoryError, SimMemoryResult};
-pub use modserver_sync::{ModServerSync, SyncError, SyncResult};
+pub use memory::{CanonicalRuntimeFacade, SimMemoryError, SimMemoryResult};
 pub use timer::TimerManager;
 pub use types::*;

@@ -5,12 +5,13 @@
 
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 use thiserror::Error;
 
 use super::counter::CounterManager;
-use super::memory::{DeviceMemory, SimMemoryError};
+use super::memory::{CanonicalRuntimeFacade, SimMemoryError};
 use super::timer::TimerManager;
 use super::types::{
     SimBitDeviceType, SimCounterType, SimTimeBase, SimTimerType, SimWordDeviceType,
@@ -525,28 +526,31 @@ pub struct ProgramExecutionResult {
 ///
 /// Evaluates ladder nodes and manages power flow through the logic.
 pub struct ProgramExecutor {
-    /// Device memory
-    memory: Arc<DeviceMemory>,
+    /// Canonical runtime facade
+    runtime: Arc<CanonicalRuntimeFacade>,
     /// Timer manager
     timer_mgr: Arc<TimerManager>,
     /// Counter manager
     counter_mgr: Arc<CounterManager>,
     /// Last execution scan count
     scan_count: RwLock<u64>,
+    /// Previous states for positive/negative edge contacts.
+    edge_state: RwLock<HashMap<String, bool>>,
 }
 
 impl ProgramExecutor {
     /// Create a new ProgramExecutor
     pub fn new(
-        memory: Arc<DeviceMemory>,
+        runtime: Arc<CanonicalRuntimeFacade>,
         timer_mgr: Arc<TimerManager>,
         counter_mgr: Arc<CounterManager>,
     ) -> Self {
         Self {
-            memory,
+            runtime,
             timer_mgr,
             counter_mgr,
             scan_count: RwLock::new(0),
+            edge_state: RwLock::new(HashMap::new()),
         }
     }
 
@@ -630,16 +634,20 @@ impl ProgramExecutor {
                 let addr = self.parse_address(&node.address)?;
                 let current = self.read_device_bool(&addr)?;
                 let addr_str = addr.to_string();
-                let result = self.memory.detect_rising_edge(&addr_str, current);
-                self.memory.update_previous(&addr_str, current);
+                let mut edge_state = self.edge_state.write();
+                let previous = edge_state.get(&addr_str).copied().unwrap_or(false);
+                let result = current && !previous;
+                edge_state.insert(addr_str, current);
                 Ok(result)
             }
             NodeType::ContactN => {
                 let addr = self.parse_address(&node.address)?;
                 let current = self.read_device_bool(&addr)?;
                 let addr_str = addr.to_string();
-                let result = self.memory.detect_falling_edge(&addr_str, current);
-                self.memory.update_previous(&addr_str, current);
+                let mut edge_state = self.edge_state.write();
+                let previous = edge_state.get(&addr_str).copied().unwrap_or(false);
+                let result = !current && previous;
+                edge_state.insert(addr_str, current);
                 Ok(result)
             }
 
@@ -819,7 +827,7 @@ impl ProgramExecutor {
                     addr.to_string()
                 ))
             })?;
-            Ok(self.memory.read_bit(device, addr.address)?)
+            Ok(self.runtime.read_bit(device, addr.address)?)
         } else if let Some(bit_idx) = addr.bit_index {
             let device = addr.as_word_device().ok_or_else(|| {
                 ExecutionError::InvalidAddress(format!(
@@ -827,7 +835,7 @@ impl ProgramExecutor {
                     addr.to_string()
                 ))
             })?;
-            Ok(self.memory.read_word_bit(device, addr.address, bit_idx)?)
+            Ok(self.runtime.read_word_bit(device, addr.address, bit_idx)?)
         } else {
             // Word device without bit index - read as bool (non-zero = true)
             let device = addr.as_word_device().ok_or_else(|| {
@@ -836,7 +844,7 @@ impl ProgramExecutor {
                     addr.to_string()
                 ))
             })?;
-            Ok(self.memory.read_word(device, addr.address)? != 0)
+            Ok(self.runtime.read_word(device, addr.address)? != 0)
         }
     }
 
@@ -849,7 +857,7 @@ impl ProgramExecutor {
                     addr.to_string()
                 ))
             })?;
-            Ok(self.memory.write_bit(device, addr.address, value)?)
+            Ok(self.runtime.write_bit(device, addr.address, value)?)
         } else if let Some(bit_idx) = addr.bit_index {
             let device = addr.as_word_device().ok_or_else(|| {
                 ExecutionError::InvalidAddress(format!(
@@ -858,7 +866,7 @@ impl ProgramExecutor {
                 ))
             })?;
             Ok(self
-                .memory
+                .runtime
                 .write_word_bit(device, addr.address, bit_idx, value)?)
         } else {
             // Word device without bit index
@@ -869,7 +877,7 @@ impl ProgramExecutor {
                 ))
             })?;
             Ok(self
-                .memory
+                .runtime
                 .write_word(device, addr.address, if value { 1 } else { 0 })?)
         }
     }
@@ -892,7 +900,7 @@ impl ProgramExecutor {
                     addr.to_string()
                 ))
             })?;
-            Ok(self.memory.read_word(device, addr.address)? as i16 as i32)
+            Ok(self.runtime.read_word(device, addr.address)? as i16 as i32)
         } else {
             // Bit device - return 0 or 1
             let device = addr.as_bit_device().ok_or_else(|| {
@@ -901,7 +909,7 @@ impl ProgramExecutor {
                     addr.to_string()
                 ))
             })?;
-            Ok(if self.memory.read_bit(device, addr.address)? {
+            Ok(if self.runtime.read_bit(device, addr.address)? {
                 1
             } else {
                 0
@@ -953,8 +961,10 @@ impl ProgramExecutor {
 
         // Update T contact
         let _ = self
-            .memory
+            .runtime
             .write_bit_internal(SimBitDeviceType::T, addr.address, done);
+        self.runtime
+            .write_word_internal(SimWordDeviceType::Td, addr.address, _elapsed as u16)?;
 
         Ok(())
     }
@@ -986,8 +996,15 @@ impl ProgramExecutor {
 
         // Update C contact
         let _ = self
-            .memory
+            .runtime
             .write_bit_internal(SimBitDeviceType::C, addr.address, done);
+        if let Some(state) = self.counter_mgr.get_state(addr.address) {
+            self.runtime.write_word_internal(
+                SimWordDeviceType::Cd,
+                addr.address,
+                state.current_value.clamp(0, u16::MAX as i32) as u16,
+            )?;
+        }
 
         Ok(())
     }
@@ -1024,7 +1041,7 @@ impl ProgramExecutor {
                     dest.to_string()
                 ))
             })?;
-            self.memory
+            self.runtime
                 .write_word(device, dest.address, result as u16)?;
         }
 
@@ -1066,7 +1083,7 @@ impl ProgramExecutor {
                     dest.to_string()
                 ))
             })?;
-            self.memory
+            self.runtime
                 .write_word(device, dest.address, result as u16)?;
         }
 
@@ -1107,7 +1124,7 @@ impl ProgramExecutor {
                     dest.to_string()
                 ))
             })?;
-            self.memory
+            self.runtime
                 .write_word(device, dest.address, result as u16)?;
         }
 
@@ -1136,7 +1153,7 @@ impl ProgramExecutor {
                     dest.to_string()
                 ))
             })?;
-            self.memory.write_word(device, dest.address, value as u16)?;
+            self.runtime.write_word(device, dest.address, value as u16)?;
         }
 
         Ok(())
@@ -1156,7 +1173,7 @@ impl ProgramExecutor {
 impl Default for ProgramExecutor {
     fn default() -> Self {
         Self::new(
-            Arc::new(DeviceMemory::new()),
+            Arc::new(CanonicalRuntimeFacade::new()),
             Arc::new(TimerManager::new()),
             Arc::new(CounterManager::new()),
         )
@@ -1173,11 +1190,11 @@ mod tests {
 
     fn create_executor() -> (
         ProgramExecutor,
-        Arc<DeviceMemory>,
+        Arc<CanonicalRuntimeFacade>,
         Arc<TimerManager>,
         Arc<CounterManager>,
     ) {
-        let memory = Arc::new(DeviceMemory::new());
+        let memory = Arc::new(CanonicalRuntimeFacade::new());
         let timer_mgr = Arc::new(TimerManager::new());
         let counter_mgr = Arc::new(CounterManager::new());
         let executor = ProgramExecutor::new(

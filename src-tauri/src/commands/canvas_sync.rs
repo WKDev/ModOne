@@ -1,6 +1,6 @@
 //! Canvas Sync Tauri command handlers
 //!
-//! This module provides Tauri commands for synchronizing OneSim DeviceMemory
+//! This module provides Tauri commands for synchronizing the OneSim canonical runtime
 //! with OneCanvas circuit simulation (PLC block mappings).
 
 use std::sync::Arc;
@@ -9,7 +9,7 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use crate::sim::{CanvasSync, DeviceMemory, PlcBlockMapping, PlcBlockType, PlcInputChange};
+use crate::sim::{CanvasSync, CanonicalRuntimeFacade, PlcBlockMapping, PlcBlockType, PlcInputChange};
 
 // ============================================================================
 // Managed State
@@ -19,19 +19,19 @@ use crate::sim::{CanvasSync, DeviceMemory, PlcBlockMapping, PlcBlockType, PlcInp
 pub struct CanvasSyncState {
     /// Canvas sync instance
     pub sync: Arc<CanvasSync>,
-    /// Shared simulation memory
-    pub sim_memory: Arc<DeviceMemory>,
+    /// Shared simulation runtime
+    pub sim_runtime: Arc<CanonicalRuntimeFacade>,
     /// Whether sync is enabled
     pub enabled: RwLock<bool>,
 }
 
 impl Default for CanvasSyncState {
     fn default() -> Self {
-        let sim_memory = Arc::new(DeviceMemory::new());
-        let sync = Arc::new(CanvasSync::new(Arc::clone(&sim_memory)));
+        let sim_runtime = Arc::new(CanonicalRuntimeFacade::new());
+        let sync = Arc::new(CanvasSync::new(Arc::clone(&sim_runtime)));
         Self {
             sync,
-            sim_memory,
+            sim_runtime,
             enabled: RwLock::new(false),
         }
     }
@@ -39,11 +39,11 @@ impl Default for CanvasSyncState {
 
 impl CanvasSyncState {
     /// Create with existing simulation memory
-    pub fn with_memory(sim_memory: Arc<DeviceMemory>) -> Self {
-        let sync = Arc::new(CanvasSync::new(Arc::clone(&sim_memory)));
+    pub fn with_runtime(sim_runtime: Arc<CanonicalRuntimeFacade>) -> Self {
+        let sync = Arc::new(CanvasSync::new(Arc::clone(&sim_runtime)));
         Self {
             sync,
-            sim_memory,
+            sim_runtime,
             enabled: RwLock::new(false),
         }
     }

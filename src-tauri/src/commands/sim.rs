@@ -14,10 +14,10 @@ use crate::commands::canvas_sync::CanvasSyncState;
 use crate::commands::modbus::{
     modbus_start_project_simulation, modbus_stop_project_simulation, ModbusState,
 };
-use crate::modbus::ModbusMemory;
+use crate::modbus::{ModbusAdapter, ModbusMemory};
 use crate::plc_runtime::{
     resolve_modbus_mapping_policy, resolve_vendor_profile, CanonicalAddress, CanonicalAreaKind,
-    CanonicalMemory, VendorAddress, VendorProfileId,
+    CanonicalValue, CanonicalWriteSource, VendorAddress,
 };
 use crate::project::{PlcSettings, ProjectConfig, SharedProjectManager};
 use crate::sim::{
@@ -25,12 +25,11 @@ use crate::sim::{
     debugger::{SimDebugger, StepResult, StepType},
     engine::OneSimEngine,
     executor::LadderProgram,
-    memory::DeviceMemory,
-    modserver_sync::ModServerSync,
+    memory::CanonicalRuntimeFacade,
     timer::TimerManager,
     types::{
-        Breakpoint, MemorySnapshot, ScanCycleInfo, SimBitDeviceType, SimWordDeviceType,
-        SimulationConfig, SimulationStatus, WatchVariable,
+        Breakpoint, MemorySnapshot, ScanCycleInfo, SimulationConfig, SimulationStatus,
+        WatchVariable,
     },
 };
 
@@ -50,9 +49,8 @@ pub struct SimState {
     engine: Arc<Mutex<Option<Arc<OneSimEngine>>>>,
     /// The debugger instance
     debugger: Arc<SimDebugger>,
-    memory: Arc<DeviceMemory>,
-    canonical_memory: Arc<parking_lot::RwLock<CanonicalMemory>>,
-    /// Shared Modbus memory for ModServerSync
+    runtime: Arc<CanonicalRuntimeFacade>,
+    /// Shared Modbus memory for ModbusAdapter
     modbus_memory: Option<Arc<ModbusMemory>>,
     program: Arc<Mutex<Option<LadderProgram>>>,
     scan_task: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
@@ -67,12 +65,11 @@ impl Default for SimState {
 }
 
 impl SimState {
-    pub fn with_memory(memory: Arc<DeviceMemory>) -> Self {
+    pub fn with_runtime(runtime: Arc<CanonicalRuntimeFacade>) -> Self {
         Self {
             engine: Arc::new(Mutex::new(None)),
             debugger: Arc::new(SimDebugger::default()),
-            memory,
-            canonical_memory: Arc::new(parking_lot::RwLock::new(CanonicalMemory::new())),
+            runtime,
             modbus_memory: None,
             program: Arc::new(Mutex::new(None)),
             scan_task: Arc::new(Mutex::new(None)),
@@ -81,16 +78,15 @@ impl SimState {
         }
     }
 
-    /// Create with both DeviceMemory and ModbusMemory for ModServerSync
-    pub fn with_memory_and_modbus(
-        memory: Arc<DeviceMemory>,
+    /// Create with both canonical runtime and ModbusMemory for ModbusAdapter.
+    pub fn with_runtime_and_modbus(
+        runtime: Arc<CanonicalRuntimeFacade>,
         modbus_memory: Arc<ModbusMemory>,
     ) -> Self {
         Self {
             engine: Arc::new(Mutex::new(None)),
             debugger: Arc::new(SimDebugger::default()),
-            memory,
-            canonical_memory: Arc::new(parking_lot::RwLock::new(CanonicalMemory::new())),
+            runtime,
             modbus_memory: Some(modbus_memory),
             program: Arc::new(Mutex::new(None)),
             scan_task: Arc::new(Mutex::new(None)),
@@ -101,7 +97,7 @@ impl SimState {
 
     /// Create a new simulation state
     pub fn new() -> Self {
-        Self::with_memory(Arc::new(DeviceMemory::new()))
+        Self::with_runtime(Arc::new(CanonicalRuntimeFacade::new()))
     }
 
     /// Get the engine (if running)
@@ -109,12 +105,8 @@ impl SimState {
         self.engine.clone()
     }
 
-    pub fn memory(&self) -> &Arc<DeviceMemory> {
-        &self.memory
-    }
-
-    pub fn canonical_memory(&self) -> &Arc<parking_lot::RwLock<CanonicalMemory>> {
-        &self.canonical_memory
+    pub fn runtime(&self) -> &Arc<CanonicalRuntimeFacade> {
+        &self.runtime
     }
 
     /// Get the debugger
@@ -137,23 +129,6 @@ pub enum DeviceValue {
     /// Word value (16-bit unsigned)
     #[serde(rename = "word")]
     Word { value: u16 },
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ResolvedSimAddress {
-    Bit {
-        device: SimBitDeviceType,
-        address: u16,
-    },
-    Word {
-        device: SimWordDeviceType,
-        address: u16,
-    },
-    WordBit {
-        device: SimWordDeviceType,
-        address: u16,
-        bit: u8,
-    },
 }
 
 /// Simulation run parameters
@@ -193,11 +168,7 @@ pub async fn sim_run(
         .as_ref()
         .map(|config| config.plc.clone())
         .unwrap_or_default();
-    let profile = resolve_vendor_profile(&plc_settings).map_err(|e| e.to_string())?;
-    state.memory().attach_canonical_mirror(
-        profile,
-        Arc::clone(state.canonical_memory()),
-    );
+    let _profile = resolve_vendor_profile(&plc_settings).map_err(|e| e.to_string())?;
 
     if let Some(project_config) = project_config.as_ref() {
         if project_config.modbus.simulation.enabled {
@@ -217,7 +188,7 @@ pub async fn sim_run(
     // Create new engine if needed
     if engine_guard.is_none() {
         let engine = Arc::new(OneSimEngine::with_components(
-            Arc::clone(state.memory()),
+            Arc::clone(state.runtime()),
             Arc::new(TimerManager::new()),
             Arc::new(CounterManager::new()),
         ));
@@ -254,27 +225,28 @@ pub async fn sim_run(
         }
     }
 
-    // Wire ModServer sync into engine (DeviceMemory ↔ ModbusMemory)
+    // Wire Modbus adapter into engine
     if let Some(ref engine) = *engine_guard {
         if let Some(ref modbus_mem) = state.modbus_memory {
-            let modserver_sync = if let Some(project_config) = project_config.as_ref() {
-                let policy = resolve_modbus_mapping_policy(
-                    &project_config.plc,
-                    Some(&project_config.modbus.exposure),
-                )
-                .map_err(|e| e.to_string())?;
-                Arc::new(ModServerSync::with_policy(
-                    Arc::clone(state.memory()),
+            let adapter = if let Some(project_config) = project_config.as_ref() {
+                let policy =
+                    resolve_modbus_mapping_policy(&project_config.plc, Some(&project_config.modbus.exposure))
+                        .map_err(|e| e.to_string())?;
+                Arc::new(ModbusAdapter::new(
+                    state.runtime().handle(),
                     Arc::clone(modbus_mem),
                     policy,
                 ))
             } else {
-                Arc::new(ModServerSync::new(
-                    Arc::clone(state.memory()),
+                let policy =
+                    resolve_modbus_mapping_policy(&plc_settings, None).map_err(|e| e.to_string())?;
+                Arc::new(ModbusAdapter::new(
+                    state.runtime().handle(),
                     Arc::clone(modbus_mem),
+                    policy,
                 ))
             };
-            engine.set_modserver_sync(modserver_sync);
+            engine.set_modbus_adapter(adapter);
         }
     }
 
@@ -557,7 +529,7 @@ fn current_project_config(
 fn resolve_sim_address(
     project_state: Option<&State<'_, SharedProjectManager>>,
     address: &str,
-) -> Result<(String, ResolvedSimAddress), String> {
+) -> Result<(String, CanonicalAddress), String> {
     let plc_settings = active_plc_settings(project_state)?;
     resolve_sim_address_for_settings(&plc_settings, address)
 }
@@ -565,25 +537,21 @@ fn resolve_sim_address(
 fn resolve_sim_address_for_settings(
     plc_settings: &PlcSettings,
     address: &str,
-) -> Result<(String, ResolvedSimAddress), String> {
+) -> Result<(String, CanonicalAddress), String> {
     let profile = resolve_vendor_profile(&plc_settings).map_err(|e| e.to_string())?;
     let vendor_address = profile.parse_address(address).map_err(|e| e.to_string())?;
     let normalized_address = profile
         .format_address(&vendor_address)
         .unwrap_or_else(|_| address.to_uppercase());
-    let canonical = profile
-        .to_canonical(&vendor_address)
-        .map_err(|e| e.to_string())?;
-
-    let resolved = bridge_canonical_to_legacy_device(profile.id(), &canonical)?;
-    Ok((normalized_address, resolved))
+    let canonical = profile.to_canonical(&vendor_address).map_err(|e| e.to_string())?;
+    Ok((normalized_address, canonical))
 }
 
 fn resolve_range_address(
     project_state: Option<&State<'_, SharedProjectManager>>,
     family: &str,
     index: u32,
-) -> Result<ResolvedSimAddress, String> {
+) -> Result<CanonicalAddress, String> {
     let plc_settings = active_plc_settings(project_state)?;
     resolve_range_address_for_settings(&plc_settings, family, index)
 }
@@ -592,192 +560,37 @@ fn resolve_range_address_for_settings(
     plc_settings: &PlcSettings,
     family: &str,
     index: u32,
-) -> Result<ResolvedSimAddress, String> {
+) -> Result<CanonicalAddress, String> {
     let profile = resolve_vendor_profile(&plc_settings).map_err(|e| e.to_string())?;
     let vendor_address = VendorAddress::new(family.to_uppercase(), index);
     profile
         .validate_address(&vendor_address)
         .map_err(|e| e.to_string())?;
-    let canonical = profile
-        .to_canonical(&vendor_address)
-        .map_err(|e| e.to_string())?;
-
-    bridge_canonical_to_legacy_device(profile.id(), &canonical)
+    profile.to_canonical(&vendor_address).map_err(|e| e.to_string())
 }
 
-fn bridge_canonical_to_legacy_device(
-    profile_id: VendorProfileId,
-    canonical: &CanonicalAddress,
-) -> Result<ResolvedSimAddress, String> {
-    let address = u16::try_from(canonical.index)
-        .map_err(|_| format!("Address {} exceeds legacy simulator range", canonical.index))?;
-
-    let map_word = |device| {
-        if let Some(bit) = canonical.bit_index {
-            ResolvedSimAddress::WordBit {
-                device,
-                address,
-                bit,
-            }
-        } else {
-            ResolvedSimAddress::Word { device, address }
-        }
-    };
-
-    let resolved = match (profile_id, canonical.area) {
-        (VendorProfileId::LsXg5000, CanonicalAreaKind::InputBit)
-        | (VendorProfileId::LsXg5000, CanonicalAreaKind::OutputBit) => ResolvedSimAddress::Bit {
-            device: SimBitDeviceType::P,
-            address,
-        },
-        (VendorProfileId::LsXg5000, CanonicalAreaKind::InternalBit) => ResolvedSimAddress::Bit {
-            device: SimBitDeviceType::M,
-            address,
-        },
-        (VendorProfileId::LsXg5000, CanonicalAreaKind::RetentiveBit) => ResolvedSimAddress::Bit {
-            device: SimBitDeviceType::K,
-            address,
-        },
-        (VendorProfileId::LsXg5000, CanonicalAreaKind::SpecialBit) => ResolvedSimAddress::Bit {
-            device: SimBitDeviceType::F,
-            address,
-        },
-        (VendorProfileId::LsXg5000, CanonicalAreaKind::TimerDoneBit) => ResolvedSimAddress::Bit {
-            device: SimBitDeviceType::T,
-            address,
-        },
-        (VendorProfileId::LsXg5000, CanonicalAreaKind::CounterDoneBit) => ResolvedSimAddress::Bit {
-            device: SimBitDeviceType::C,
-            address,
-        },
-        (VendorProfileId::LsXg5000, CanonicalAreaKind::DataWord) => map_word(SimWordDeviceType::D),
-        (VendorProfileId::LsXg5000, CanonicalAreaKind::RetentiveWord) => {
-            map_word(SimWordDeviceType::R)
-        }
-        (VendorProfileId::LsXg5000, CanonicalAreaKind::IndexWord) => map_word(SimWordDeviceType::Z),
-        (VendorProfileId::LsXg5000, CanonicalAreaKind::SystemWord) => {
-            map_word(SimWordDeviceType::N)
-        }
-        (VendorProfileId::LsXg5000, CanonicalAreaKind::TimerValueWord) => {
-            map_word(SimWordDeviceType::Td)
-        }
-        (VendorProfileId::LsXg5000, CanonicalAreaKind::CounterValueWord) => {
-            map_word(SimWordDeviceType::Cd)
-        }
-        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::InputBit) => {
-            ResolvedSimAddress::Bit {
-                device: SimBitDeviceType::X,
-                address,
-            }
-        }
-        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::OutputBit) => {
-            ResolvedSimAddress::Bit {
-                device: SimBitDeviceType::Y,
-                address,
-            }
-        }
-        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::InternalBit) => {
-            ResolvedSimAddress::Bit {
-                device: SimBitDeviceType::M,
-                address,
-            }
-        }
-        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::RetentiveBit) => {
-            ResolvedSimAddress::Bit {
-                device: SimBitDeviceType::K,
-                address,
-            }
-        }
-        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::TimerDoneBit) => {
-            ResolvedSimAddress::Bit {
-                device: SimBitDeviceType::T,
-                address,
-            }
-        }
-        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::CounterDoneBit) => {
-            ResolvedSimAddress::Bit {
-                device: SimBitDeviceType::C,
-                address,
-            }
-        }
-        (VendorProfileId::MelsecFxQCommon, CanonicalAreaKind::DataWord) => {
-            map_word(SimWordDeviceType::D)
-        }
-        (_, CanonicalAreaKind::SystemBit) => {
-            return Err("SystemBit is not bridged by the legacy simulator memory".to_string());
-        }
-        (_, area) => {
-            return Err(format!(
-                "Canonical area {:?} is not bridged to the legacy simulator memory yet",
-                area
-            ));
-        }
-    };
-
-    Ok(resolved)
-}
-
-fn read_resolved_device(
-    memory: &Arc<DeviceMemory>,
-    resolved: ResolvedSimAddress,
+fn read_canonical_device(
+    runtime: &Arc<CanonicalRuntimeFacade>,
+    address: CanonicalAddress,
 ) -> Result<DeviceValue, String> {
-    match resolved {
-        ResolvedSimAddress::Bit { device, address } => {
-            let value = memory
-                .read_bit(device, address)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Bit { value })
-        }
-        ResolvedSimAddress::Word { device, address } => {
-            let value = memory
-                .read_word(device, address)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Word { value })
-        }
-        ResolvedSimAddress::WordBit {
-            device,
-            address,
-            bit,
-        } => {
-            let value = memory
-                .read_word_bit(device, address, bit)
-                .map_err(|e| e.to_string())?;
-            Ok(DeviceValue::Bit { value })
-        }
+    match runtime.read(address).map_err(|e| e.to_string())? {
+        CanonicalValue::Bool(value) => Ok(DeviceValue::Bit { value }),
+        CanonicalValue::U16(value) => Ok(DeviceValue::Word { value }),
     }
 }
 
-fn write_resolved_device(
-    memory: &Arc<DeviceMemory>,
-    resolved: ResolvedSimAddress,
+fn write_canonical_device(
+    runtime: &Arc<CanonicalRuntimeFacade>,
+    address: CanonicalAddress,
     value: &DeviceValue,
 ) -> Result<(), String> {
-    match (resolved, value) {
-        (ResolvedSimAddress::Bit { device, address }, DeviceValue::Bit { value }) => memory
-            .write_bit(device, address, *value)
+    match value {
+        DeviceValue::Bit { value } => runtime
+            .write(address, CanonicalValue::Bool(*value), CanonicalWriteSource::Simulation)
             .map_err(|e| e.to_string()),
-        (ResolvedSimAddress::Word { device, address }, DeviceValue::Word { value }) => memory
-            .write_word(device, address, *value)
+        DeviceValue::Word { value } => runtime
+            .write(address, CanonicalValue::U16(*value), CanonicalWriteSource::Simulation)
             .map_err(|e| e.to_string()),
-        (
-            ResolvedSimAddress::WordBit {
-                device,
-                address,
-                bit,
-            },
-            DeviceValue::Bit { value },
-        ) => memory
-            .write_word_bit(device, address, bit, *value)
-            .map_err(|e| e.to_string()),
-        (ResolvedSimAddress::Bit { .. }, DeviceValue::Word { .. }) => {
-            Err("Bit device requires a bit value".to_string())
-        }
-        (ResolvedSimAddress::Word { .. }, DeviceValue::Bit { .. }) => {
-            Err("Word device requires a word value".to_string())
-        }
-        (ResolvedSimAddress::WordBit { .. }, DeviceValue::Word { .. }) => {
-            Err("Word-bit address requires a bit value".to_string())
-        }
     }
 }
 
@@ -792,9 +605,9 @@ pub fn sim_read_device(
 
     let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
 
-    let memory = engine.memory();
-    let (_, resolved) = resolve_sim_address(Some(&project_state), &address)?;
-    read_resolved_device(memory, resolved)
+    let runtime = engine.runtime();
+    let (_, canonical) = resolve_sim_address(Some(&project_state), &address)?;
+    read_canonical_device(runtime, canonical)
 }
 
 /// Write a device value
@@ -810,12 +623,12 @@ pub fn sim_write_device(
 
     let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
 
-    let memory = engine.memory();
-    let (normalized_address, resolved) = resolve_sim_address(Some(&project_state), &address)?;
+    let runtime = engine.runtime();
+    let (normalized_address, canonical) = resolve_sim_address(Some(&project_state), &address)?;
 
     // Get old value for change event
-    let old_value = read_resolved_device(memory, resolved)?;
-    write_resolved_device(memory, resolved, &value)?;
+    let old_value = read_canonical_device(runtime, canonical)?;
+    write_canonical_device(runtime, canonical, &value)?;
 
     // Emit device change event
     let _ = app.emit(
@@ -854,13 +667,12 @@ pub fn sim_read_memory_range(
 
     let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
 
-    let memory = engine.memory();
     let mut values = Vec::with_capacity(count as usize);
 
     for i in 0..count {
         let addr = start.saturating_add(i);
-        let resolved = resolve_range_address(Some(&project_state), &device_type, addr as u32)?;
-        let value = read_resolved_device(memory, resolved)?;
+        let canonical = resolve_range_address(Some(&project_state), &device_type, addr as u32)?;
+        let value = read_canonical_device(engine.runtime(), canonical)?;
         values.push(value);
     }
 
@@ -887,11 +699,7 @@ mod tests {
         assert_eq!(normalized, "D0100.5");
         assert_eq!(
             resolved,
-            ResolvedSimAddress::WordBit {
-                device: SimWordDeviceType::D,
-                address: 100,
-                bit: 5,
-            }
+            CanonicalAddress::with_bit_index(CanonicalAreaKind::DataWord, 100, 5)
         );
     }
 
@@ -905,31 +713,13 @@ mod tests {
         };
 
         let (_, x) = resolve_sim_address_for_settings(&settings, "X10").expect("X should map");
-        assert_eq!(
-            x,
-            ResolvedSimAddress::Bit {
-                device: SimBitDeviceType::X,
-                address: 0o10,
-            }
-        );
+        assert_eq!(x, CanonicalAddress::new(CanonicalAreaKind::InputBit, 0o10));
 
         let (_, m) = resolve_sim_address_for_settings(&settings, "M100").expect("M should map");
-        assert_eq!(
-            m,
-            ResolvedSimAddress::Bit {
-                device: SimBitDeviceType::M,
-                address: 100,
-            }
-        );
+        assert_eq!(m, CanonicalAddress::new(CanonicalAreaKind::InternalBit, 100));
 
         let (_, y) = resolve_sim_address_for_settings(&settings, "Y17").expect("Y should map");
-        assert_eq!(
-            y,
-            ResolvedSimAddress::Bit {
-                device: SimBitDeviceType::Y,
-                address: 0o17,
-            }
-        );
+        assert_eq!(y, CanonicalAddress::new(CanonicalAreaKind::OutputBit, 0o17));
     }
 
     #[test]
@@ -942,22 +732,10 @@ mod tests {
         };
 
         let (_, input) = resolve_sim_address_for_settings(&settings, "P0019").expect("P19");
-        assert_eq!(
-            input,
-            ResolvedSimAddress::Bit {
-                device: SimBitDeviceType::P,
-                address: 19,
-            }
-        );
+        assert_eq!(input, CanonicalAddress::new(CanonicalAreaKind::InputBit, 19));
 
         let (_, output) = resolve_sim_address_for_settings(&settings, "P0020").expect("P20");
-        assert_eq!(
-            output,
-            ResolvedSimAddress::Bit {
-                device: SimBitDeviceType::P,
-                address: 20,
-            }
-        );
+        assert_eq!(output, CanonicalAddress::new(CanonicalAreaKind::OutputBit, 20));
     }
 }
 
@@ -968,8 +746,12 @@ pub fn sim_get_memory_snapshot(state: State<'_, SimState>) -> Result<MemorySnaps
 
     let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
 
-    let memory = engine.memory();
-    Ok(memory.get_snapshot("sim"))
+    Ok(engine.runtime().get_snapshot(
+        "sim",
+        engine.get_status().scan_count,
+        engine.timer_mgr().get_all_states().into_iter().map(|(k, v)| (k as u32, v)).collect(),
+        engine.counter_mgr().get_all_states().into_iter().map(|(k, v)| (k as u32, v)).collect(),
+    ))
 }
 
 // ============================================================================
@@ -1021,12 +803,12 @@ pub fn sim_add_watch(state: State<'_, SimState>, address: String) -> Result<(), 
     let engine_guard = state.engine.lock();
 
     if let Some(ref engine) = *engine_guard {
-        let memory = engine.memory();
-        state.debugger.add_watch(&address, memory);
+        state.debugger.add_watch(&address, engine.runtime());
         Ok(())
     } else {
         // Add watch without initial value
-        state.debugger.add_watch(&address, &DeviceMemory::new());
+        let runtime = CanonicalRuntimeFacade::new();
+        state.debugger.add_watch(&address, &runtime);
         Ok(())
     }
 }

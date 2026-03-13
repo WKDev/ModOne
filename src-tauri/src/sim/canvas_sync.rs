@@ -1,6 +1,6 @@
 //! Canvas Sync Module
 //!
-//! Provides synchronization between OneSim DeviceMemory and OneCanvas circuit
+//! Provides synchronization between the canonical simulator runtime and OneCanvas circuit
 //! simulation, mapping plc_out block states to Coils and plc_in block states
 //! to Discrete Inputs.
 
@@ -11,7 +11,7 @@ use std::sync::Arc;
 use tauri::Emitter;
 use thiserror::Error;
 
-use super::memory::DeviceMemory;
+use super::memory::CanonicalRuntimeFacade;
 use super::types::SimBitDeviceType;
 
 // ============================================================================
@@ -22,8 +22,8 @@ use super::types::SimBitDeviceType;
 #[derive(Debug, Error)]
 pub enum CanvasSyncError {
     /// Error accessing device memory
-    #[error("Device memory error: {0}")]
-    DeviceMemoryError(String),
+    #[error("Runtime memory error: {0}")]
+    RuntimeMemoryError(String),
 
     /// Mapping not found
     #[error("Mapping not found for block: {0}")]
@@ -171,11 +171,11 @@ pub struct PlcInputChange {
 
 /// Canvas synchronization manager
 ///
-/// Handles bidirectional state sync between OneSim DeviceMemory and
+/// Handles bidirectional state sync between the canonical runtime and
 /// OneCanvas circuit simulation blocks.
 pub struct CanvasSync {
     /// Simulation memory reference
-    sim_memory: Arc<DeviceMemory>,
+    runtime: Arc<CanonicalRuntimeFacade>,
     /// Tauri app handle for event emission
     app_handle: RwLock<Option<tauri::AppHandle>>,
     /// Registered PLC block mappings
@@ -190,9 +190,9 @@ pub struct CanvasSync {
 
 impl CanvasSync {
     /// Create a new CanvasSync instance
-    pub fn new(sim_memory: Arc<DeviceMemory>) -> Self {
+    pub fn new(runtime: Arc<CanonicalRuntimeFacade>) -> Self {
         Self {
-            sim_memory,
+            runtime,
             app_handle: RwLock::new(None),
             plc_block_mappings: RwLock::new(Vec::new()),
             previous_states: RwLock::new(HashMap::new()),
@@ -267,7 +267,7 @@ impl CanvasSync {
     }
 
     // ========================================================================
-    // PlcOut Handling (DeviceMemory → OneCanvas)
+    // PlcOut Handling (Runtime → OneCanvas)
     // ========================================================================
 
     /// Update all PLC output blocks with current device states
@@ -324,9 +324,9 @@ impl CanvasSync {
     fn read_device_state(&self, mapping: &PlcBlockMapping) -> CanvasSyncResult<bool> {
         let device_type = self.parse_device_type(&mapping.device_type)?;
 
-        self.sim_memory
+        self.runtime
             .read_bit(device_type, mapping.address)
-            .map_err(|e| CanvasSyncError::DeviceMemoryError(e.to_string()))
+            .map_err(|e| CanvasSyncError::RuntimeMemoryError(e.to_string()))
     }
 
     /// Apply normally_open and inverted logic to output state
@@ -365,13 +365,13 @@ impl CanvasSync {
     }
 
     // ========================================================================
-    // PlcIn Handling (OneCanvas → DeviceMemory)
+    // PlcIn Handling (OneCanvas → Runtime)
     // ========================================================================
 
     /// Handle PLC input change from canvas
     ///
     /// Called when a circuit's state changes affecting a plc_in block.
-    /// Writes the state to the corresponding device in DeviceMemory.
+    /// Writes the state to the corresponding device in the canonical runtime.
     pub fn handle_plc_input_change(&self, block_id: &str, circuit_state: bool) -> CanvasSyncResult<()> {
         let mapping = self.get_mapping(block_id)
             .ok_or_else(|| CanvasSyncError::MappingNotFound(block_id.to_string()))?;
@@ -419,9 +419,9 @@ impl CanvasSync {
         let device_type = self.parse_device_type(&mapping.device_type)?;
 
         // P relays can be written for input simulation
-        self.sim_memory
+        self.runtime
             .write_bit(device_type, mapping.address, state)
-            .map_err(|e| CanvasSyncError::DeviceMemoryError(e.to_string()))
+            .map_err(|e| CanvasSyncError::RuntimeMemoryError(e.to_string()))
     }
 
     // ========================================================================
@@ -506,8 +506,8 @@ mod tests {
     use super::*;
 
     fn create_test_sync() -> CanvasSync {
-        let sim_memory = Arc::new(DeviceMemory::new());
-        CanvasSync::new(sim_memory)
+        let runtime = Arc::new(CanonicalRuntimeFacade::new());
+        CanvasSync::new(runtime)
     }
 
     // ========================================================================
@@ -573,11 +573,11 @@ mod tests {
 
     #[test]
     fn test_read_device_state() {
-        let sim_memory = Arc::new(DeviceMemory::new());
-        let sync = CanvasSync::new(Arc::clone(&sim_memory));
+        let runtime = Arc::new(CanonicalRuntimeFacade::new());
+        let sync = CanvasSync::new(Arc::clone(&runtime));
 
         // Set M0 to true
-        sim_memory.write_bit(SimBitDeviceType::M, 0, true).unwrap();
+        runtime.write_bit(SimBitDeviceType::M, 0, true).unwrap();
 
         let mapping = PlcBlockMapping::new_plc_out("block1", "M", 0);
         let state = sync.read_device_state(&mapping).unwrap();
@@ -638,8 +638,8 @@ mod tests {
 
     #[test]
     fn test_handle_plc_input_change() {
-        let sim_memory = Arc::new(DeviceMemory::new());
-        let sync = CanvasSync::new(Arc::clone(&sim_memory));
+        let runtime = Arc::new(CanonicalRuntimeFacade::new());
+        let sync = CanvasSync::new(Arc::clone(&runtime));
 
         let mapping = PlcBlockMapping::new_plc_in("sensor1", "P", 0);
         sync.register_mapping(mapping);
@@ -648,17 +648,17 @@ mod tests {
         sync.handle_plc_input_change("sensor1", true).unwrap();
 
         // Verify P0 is set
-        assert!(sim_memory.read_bit(SimBitDeviceType::P, 0).unwrap());
+        assert!(runtime.read_bit(SimBitDeviceType::P, 0).unwrap());
 
         // Handle input change to false
         sync.handle_plc_input_change("sensor1", false).unwrap();
-        assert!(!sim_memory.read_bit(SimBitDeviceType::P, 0).unwrap());
+        assert!(!runtime.read_bit(SimBitDeviceType::P, 0).unwrap());
     }
 
     #[test]
     fn test_handle_plc_input_change_inverted() {
-        let sim_memory = Arc::new(DeviceMemory::new());
-        let sync = CanvasSync::new(Arc::clone(&sim_memory));
+        let runtime = Arc::new(CanonicalRuntimeFacade::new());
+        let sync = CanvasSync::new(Arc::clone(&runtime));
 
         let mapping = PlcBlockMapping::new_plc_in("sensor1", "P", 0)
             .with_inverted(true);
@@ -666,10 +666,10 @@ mod tests {
 
         // Handle input change with inversion
         sync.handle_plc_input_change("sensor1", true).unwrap();
-        assert!(!sim_memory.read_bit(SimBitDeviceType::P, 0).unwrap());
+        assert!(!runtime.read_bit(SimBitDeviceType::P, 0).unwrap());
 
         sync.handle_plc_input_change("sensor1", false).unwrap();
-        assert!(sim_memory.read_bit(SimBitDeviceType::P, 0).unwrap());
+        assert!(runtime.read_bit(SimBitDeviceType::P, 0).unwrap());
     }
 
     #[test]
@@ -723,8 +723,8 @@ mod tests {
 
     #[test]
     fn test_statistics() {
-        let sim_memory = Arc::new(DeviceMemory::new());
-        let sync = CanvasSync::new(Arc::clone(&sim_memory));
+        let runtime = Arc::new(CanonicalRuntimeFacade::new());
+        let sync = CanvasSync::new(Arc::clone(&runtime));
 
         assert_eq!(sync.output_update_count(), 0);
         assert_eq!(sync.input_change_count(), 0);

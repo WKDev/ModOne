@@ -23,10 +23,8 @@ pub type ModbusAdapterResult<T> = Result<T, ModbusAdapterError>;
 
 /// Canonical-runtime-first Modbus adapter.
 ///
-/// This is the target Wave 4 boundary: Modbus reads/writes should operate on the
-/// canonical runtime model, not on legacy simulator device letters. The legacy
-/// `ModServerSync` can coexist temporarily during migration, but new protocol work
-/// should build on this adapter instead of extending the old sync layer.
+/// This is the canonical Modbus runtime boundary: Modbus reads/writes operate on
+/// the canonical runtime model, not on simulator-specific device-letter storage.
 pub struct ModbusAdapter {
     canonical_memory: Arc<RwLock<CanonicalMemory>>,
     modbus_memory: Arc<ModbusMemory>,

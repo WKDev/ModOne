@@ -40,7 +40,7 @@ pub async fn scope_tick(
         }
     };
 
-    let memory = engine.memory();
+    let runtime = engine.runtime();
 
     // Get mappings
     let mappings = scope_state
@@ -76,7 +76,7 @@ pub async fn scope_tick(
         };
 
         // Read device value and convert to voltage
-        let voltage = match read_device_voltage(memory, mapping) {
+        let voltage = match read_device_voltage(runtime, mapping) {
             Ok(v) => v,
             Err(e) => {
                 result.channels_skipped += 1;
@@ -98,7 +98,7 @@ pub async fn scope_tick(
 
 /// Read device value from memory and convert to voltage based on mapping.
 fn read_device_voltage(
-    memory: &std::sync::Arc<crate::sim::memory::DeviceMemory>,
+    runtime: &std::sync::Arc<crate::sim::memory::CanonicalRuntimeFacade>,
     mapping: &crate::canvas::scope_sync::ScopeChannelMapping,
 ) -> Result<f32, String> {
     let device_type = mapping.device_type.to_uppercase();
@@ -107,74 +107,74 @@ fn read_device_voltage(
     match device_type.as_str() {
         // Bit devices - output scale voltage when true, 0 when false
         "P" => {
-            let value = memory
+            let value = runtime
                 .read_bit(SimBitDeviceType::P, mapping.address)
                 .map_err(|e| e.to_string())?;
             Ok(if value { mapping.scale } else { 0.0 } + mapping.offset)
         }
         "M" => {
-            let value = memory
+            let value = runtime
                 .read_bit(SimBitDeviceType::M, mapping.address)
                 .map_err(|e| e.to_string())?;
             Ok(if value { mapping.scale } else { 0.0 } + mapping.offset)
         }
         "K" => {
-            let value = memory
+            let value = runtime
                 .read_bit(SimBitDeviceType::K, mapping.address)
                 .map_err(|e| e.to_string())?;
             Ok(if value { mapping.scale } else { 0.0 } + mapping.offset)
         }
         "F" => {
-            let value = memory
+            let value = runtime
                 .read_bit(SimBitDeviceType::F, mapping.address)
                 .map_err(|e| e.to_string())?;
             Ok(if value { mapping.scale } else { 0.0 } + mapping.offset)
         }
         "T" => {
-            let value = memory
+            let value = runtime
                 .read_bit(SimBitDeviceType::T, mapping.address)
                 .map_err(|e| e.to_string())?;
             Ok(if value { mapping.scale } else { 0.0 } + mapping.offset)
         }
         "C" => {
-            let value = memory
+            let value = runtime
                 .read_bit(SimBitDeviceType::C, mapping.address)
                 .map_err(|e| e.to_string())?;
             Ok(if value { mapping.scale } else { 0.0 } + mapping.offset)
         }
         // Word devices - value * scale + offset
         "D" => {
-            let value = memory
+            let value = runtime
                 .read_word(SimWordDeviceType::D, mapping.address)
                 .map_err(|e| e.to_string())?;
             Ok(value as f32 * mapping.scale + mapping.offset)
         }
         "R" => {
-            let value = memory
+            let value = runtime
                 .read_word(SimWordDeviceType::R, mapping.address)
                 .map_err(|e| e.to_string())?;
             Ok(value as f32 * mapping.scale + mapping.offset)
         }
         "Z" => {
-            let value = memory
+            let value = runtime
                 .read_word(SimWordDeviceType::Z, mapping.address)
                 .map_err(|e| e.to_string())?;
             Ok(value as f32 * mapping.scale + mapping.offset)
         }
         "N" => {
-            let value = memory
+            let value = runtime
                 .read_word(SimWordDeviceType::N, mapping.address)
                 .map_err(|e| e.to_string())?;
             Ok(value as f32 * mapping.scale + mapping.offset)
         }
         "TD" => {
-            let value = memory
+            let value = runtime
                 .read_word(SimWordDeviceType::Td, mapping.address)
                 .map_err(|e| e.to_string())?;
             Ok(value as f32 * mapping.scale + mapping.offset)
         }
         "CD" => {
-            let value = memory
+            let value = runtime
                 .read_word(SimWordDeviceType::Cd, mapping.address)
                 .map_err(|e| e.to_string())?;
             Ok(value as f32 * mapping.scale + mapping.offset)
@@ -206,7 +206,7 @@ pub async fn scope_read_device_voltage(
         .as_ref()
         .ok_or("Simulation is not running")?;
 
-    let memory = engine.memory();
+    let runtime = engine.runtime();
     let device_upper = device_type.to_uppercase();
     let offset_val = offset.unwrap_or(0.0);
 
@@ -226,5 +226,5 @@ pub async fn scope_read_device_voltage(
         label: None,
     };
 
-    read_device_voltage(memory, &mapping)
+    read_device_voltage(runtime, &mapping)
 }
