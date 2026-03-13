@@ -5,11 +5,14 @@
 
 pub mod adapter;
 pub mod memory;
+pub mod pdu;
 pub mod rtu;
 pub mod tcp;
 pub mod types;
 
-pub use adapter::{DirtyPublishWindow, ModbusAdapter, ModbusAdapterError, ModbusAdapterResult};
+pub use adapter::{
+    DirtyPublishWindow, ModbusAdapter, ModbusAdapterError, ModbusAdapterResult, ProtocolAdapter,
+};
 pub use memory::ModbusMemory;
 pub use rtu::{
     list_available_ports, ModbusRtuServer, PortInfo, RtuConfig, RtuDataBits, RtuParity,

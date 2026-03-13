@@ -96,6 +96,7 @@ impl ProjectManifest {
             memory_map: self.memory_map.clone(),
             auto_save: self.auto_save.clone(),
             canvas: self.canvas.clone(),
+            network: super::config::NetworkSettings::default(),
         }
     }
 

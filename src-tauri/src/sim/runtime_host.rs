@@ -271,7 +271,7 @@ impl SimulationRuntimeHost {
             policy,
         ));
         self.protocol_runtime
-            .attach_modbus(Arc::clone(&self.runtime), adapter)
+            .attach_adapter(Arc::clone(&self.runtime), adapter)
     }
 
     fn spawn_event_forwarder(&self, app: AppHandle, engine: Arc<OneSimEngine>) {

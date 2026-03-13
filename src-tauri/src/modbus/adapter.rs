@@ -11,6 +11,29 @@ use crate::plc_runtime::{
 
 use super::{ChangeSource, MemoryError, ModbusMemory};
 
+/// Transport-agnostic protocol adapter trait.
+///
+/// This trait defines the interface between the protocol runtime and
+/// specific protocol adapters (Modbus, OPC UA, etc.). The protocol runtime
+/// uses this trait to synchronize canonical memory with protocol-specific
+/// address spaces.
+pub trait ProtocolAdapter: Send + Sync {
+    /// Apply external writes from protocol clients back into canonical memory.
+    fn apply_external_writes(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
+
+    /// Publish only the dirty canonical regions into protocol address space.
+    fn publish_dirty_state(
+        &self,
+        windows: &[DirtyPublishWindow],
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
+
+    /// Publish full canonical runtime state into protocol address space.
+    fn publish_runtime_state(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
+
+    /// Full synchronization: apply external writes then publish all state.
+    fn full_sync(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
+}
+
 #[derive(Debug, Error)]
 pub enum ModbusAdapterError {
     #[error("canonical runtime error: {0}")]
@@ -359,6 +382,27 @@ impl ModbusAdapter {
         }
 
         Some((start.saturating_add(rule.offset), count))
+    }
+}
+
+impl ProtocolAdapter for ModbusAdapter {
+    fn apply_external_writes(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        ModbusAdapter::apply_external_writes(self).map_err(|e| Box::new(e) as _)
+    }
+
+    fn publish_dirty_state(
+        &self,
+        windows: &[DirtyPublishWindow],
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        ModbusAdapter::publish_dirty_state(self, windows).map_err(|e| Box::new(e) as _)
+    }
+
+    fn publish_runtime_state(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        ModbusAdapter::publish_runtime_state(self).map_err(|e| Box::new(e) as _)
+    }
+
+    fn full_sync(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        ModbusAdapter::full_sync(self).map_err(|e| Box::new(e) as _)
     }
 }
 

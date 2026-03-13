@@ -30,6 +30,10 @@ pub struct ProjectConfig {
     /// Canvas settings
     #[serde(default)]
     pub canvas: CanvasSettings,
+
+    /// Network settings for PLC IP simulation
+    #[serde(default)]
+    pub network: NetworkSettings,
 }
 
 impl Default for ProjectConfig {
@@ -42,6 +46,38 @@ impl Default for ProjectConfig {
             memory_map: MemoryMapSettings::default(),
             auto_save: AutoSaveSettings::default(),
             canvas: CanvasSettings::default(),
+            network: NetworkSettings::default(),
+        }
+    }
+}
+
+/// Network settings for PLC IP simulation.
+///
+/// When `plc_ip` is set, the simulator will bind Modbus TCP (and future OPC UA)
+/// servers to this IP address instead of the default `0.0.0.0`. The IP can be
+/// assigned to a network interface as an alias using OS-level commands
+/// (e.g., `netsh interface ip add address` on Windows).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NetworkSettings {
+    /// IP address that the simulated PLC should use on the network.
+    /// When set, protocol servers (Modbus TCP, OPC UA) bind to this IP.
+    /// When None, servers bind to 0.0.0.0 (all interfaces).
+    pub plc_ip: Option<String>,
+
+    /// Network interface name for IP alias assignment.
+    /// Used when automatically managing IP aliases.
+    pub interface_name: Option<String>,
+
+    /// Subnet mask for the PLC IP (e.g., "255.255.255.0").
+    pub subnet_mask: Option<String>,
+}
+
+impl Default for NetworkSettings {
+    fn default() -> Self {
+        Self {
+            plc_ip: None,
+            interface_name: None,
+            subnet_mask: None,
         }
     }
 }

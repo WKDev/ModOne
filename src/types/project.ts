@@ -160,6 +160,16 @@ export interface ProjectConfig {
   memory_map: MemoryMapSettings;
   auto_save?: AutoSaveSettings;
   canvas?: CanvasSettings;
+  network?: NetworkSettings;
+}
+
+export interface NetworkSettings {
+  /** IP address the simulated PLC uses on the network. Null means bind to 0.0.0.0 */
+  plc_ip: string | null;
+  /** Network interface name for IP alias assignment */
+  interface_name: string | null;
+  /** Subnet mask (e.g., "255.255.255.0") */
+  subnet_mask: string | null;
 }
 
 // Placeholder types (to be fully implemented in later units)

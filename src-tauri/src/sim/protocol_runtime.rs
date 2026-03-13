@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use parking_lot::Mutex;
 use tokio::sync::Notify;
 
-use crate::modbus::{DirtyPublishWindow, ModbusAdapter};
+use crate::modbus::{DirtyPublishWindow, ProtocolAdapter};
 use crate::plc_runtime::{CanonicalAreaKind, CanonicalMemoryEvent};
 
 use super::memory::CanonicalRuntimeFacade;
@@ -14,7 +14,7 @@ const PROTOCOL_COALESCE_WINDOW: Duration = Duration::from_millis(2);
 const PROTOCOL_MAX_DEFERRED_FLUSH: Duration = Duration::from_millis(10);
 
 pub struct ProtocolRuntime {
-    adapter: Mutex<Option<Arc<ModbusAdapter>>>,
+    adapter: Mutex<Option<Arc<dyn ProtocolAdapter>>>,
     task: Mutex<Option<tokio::task::JoinHandle<()>>>,
     flush_notify: Arc<Notify>,
 }
@@ -34,12 +34,12 @@ impl ProtocolRuntime {
         }
     }
 
-    pub fn attach_modbus(
+    pub fn attach_adapter(
         &self,
         runtime: Arc<CanonicalRuntimeFacade>,
-        adapter: Arc<ModbusAdapter>,
+        adapter: Arc<dyn ProtocolAdapter>,
     ) -> Result<(), String> {
-        self.detach_modbus();
+        self.detach_adapter();
         adapter.full_sync().map_err(|e| e.to_string())?;
         *self.adapter.lock() = Some(Arc::clone(&adapter));
 
@@ -72,11 +72,11 @@ impl ProtocolRuntime {
                         if adapter.apply_external_writes().is_err() {
                             continue;
                         }
-                        try_flush(&adapter, &mut dirty_windows, &mut dirty_since, &mut last_flush);
+                        try_flush(adapter.as_ref(), &mut dirty_windows, &mut dirty_since, &mut last_flush);
                     }
                     _ = flush_notify.notified() => {
                         if adapter.apply_external_writes().is_ok() {
-                            force_flush(&adapter, &mut dirty_windows, &mut dirty_since, &mut last_flush);
+                            force_flush(adapter.as_ref(), &mut dirty_windows, &mut dirty_since, &mut last_flush);
                         }
                     }
                 }
@@ -87,19 +87,29 @@ impl ProtocolRuntime {
         Ok(())
     }
 
-    pub fn detach_modbus(&self) {
+    pub fn detach_adapter(&self) {
         if let Some(task) = self.task.lock().take() {
             task.abort();
         }
         *self.adapter.lock() = None;
     }
 
+    /// Backward-compatible alias for `detach_adapter`.
+    pub fn detach_modbus(&self) {
+        self.detach_adapter();
+    }
+
     pub fn flush_now(&self) {
         self.flush_notify.notify_one();
     }
 
-    pub fn has_modbus(&self) -> bool {
+    pub fn has_adapter(&self) -> bool {
         self.adapter.lock().is_some()
+    }
+
+    /// Backward-compatible alias for `has_adapter`.
+    pub fn has_modbus(&self) -> bool {
+        self.has_adapter()
     }
 }
 
@@ -131,7 +141,7 @@ fn merge_address(
 }
 
 fn try_flush(
-    adapter: &ModbusAdapter,
+    adapter: &dyn ProtocolAdapter,
     dirty_windows: &mut HashMap<CanonicalAreaKind, DirtyPublishWindow>,
     dirty_since: &mut Option<Instant>,
     last_flush: &mut Instant,
@@ -151,7 +161,7 @@ fn try_flush(
 }
 
 fn force_flush(
-    adapter: &ModbusAdapter,
+    adapter: &dyn ProtocolAdapter,
     dirty_windows: &mut HashMap<CanonicalAreaKind, DirtyPublishWindow>,
     dirty_since: &mut Option<Instant>,
     last_flush: &mut Instant,
