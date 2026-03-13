@@ -455,7 +455,7 @@ export const usePanelStore = create<PanelStore>()(
       },
 
       moveTabToNewPanel: (panelId, tabId) => {
-        const { panels, gridConfig, addPanel, removeTab } = get();
+        const { panels, gridConfig } = get();
         const panel = panels.find((p) => p.id === panelId);
         const tab = panel?.tabs?.find((t) => t.id === tabId);
 
@@ -466,34 +466,53 @@ export const usePanelStore = create<PanelStore>()(
         const maxRow = gridConfig.rows.length + 1;
         const newArea = `${maxRow - 1} / ${maxCol - 1} / ${maxRow} / ${maxCol}`;
 
-        // Create new panel with the tab
-        const newPanelId = addPanel(tab.panelType, newArea);
-
-        // Add the tab to the new panel
+        const newPanelId = generatePanelId();
         const newTabId = generateTabId();
-        const newTab: TabState = {
-          ...tab,
-          id: newTabId,
-        };
+        const newTab: TabState = { ...tab, id: newTabId };
 
+        // Atomic: create new panel with tab + remove tab from source in one set()
         set(
-          (state) => ({
-            panels: state.panels.map((p) =>
-              p.id === newPanelId
-                ? {
-                    ...p,
-                    tabs: [newTab],
-                    activeTabId: newTabId,
+          (state) => {
+            // Remove tab from source panel and calculate new active tab
+            const updatedPanels = state.panels.map((p) => {
+              if (p.id === panelId) {
+                const tabs = p.tabs || [];
+                const tabIndex = tabs.findIndex((t) => t.id === tabId);
+                const newTabs = tabs.filter((t) => t.id !== tabId);
+                let newActiveTabId = p.activeTabId;
+                if (p.activeTabId === tabId) {
+                  if (newTabs.length === 0) {
+                    newActiveTabId = null;
+                  } else if (tabIndex >= newTabs.length) {
+                    newActiveTabId = newTabs[newTabs.length - 1].id;
+                  } else {
+                    newActiveTabId = newTabs[tabIndex].id;
                   }
-                : p
-            ),
-          }),
+                }
+                return { ...p, tabs: newTabs, activeTabId: newActiveTabId };
+              }
+              return p;
+            });
+
+            // Add new panel with the moved tab
+            const newPanel: PanelState = {
+              id: newPanelId,
+              type: tab.panelType,
+              title: PANEL_TYPE_LABELS[tab.panelType],
+              gridArea: newArea,
+              isMinimized: false,
+              tabs: [newTab],
+              activeTabId: newTabId,
+            };
+
+            return {
+              panels: [...updatedPanels, newPanel],
+              activePanel: newPanelId,
+            };
+          },
           false,
           'moveTabToNewPanel'
         );
-
-        // Remove tab from original panel
-        removeTab(panelId, tabId);
 
         return newPanelId;
       },

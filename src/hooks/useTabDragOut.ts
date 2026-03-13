@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Window } from '@tauri-apps/api/window';
 import { usePanelStore } from '../stores/panelStore';
 import { DEFAULT_FLOATING_WINDOW_SIZE } from '../types/window';
@@ -128,6 +128,11 @@ export function useTabDragOut() {
     },
     [cleanupGlobalListener, isOutsideWindow, moveTabToFloatingWindow]
   );
+
+  // Cleanup on unmount (e.g., workspace switch mid-drag)
+  useEffect(() => {
+    return () => cleanupGlobalListener();
+  }, [cleanupGlobalListener]);
 
   return { onTabDragStart, onTabDragEnd };
 }
