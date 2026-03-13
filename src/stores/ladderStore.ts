@@ -48,6 +48,7 @@ import {
   isCounterType,
   isCompareType,
 } from '../types/ladder';
+import type { RuntimeBinding } from '../types/onesim';
 
 // ============================================================================
 // Types
@@ -156,7 +157,7 @@ interface LadderActions {
   /** Update monitoring state with new values */
   updateMonitoringState: (state: Partial<LadderMonitoringState>) => void;
   /** Force a device to a specific value */
-  forceDevice: (address: string, value: boolean | number) => void;
+  forceDevice: (address: string, value: boolean | number, binding?: RuntimeBinding) => void;
   /** Release force on a device */
   releaseForce: (address: string) => void;
 
@@ -782,27 +783,31 @@ export const useLadderStore = create<LadderStore>()(
             if (!state.monitoringState) return;
 
             if (updates.deviceStates) {
-              updates.deviceStates.forEach((value, key) => {
-                state.monitoringState!.deviceStates.set(key, value);
-              });
+              state.monitoringState.deviceStates = updates.deviceStates;
+            }
+            if (updates.deviceBindings) {
+              state.monitoringState.deviceBindings = updates.deviceBindings;
             }
             if (updates.forcedDevices) {
-              updates.forcedDevices.forEach((value) => {
-                state.monitoringState!.forcedDevices.add(value);
-              });
+              state.monitoringState.forcedDevices = updates.forcedDevices;
+            }
+            if (updates.forcedDeviceBindings) {
+              state.monitoringState.forcedDeviceBindings = updates.forcedDeviceBindings;
             }
             if (updates.energizedWires) {
               state.monitoringState.energizedWires = updates.energizedWires;
             }
             if (updates.timerStates) {
-              updates.timerStates.forEach((value, key) => {
-                state.monitoringState!.timerStates.set(key, value);
-              });
+              state.monitoringState.timerStates = updates.timerStates;
+            }
+            if (updates.timerBindings) {
+              state.monitoringState.timerBindings = updates.timerBindings;
             }
             if (updates.counterStates) {
-              updates.counterStates.forEach((value, key) => {
-                state.monitoringState!.counterStates.set(key, value);
-              });
+              state.monitoringState.counterStates = updates.counterStates;
+            }
+            if (updates.counterBindings) {
+              state.monitoringState.counterBindings = updates.counterBindings;
             }
           },
           false,
@@ -810,12 +815,16 @@ export const useLadderStore = create<LadderStore>()(
         );
       },
 
-      forceDevice: (address, value) => {
+      forceDevice: (address, value, binding) => {
         set(
           (state) => {
             if (!state.monitoringState) return;
             state.monitoringState.deviceStates.set(address, value);
             state.monitoringState.forcedDevices.add(address);
+            if (binding) {
+              state.monitoringState.deviceBindings.set(address, binding);
+              state.monitoringState.forcedDeviceBindings.set(address, binding);
+            }
           },
           false,
           `forceDevice/${address}`
@@ -827,6 +836,7 @@ export const useLadderStore = create<LadderStore>()(
           (state) => {
             if (!state.monitoringState) return;
             state.monitoringState.forcedDevices.delete(address);
+            state.monitoringState.forcedDeviceBindings.delete(address);
           },
           false,
           `releaseForce/${address}`

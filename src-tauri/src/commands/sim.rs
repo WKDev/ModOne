@@ -40,6 +40,8 @@ use crate::sim::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ForcedDeviceValue {
+    pub binding: RuntimeBinding,
+    pub display_address: String,
     pub value: serde_json::Value,
 }
 
@@ -55,7 +57,7 @@ pub struct SimState {
     program: Arc<Mutex<Option<CompiledProgram>>>,
     scan_task: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
     monitoring_active: Arc<AtomicBool>,
-    forced_devices: Arc<parking_lot::RwLock<HashMap<String, serde_json::Value>>>,
+    forced_devices: Arc<parking_lot::RwLock<HashMap<String, ForcedDeviceValue>>>,
 }
 
 impl Default for SimState {
@@ -687,6 +689,22 @@ pub fn sim_read_device(
     read_canonical_device(runtime, canonical)
 }
 
+#[tauri::command]
+pub fn sim_read_binding(
+    state: State<'_, SimState>,
+    project_state: State<'_, SharedProjectManager>,
+    request: WatchBindingRequest,
+) -> Result<DeviceValue, String> {
+    let engine_guard = state.engine.lock();
+    let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
+    let runtime = engine.runtime();
+    let (binding, _) = resolve_runtime_binding(Some(&project_state), &request)?;
+    let canonical = binding
+        .canonical_address()
+        .ok_or_else(|| "Tag binding reads are not implemented yet".to_string())?;
+    read_canonical_device(runtime, canonical)
+}
+
 /// Write a device value
 #[tauri::command]
 pub fn sim_write_device(
@@ -724,6 +742,48 @@ pub fn sim_write_device(
     if let Some(hit) = debugger.check_device_change(
         &binding,
         &normalized_address,
+        serde_json::to_value(&old_value).unwrap_or_default(),
+        serde_json::to_value(&value).unwrap_or_default(),
+    ) {
+        debugger.pause(hit.clone());
+        let _ = app.emit(SIM_BREAKPOINT_HIT_EVENT, serde_json::json!({ "hit": hit }));
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn sim_write_binding(
+    app: AppHandle,
+    state: State<'_, SimState>,
+    project_state: State<'_, SharedProjectManager>,
+    request: WatchBindingRequest,
+    value: DeviceValue,
+) -> Result<(), String> {
+    let engine_guard = state.engine.lock();
+    let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
+    let runtime = engine.runtime();
+    let (binding, display_address) = resolve_runtime_binding(Some(&project_state), &request)?;
+    let canonical = binding
+        .canonical_address()
+        .ok_or_else(|| "Tag binding writes are not implemented yet".to_string())?;
+    let old_value = read_canonical_device(runtime, canonical)?;
+    write_canonical_device(runtime, canonical, &value)?;
+
+    let _ = app.emit(
+        SIM_DEVICE_CHANGE_EVENT,
+        serde_json::json!({
+            "address": display_address,
+            "binding": binding,
+            "oldValue": old_value,
+            "newValue": value
+        }),
+    );
+
+    let debugger = state.debugger();
+    if let Some(hit) = debugger.check_device_change(
+        &binding,
+        &display_address,
         serde_json::to_value(&old_value).unwrap_or_default(),
         serde_json::to_value(&value).unwrap_or_default(),
     ) {
@@ -1024,16 +1084,30 @@ pub fn ladder_stop_monitoring(state: State<'_, SimState>) -> Result<(), String> 
 #[tauri::command]
 pub fn ladder_force_device(
     state: State<'_, SimState>,
-    address: String,
+    project_state: State<'_, SharedProjectManager>,
+    request: WatchBindingRequest,
     value: serde_json::Value,
 ) -> Result<(), String> {
-    state.forced_devices.write().insert(address, value);
+    let (binding, display_address) = resolve_runtime_binding(Some(&project_state), &request)?;
+    state.forced_devices.write().insert(
+        display_address.clone(),
+        ForcedDeviceValue {
+            binding,
+            display_address,
+            value,
+        },
+    );
     Ok(())
 }
 
 /// Release force on a device
 #[tauri::command]
-pub fn ladder_release_force(state: State<'_, SimState>, address: String) -> Result<(), String> {
-    state.forced_devices.write().remove(&address);
+pub fn ladder_release_force(
+    state: State<'_, SimState>,
+    project_state: State<'_, SharedProjectManager>,
+    request: WatchBindingRequest,
+) -> Result<(), String> {
+    let (_, display_address) = resolve_runtime_binding(Some(&project_state), &request)?;
+    state.forced_devices.write().remove(&display_address);
     Ok(())
 }

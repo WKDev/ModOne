@@ -98,6 +98,7 @@ export {
 import type {
   GridPosition,
 } from '../components/OneParser/types';
+import type { RuntimeBinding } from './onesim';
 
 // ============================================================================
 // Wire Direction Bitmask
@@ -403,7 +404,7 @@ export interface WireEndpoint {
 }
 
 export interface VerticalLinkPosition {
-  /** Vertical-link grid row, using origin (0, -0.5) in main-grid space */
+  /** Gap row, where 0 connects main rows 0 and 1 */
   row: number;
   /** Boundary column index shared with the main grid */
   col: number;
@@ -426,11 +427,85 @@ export interface VerticalLinkEntity {
 }
 
 export function getVerticalLinkRowFromMainGridRow(mainRow: number): number {
-  return mainRow + 1;
+  return mainRow;
 }
 
 export function getMainGridRowFromVerticalLinkRow(verticalRow: number): number {
-  return verticalRow - 1;
+  return verticalRow;
+}
+
+export type LadderCellType =
+  | ContactType
+  | CoilType
+  | TimerType
+  | CounterType
+  | CompareType;
+
+export interface HorizontalEdgePosition {
+  row: number;
+  startBoundaryCol: number;
+  endBoundaryCol: number;
+}
+
+export interface HorizontalEdgeProperties {
+  isValid?: boolean;
+}
+
+export interface HorizontalEdgeEntity {
+  id: string;
+  position: HorizontalEdgePosition;
+  selected?: boolean;
+  properties: HorizontalEdgeProperties;
+}
+
+export type VerticalEdgePosition = VerticalLinkPosition;
+export type VerticalEdgeProperties = VerticalLinkProperties;
+export type VerticalEdgeEntity = VerticalLinkEntity;
+
+export interface TopologyNode {
+  id: string;
+  boundaryCol: number;
+  row: number;
+  incidentEdgeIds: string[];
+  attachedElementIds: string[];
+  degree: number;
+  netId: string;
+}
+
+export interface TopologyIssue {
+  id: string;
+  severity: 'warning' | 'error';
+  code:
+    | 'ISOLATED_NET'
+    | 'DANGLING_VERTICAL_EDGE'
+    | 'INVALID_VERTICAL_CHAIN';
+  message: string;
+}
+
+export interface VerticalContinuityChain {
+  id: string;
+  edgeIds: string[];
+  boundaryCol: number;
+  gapRows: number[];
+  valid: boolean;
+  reason?: string;
+}
+
+export interface DerivedTopology {
+  nodes: Map<string, TopologyNode>;
+  adjacency: Map<string, string[]>;
+  netIdsByEdgeId: Map<string, string>;
+  netIdsByElementId: Map<string, string>;
+  cellsByCoord: Map<string, string>;
+  horizontalEdgesByRow: Map<number, string[]>;
+  verticalEdgesByCoord: Map<string, string>;
+  verticalChains: VerticalContinuityChain[];
+  issues: TopologyIssue[];
+}
+
+export interface LadderSelectionItem {
+  id: string;
+  kind: 'cell' | 'horizontal-edge' | 'vertical-edge';
 }
 
 /** Wire connection between elements */
@@ -503,14 +578,22 @@ export interface CounterState {
 export interface LadderMonitoringState {
   /** Device states (address -> boolean for bits, number for words) */
   deviceStates: Map<string, boolean | number>;
+  /** Device bindings keyed by display address */
+  deviceBindings: Map<string, RuntimeBinding>;
   /** Forced device addresses */
   forcedDevices: Set<string>;
+  /** Forced device bindings keyed by display address */
+  forcedDeviceBindings: Map<string, RuntimeBinding>;
   /** Energized wire IDs */
   energizedWires: Set<string>;
   /** Timer states (address -> state) */
   timerStates: Map<string, TimerState>;
+  /** Timer bindings keyed by display address */
+  timerBindings: Map<string, RuntimeBinding>;
   /** Counter states (address -> state) */
   counterStates: Map<string, CounterState>;
+  /** Counter bindings keyed by display address */
+  counterBindings: Map<string, RuntimeBinding>;
 }
 
 /** Default timer state */
@@ -531,10 +614,14 @@ export const DEFAULT_COUNTER_STATE: CounterState = {
 /** Default monitoring state */
 export const DEFAULT_MONITORING_STATE: LadderMonitoringState = {
   deviceStates: new Map(),
+  deviceBindings: new Map(),
   forcedDevices: new Set(),
+  forcedDeviceBindings: new Map(),
   energizedWires: new Set(),
   timerStates: new Map(),
+  timerBindings: new Map(),
   counterStates: new Map(),
+  counterBindings: new Map(),
 };
 
 // ============================================================================
@@ -669,10 +756,14 @@ export function isLogicElement(element: LadderElement): boolean {
 export function createEmptyMonitoringState(): LadderMonitoringState {
   return {
     deviceStates: new Map(),
+    deviceBindings: new Map(),
     forcedDevices: new Set(),
+    forcedDeviceBindings: new Map(),
     energizedWires: new Set(),
     timerStates: new Map(),
+    timerBindings: new Map(),
     counterStates: new Map(),
+    counterBindings: new Map(),
   };
 }
 

@@ -13,6 +13,7 @@ use tauri::{AppHandle, Emitter};
 use thiserror::Error;
 use tokio::sync::oneshot;
 
+use crate::commands::sim::ForcedDeviceValue;
 use crate::modbus::ModbusAdapter;
 
 use super::counter::CounterManager;
@@ -169,7 +170,7 @@ pub struct OneSimEngine {
     /// Whether monitoring is active (shared with command handler)
     monitoring_active: RwLock<Option<Arc<AtomicBool>>>,
     /// Forced device values (shared with command handler)
-    forced_devices: RwLock<Option<Arc<parking_lot::RwLock<HashMap<String, serde_json::Value>>>>>,
+    forced_devices: RwLock<Option<Arc<parking_lot::RwLock<HashMap<String, ForcedDeviceValue>>>>>,
 
     // Canvas synchronization
     /// Canvas sync for PLC output -> circuit block state updates
@@ -296,7 +297,7 @@ impl OneSimEngine {
     pub fn set_monitoring_state(
         &self,
         active: Arc<AtomicBool>,
-        forced: Arc<parking_lot::RwLock<HashMap<String, serde_json::Value>>>,
+        forced: Arc<parking_lot::RwLock<HashMap<String, ForcedDeviceValue>>>,
     ) {
         *self.monitoring_active.write() = Some(active);
         *self.forced_devices.write() = Some(forced);
@@ -314,77 +315,40 @@ impl OneSimEngine {
             return;
         }
 
-        for (address, value) in forced.iter() {
-            let upper = address.to_uppercase();
-            let (dev_type, addr_str) = if upper.starts_with("TD") || upper.starts_with("CD") {
-                (&upper[..2], &upper[2..])
-            } else if upper.len() >= 2 {
-                (&upper[..1], &upper[1..])
-            } else {
-                continue;
-            };
-
-            let addr: u16 = match addr_str.parse() {
-                Ok(a) => a,
-                Err(_) => {
-                    self.emit_monitoring_error(format!("Invalid forced device address: {}", address));
-                    continue;
-                }
-            };
-
-            match dev_type {
-                "P" | "M" | "K" => {
-                    if let Some(v) = value.as_bool() {
-                        let canonical = match dev_type {
-                            "P" => crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::OutputBit, addr as u32),
-                            "M" => crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::InternalBit, addr as u32),
-                            "K" => crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::RetentiveBit, addr as u32),
-                            _ => continue,
-                        };
-                        if let Err(err) = self.runtime.write_bool(canonical, v, crate::plc_runtime::CanonicalWriteSource::Simulation) {
-                            self.emit_monitoring_error(format!("Failed forcing {}: {}", address, err));
+        for forced_value in forced.values() {
+            match forced_value.binding.canonical_address() {
+                Some(canonical) if canonical.area.is_bit_area() || canonical.bit_index.is_some() => {
+                    if let Some(v) = forced_value.value.as_bool() {
+                        if let Err(err) = self.runtime.write_bool(
+                            canonical,
+                            v,
+                            crate::plc_runtime::CanonicalWriteSource::Simulation,
+                        ) {
+                            self.emit_monitoring_error(format!(
+                                "Failed forcing {}: {}",
+                                forced_value.display_address, err
+                            ));
                         }
                     }
                 }
-                "D" | "R" | "Z" | "N" => {
-                    if let Some(v) = value.as_u64() {
-                        let canonical = match dev_type {
-                            "D" => crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::DataWord, addr as u32),
-                            "R" => crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::RetentiveWord, addr as u32),
-                            "Z" => crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::IndexWord, addr as u32),
-                            "N" => crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::SystemWord, addr as u32),
-                            _ => continue,
-                        };
-                        if let Err(err) = self.runtime.write_word_value(canonical, v as u16, crate::plc_runtime::CanonicalWriteSource::Simulation) {
-                            self.emit_monitoring_error(format!("Failed forcing {}: {}", address, err));
-                        }
-                    }
-                }
-                "TD" => {
-                    if let Some(v) = value.as_u64() {
+                Some(canonical) => {
+                    if let Some(v) = forced_value.value.as_u64() {
                         if let Err(err) = self.runtime.write_word_value(
-                            crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::TimerValueWord, addr as u32),
+                            canonical,
                             v as u16,
                             crate::plc_runtime::CanonicalWriteSource::Simulation,
-                        )
-                        {
-                            self.emit_monitoring_error(format!("Failed forcing {}: {}", address, err));
+                        ) {
+                            self.emit_monitoring_error(format!(
+                                "Failed forcing {}: {}",
+                                forced_value.display_address, err
+                            ));
                         }
                     }
                 }
-                "CD" => {
-                    if let Some(v) = value.as_u64() {
-                        if let Err(err) = self.runtime.write_word_value(
-                            crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::CounterValueWord, addr as u32),
-                            v as u16,
-                            crate::plc_runtime::CanonicalWriteSource::Simulation,
-                        )
-                        {
-                            self.emit_monitoring_error(format!("Failed forcing {}: {}", address, err));
-                        }
-                    }
-                }
-                _ => {}
+                None => self.emit_monitoring_error(format!(
+                    "Tag-bound forced device is not implemented yet: {}",
+                    forced_value.display_address
+                )),
             }
         }
     }
@@ -405,6 +369,7 @@ impl OneSimEngine {
             let mut devices = Vec::new();
 
             for (area, dev_name, limit) in &[
+                (crate::plc_runtime::CanonicalAreaKind::InputBit, "InputBit", 256u32),
                 (crate::plc_runtime::CanonicalAreaKind::OutputBit, "OutputBit", 256u32),
                 (crate::plc_runtime::CanonicalAreaKind::InternalBit, "InternalBit", 256u32),
                 (crate::plc_runtime::CanonicalAreaKind::RetentiveBit, "RetentiveBit", 256u32),
@@ -414,6 +379,9 @@ impl OneSimEngine {
                         if val {
                             devices.push(serde_json::json!({
                                 "address": format!("{}:{}", dev_name, addr),
+                                "binding": crate::sim::RuntimeBinding::canonical(
+                                    crate::plc_runtime::CanonicalAddress::new(*area, addr)
+                                ),
                                 "value": val
                             }));
                         }
@@ -430,6 +398,9 @@ impl OneSimEngine {
                         if val {
                             devices.push(serde_json::json!({
                                 "address": format!("{}:{}", dev_name, addr),
+                                "binding": crate::sim::RuntimeBinding::canonical(
+                                    crate::plc_runtime::CanonicalAddress::new(*area, addr)
+                                ),
                                 "value": val
                             }));
                         }
@@ -442,6 +413,9 @@ impl OneSimEngine {
                     if val != 0 {
                         devices.push(serde_json::json!({
                             "address": format!("DataWord:{}", addr),
+                            "binding": crate::sim::RuntimeBinding::canonical(
+                                crate::plc_runtime::CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::DataWord, addr)
+                            ),
                             "value": val
                         }));
                     }
@@ -454,6 +428,12 @@ impl OneSimEngine {
                 .map(|(addr, state)| {
                     serde_json::json!({
                         "address": format!("T{}", addr),
+                        "binding": crate::sim::RuntimeBinding::canonical(
+                                crate::plc_runtime::CanonicalAddress::new(
+                                    crate::plc_runtime::CanonicalAreaKind::TimerValueWord,
+                                    (*addr).into(),
+                                )
+                        ),
                         "state": state
                     })
                 })
@@ -465,15 +445,41 @@ impl OneSimEngine {
                 .map(|(addr, state)| {
                     serde_json::json!({
                         "address": format!("C{}", addr),
+                        "binding": crate::sim::RuntimeBinding::canonical(
+                                crate::plc_runtime::CanonicalAddress::new(
+                                    crate::plc_runtime::CanonicalAreaKind::CounterValueWord,
+                                    (*addr).into(),
+                                )
+                        ),
                         "state": state
                     })
                 })
                 .collect();
 
+            let forced_devices: Vec<serde_json::Value> = self
+                .forced_devices
+                .read()
+                .as_ref()
+                .map(|devices| {
+                    devices
+                        .read()
+                        .values()
+                        .map(|forced| {
+                            serde_json::json!({
+                                "address": forced.display_address,
+                                "binding": forced.binding,
+                                "value": forced.value,
+                            })
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+
             let payload = serde_json::json!({
                 "devices": devices,
                 "timers": timers,
-                "counters": counters
+                "counters": counters,
+                "forcedDevices": forced_devices,
             });
 
             let _ = handle.emit("ladder:monitoring-update", &payload);

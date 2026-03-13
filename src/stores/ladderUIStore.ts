@@ -3,9 +3,16 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type { LadderElement, LadderElementType, LadderMonitoringState, GridPosition, VerticalLinkPosition } from '../types/ladder';
+import type { RuntimeBinding } from '../types/onesim';
 import { createEmptyMonitoringState } from '../types/ladder';
 
 enableMapSet();
+
+export interface LadderEdgeHover {
+  kind: 'horizontal-edge' | 'vertical-edge';
+  row: number;
+  col: number;
+}
 
 export interface LadderUIState {
   selectedElementIds: Set<string>;
@@ -18,6 +25,8 @@ export interface LadderUIState {
   lastWireVPlacement: GridPosition | null;
   /** Active cursor cell position (Excel-style active cell indicator) */
   cursorCell: GridPosition | null;
+  /** Hovered edge candidate under the pointer */
+  edgeHover: LadderEdgeHover | null;
   /** Anchor cell for range selection (Shift+Click/ArrowKey extends from here) */
   selectionAnchor: GridPosition | null;
   /** Current vertical scroll offset of the Pixi viewport (world Y) */
@@ -42,13 +51,14 @@ export interface LadderUIActions {
 
   /** Set the active cursor cell (Excel-style current cell) */
   setCursorCell: (position: GridPosition | null) => void;
+  setEdgeHover: (hover: LadderEdgeHover | null) => void;
   /** Set the selection anchor for range selection (Shift+click/arrows) */
   setSelectionAnchor: (position: GridPosition | null) => void;
 
   startMonitoring: () => void;
   stopMonitoring: () => void;
   updateMonitoringState: (updates: Partial<LadderMonitoringState>) => void;
-  forceDevice: (address: string, value: boolean | number) => void;
+  forceDevice: (address: string, value: boolean | number, binding?: RuntimeBinding) => void;
   releaseForce: (address: string) => void;
 
   /** Set the current vertical scroll offset */
@@ -67,6 +77,7 @@ const createInitialState = (): LadderUIState => ({
   activeTool: null,
   lastWireVPlacement: null,
   cursorCell: null,
+  edgeHover: null,
   selectionAnchor: null,
   viewportY: 0,
 });
@@ -201,6 +212,16 @@ export const useLadderUIStore = create<LadderUIStore>()(
         );
       },
 
+      setEdgeHover: (hover) => {
+        set(
+          (state) => {
+            state.edgeHover = hover;
+          },
+          false,
+          'setEdgeHover'
+        );
+      },
+
       setSelectionAnchor: (position) => {
         set(
           (state) => {
@@ -239,27 +260,31 @@ export const useLadderUIStore = create<LadderUIStore>()(
             if (!state.monitoringState) return;
 
             if (updates.deviceStates) {
-              updates.deviceStates.forEach((value, key) => {
-                state.monitoringState!.deviceStates.set(key, value);
-              });
+              state.monitoringState.deviceStates = updates.deviceStates;
+            }
+            if (updates.deviceBindings) {
+              state.monitoringState.deviceBindings = updates.deviceBindings;
             }
             if (updates.forcedDevices) {
-              updates.forcedDevices.forEach((value) => {
-                state.monitoringState!.forcedDevices.add(value);
-              });
+              state.monitoringState.forcedDevices = updates.forcedDevices;
+            }
+            if (updates.forcedDeviceBindings) {
+              state.monitoringState.forcedDeviceBindings = updates.forcedDeviceBindings;
             }
             if (updates.energizedWires) {
               state.monitoringState.energizedWires = updates.energizedWires;
             }
             if (updates.timerStates) {
-              updates.timerStates.forEach((value, key) => {
-                state.monitoringState!.timerStates.set(key, value);
-              });
+              state.monitoringState.timerStates = updates.timerStates;
+            }
+            if (updates.timerBindings) {
+              state.monitoringState.timerBindings = updates.timerBindings;
             }
             if (updates.counterStates) {
-              updates.counterStates.forEach((value, key) => {
-                state.monitoringState!.counterStates.set(key, value);
-              });
+              state.monitoringState.counterStates = updates.counterStates;
+            }
+            if (updates.counterBindings) {
+              state.monitoringState.counterBindings = updates.counterBindings;
             }
           },
           false,
@@ -267,12 +292,16 @@ export const useLadderUIStore = create<LadderUIStore>()(
         );
       },
 
-      forceDevice: (address, value) => {
+      forceDevice: (address, value, binding) => {
         set(
           (state) => {
             if (!state.monitoringState) return;
             state.monitoringState.deviceStates.set(address, value);
             state.monitoringState.forcedDevices.add(address);
+            if (binding) {
+              state.monitoringState.deviceBindings.set(address, binding);
+              state.monitoringState.forcedDeviceBindings.set(address, binding);
+            }
           },
           false,
           `forceDevice/${address}`
@@ -284,6 +313,7 @@ export const useLadderUIStore = create<LadderUIStore>()(
           (state) => {
             if (!state.monitoringState) return;
             state.monitoringState.forcedDevices.delete(address);
+            state.monitoringState.forcedDeviceBindings.delete(address);
           },
           false,
           `releaseForce/${address}`

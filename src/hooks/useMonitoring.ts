@@ -19,6 +19,7 @@ import type {
   TimerState,
   CounterState,
 } from '../types/ladder';
+import type { ResolvedBinding, RuntimeBinding } from '../types/onesim';
 
 // ============================================================================
 // Types
@@ -28,6 +29,8 @@ import type {
 export interface DeviceStateUpdate {
   /** Device address (e.g., 'X0', 'Y0', 'D0') */
   address: string;
+  /** Canonical/tag binding */
+  binding?: RuntimeBinding;
   /** Current value (boolean for bits, number for words) */
   value: boolean | number;
 }
@@ -36,6 +39,8 @@ export interface DeviceStateUpdate {
 export interface TimerStateUpdate {
   /** Timer address (e.g., 'T0') */
   address: string;
+  /** Canonical/tag binding */
+  binding?: RuntimeBinding;
   /** Timer state */
   state: TimerState;
 }
@@ -44,8 +49,20 @@ export interface TimerStateUpdate {
 export interface CounterStateUpdate {
   /** Counter address (e.g., 'C0') */
   address: string;
+  /** Canonical/tag binding */
+  binding?: RuntimeBinding;
   /** Counter state */
   state: CounterState;
+}
+
+/** Forced device update from backend */
+export interface ForcedDeviceUpdate {
+  /** Device address */
+  address: string;
+  /** Canonical/tag binding */
+  binding?: RuntimeBinding;
+  /** Forced value */
+  value: boolean | number;
 }
 
 /** Batch monitoring update event payload */
@@ -56,6 +73,8 @@ export interface MonitoringUpdatePayload {
   timers?: TimerStateUpdate[];
   /** Counter state updates */
   counters?: CounterStateUpdate[];
+  /** Forced device updates */
+  forcedDevices?: ForcedDeviceUpdate[];
   /** Energized wire IDs */
   energizedWires?: string[];
 }
@@ -150,30 +169,59 @@ export function useMonitoring(): UseMonitoringResult {
       const stateUpdate: Partial<LadderMonitoringState> = {};
 
       // Process device states
-      if (payload.devices && payload.devices.length > 0) {
+      if (payload.devices) {
         const deviceStates = new Map<string, boolean | number>();
+        const deviceBindings = new Map<string, RuntimeBinding>();
         for (const update of payload.devices) {
           deviceStates.set(update.address, update.value);
+          if (update.binding) {
+            deviceBindings.set(update.address, update.binding);
+          }
         }
         stateUpdate.deviceStates = deviceStates;
+        stateUpdate.deviceBindings = deviceBindings;
       }
 
       // Process timer states
-      if (payload.timers && payload.timers.length > 0) {
+      if (payload.timers) {
         const timerStates = new Map<string, TimerState>();
+        const timerBindings = new Map<string, RuntimeBinding>();
         for (const update of payload.timers) {
           timerStates.set(update.address, update.state);
+          if (update.binding) {
+            timerBindings.set(update.address, update.binding);
+          }
         }
         stateUpdate.timerStates = timerStates;
+        stateUpdate.timerBindings = timerBindings;
       }
 
       // Process counter states
-      if (payload.counters && payload.counters.length > 0) {
+      if (payload.counters) {
         const counterStates = new Map<string, CounterState>();
+        const counterBindings = new Map<string, RuntimeBinding>();
         for (const update of payload.counters) {
           counterStates.set(update.address, update.state);
+          if (update.binding) {
+            counterBindings.set(update.address, update.binding);
+          }
         }
         stateUpdate.counterStates = counterStates;
+        stateUpdate.counterBindings = counterBindings;
+      }
+
+      // Process forced devices
+      if (payload.forcedDevices) {
+        const forcedDevices = new Set<string>();
+        const forcedDeviceBindings = new Map<string, RuntimeBinding>();
+        for (const update of payload.forcedDevices) {
+          forcedDevices.add(update.address);
+          if (update.binding) {
+            forcedDeviceBindings.set(update.address, update.binding);
+          }
+        }
+        stateUpdate.forcedDevices = forcedDevices;
+        stateUpdate.forcedDeviceBindings = forcedDeviceBindings;
       }
 
       // Process energized wires
@@ -291,10 +339,18 @@ export function useMonitoring(): UseMonitoringResult {
       if (!isMonitoring) return;
 
       try {
+        const resolved = await invoke<ResolvedBinding>('sim_resolve_binding', { address });
         // Send to backend
-        await invoke('ladder_force_device', { address, value });
+        await invoke('ladder_force_device', {
+          request: {
+            binding: resolved.binding,
+            address,
+            displayAddress: resolved.displayAddress,
+          },
+          value,
+        });
         // Update local state
-        storeForceDevice(address, value);
+        storeForceDevice(address, value, resolved.binding);
       } catch (err) {
         console.error(`Failed to force device ${address}:`, err);
         throw err;
@@ -311,8 +367,15 @@ export function useMonitoring(): UseMonitoringResult {
       if (!isMonitoring) return;
 
       try {
+        const resolved = await invoke<ResolvedBinding>('sim_resolve_binding', { address });
         // Send to backend
-        await invoke('ladder_release_force', { address });
+        await invoke('ladder_release_force', {
+          request: {
+            binding: resolved.binding,
+            address,
+            displayAddress: resolved.displayAddress,
+          },
+        });
         // Update local state
         storeReleaseForce(address);
       } catch (err) {
