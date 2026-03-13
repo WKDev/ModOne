@@ -40,6 +40,7 @@ interface PanelStoreActions {
   closeAllTabs: (panelId: string) => void;
   duplicateTab: (panelId: string, tabId: string) => string | null;
   moveTabToNewPanel: (panelId: string, tabId: string) => string | null;
+  moveTabBetweenPanels: (sourcePanelId: string, tabId: string, targetPanelId: string, insertIndex?: number) => boolean;
   // Settings tab action
   openSettingsTab: () => void;
   // Panel drag-and-drop actions
@@ -515,6 +516,57 @@ export const usePanelStore = create<PanelStore>()(
         );
 
         return newPanelId;
+      },
+
+      moveTabBetweenPanels: (sourcePanelId, tabId, targetPanelId, insertIndex) => {
+        if (sourcePanelId === targetPanelId) return false;
+
+        const { panels } = get();
+        const sourcePanel = panels.find((p) => p.id === sourcePanelId);
+        const tab = sourcePanel?.tabs?.find((t) => t.id === tabId);
+        const targetPanel = panels.find((p) => p.id === targetPanelId);
+
+        if (!tab || !targetPanel) return false;
+
+        const newTabId = generateTabId();
+        const newTab: TabState = { ...tab, id: newTabId };
+
+        set(
+          (state) => ({
+            panels: state.panels.map((p) => {
+              if (p.id === sourcePanelId) {
+                // Remove tab from source
+                const tabs = p.tabs || [];
+                const tabIndex = tabs.findIndex((t) => t.id === tabId);
+                const newTabs = tabs.filter((t) => t.id !== tabId);
+                let newActiveTabId = p.activeTabId;
+                if (p.activeTabId === tabId) {
+                  if (newTabs.length === 0) {
+                    newActiveTabId = null;
+                  } else if (tabIndex >= newTabs.length) {
+                    newActiveTabId = newTabs[newTabs.length - 1].id;
+                  } else {
+                    newActiveTabId = newTabs[tabIndex].id;
+                  }
+                }
+                return { ...p, tabs: newTabs, activeTabId: newActiveTabId };
+              }
+              if (p.id === targetPanelId) {
+                // Insert tab into target at specified index
+                const tabs = [...(p.tabs || [])];
+                const idx = insertIndex != null ? Math.min(insertIndex, tabs.length) : tabs.length;
+                tabs.splice(idx, 0, newTab);
+                return { ...p, tabs, activeTabId: newTabId };
+              }
+              return p;
+            }),
+            activePanel: targetPanelId,
+          }),
+          false,
+          'moveTabBetweenPanels'
+        );
+
+        return true;
       },
 
       // Tab tear-off: move a tab to a new floating window

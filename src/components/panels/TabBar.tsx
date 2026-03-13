@@ -28,7 +28,7 @@ export function TabBar({
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
-  const { setActiveTab, reorderTabs } = usePanelStore();
+  const { setActiveTab, reorderTabs, moveTabBetweenPanels } = usePanelStore();
   const { onTabDragStart, onTabDragEnd } = useTabDragOut();
 
   // Tab close handling with unsaved changes support
@@ -117,8 +117,13 @@ export function TabBar({
 
     const fromIndex = parseInt(e.dataTransfer.getData('tab-index'), 10);
     const sourcePanelId = e.dataTransfer.getData('panel-id');
+    const sourceTabId = e.dataTransfer.getData('tab-id');
 
-    if (sourcePanelId === panelId && !isNaN(fromIndex) && fromIndex !== toIndex) {
+    if (sourcePanelId && sourcePanelId !== panelId && sourceTabId) {
+      // Cross-panel tab move
+      moveTabBetweenPanels(sourcePanelId, sourceTabId, panelId, toIndex);
+    } else if (sourcePanelId === panelId && !isNaN(fromIndex) && fromIndex !== toIndex) {
+      // Same-panel reorder
       reorderTabs(panelId, fromIndex, toIndex);
     }
 
