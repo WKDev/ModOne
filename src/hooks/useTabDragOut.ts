@@ -1,52 +1,31 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { Window } from '@tauri-apps/api/window';
 import { usePanelStore } from '../stores/panelStore';
+import { useWindowBoundary } from './useWindowBoundary';
 import { DEFAULT_FLOATING_WINDOW_SIZE } from '../types/window';
-
-interface WindowBounds {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
 
 interface DragState {
   tabId: string;
   panelId: string;
-  lastScreenX: number;
-  lastScreenY: number;
-  windowBounds: WindowBounds | null;
+  /** Last known clientX from dragover (viewport-relative, always reliable) */
+  lastClientX: number;
+  lastClientY: number;
+  /** Whether the cursor was outside the window boundary on last check */
+  isOutside: boolean;
 }
 
 /**
  * Hook that detects when a tab is dragged outside the window boundary
  * and automatically tears it off into a floating window.
  *
- * Uses a document-level dragover listener to track cursor position
- * continuously, even when the cursor is over non-drop-target areas.
+ * Uses the same useWindowBoundary + clientX/clientY approach as
+ * PanelDndProvider (proven to work on WebView2), instead of relying
+ * on screenX/screenY from dragend which can be (0,0) on some platforms.
  */
 export function useTabDragOut() {
   const dragStateRef = useRef<DragState | null>(null);
   const globalHandlerRef = useRef<((e: DragEvent) => void) | null>(null);
   const moveTabToFloatingWindow = usePanelStore((s) => s.moveTabToFloatingWindow);
-
-  const cacheWindowBounds = useCallback(async () => {
-    try {
-      const win = Window.getCurrent();
-      const [pos, size] = await Promise.all([
-        win.outerPosition(),
-        win.innerSize(),
-      ]);
-      return {
-        x: pos.x,
-        y: pos.y,
-        width: size.width,
-        height: size.height,
-      };
-    } catch {
-      return null;
-    }
-  }, []);
+  const { checkPosition, getScreenPosition, refreshBounds } = useWindowBoundary();
 
   const cleanupGlobalListener = useCallback(() => {
     if (globalHandlerRef.current) {
@@ -56,77 +35,62 @@ export function useTabDragOut() {
   }, []);
 
   const onTabDragStart = useCallback(
-    async (panelId: string, tabId: string) => {
-      const bounds = await cacheWindowBounds();
+    (panelId: string, tabId: string) => {
+      refreshBounds();
       dragStateRef.current = {
         tabId,
         panelId,
-        lastScreenX: 0,
-        lastScreenY: 0,
-        windowBounds: bounds,
+        lastClientX: 0,
+        lastClientY: 0,
+        isOutside: false,
       };
 
-      // Track cursor position globally during drag
+      // Track cursor position globally during drag using clientX/clientY
       cleanupGlobalListener();
       const handler = (e: DragEvent) => {
-        if (dragStateRef.current && (e.screenX !== 0 || e.screenY !== 0)) {
-          dragStateRef.current.lastScreenX = e.screenX;
-          dragStateRef.current.lastScreenY = e.screenY;
+        if (!dragStateRef.current) return;
+        // clientX/clientY are always reliable in dragover, even on WebView2
+        if (e.clientX !== 0 || e.clientY !== 0) {
+          dragStateRef.current.lastClientX = e.clientX;
+          dragStateRef.current.lastClientY = e.clientY;
+          dragStateRef.current.isOutside = checkPosition(e.clientX, e.clientY);
         }
       };
       document.addEventListener('dragover', handler);
       globalHandlerRef.current = handler;
     },
-    [cacheWindowBounds, cleanupGlobalListener]
-  );
-
-  const isOutsideWindow = useCallback(
-    (screenX: number, screenY: number, bounds: WindowBounds): boolean => {
-      return (
-        screenX < bounds.x ||
-        screenX > bounds.x + bounds.width ||
-        screenY < bounds.y ||
-        screenY > bounds.y + bounds.height
-      );
-    },
-    []
+    [checkPosition, cleanupGlobalListener, refreshBounds]
   );
 
   /**
    * Returns true if the drop was handled as a tear-off (caller should skip reorder).
    */
   const onTabDragEnd = useCallback(
-    async (e: React.DragEvent): Promise<boolean> => {
+    async (_e: React.DragEvent): Promise<boolean> => {
       cleanupGlobalListener();
 
       const state = dragStateRef.current;
       dragStateRef.current = null;
 
-      if (!state || !state.windowBounds) return false;
+      if (!state) return false;
 
-      // Use event coordinates, fall back to cached if browser reports 0,0
-      let screenX = e.screenX;
-      let screenY = e.screenY;
-      if (screenX === 0 && screenY === 0) {
-        screenX = state.lastScreenX;
-        screenY = state.lastScreenY;
-      }
+      // Use the continuously-tracked isOutside flag from dragover events
+      // (much more reliable than dragend screenX/screenY on WebView2)
+      if (!state.isOutside) return false;
 
-      if (screenX === 0 && screenY === 0) return false;
+      // Convert last known client position to screen coordinates for window placement
+      const screenPos = getScreenPosition(state.lastClientX, state.lastClientY);
+      if (!screenPos) return false;
 
-      if (isOutsideWindow(screenX, screenY, state.windowBounds)) {
-        await moveTabToFloatingWindow(state.panelId, state.tabId, {
-          x: screenX - DEFAULT_FLOATING_WINDOW_SIZE.width / 2,
-          y: screenY - 20, // offset so title bar is near cursor
-          width: DEFAULT_FLOATING_WINDOW_SIZE.width,
-          height: DEFAULT_FLOATING_WINDOW_SIZE.height,
-        });
-        return true;
-      }
-
-      return false;
+      await moveTabToFloatingWindow(state.panelId, state.tabId, {
+        x: screenPos.x - DEFAULT_FLOATING_WINDOW_SIZE.width / 2,
+        y: screenPos.y - 20,
+        width: DEFAULT_FLOATING_WINDOW_SIZE.width,
+        height: DEFAULT_FLOATING_WINDOW_SIZE.height,
+      });
+      return true;
     },
-    [cleanupGlobalListener, isOutsideWindow, moveTabToFloatingWindow]
+    [cleanupGlobalListener, getScreenPosition, moveTabToFloatingWindow]
   );
 
   // Cleanup on unmount (e.g., workspace switch mid-drag)
