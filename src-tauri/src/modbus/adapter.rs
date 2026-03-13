@@ -416,4 +416,148 @@ mod tests {
             CanonicalValue::U16(4321)
         );
     }
+
+    #[test]
+    fn publishes_discrete_inputs_and_input_registers_with_offsets() {
+        let canonical = Arc::new(RwLock::new(CanonicalMemory::new()));
+        canonical
+            .write()
+            .write(
+                CanonicalAddress::new(CanonicalAreaKind::InputBit, 2),
+                CanonicalValue::Bool(true),
+                CanonicalWriteSource::Test,
+            )
+            .unwrap();
+        canonical
+            .write()
+            .write(
+                CanonicalAddress::new(CanonicalAreaKind::RetentiveWord, 1),
+                CanonicalValue::U16(777),
+                CanonicalWriteSource::Test,
+            )
+            .unwrap();
+
+        let modbus_memory = Arc::new(ModbusMemory::new(&MemoryMapSettings {
+            coil_start: 100,
+            coil_count: 16,
+            discrete_input_start: 200,
+            discrete_input_count: 16,
+            holding_register_start: 300,
+            holding_register_count: 16,
+            input_register_start: 400,
+            input_register_count: 16,
+        }));
+
+        let policy = ModbusMappingPolicy {
+            profile_id: VendorProfileId::MelsecFxQCommon,
+            source: ModbusMappingSource::Custom,
+            rules: vec![
+                ModbusMappingRule {
+                    family: "X".to_string(),
+                    canonical_area: CanonicalAreaKind::InputBit,
+                    address_space: ModbusAddressSpace::DiscreteInput,
+                    offset: 3,
+                    count: 8,
+                },
+                ModbusMappingRule {
+                    family: "R".to_string(),
+                    canonical_area: CanonicalAreaKind::RetentiveWord,
+                    address_space: ModbusAddressSpace::InputRegister,
+                    offset: 4,
+                    count: 8,
+                },
+            ],
+        };
+
+        let adapter = ModbusAdapter::new(canonical, Arc::clone(&modbus_memory), policy);
+        adapter.publish_runtime_state().unwrap();
+
+        assert!(modbus_memory.read_discrete_inputs(205, 1).unwrap()[0]);
+        assert_eq!(modbus_memory.read_input_registers(405, 1).unwrap()[0], 777);
+    }
+
+    #[test]
+    fn full_sync_honors_configured_window_starts_and_rule_offsets() {
+        let canonical = Arc::new(RwLock::new(CanonicalMemory::new()));
+        canonical
+            .write()
+            .write(
+                CanonicalAddress::new(CanonicalAreaKind::OutputBit, 1),
+                CanonicalValue::Bool(true),
+                CanonicalWriteSource::Simulation,
+            )
+            .unwrap();
+        canonical
+            .write()
+            .write(
+                CanonicalAddress::new(CanonicalAreaKind::DataWord, 2),
+                CanonicalValue::U16(2222),
+                CanonicalWriteSource::Simulation,
+            )
+            .unwrap();
+
+        let modbus_memory = Arc::new(ModbusMemory::new(&MemoryMapSettings {
+            coil_start: 10,
+            coil_count: 16,
+            discrete_input_start: 110,
+            discrete_input_count: 16,
+            holding_register_start: 210,
+            holding_register_count: 16,
+            input_register_start: 310,
+            input_register_count: 16,
+        }));
+
+        let policy = ModbusMappingPolicy {
+            profile_id: VendorProfileId::LsXg5000,
+            source: ModbusMappingSource::Custom,
+            rules: vec![
+                ModbusMappingRule {
+                    family: "P".to_string(),
+                    canonical_area: CanonicalAreaKind::OutputBit,
+                    address_space: ModbusAddressSpace::Coil,
+                    offset: 1,
+                    count: 8,
+                },
+                ModbusMappingRule {
+                    family: "D".to_string(),
+                    canonical_area: CanonicalAreaKind::DataWord,
+                    address_space: ModbusAddressSpace::HoldingRegister,
+                    offset: 2,
+                    count: 8,
+                },
+            ],
+        };
+
+        let adapter = ModbusAdapter::new(
+            Arc::clone(&canonical),
+            Arc::clone(&modbus_memory),
+            policy,
+        );
+
+        modbus_memory
+            .write_coil_with_source(13, true, ChangeSource::External)
+            .unwrap();
+        modbus_memory
+            .write_holding_register_with_source(214, 4444, ChangeSource::External)
+            .unwrap();
+
+        adapter.full_sync().unwrap();
+
+        assert!(modbus_memory.read_coils(12, 1).unwrap()[0]);
+        assert_eq!(modbus_memory.read_holding_registers(214, 1).unwrap()[0], 4444);
+        assert_eq!(
+            canonical
+                .read()
+                .read(CanonicalAddress::new(CanonicalAreaKind::OutputBit, 3))
+                .unwrap(),
+            CanonicalValue::Bool(true)
+        );
+        assert_eq!(
+            canonical
+                .read()
+                .read(CanonicalAddress::new(CanonicalAreaKind::DataWord, 4))
+                .unwrap(),
+            CanonicalValue::U16(4444)
+        );
+    }
 }
