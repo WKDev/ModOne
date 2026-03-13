@@ -13,6 +13,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use crate::plc_runtime::CanonicalValue;
 
 use super::memory::CanonicalRuntimeFacade;
+use super::tag_registry::SharedTagRegistry;
 use super::types::{Breakpoint, BreakpointType, RuntimeBinding, SimBitDeviceType, SimWordDeviceType, WatchVariable};
 
 // ============================================================================
@@ -136,6 +137,8 @@ pub struct SimDebugger {
     paused_at: RwLock<Option<BreakpointHit>>,
     /// Maximum history entries for watch variables
     max_watch_history: usize,
+    /// Shared semantic tag resolver
+    tag_registry: SharedTagRegistry,
 }
 
 impl Default for SimDebugger {
@@ -145,8 +148,7 @@ impl Default for SimDebugger {
 }
 
 impl SimDebugger {
-    /// Create a new debugger instance
-    pub fn new(max_watch_history: usize) -> Self {
+    pub fn with_tag_registry(max_watch_history: usize, tag_registry: SharedTagRegistry) -> Self {
         Self {
             breakpoints: RwLock::new(Vec::new()),
             watches: RwLock::new(HashMap::new()),
@@ -154,7 +156,13 @@ impl SimDebugger {
             step_type: RwLock::new(StepType::default()),
             paused_at: RwLock::new(None),
             max_watch_history,
+            tag_registry,
         }
+    }
+
+    /// Create a new debugger instance
+    pub fn new(max_watch_history: usize) -> Self {
+        Self::with_tag_registry(max_watch_history, std::sync::Arc::new(super::tag_registry::TagRegistry::new()))
     }
 
     // ========================================================================
@@ -475,27 +483,6 @@ impl SimDebugger {
         self.watches.write().clear();
     }
 
-    /// Read device value as JSON for watch variables
-    fn read_device_json_value(&self, address: &str, memory: &CanonicalRuntimeFacade) -> serde_json::Value {
-        if address.is_empty() {
-            return serde_json::Value::Null;
-        }
-
-        // Try bit device first
-        if let Some((device_type, addr)) = Self::parse_bit_device(address) {
-            let value = memory.read_bit(device_type, addr).unwrap_or(false);
-            return serde_json::json!(value);
-        }
-
-        // Try word device
-        if let Some((device_type, addr)) = Self::parse_word_device(address) {
-            let value = memory.read_word(device_type, addr).unwrap_or(0);
-            return serde_json::json!(value);
-        }
-
-        serde_json::Value::Null
-    }
-
     fn read_binding_json_value(
         &self,
         binding: &RuntimeBinding,
@@ -507,7 +494,14 @@ impl SimDebugger {
                 Ok(CanonicalValue::U16(value)) => serde_json::json!(value),
                 Err(_) => serde_json::Value::Null,
             },
-            RuntimeBinding::Tag { tag_id } => self.read_device_json_value(tag_id, memory),
+            RuntimeBinding::Tag { tag_id } => match self.tag_registry.resolve(tag_id) {
+                Ok(tag) => match memory.read(tag.canonical_address) {
+                    Ok(CanonicalValue::Bool(value)) => serde_json::json!(value),
+                    Ok(CanonicalValue::U16(value)) => serde_json::json!(value),
+                    Err(_) => serde_json::Value::Null,
+                },
+                Err(_) => serde_json::Value::Null,
+            },
         }
     }
 

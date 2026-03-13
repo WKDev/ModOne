@@ -11,7 +11,10 @@ use tauri::State;
 
 use crate::plc_runtime::{resolve_vendor_profile, VendorAddress};
 use crate::project::{PlcSettings, SharedProjectManager};
-use crate::sim::{CanvasSync, CanonicalRuntimeFacade, PlcBlockMapping, PlcBlockType, PlcInputChange, RuntimeBinding};
+use crate::sim::{
+    tag_registry::SharedTagRegistry, CanvasSync, CanonicalRuntimeFacade, PlcBlockMapping,
+    PlcBlockType, PlcInputChange, RuntimeBinding,
+};
 
 // ============================================================================
 // Managed State
@@ -25,28 +28,38 @@ pub struct CanvasSyncState {
     pub sim_runtime: Arc<CanonicalRuntimeFacade>,
     /// Whether sync is enabled
     pub enabled: RwLock<bool>,
+    pub tag_registry: SharedTagRegistry,
 }
 
 impl Default for CanvasSyncState {
     fn default() -> Self {
         let sim_runtime = Arc::new(CanonicalRuntimeFacade::new());
-        let sync = Arc::new(CanvasSync::new(Arc::clone(&sim_runtime)));
+        let tag_registry = Arc::new(crate::sim::tag_registry::TagRegistry::new());
+        let sync = Arc::new(CanvasSync::new(
+            Arc::clone(&sim_runtime),
+            Arc::clone(&tag_registry),
+        ));
         Self {
             sync,
             sim_runtime,
             enabled: RwLock::new(false),
+            tag_registry,
         }
     }
 }
 
 impl CanvasSyncState {
     /// Create with existing simulation memory
-    pub fn with_runtime(sim_runtime: Arc<CanonicalRuntimeFacade>) -> Self {
-        let sync = Arc::new(CanvasSync::new(Arc::clone(&sim_runtime)));
+    pub fn with_runtime(
+        sim_runtime: Arc<CanonicalRuntimeFacade>,
+        tag_registry: SharedTagRegistry,
+    ) -> Self {
+        let sync = Arc::new(CanvasSync::new(Arc::clone(&sim_runtime), Arc::clone(&tag_registry)));
         Self {
             sync,
             sim_runtime,
             enabled: RwLock::new(false),
+            tag_registry,
         }
     }
 

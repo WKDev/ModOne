@@ -11,6 +11,7 @@ pub mod memory;
 pub mod monitoring;
 pub mod protocol_runtime;
 pub mod runtime_host;
+pub mod tag_registry;
 pub mod timer;
 pub mod types;
 

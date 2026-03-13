@@ -77,7 +77,7 @@ pub async fn scope_tick(
         };
 
         // Read device value and convert to voltage
-        let voltage = match read_device_voltage(runtime, mapping) {
+        let voltage = match read_device_voltage(runtime, &sim_state.tag_registry(), mapping) {
             Ok(v) => v,
             Err(e) => {
                 result.channels_skipped += 1;
@@ -100,6 +100,7 @@ pub async fn scope_tick(
 /// Read device value from memory and convert to voltage based on mapping.
 fn read_device_voltage(
     runtime: &std::sync::Arc<crate::sim::memory::CanonicalRuntimeFacade>,
+    tag_registry: &crate::sim::tag_registry::SharedTagRegistry,
     mapping: &crate::canvas::scope_sync::ScopeChannelMapping,
 ) -> Result<f32, String> {
     match &mapping.binding {
@@ -107,10 +108,13 @@ fn read_device_voltage(
             CanonicalValue::Bool(value) => Ok(if value { mapping.scale } else { 0.0 } + mapping.offset),
             CanonicalValue::U16(value) => Ok(value as f32 * mapping.scale + mapping.offset),
         },
-        RuntimeBinding::Tag { tag_id } => Err(format!(
-            "Tag binding not implemented yet for scope sampling: {}",
-            tag_id
-        )),
+        RuntimeBinding::Tag { tag_id } => {
+            let tag = tag_registry.resolve(tag_id).map_err(|e| e.to_string())?;
+            match runtime.read(tag.canonical_address).map_err(|e| e.to_string())? {
+                CanonicalValue::Bool(value) => Ok(if value { mapping.scale } else { 0.0 } + mapping.offset),
+                CanonicalValue::U16(value) => Ok(value as f32 * mapping.scale + mapping.offset),
+            }
+        }
     }
 }
 
@@ -157,5 +161,5 @@ pub async fn scope_read_device_voltage(
         label: None,
     };
 
-    read_device_voltage(runtime, &mapping)
+    read_device_voltage(runtime, &sim_state.tag_registry(), &mapping)
 }

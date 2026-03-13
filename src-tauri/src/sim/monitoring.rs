@@ -10,6 +10,7 @@ use crate::plc_runtime::{CanonicalAddress, CanonicalMemoryEvent, CanonicalValue,
 
 use super::debugger::SimDebugger;
 use super::memory::CanonicalRuntimeFacade;
+use super::tag_registry::SharedTagRegistry;
 use super::timer::TimerManager;
 use super::counter::CounterManager;
 use super::types::{ForcedDeviceValue, RuntimeBinding};
@@ -48,6 +49,7 @@ impl MonitoringService {
         app: AppHandle,
         runtime: Arc<CanonicalRuntimeFacade>,
         debugger: Arc<SimDebugger>,
+        tag_registry: SharedTagRegistry,
         timer_mgr: Arc<TimerManager>,
         counter_mgr: Arc<CounterManager>,
     ) {
@@ -87,6 +89,7 @@ impl MonitoringService {
                             &app,
                             &runtime,
                             &debugger,
+                            &tag_registry,
                             &forced_devices,
                             &tracked_bindings,
                             &tracked_values,
@@ -145,15 +148,16 @@ impl MonitoringService {
         self.refresh_requested.store(true, Ordering::SeqCst);
     }
 
-    pub fn apply_forced_values(&self, runtime: &CanonicalRuntimeFacade) -> Result<(), String> {
+    pub fn apply_forced_values(
+        &self,
+        runtime: &CanonicalRuntimeFacade,
+        tag_registry: &SharedTagRegistry,
+    ) -> Result<(), String> {
         let forced = self.forced_devices.read();
         for forced_value in forced.values() {
-            let Some(canonical) = forced_value.binding.canonical_address() else {
-                return Err(format!(
-                    "Tag-bound forced device is not implemented yet: {}",
-                    forced_value.display_address
-                ));
-            };
+            let canonical = tag_registry
+                .resolve_binding(&forced_value.binding)
+                .map_err(|e| e.to_string())?;
 
             if canonical.area.is_bit_area() || canonical.bit_index.is_some() {
                 let Some(value) = forced_value.value.as_bool() else {
@@ -214,6 +218,7 @@ fn emit_snapshot(
     app: &AppHandle,
     runtime: &CanonicalRuntimeFacade,
     debugger: &SimDebugger,
+    tag_registry: &SharedTagRegistry,
     forced_devices: &RwLock<HashMap<String, ForcedDeviceValue>>,
     tracked_bindings: &RwLock<HashMap<RuntimeBinding, String>>,
     tracked_values: &HashMap<CanonicalAddress, CanonicalValue>,
@@ -234,7 +239,7 @@ fn emit_snapshot(
     }
 
     for (binding, display_address) in tracked_bindings.read().iter() {
-        let Some(address) = binding.canonical_address() else {
+        let Ok(address) = tag_registry.resolve_binding(binding) else {
             continue;
         };
         if devices.iter().any(|entry| entry["binding"] == serde_json::to_value(binding).unwrap_or_default()) {

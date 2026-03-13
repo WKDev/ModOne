@@ -15,6 +15,7 @@ use super::executor::CompiledProgram;
 use super::memory::CanonicalRuntimeFacade;
 use super::monitoring::MonitoringService;
 use super::protocol_runtime::ProtocolRuntime;
+use super::tag_registry::SharedTagRegistry;
 use super::timer::TimerManager;
 use super::types::{ScanCycleInfo, SimulationConfig, SimulationStatus};
 
@@ -34,13 +35,14 @@ pub struct SimulationRuntimeHost {
     monitoring: Arc<MonitoringService>,
     protocol_runtime: Arc<ProtocolRuntime>,
     canvas_sync: Arc<RwLock<Option<Arc<CanvasSync>>>>,
+    tag_registry: SharedTagRegistry,
 }
 
 impl SimulationRuntimeHost {
-    pub fn with_runtime(runtime: Arc<CanonicalRuntimeFacade>) -> Self {
+    pub fn with_runtime(runtime: Arc<CanonicalRuntimeFacade>, tag_registry: SharedTagRegistry) -> Self {
         Self {
             engine: Arc::new(Mutex::new(None)),
-            debugger: Arc::new(SimDebugger::default()),
+            debugger: Arc::new(SimDebugger::with_tag_registry(100, Arc::clone(&tag_registry))),
             runtime,
             modbus_memory: None,
             program: Arc::new(Mutex::new(None)),
@@ -49,14 +51,16 @@ impl SimulationRuntimeHost {
             monitoring: Arc::new(MonitoringService::new()),
             protocol_runtime: Arc::new(ProtocolRuntime::new()),
             canvas_sync: Arc::new(RwLock::new(None)),
+            tag_registry,
         }
     }
 
     pub fn with_runtime_and_modbus(
         runtime: Arc<CanonicalRuntimeFacade>,
         modbus_memory: Arc<ModbusMemory>,
+        tag_registry: SharedTagRegistry,
     ) -> Self {
-        let mut host = Self::with_runtime(runtime);
+        let mut host = Self::with_runtime(runtime, tag_registry);
         host.modbus_memory = Some(modbus_memory);
         host
     }
@@ -79,6 +83,10 @@ impl SimulationRuntimeHost {
 
     pub fn protocol_runtime(&self) -> Arc<ProtocolRuntime> {
         Arc::clone(&self.protocol_runtime)
+    }
+
+    pub fn tag_registry(&self) -> SharedTagRegistry {
+        Arc::clone(&self.tag_registry)
     }
 
     pub fn load_program(&self, program: CompiledProgram) {
@@ -124,6 +132,7 @@ impl SimulationRuntimeHost {
             app.clone(),
             Arc::clone(&self.runtime),
             Arc::clone(&self.debugger),
+            Arc::clone(&self.tag_registry),
             Arc::clone(engine.timer_mgr()),
             Arc::clone(engine.counter_mgr()),
         );
@@ -275,6 +284,7 @@ impl SimulationRuntimeHost {
         let protocol_runtime = Arc::clone(&self.protocol_runtime);
         let runtime = Arc::clone(&self.runtime);
         let canvas_sync = Arc::clone(&self.canvas_sync);
+        let tag_registry = Arc::clone(&self.tag_registry);
         let event_task = tokio::spawn(async move {
             while let Ok(event) = rx.recv().await {
                 match event {
@@ -283,7 +293,7 @@ impl SimulationRuntimeHost {
                         emit_status_update(&app, &engine.get_status());
                     }
                     EngineEvent::ScanComplete(event) => {
-                        if let Err(err) = monitoring.apply_forced_values(&runtime) {
+                        if let Err(err) = monitoring.apply_forced_values(&runtime, &tag_registry) {
                             let _ = app.emit(
                                 "ladder:monitoring-error",
                                 serde_json::json!({

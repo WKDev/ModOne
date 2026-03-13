@@ -93,10 +93,10 @@ use commands::{
     // Simulation commands
     ladder_force_device, ladder_release_force, ladder_start_monitoring, ladder_stop_monitoring,
     sim_add_breakpoint, sim_add_watch, sim_continue, sim_get_breakpoints,
-    sim_get_debugger_state, sim_get_memory_snapshot, sim_get_scan_info, sim_get_status,
-    sim_load_program, sim_get_watches, sim_pause, sim_read_binding,
+    sim_create_raw_tag, sim_get_debugger_state, sim_get_memory_snapshot, sim_get_scan_info, sim_get_status,
+    sim_get_tag, sim_list_tags, sim_load_program, sim_get_watches, sim_pause, sim_read_binding,
     sim_resolve_binding, sim_resolve_binding_parts,
-    sim_remove_breakpoint, sim_set_breakpoint_enabled,
+    sim_register_tag, sim_remove_breakpoint, sim_remove_tag, sim_set_breakpoint_enabled,
     sim_remove_watch, sim_reset, sim_resume, sim_run, sim_step, sim_stop, sim_write_binding,
     SimState,
     // Explorer commands
@@ -142,10 +142,15 @@ pub fn run() {
 
     // Initialize Canvas Sync and Simulation states with shared memory
     let shared_runtime = Arc::new(CanonicalRuntimeFacade::new());
-    let canvas_sync_state = CanvasSyncState::with_runtime(Arc::clone(&shared_runtime));
+    let shared_tag_registry = Arc::new(crate::sim::tag_registry::TagRegistry::new());
+    let canvas_sync_state = CanvasSyncState::with_runtime(
+        Arc::clone(&shared_runtime),
+        Arc::clone(&shared_tag_registry),
+    );
     let sim_state = SimState::with_runtime_and_modbus(
         Arc::clone(&shared_runtime),
         Arc::clone(&modbus_state.memory),
+        Arc::clone(&shared_tag_registry),
     );
 
     // Initialize error logger
@@ -399,6 +404,11 @@ pub fn run() {
             sim_load_program,
             sim_resolve_binding,
             sim_resolve_binding_parts,
+            sim_register_tag,
+            sim_get_tag,
+            sim_list_tags,
+            sim_remove_tag,
+            sim_create_raw_tag,
             sim_read_binding,
             sim_write_binding,
             sim_get_memory_snapshot,

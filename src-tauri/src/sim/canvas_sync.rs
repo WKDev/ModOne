@@ -12,6 +12,7 @@ use tauri::Emitter;
 use thiserror::Error;
 
 use super::memory::CanonicalRuntimeFacade;
+use super::tag_registry::SharedTagRegistry;
 use super::types::RuntimeBinding;
 
 // ============================================================================
@@ -184,6 +185,8 @@ pub struct PlcInputChange {
 pub struct CanvasSync {
     /// Simulation memory reference
     runtime: Arc<CanonicalRuntimeFacade>,
+    /// Shared semantic tag registry
+    tag_registry: SharedTagRegistry,
     /// Tauri app handle for event emission
     app_handle: RwLock<Option<tauri::AppHandle>>,
     /// Registered PLC block mappings
@@ -198,9 +201,10 @@ pub struct CanvasSync {
 
 impl CanvasSync {
     /// Create a new CanvasSync instance
-    pub fn new(runtime: Arc<CanonicalRuntimeFacade>) -> Self {
+    pub fn new(runtime: Arc<CanonicalRuntimeFacade>, tag_registry: SharedTagRegistry) -> Self {
         Self {
             runtime,
+            tag_registry,
             app_handle: RwLock::new(None),
             plc_block_mappings: RwLock::new(Vec::new()),
             previous_states: RwLock::new(HashMap::new()),
@@ -335,10 +339,15 @@ impl CanvasSync {
                 .runtime
                 .read_bool(*address)
                 .map_err(|e| CanvasSyncError::RuntimeMemoryError(e.to_string())),
-            RuntimeBinding::Tag { tag_id } => Err(CanvasSyncError::InvalidAddress(format!(
-                "Tag binding not implemented yet for canvas sync: {}",
-                tag_id
-            ))),
+            RuntimeBinding::Tag { tag_id } => {
+                let tag = self
+                    .tag_registry
+                    .resolve(tag_id)
+                    .map_err(|e| CanvasSyncError::InvalidAddress(e.to_string()))?;
+                self.runtime
+                    .read_bool(tag.canonical_address)
+                    .map_err(|e| CanvasSyncError::RuntimeMemoryError(e.to_string()))
+            }
         }
     }
 
@@ -438,10 +447,19 @@ impl CanvasSync {
                     crate::plc_runtime::CanonicalWriteSource::Simulation,
                 )
                 .map_err(|e| CanvasSyncError::RuntimeMemoryError(e.to_string())),
-            RuntimeBinding::Tag { tag_id } => Err(CanvasSyncError::InvalidAddress(format!(
-                "Tag binding not implemented yet for canvas sync: {}",
-                tag_id
-            ))),
+            RuntimeBinding::Tag { tag_id } => {
+                let tag = self
+                    .tag_registry
+                    .resolve(tag_id)
+                    .map_err(|e| CanvasSyncError::InvalidAddress(e.to_string()))?;
+                self.runtime
+                    .write_bool(
+                        tag.canonical_address,
+                        state,
+                        crate::plc_runtime::CanonicalWriteSource::Simulation,
+                    )
+                    .map_err(|e| CanvasSyncError::RuntimeMemoryError(e.to_string()))
+            }
         }
     }
 
@@ -506,6 +524,7 @@ impl CanvasSync {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sim::tag_registry::TagRegistry;
     use crate::plc_runtime::{CanonicalAddress, CanonicalAreaKind};
 
     fn bit_binding(area: CanonicalAreaKind, index: u32) -> RuntimeBinding {
@@ -514,7 +533,7 @@ mod tests {
 
     fn create_test_sync() -> CanvasSync {
         let runtime = Arc::new(CanonicalRuntimeFacade::new());
-        CanvasSync::new(runtime)
+        CanvasSync::new(runtime, Arc::new(TagRegistry::new()))
     }
 
     // ========================================================================
@@ -602,7 +621,7 @@ mod tests {
     #[test]
     fn test_read_device_state() {
         let runtime = Arc::new(CanonicalRuntimeFacade::new());
-        let sync = CanvasSync::new(Arc::clone(&runtime));
+        let sync = CanvasSync::new(Arc::clone(&runtime), Arc::new(TagRegistry::new()));
 
         // Set M0 to true
         runtime
@@ -690,7 +709,7 @@ mod tests {
     #[test]
     fn test_handle_plc_input_change() {
         let runtime = Arc::new(CanonicalRuntimeFacade::new());
-        let sync = CanvasSync::new(Arc::clone(&runtime));
+        let sync = CanvasSync::new(Arc::clone(&runtime), Arc::new(TagRegistry::new()));
 
         let mapping =
             PlcBlockMapping::new_plc_in("sensor1", bit_binding(CanonicalAreaKind::InputBit, 0), "P0");
@@ -714,7 +733,7 @@ mod tests {
     #[test]
     fn test_handle_plc_input_change_inverted() {
         let runtime = Arc::new(CanonicalRuntimeFacade::new());
-        let sync = CanvasSync::new(Arc::clone(&runtime));
+        let sync = CanvasSync::new(Arc::clone(&runtime), Arc::new(TagRegistry::new()));
 
         let mapping = PlcBlockMapping::new_plc_in(
             "sensor1",
@@ -764,7 +783,7 @@ mod tests {
     #[test]
     fn test_statistics() {
         let runtime = Arc::new(CanonicalRuntimeFacade::new());
-        let sync = CanvasSync::new(Arc::clone(&runtime));
+        let sync = CanvasSync::new(Arc::clone(&runtime), Arc::new(TagRegistry::new()));
 
         assert_eq!(sync.output_update_count(), 0);
         assert_eq!(sync.input_change_count(), 0);

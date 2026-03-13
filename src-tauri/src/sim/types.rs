@@ -428,6 +428,57 @@ pub struct ForcedDeviceValue {
     pub value: serde_json::Value,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TagClass {
+    RawBacked,
+    Semantic,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TagAccessLevel {
+    ReadOnly,
+    ReadWrite,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TagDefinition {
+    pub tag_id: String,
+    pub class: TagClass,
+    pub display_name: String,
+    pub binding: RuntimeBinding,
+    pub canonical_address: CanonicalAddress,
+    pub access: TagAccessLevel,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub vendor_aliases: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub engineering_unit: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegisterTagRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tag_id: Option<String>,
+    pub display_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub binding: Option<RuntimeBinding>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub canonical_address: Option<CanonicalAddress>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub vendor_aliases: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub engineering_unit: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub access: Option<TagAccessLevel>,
+}
+
 /// Breakpoint types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

@@ -43,6 +43,32 @@ export type RuntimeBinding =
   | { kind: 'canonical'; address: CanonicalAddress }
   | { kind: 'tag'; tagId: string };
 
+export type TagClass = 'rawBacked' | 'semantic';
+export type TagAccessLevel = 'readOnly' | 'readWrite';
+
+export interface TagDefinition {
+  tagId: string;
+  class: TagClass;
+  displayName: string;
+  binding: RuntimeBinding;
+  canonicalAddress: CanonicalAddress;
+  access: TagAccessLevel;
+  vendorAliases?: string[];
+  description?: string;
+  engineeringUnit?: string;
+}
+
+export interface RegisterTagRequest {
+  tagId?: string;
+  displayName: string;
+  binding?: RuntimeBinding;
+  canonicalAddress?: CanonicalAddress;
+  vendorAliases?: string[];
+  description?: string;
+  engineeringUnit?: string;
+  access?: TagAccessLevel;
+}
+
 export interface ResolvedBinding {
   binding: RuntimeBinding;
   displayAddress: string;

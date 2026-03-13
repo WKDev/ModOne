@@ -22,9 +22,10 @@ use crate::sim::{
     executor::{compile_program, LadderProgram},
     memory::CanonicalRuntimeFacade,
     runtime_host::SimulationRuntimeHost,
+    tag_registry::SharedTagRegistry,
     types::{
-        Breakpoint, ForcedDeviceValue, MemorySnapshot, RuntimeBinding, ScanCycleInfo,
-        SimulationConfig, SimulationStatus, WatchVariable,
+        Breakpoint, ForcedDeviceValue, MemorySnapshot, RegisterTagRequest, RuntimeBinding,
+        ScanCycleInfo, SimulationConfig, SimulationStatus, TagDefinition, WatchVariable,
     },
 };
 
@@ -46,7 +47,10 @@ impl Default for SimState {
 impl SimState {
     pub fn with_runtime(runtime: Arc<CanonicalRuntimeFacade>) -> Self {
         Self {
-            host: Arc::new(SimulationRuntimeHost::with_runtime(runtime)),
+            host: Arc::new(SimulationRuntimeHost::with_runtime(
+                runtime,
+                Arc::new(crate::sim::tag_registry::TagRegistry::new()),
+            )),
         }
     }
 
@@ -54,9 +58,14 @@ impl SimState {
     pub fn with_runtime_and_modbus(
         runtime: Arc<CanonicalRuntimeFacade>,
         modbus_memory: Arc<ModbusMemory>,
+        tag_registry: SharedTagRegistry,
     ) -> Self {
         Self {
-            host: Arc::new(SimulationRuntimeHost::with_runtime_and_modbus(runtime, modbus_memory)),
+            host: Arc::new(SimulationRuntimeHost::with_runtime_and_modbus(
+                runtime,
+                modbus_memory,
+                tag_registry,
+            )),
         }
     }
 
@@ -81,6 +90,10 @@ impl SimState {
 
     pub fn host(&self) -> Arc<SimulationRuntimeHost> {
         Arc::clone(&self.host)
+    }
+
+    pub fn tag_registry(&self) -> SharedTagRegistry {
+        self.host.tag_registry()
     }
 }
 
@@ -349,6 +362,13 @@ fn read_canonical_device(
     }
 }
 
+fn resolve_binding_to_canonical(
+    registry: &SharedTagRegistry,
+    binding: &RuntimeBinding,
+) -> Result<CanonicalAddress, String> {
+    registry.resolve_binding(binding).map_err(|e| e.to_string())
+}
+
 fn write_canonical_device(
     runtime: &Arc<CanonicalRuntimeFacade>,
     address: CanonicalAddress,
@@ -375,9 +395,7 @@ pub fn sim_read_binding(
     let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
     let runtime = engine.runtime();
     let (binding, _) = resolve_runtime_binding(Some(&project_state), &request)?;
-    let canonical = binding
-        .canonical_address()
-        .ok_or_else(|| "Tag binding reads are not implemented yet".to_string())?;
+    let canonical = resolve_binding_to_canonical(&state.tag_registry(), &binding)?;
     read_canonical_device(runtime, canonical)
 }
 
@@ -394,9 +412,7 @@ pub fn sim_write_binding(
     let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
     let runtime = engine.runtime();
     let (binding, display_address) = resolve_runtime_binding(Some(&project_state), &request)?;
-    let canonical = binding
-        .canonical_address()
-        .ok_or_else(|| "Tag binding writes are not implemented yet".to_string())?;
+    let canonical = resolve_binding_to_canonical(&state.tag_registry(), &binding)?;
     let old_value = read_canonical_device(runtime, canonical)?;
     write_canonical_device(runtime, canonical, &value)?;
 
@@ -498,6 +514,64 @@ pub fn sim_get_memory_snapshot(state: State<'_, SimState>) -> Result<MemorySnaps
         engine.timer_mgr().get_all_states().into_iter().map(|(k, v)| (k as u32, v)).collect(),
         engine.counter_mgr().get_all_states().into_iter().map(|(k, v)| (k as u32, v)).collect(),
     ))
+}
+
+#[tauri::command]
+pub fn sim_register_tag(
+    state: State<'_, SimState>,
+    mut request: RegisterTagRequest,
+) -> Result<TagDefinition, String> {
+    if request.canonical_address.is_none() {
+        if let Some(binding) = request.binding.clone() {
+            request.canonical_address = Some(resolve_binding_to_canonical(&state.tag_registry(), &binding)?);
+        }
+    }
+
+    if request.canonical_address.is_none() {
+        return Err("Tag registration requires a canonical binding".to_string());
+    }
+
+    if request.vendor_aliases.is_empty() {
+        if let Some(RuntimeBinding::Canonical { address }) = request.binding.as_ref() {
+            request.vendor_aliases.push(format!("{:?}:{}", address.area, address.index));
+        }
+    }
+
+    state
+        .tag_registry()
+        .register_semantic(request)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn sim_get_tag(state: State<'_, SimState>, tag_id: String) -> Result<TagDefinition, String> {
+    state.tag_registry().resolve(&tag_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn sim_list_tags(
+    state: State<'_, SimState>,
+    include_raw: Option<bool>,
+) -> Result<Vec<TagDefinition>, String> {
+    Ok(state.tag_registry().list(include_raw.unwrap_or(false)))
+}
+
+#[tauri::command]
+pub fn sim_remove_tag(state: State<'_, SimState>, tag_id: String) -> Result<(), String> {
+    state.tag_registry().remove(&tag_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn sim_create_raw_tag(
+    state: State<'_, SimState>,
+    project_state: State<'_, SharedProjectManager>,
+    request: WatchBindingRequest,
+) -> Result<TagDefinition, String> {
+    let (binding, display_address) = resolve_runtime_binding(Some(&project_state), &request)?;
+    let canonical = resolve_binding_to_canonical(&state.tag_registry(), &binding)?;
+    Ok(state
+        .tag_registry()
+        .raw_tag_for_address(canonical, Some(display_address.clone()), vec![display_address]))
 }
 
 // ============================================================================
