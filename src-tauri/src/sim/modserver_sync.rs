@@ -10,6 +10,10 @@ use std::sync::Arc;
 use thiserror::Error;
 
 use crate::modbus::{ChangeSource, ModbusMemory};
+use crate::plc_runtime::{
+    CanonicalAreaKind, ModbusAddressSpace, ModbusMappingPolicy, ModbusMappingRule,
+    ModbusMappingSource, VendorProfileId,
+};
 
 use super::memory::DeviceMemory;
 use super::types::{SimBitDeviceType, SimWordDeviceType, SyncMode};
@@ -74,6 +78,71 @@ pub enum SyncError {
 /// Result type for sync operations
 pub type SyncResult<T> = Result<T, SyncError>;
 
+fn default_ls_legacy_policy() -> ModbusMappingPolicy {
+    ModbusMappingPolicy {
+        profile_id: VendorProfileId::LsXg5000,
+        source: ModbusMappingSource::LegacyWide,
+        rules: vec![
+            ModbusMappingRule {
+                family: "M".to_string(),
+                canonical_area: CanonicalAreaKind::InternalBit,
+                address_space: ModbusAddressSpace::Coil,
+                offset: M_COIL_OFFSET,
+                count: M_SYNC_COUNT,
+            },
+            ModbusMappingRule {
+                family: "K".to_string(),
+                canonical_area: CanonicalAreaKind::RetentiveBit,
+                address_space: ModbusAddressSpace::Coil,
+                offset: K_COIL_OFFSET,
+                count: K_SYNC_COUNT,
+            },
+            ModbusMappingRule {
+                family: "T".to_string(),
+                canonical_area: CanonicalAreaKind::TimerDoneBit,
+                address_space: ModbusAddressSpace::Coil,
+                offset: T_COIL_OFFSET,
+                count: T_SYNC_COUNT,
+            },
+            ModbusMappingRule {
+                family: "C".to_string(),
+                canonical_area: CanonicalAreaKind::CounterDoneBit,
+                address_space: ModbusAddressSpace::Coil,
+                offset: C_COIL_OFFSET,
+                count: C_SYNC_COUNT,
+            },
+            ModbusMappingRule {
+                family: "P".to_string(),
+                canonical_area: CanonicalAreaKind::InputBit,
+                address_space: ModbusAddressSpace::DiscreteInput,
+                offset: 0,
+                count: P_SYNC_COUNT,
+            },
+            ModbusMappingRule {
+                family: "D".to_string(),
+                canonical_area: CanonicalAreaKind::DataWord,
+                address_space: ModbusAddressSpace::HoldingRegister,
+                offset: D_HR_OFFSET,
+                count: D_SYNC_COUNT,
+            },
+            ModbusMappingRule {
+                family: "TD".to_string(),
+                canonical_area: CanonicalAreaKind::TimerValueWord,
+                address_space: ModbusAddressSpace::HoldingRegister,
+                offset: TD_HR_OFFSET,
+                count: TD_SYNC_COUNT,
+            },
+            ModbusMappingRule {
+                family: "CD".to_string(),
+                canonical_area: CanonicalAreaKind::CounterValueWord,
+                address_space: ModbusAddressSpace::HoldingRegister,
+                offset: CD_HR_OFFSET,
+                count: CD_SYNC_COUNT,
+            },
+        ],
+    }
+}
+
 // ============================================================================
 // ModServer Sync Structure
 // ============================================================================
@@ -90,6 +159,8 @@ pub struct ModServerSync {
     sim_memory: Arc<DeviceMemory>,
     /// Modbus memory
     modbus_memory: Arc<ModbusMemory>,
+    /// Active Modbus exposure policy used by the project/profile.
+    policy: RwLock<ModbusMappingPolicy>,
     /// Current synchronization mode
     sync_mode: RwLock<SyncMode>,
     /// Tracks external writes to Holding Registers
@@ -115,6 +186,23 @@ impl ModServerSync {
         Self {
             sim_memory,
             modbus_memory,
+            policy: RwLock::new(default_ls_legacy_policy()),
+            sync_mode: RwLock::new(SyncMode::EndOfScan),
+            external_write_flags: RwLock::new(HashSet::new()),
+            input_sync_count: RwLock::new(0),
+            output_sync_count: RwLock::new(0),
+        }
+    }
+
+    pub fn with_policy(
+        sim_memory: Arc<DeviceMemory>,
+        modbus_memory: Arc<ModbusMemory>,
+        policy: ModbusMappingPolicy,
+    ) -> Self {
+        Self {
+            sim_memory,
+            modbus_memory,
+            policy: RwLock::new(policy),
             sync_mode: RwLock::new(SyncMode::EndOfScan),
             external_write_flags: RwLock::new(HashSet::new()),
             input_sync_count: RwLock::new(0),
@@ -131,11 +219,16 @@ impl ModServerSync {
         Self {
             sim_memory,
             modbus_memory,
+            policy: RwLock::new(default_ls_legacy_policy()),
             sync_mode: RwLock::new(mode),
             external_write_flags: RwLock::new(HashSet::new()),
             input_sync_count: RwLock::new(0),
             output_sync_count: RwLock::new(0),
         }
+    }
+
+    pub fn set_policy(&self, policy: ModbusMappingPolicy) {
+        *self.policy.write() = policy;
     }
 
     // ========================================================================
@@ -202,81 +295,34 @@ impl ModServerSync {
     /// - Discrete Inputs → P relays
     /// - External Holding Register writes → D registers
     pub fn sync_inputs(&self) -> SyncResult<()> {
-        self.sync_discrete_inputs_to_p()?;
-        self.sync_external_hr_to_d()?;
-
-        *self.input_sync_count.write() += 1;
-        Ok(())
-    }
-
-    /// Sync Discrete Inputs to P (Input Relay) in DeviceMemory
-    fn sync_discrete_inputs_to_p(&self) -> SyncResult<()> {
-        let config = self.modbus_memory.config();
-        let count = config.discrete_input_count.min(P_SYNC_COUNT);
-        if count == 0 {
-            return Ok(());
-        }
-
-        // Read Discrete Inputs from ModServer
-        let di_values = self
+        let policy = self.policy.read().clone();
+        let external_coil_writes: HashSet<u16> = self
             .modbus_memory
-            .read_discrete_inputs(config.discrete_input_start, count)
-            .map_err(|e| SyncError::ModbusMemoryError(e.to_string()))?;
-
-        // Write to P (Input Relay) in DeviceMemory
-        // Note: P relays might be read-only in normal operation,
-        // but we use write_bit here for simulation input
-        for (i, value) in di_values.iter().enumerate() {
-            // P relays are NOT read-only, they can be written from external inputs
-            self.sim_memory
-                .write_bit(SimBitDeviceType::P, i as u16, *value)
-                .map_err(|e| SyncError::DeviceMemoryError(e.to_string()))?;
-        }
-
-        Ok(())
-    }
-
-    /// Sync external Holding Register writes to D registers
-    fn sync_external_hr_to_d(&self) -> SyncResult<()> {
-        let config = self.modbus_memory.config();
-        let hr_start = config.holding_register_start;
-        let visible_count = config.holding_register_count.min(D_SYNC_COUNT);
-        if visible_count == 0 {
-            self.external_write_flags.write().clear();
-            self.modbus_memory.take_external_holding_writes();
-            return Ok(());
-        }
-
-        // Get and clear external write flags atomically
-        let mut external_writes: HashSet<u16> = {
+            .take_external_coil_writes()
+            .into_iter()
+            .collect();
+        let mut external_holding_writes: HashSet<u16> = {
             let mut flags = self.external_write_flags.write();
             let writes: HashSet<u16> = flags.iter().copied().collect();
             flags.clear();
             writes
         };
-        external_writes.extend(self.modbus_memory.take_external_holding_writes());
+        external_holding_writes.extend(self.modbus_memory.take_external_holding_writes());
 
-        // Sync each externally written address
-        for address in external_writes {
-            let Some(relative) = address.checked_sub(hr_start) else {
-                continue;
-            };
-            if relative >= visible_count {
-                continue;
-            }
-
-            let value = self
-                .modbus_memory
-                .read_holding_registers(address, 1)
-                .map_err(|e| SyncError::ModbusMemoryError(e.to_string()))?;
-
-            if let Some(&hr_value) = value.first() {
-                self.sim_memory
-                    .write_word(SimWordDeviceType::D, relative, hr_value)
-                    .map_err(|e| SyncError::DeviceMemoryError(e.to_string()))?;
+        for rule in &policy.rules {
+            match rule.address_space {
+                ModbusAddressSpace::DiscreteInput => self.sync_read_only_bit_rule(rule)?,
+                ModbusAddressSpace::InputRegister => self.sync_read_only_word_rule(rule)?,
+                ModbusAddressSpace::Coil => {
+                    self.sync_external_coil_rule(rule, &external_coil_writes)?
+                }
+                ModbusAddressSpace::HoldingRegister => {
+                    self.sync_external_holding_rule(rule, &external_holding_writes)?
+                }
             }
         }
 
+        *self.input_sync_count.write() += 1;
         Ok(())
     }
 
@@ -295,121 +341,241 @@ impl ModServerSync {
     /// - TD registers → Holding Registers at offset 28208
     /// - CD registers → Holding Registers at offset 30256
     pub fn sync_outputs(&self) -> SyncResult<()> {
-        let config = self.modbus_memory.config();
-
-        // Sync bit devices to Coils
-        self.sync_bit_device_to_coils(
-            SimBitDeviceType::M,
-            config.coil_start.saturating_add(M_COIL_OFFSET),
-            M_COIL_OFFSET,
-            config.coil_count,
-            M_SYNC_COUNT,
-        )?;
-        self.sync_bit_device_to_coils(
-            SimBitDeviceType::K,
-            config.coil_start.saturating_add(K_COIL_OFFSET),
-            K_COIL_OFFSET,
-            config.coil_count,
-            K_SYNC_COUNT,
-        )?;
-        self.sync_bit_device_to_coils(
-            SimBitDeviceType::T,
-            config.coil_start.saturating_add(T_COIL_OFFSET),
-            T_COIL_OFFSET,
-            config.coil_count,
-            T_SYNC_COUNT,
-        )?;
-        self.sync_bit_device_to_coils(
-            SimBitDeviceType::C,
-            config.coil_start.saturating_add(C_COIL_OFFSET),
-            C_COIL_OFFSET,
-            config.coil_count,
-            C_SYNC_COUNT,
-        )?;
-
-        // Sync word devices to Holding Registers
-        self.sync_word_device_to_hr(
-            SimWordDeviceType::D,
-            config.holding_register_start.saturating_add(D_HR_OFFSET),
-            D_HR_OFFSET,
-            config.holding_register_count,
-            D_SYNC_COUNT,
-        )?;
-        self.sync_word_device_to_hr(
-            SimWordDeviceType::Td,
-            config.holding_register_start.saturating_add(TD_HR_OFFSET),
-            TD_HR_OFFSET,
-            config.holding_register_count,
-            TD_SYNC_COUNT,
-        )?;
-        self.sync_word_device_to_hr(
-            SimWordDeviceType::Cd,
-            config.holding_register_start.saturating_add(CD_HR_OFFSET),
-            CD_HR_OFFSET,
-            config.holding_register_count,
-            CD_SYNC_COUNT,
-        )?;
+        let policy = self.policy.read().clone();
+        for rule in &policy.rules {
+            match rule.address_space {
+                ModbusAddressSpace::Coil => self.sync_rule_to_coils(rule)?,
+                ModbusAddressSpace::DiscreteInput => self.sync_rule_to_discrete_inputs(rule)?,
+                ModbusAddressSpace::HoldingRegister => self.sync_rule_to_holding_registers(rule)?,
+                ModbusAddressSpace::InputRegister => self.sync_rule_to_input_registers(rule)?,
+            }
+        }
 
         *self.output_sync_count.write() += 1;
         Ok(())
     }
 
-    /// Sync a bit device to Coils at specified offset
-    fn sync_bit_device_to_coils(
-        &self,
-        device: SimBitDeviceType,
-        address: u16,
-        offset: u16,
-        exposed_count: u16,
-        count: u16,
-    ) -> SyncResult<()> {
-        if offset >= exposed_count {
+    fn sync_read_only_bit_rule(&self, rule: &ModbusMappingRule) -> SyncResult<()> {
+        let Some((device, count, address)) = self.resolve_bit_rule_window(rule) else {
             return Ok(());
-        }
-        let count = count.min(exposed_count - offset);
-        if count == 0 {
-            return Ok(());
-        }
-
+        };
         let values = self
-            .sim_memory
-            .read_bits(device, 0, count)
-            .map_err(|e| SyncError::DeviceMemoryError(e.to_string()))?;
-
-        self.modbus_memory
-            .write_coils_with_source(address, &values, ChangeSource::Simulation)
+            .modbus_memory
+            .read_discrete_inputs(address, count)
             .map_err(|e| SyncError::ModbusMemoryError(e.to_string()))?;
+        self.write_bit_values_internal(device, &values)
+    }
+
+    fn sync_read_only_word_rule(&self, rule: &ModbusMappingRule) -> SyncResult<()> {
+        let Some((device, count, address)) = self.resolve_word_rule_window(rule) else {
+            return Ok(());
+        };
+        let values = self
+            .modbus_memory
+            .read_input_registers(address, count)
+            .map_err(|e| SyncError::ModbusMemoryError(e.to_string()))?;
+        self.write_word_values_internal(device, &values)
+    }
+
+    fn sync_external_coil_rule(
+        &self,
+        rule: &ModbusMappingRule,
+        external_writes: &HashSet<u16>,
+    ) -> SyncResult<()> {
+        let Some((device, count, address)) = self.resolve_bit_rule_window(rule) else {
+            return Ok(());
+        };
+        if external_writes.is_empty() {
+            return Ok(());
+        }
+
+        for external_address in external_writes.iter().copied() {
+            let Some(relative) = external_address.checked_sub(address) else {
+                continue;
+            };
+            if relative >= count {
+                continue;
+            }
+
+            let value = self
+                .modbus_memory
+                .read_coils(external_address, 1)
+                .map_err(|e| SyncError::ModbusMemoryError(e.to_string()))?;
+            if let Some(bit) = value.first() {
+                self.write_single_bit_external(device, relative, *bit)?;
+            }
+        }
 
         Ok(())
     }
 
-    /// Sync a word device to Holding Registers at specified offset
-    fn sync_word_device_to_hr(
+    fn sync_external_holding_rule(
+        &self,
+        rule: &ModbusMappingRule,
+        external_writes: &HashSet<u16>,
+    ) -> SyncResult<()> {
+        let Some((device, count, address)) = self.resolve_word_rule_window(rule) else {
+            return Ok(());
+        };
+
+        for external_address in external_writes.iter().copied() {
+            let Some(relative) = external_address.checked_sub(address) else {
+                continue;
+            };
+            if relative >= count {
+                continue;
+            }
+
+            let value = self
+                .modbus_memory
+                .read_holding_registers(external_address, 1)
+                .map_err(|e| SyncError::ModbusMemoryError(e.to_string()))?;
+            if let Some(word) = value.first() {
+                self.write_single_word_external(device, relative, *word)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn sync_rule_to_coils(&self, rule: &ModbusMappingRule) -> SyncResult<()> {
+        let Some((device, count, address)) = self.resolve_bit_rule_window(rule) else {
+            return Ok(());
+        };
+        let values = self.read_bit_values(device, count)?;
+        self.modbus_memory
+            .write_coils_with_source(address, &values, ChangeSource::Simulation)
+            .map_err(|e| SyncError::ModbusMemoryError(e.to_string()))
+    }
+
+    fn sync_rule_to_discrete_inputs(&self, rule: &ModbusMappingRule) -> SyncResult<()> {
+        let Some((device, count, address)) = self.resolve_bit_rule_window(rule) else {
+            return Ok(());
+        };
+        let values = self.read_bit_values(device, count)?;
+        self.modbus_memory
+            .write_discrete_inputs_with_source(address, &values, ChangeSource::Simulation)
+            .map_err(|e| SyncError::ModbusMemoryError(e.to_string()))
+    }
+
+    fn sync_rule_to_holding_registers(&self, rule: &ModbusMappingRule) -> SyncResult<()> {
+        let Some((device, count, address)) = self.resolve_word_rule_window(rule) else {
+            return Ok(());
+        };
+        let values = self.read_word_values(device, count)?;
+        self.modbus_memory
+            .write_holding_registers_with_source(address, &values, ChangeSource::Simulation)
+            .map_err(|e| SyncError::ModbusMemoryError(e.to_string()))
+    }
+
+    fn sync_rule_to_input_registers(&self, rule: &ModbusMappingRule) -> SyncResult<()> {
+        let Some((device, count, address)) = self.resolve_word_rule_window(rule) else {
+            return Ok(());
+        };
+        let values = self.read_word_values(device, count)?;
+        self.modbus_memory
+            .write_input_registers_with_source(address, &values, ChangeSource::Simulation)
+            .map_err(|e| SyncError::ModbusMemoryError(e.to_string()))
+    }
+
+    fn resolve_bit_rule_window(
+        &self,
+        rule: &ModbusMappingRule,
+    ) -> Option<(SimBitDeviceType, u16, u16)> {
+        let device = map_bit_family(&rule.family)?;
+        let config = self.modbus_memory.config();
+        let (space_start, space_count) = match rule.address_space {
+            ModbusAddressSpace::Coil => (config.coil_start, config.coil_count),
+            ModbusAddressSpace::DiscreteInput => {
+                (config.discrete_input_start, config.discrete_input_count)
+            }
+            _ => return None,
+        };
+        let device_count = device.default_size() as u16;
+        let count = clamp_rule_count(space_count, rule.offset, rule.count, device_count);
+        if count == 0 {
+            return None;
+        }
+
+        Some((device, count, space_start.saturating_add(rule.offset)))
+    }
+
+    fn resolve_word_rule_window(
+        &self,
+        rule: &ModbusMappingRule,
+    ) -> Option<(SimWordDeviceType, u16, u16)> {
+        let device = map_word_family(&rule.family)?;
+        let config = self.modbus_memory.config();
+        let (space_start, space_count) = match rule.address_space {
+            ModbusAddressSpace::HoldingRegister => {
+                (config.holding_register_start, config.holding_register_count)
+            }
+            ModbusAddressSpace::InputRegister => (config.input_register_start, config.input_register_count),
+            _ => return None,
+        };
+        let device_count = device.default_size() as u16;
+        let count = clamp_rule_count(space_count, rule.offset, rule.count, device_count);
+        if count == 0 {
+            return None;
+        }
+
+        Some((device, count, space_start.saturating_add(rule.offset)))
+    }
+
+    fn read_bit_values(&self, device: SimBitDeviceType, count: u16) -> SyncResult<Vec<bool>> {
+        self.sim_memory
+            .read_bits(device, 0, count)
+            .map_err(|e| SyncError::DeviceMemoryError(e.to_string()))
+    }
+
+    fn read_word_values(&self, device: SimWordDeviceType, count: u16) -> SyncResult<Vec<u16>> {
+        self.sim_memory
+            .read_words(device, 0, count)
+            .map_err(|e| SyncError::DeviceMemoryError(e.to_string()))
+    }
+
+    fn write_bit_values_internal(&self, device: SimBitDeviceType, values: &[bool]) -> SyncResult<()> {
+        for (index, value) in values.iter().copied().enumerate() {
+            self.sim_memory
+                .write_bit_internal(device, index as u16, value)
+                .map_err(|e| SyncError::DeviceMemoryError(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    fn write_word_values_internal(
+        &self,
+        device: SimWordDeviceType,
+        values: &[u16],
+    ) -> SyncResult<()> {
+        for (index, value) in values.iter().copied().enumerate() {
+            self.sim_memory
+                .write_word(device, index as u16, value)
+                .map_err(|e| SyncError::DeviceMemoryError(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    fn write_single_bit_external(
+        &self,
+        device: SimBitDeviceType,
+        address: u16,
+        value: bool,
+    ) -> SyncResult<()> {
+        self.sim_memory
+            .write_bit(device, address, value)
+            .map_err(|e| SyncError::DeviceMemoryError(e.to_string()))
+    }
+
+    fn write_single_word_external(
         &self,
         device: SimWordDeviceType,
         address: u16,
-        offset: u16,
-        exposed_count: u16,
-        count: u16,
+        value: u16,
     ) -> SyncResult<()> {
-        if offset >= exposed_count {
-            return Ok(());
-        }
-        let count = count.min(exposed_count - offset);
-        if count == 0 {
-            return Ok(());
-        }
-
-        let values = self
-            .sim_memory
-            .read_words(device, 0, count)
-            .map_err(|e| SyncError::DeviceMemoryError(e.to_string()))?;
-
-        self.modbus_memory
-            .write_holding_registers_with_source(address, &values, ChangeSource::Simulation)
-            .map_err(|e| SyncError::ModbusMemoryError(e.to_string()))?;
-
-        Ok(())
+        self.sim_memory
+            .write_word(device, address, value)
+            .map_err(|e| SyncError::DeviceMemoryError(e.to_string()))
     }
 
     // ========================================================================
@@ -473,6 +639,40 @@ impl ModServerSync {
     }
 }
 
+fn clamp_rule_count(space_count: u16, offset: u16, requested: u16, device_count: u16) -> u16 {
+    if offset >= space_count {
+        return 0;
+    }
+
+    requested.min(space_count - offset).min(device_count)
+}
+
+fn map_bit_family(family: &str) -> Option<SimBitDeviceType> {
+    match family.trim().to_uppercase().as_str() {
+        "X" => Some(SimBitDeviceType::X),
+        "Y" => Some(SimBitDeviceType::Y),
+        "P" => Some(SimBitDeviceType::P),
+        "M" => Some(SimBitDeviceType::M),
+        "K" | "L" => Some(SimBitDeviceType::K),
+        "F" => Some(SimBitDeviceType::F),
+        "T" => Some(SimBitDeviceType::T),
+        "C" => Some(SimBitDeviceType::C),
+        _ => None,
+    }
+}
+
+fn map_word_family(family: &str) -> Option<SimWordDeviceType> {
+    match family.trim().to_uppercase().as_str() {
+        "D" => Some(SimWordDeviceType::D),
+        "R" => Some(SimWordDeviceType::R),
+        "Z" => Some(SimWordDeviceType::Z),
+        "N" => Some(SimWordDeviceType::N),
+        "TD" => Some(SimWordDeviceType::Td),
+        "CD" => Some(SimWordDeviceType::Cd),
+        _ => None,
+    }
+}
+
 // ============================================================================
 // Unit Tests
 // ============================================================================
@@ -481,6 +681,8 @@ impl ModServerSync {
 mod tests {
     use super::*;
     use crate::modbus::MemoryMapSettings;
+    use crate::plc_runtime::resolve_modbus_mapping_policy;
+    use crate::project::{PlcHardwareTopology, PlcManufacturer, PlcSettings};
 
     fn create_test_sync() -> ModServerSync {
         let sim_memory = Arc::new(DeviceMemory::new());
@@ -495,6 +697,21 @@ mod tests {
             input_register_count: 10000,
         }));
         ModServerSync::new(sim_memory, modbus_memory)
+    }
+
+    fn create_test_memory() -> (Arc<DeviceMemory>, Arc<ModbusMemory>) {
+        let sim_memory = Arc::new(DeviceMemory::new());
+        let modbus_memory = Arc::new(ModbusMemory::new(&MemoryMapSettings {
+            coil_start: 0,
+            coil_count: 15000,
+            discrete_input_start: 0,
+            discrete_input_count: 3000,
+            holding_register_start: 0,
+            holding_register_count: 35000,
+            input_register_start: 0,
+            input_register_count: 10000,
+        }));
+        (sim_memory, modbus_memory)
     }
 
     // ========================================================================
@@ -1105,5 +1322,98 @@ mod tests {
                 .unwrap()[0],
             6000
         );
+    }
+
+    #[test]
+    fn test_ls_recommended_policy_only_syncs_m_and_d() {
+        let (sim_memory, modbus_memory) = create_test_memory();
+        let policy = resolve_modbus_mapping_policy(
+            &PlcSettings {
+                manufacturer: PlcManufacturer::LS,
+                model: "XBC-DN32H".to_string(),
+                scan_time_ms: 10,
+                hardware_topology: PlcHardwareTopology::default(),
+            },
+            None,
+        )
+        .expect("ls policy should resolve");
+        let sync = ModServerSync::with_policy(
+            Arc::clone(&sim_memory),
+            Arc::clone(&modbus_memory),
+            policy,
+        );
+
+        sim_memory.write_bit(SimBitDeviceType::M, 5, true).unwrap();
+        sim_memory.write_bit(SimBitDeviceType::K, 5, true).unwrap();
+        sim_memory.write_word(SimWordDeviceType::D, 7, 4321).unwrap();
+        sim_memory.write_word(SimWordDeviceType::R, 7, 8765).unwrap();
+
+        sync.sync_outputs().unwrap();
+
+        assert!(modbus_memory.read_coils(5, 1).unwrap()[0]);
+        assert_eq!(modbus_memory.read_holding_registers(7, 1).unwrap()[0], 4321);
+        assert!(!modbus_memory.read_coils(K_COIL_OFFSET + 5, 1).unwrap()[0]);
+        assert_eq!(
+            modbus_memory.read_holding_registers(10000 + 7, 1).unwrap()[0],
+            0
+        );
+    }
+
+    #[test]
+    fn test_melsec_recommended_policy_syncs_xyd() {
+        let (sim_memory, modbus_memory) = create_test_memory();
+        let policy = resolve_modbus_mapping_policy(
+            &PlcSettings {
+                manufacturer: PlcManufacturer::Mitsubishi,
+                model: "FX5U".to_string(),
+                scan_time_ms: 10,
+                hardware_topology: PlcHardwareTopology::default(),
+            },
+            None,
+        )
+        .expect("melsec policy should resolve");
+        let sync = ModServerSync::with_policy(
+            Arc::clone(&sim_memory),
+            Arc::clone(&modbus_memory),
+            policy,
+        );
+
+        modbus_memory.write_discrete_input(3, true).unwrap();
+        sim_memory.write_bit(SimBitDeviceType::Y, 4, true).unwrap();
+        sim_memory.write_word(SimWordDeviceType::D, 8, 2468).unwrap();
+
+        sync.sync_inputs().unwrap();
+        sync.sync_outputs().unwrap();
+
+        assert!(sim_memory.read_bit(SimBitDeviceType::X, 3).unwrap());
+        assert!(modbus_memory.read_coils(4, 1).unwrap()[0]);
+        assert_eq!(modbus_memory.read_holding_registers(8, 1).unwrap()[0], 2468);
+    }
+
+    #[test]
+    fn test_external_writes_are_fanned_out_across_multiple_rules() {
+        let (sim_memory, modbus_memory) = create_test_memory();
+        let sync = ModServerSync::new(Arc::clone(&sim_memory), Arc::clone(&modbus_memory));
+
+        modbus_memory
+            .write_coil_with_source(0, true, ChangeSource::External)
+            .unwrap();
+        modbus_memory
+            .write_coil_with_source(K_COIL_OFFSET + 1, true, ChangeSource::External)
+            .unwrap();
+        modbus_memory
+            .write_holding_register_with_source(2, 1111, ChangeSource::External)
+            .unwrap();
+        modbus_memory
+            .write_holding_register_with_source(TD_HR_OFFSET + 3, 2222, ChangeSource::External)
+            .unwrap();
+        sync.mark_external_write(2);
+
+        sync.sync_inputs().unwrap();
+
+        assert!(sim_memory.read_bit(SimBitDeviceType::M, 0).unwrap());
+        assert!(sim_memory.read_bit(SimBitDeviceType::K, 1).unwrap());
+        assert_eq!(sim_memory.read_word(SimWordDeviceType::D, 2).unwrap(), 1111);
+        assert_eq!(sim_memory.read_word(SimWordDeviceType::Td, 3).unwrap(), 2222);
     }
 }

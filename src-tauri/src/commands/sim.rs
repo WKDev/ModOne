@@ -16,7 +16,8 @@ use crate::commands::modbus::{
 };
 use crate::modbus::ModbusMemory;
 use crate::plc_runtime::{
-    resolve_vendor_profile, CanonicalAddress, CanonicalAreaKind, VendorAddress, VendorProfileId,
+    resolve_modbus_mapping_policy, resolve_vendor_profile, CanonicalAddress, CanonicalAreaKind,
+    VendorAddress, VendorProfileId,
 };
 use crate::project::{PlcSettings, ProjectConfig, SharedProjectManager};
 use crate::sim::{
@@ -239,10 +240,23 @@ pub async fn sim_run(
     // Wire ModServer sync into engine (DeviceMemory ↔ ModbusMemory)
     if let Some(ref engine) = *engine_guard {
         if let Some(ref modbus_mem) = state.modbus_memory {
-            let modserver_sync = Arc::new(ModServerSync::new(
-                Arc::clone(state.memory()),
-                Arc::clone(modbus_mem),
-            ));
+            let modserver_sync = if let Some(project_config) = project_config.as_ref() {
+                let policy = resolve_modbus_mapping_policy(
+                    &project_config.plc,
+                    Some(&project_config.modbus.exposure),
+                )
+                .map_err(|e| e.to_string())?;
+                Arc::new(ModServerSync::with_policy(
+                    Arc::clone(state.memory()),
+                    Arc::clone(modbus_mem),
+                    policy,
+                ))
+            } else {
+                Arc::new(ModServerSync::new(
+                    Arc::clone(state.memory()),
+                    Arc::clone(modbus_mem),
+                ))
+            };
             engine.set_modserver_sync(modserver_sync);
         }
     }

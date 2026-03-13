@@ -37,6 +37,8 @@ pub struct ModbusMemory {
     change_buffer: RwLock<Vec<MemoryChangeEvent>>,
     /// Whether we're in batch mode
     batch_mode: RwLock<bool>,
+    /// Absolute coil addresses written by external Modbus clients.
+    external_coil_writes: RwLock<HashSet<u16>>,
     /// Absolute holding register addresses written by external Modbus clients.
     external_holding_writes: RwLock<HashSet<u16>>,
 }
@@ -55,6 +57,7 @@ impl ModbusMemory {
             app_handle: RwLock::new(None),
             change_buffer: RwLock::new(Vec::new()),
             batch_mode: RwLock::new(false),
+            external_coil_writes: RwLock::new(HashSet::new()),
             external_holding_writes: RwLock::new(HashSet::new()),
         }
     }
@@ -78,6 +81,7 @@ impl ModbusMemory {
         *self.config.write() = config.clone();
         self.change_buffer.write().clear();
         *self.batch_mode.write() = false;
+        self.external_coil_writes.write().clear();
         self.external_holding_writes.write().clear();
     }
 
@@ -163,6 +167,9 @@ impl ModbusMemory {
 
         // Only emit if value actually changed
         if old_value != value {
+            if matches!(source, ChangeSource::External) {
+                self.external_coil_writes.write().insert(address);
+            }
             self.emit_change(MemoryChangeEvent::coil(
                 address,
                 old_value,
@@ -212,8 +219,12 @@ impl ModbusMemory {
         self.start_batch();
         for (i, (&old, &new)) in old_values.iter().zip(values.iter()).enumerate() {
             if old != new {
+                let address = start + i as u16;
+                if matches!(source, ChangeSource::External) {
+                    self.external_coil_writes.write().insert(address);
+                }
                 self.emit_change(MemoryChangeEvent::coil(
-                    start + i as u16,
+                    address,
                     old,
                     new,
                     source.as_str(),
@@ -682,7 +693,16 @@ impl ModbusMemory {
         self.discrete_inputs.write().fill(false);
         self.holding_registers.write().fill(0);
         self.input_registers.write().fill(0);
+        self.external_coil_writes.write().clear();
         self.external_holding_writes.write().clear();
+    }
+
+    /// Drain externally written coil addresses.
+    pub fn take_external_coil_writes(&self) -> Vec<u16> {
+        let mut writes = self.external_coil_writes.write();
+        let drained: Vec<u16> = writes.iter().copied().collect();
+        writes.clear();
+        drained
     }
 
     /// Drain externally written holding register addresses.
