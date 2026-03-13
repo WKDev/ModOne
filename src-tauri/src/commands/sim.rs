@@ -266,7 +266,10 @@ pub async fn sim_run(
                     policy,
                 ))
             };
+            adapter.full_sync().map_err(|e| e.to_string())?;
             engine.set_modbus_adapter(adapter);
+        } else {
+            engine.clear_modbus_adapter();
         }
     }
 
@@ -328,6 +331,7 @@ pub async fn sim_stop(
         let engine_guard = state.engine.lock();
         if let Some(ref engine) = *engine_guard {
             engine.stop();
+            engine.clear_modbus_adapter();
             true
         } else {
             false
@@ -441,6 +445,7 @@ pub async fn sim_reset(
         // Stop if running
         if let Some(ref engine) = *engine_guard {
             engine.stop();
+            engine.clear_modbus_adapter();
         }
 
         // Clear the engine

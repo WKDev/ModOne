@@ -501,6 +501,11 @@ impl OneSimEngine {
         *self.modbus_adapter.write() = Some(adapter);
     }
 
+    /// Clear the Modbus adapter from the engine lifecycle.
+    pub fn clear_modbus_adapter(&self) {
+        *self.modbus_adapter.write() = None;
+    }
+
     // ========================================================================
     // Control Methods
     // ========================================================================
