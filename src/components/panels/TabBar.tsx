@@ -130,11 +130,17 @@ export function TabBar({
     setDragOverIndex(null);
   };
 
-  // Empty state
+  // Empty state — also acts as a drop target for cross-panel tab moves
   if (tabs.length === 0) {
     return (
-      <div className="flex items-center h-8 bg-[var(--color-bg-primary)] border-b border-[var(--color-border)] px-2">
-        <span className="text-xs text-[var(--color-text-muted)] italic">No tabs</span>
+      <div
+        className={`flex items-center h-8 bg-[var(--color-bg-primary)] border-b border-[var(--color-border)] px-2
+          ${dragOverIndex === 0 ? 'ring-1 ring-inset ring-[var(--color-accent)]' : ''}`}
+        onDragOver={(e) => handleDragOver(e, 0)}
+        onDragLeave={() => setDragOverIndex(null)}
+        onDrop={(e) => handleDrop(e, 0)}
+      >
+        <span className="text-xs text-[var(--color-text-muted)] italic">Drop a tab here</span>
         {onAddTab && (
           <button
             className="ml-2 w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"

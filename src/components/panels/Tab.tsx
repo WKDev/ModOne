@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 export interface TabComponentProps {
   id: string;
@@ -33,6 +33,8 @@ export function Tab({
   onDrop,
 }: TabComponentProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragImageRef = useRef<HTMLDivElement | null>(null);
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -53,7 +55,30 @@ export function Tab({
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData('text/plain', id);
     e.dataTransfer.effectAllowed = 'move';
+
+    // Custom drag image showing tab title
+    const el = document.createElement('div');
+    el.textContent = `${isModified ? '* ' : ''}${title}`;
+    el.style.cssText =
+      'position:fixed;top:-1000px;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:500;' +
+      'background:var(--color-bg-secondary);color:var(--color-text-primary);border:1px solid var(--color-border);' +
+      'box-shadow:0 2px 8px rgba(0,0,0,0.2);white-space:nowrap;pointer-events:none;';
+    document.body.appendChild(el);
+    e.dataTransfer.setDragImage(el, el.offsetWidth / 2, el.offsetHeight / 2);
+    dragImageRef.current = el;
+
+    setIsDragging(true);
     onDragStart?.(e);
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    setIsDragging(false);
+    // Clean up custom drag image
+    if (dragImageRef.current) {
+      document.body.removeChild(dragImageRef.current);
+      dragImageRef.current = null;
+    }
+    onDragEnd?.(e);
   };
 
   return (
@@ -61,6 +86,7 @@ export function Tab({
       data-tab-id={id}
       className={`group relative flex items-center gap-1.5 px-3 h-8 min-w-[100px] max-w-[180px] cursor-pointer select-none
         border-r border-[var(--color-border)] transition-colors duration-150
+        ${isDragging ? 'opacity-40' : ''}
         ${isActive
           ? 'bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)] border-b-2 border-b-[var(--color-accent)]'
           : 'bg-[var(--color-bg-primary)] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-text-secondary)] border-b-2 border-b-transparent'
@@ -72,7 +98,7 @@ export function Tab({
       draggable={draggable}
       onDragStart={handleDragStart}
       onDragOver={onDragOver}
-      onDragEnd={onDragEnd}
+      onDragEnd={handleDragEnd}
       onDrop={onDrop}
     >
       {/* Icon */}
