@@ -2,6 +2,7 @@ import { memo, useCallback } from 'react';
 import { useCanvasFacade } from '../../../../hooks/useCanvasFacade';
 import { useProjectStore } from '../../../../stores/projectStore';
 import { Settings2 } from 'lucide-react';
+import type { RuntimeGridUnit } from '../../../../components/OneCanvas/types';
 
 interface CanvasPropertiesProps {
   documentId: string | null;
@@ -35,7 +36,7 @@ export const CanvasProperties = memo(function CanvasProperties({
     facade.setGridStyle(style);
   }, [facade]);
 
-  const handleGridUnitChange = useCallback((unit: 'px' | 'mil' | 'mm') => {
+  const handleGridUnitChange = useCallback((unit: RuntimeGridUnit) => {
     facade.setGridUnit(unit);
   }, [facade]);
 
@@ -91,10 +92,9 @@ export const CanvasProperties = memo(function CanvasProperties({
           <label className="text-xs text-neutral-500">Grid Unit</label>
           <select
             value={gridUnit}
-            onChange={(e) => handleGridUnitChange(e.target.value as 'px' | 'mil' | 'mm')}
+            onChange={(e) => handleGridUnitChange(e.target.value as RuntimeGridUnit)}
             className="w-full px-2 py-1.5 bg-neutral-800 border border-neutral-700 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 appearance-none cursor-pointer"
           >
-            <option value="px">px (pixels)</option>
             <option value="mil">mil (1/1000 inch)</option>
             <option value="mm">mm (millimeters)</option>
           </select>
@@ -108,12 +108,6 @@ export const CanvasProperties = memo(function CanvasProperties({
             onChange={(e) => handleGridSizeChange(Number(e.target.value))}
             className="w-full px-2 py-1.5 bg-neutral-800 border border-neutral-700 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 appearance-none cursor-pointer"
           >
-            {gridUnit === 'px' && <>
-              <option value={5}>5 px</option>
-              <option value={10}>10 px</option>
-              <option value={20}>20 px</option>
-              <option value={50}>50 px</option>
-            </>}
             {gridUnit === 'mil' && <>
               <option value={5}>5 mil</option>
               <option value={10}>10 mil</option>
@@ -123,10 +117,10 @@ export const CanvasProperties = memo(function CanvasProperties({
             </>}
             {gridUnit === 'mm' && <>
               <option value={1}>1 mm</option>
-              <option value={2}>2 mm</option>
-              <option value={4}>4 mm (Default)</option>
-              <option value={8}>8 mm</option>
-              <option value={16}>16 mm</option>
+              <option value={2.5}>2.5 mm</option>
+              <option value={5}>5 mm (Default)</option>
+              <option value={10}>10 mm</option>
+              <option value={20}>20 mm</option>
             </>}
           </select>
         </div>

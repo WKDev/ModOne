@@ -22,8 +22,16 @@ import type {
   WireEndpoint,
   Position,
   PortPosition,
+  RuntimeGridUnit,
   SerializableCircuitState,
 } from '../components/OneCanvas/types';
+import {
+  GRID_MODULE_MM,
+  GRID_VERSION,
+  ensureRuntimeGridUnit,
+  normalizeGridSizeForRuntime,
+  normalizeSerializableCircuitState,
+} from '../components/OneCanvas/canvasUnits';
 import { isCanvasDocument, isSchematicDocument } from '../types/document';
 import {
   alignComponents,
@@ -37,6 +45,13 @@ import type { CanvasFacadeReturn, WireDrawingState } from '../types/canvasFacade
 // ============================================================================
 
 const EXIT_DETECTION_THRESHOLD = 4;
+const DEFAULT_PROJECT_CANVAS_SETTINGS = {
+  grid_size: GRID_MODULE_MM,
+  snap_to_grid: true,
+  show_grid: true,
+  grid_style: 'dots' as const,
+  grid_unit: 'mm' as const,
+};
 
 // ============================================================================
 // Helpers
@@ -103,22 +118,24 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
   const projectCanvasSettings = useProjectStore((s) => s.currentProject?.config.canvas);
   const updateProjectConfig = useProjectStore((s) => s.updateConfig);
 
-  const gridSize = activeDocumentState?.gridSize ?? projectCanvasSettings?.grid_size ?? 4;
+  const projectGrid = useMemo(
+    () => normalizeGridSizeForRuntime(
+      projectCanvasSettings?.grid_size ?? GRID_MODULE_MM,
+      projectCanvasSettings?.grid_unit,
+    ),
+    [projectCanvasSettings?.grid_size, projectCanvasSettings?.grid_unit]
+  );
+
+  const gridSize = activeDocumentState?.gridSize ?? projectGrid.gridSize;
   const snapToGrid = activeDocumentState?.snapToGrid ?? projectCanvasSettings?.snap_to_grid ?? true;
   const showGrid = activeDocumentState?.showGrid ?? projectCanvasSettings?.show_grid ?? true;
   const gridStyle = activeDocumentState?.gridStyle ?? projectCanvasSettings?.grid_style ?? 'dots';
-  const gridUnit = (activeDocumentState as any)?.gridUnit ?? projectCanvasSettings?.grid_unit ?? 'mm';
+  const gridUnit = activeDocumentState?.gridUnit ?? projectGrid.gridUnit;
 
   const setGridSize = useCallback((size: number) => {
     updateProjectConfig({
       canvas: {
-        ...(projectCanvasSettings || {
-          grid_size: 4,
-          snap_to_grid: true,
-          show_grid: true,
-          grid_style: 'dots',
-          grid_unit: 'mm',
-        }),
+        ...(projectCanvasSettings || DEFAULT_PROJECT_CANVAS_SETTINGS),
         grid_size: size,
       },
     });
@@ -128,29 +145,17 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
   const setGridStyle = useCallback((style: 'dots' | 'lines') => {
     updateProjectConfig({
       canvas: {
-        ...(projectCanvasSettings || {
-          grid_size: 4,
-          snap_to_grid: true,
-          show_grid: true,
-          grid_style: 'dots',
-          grid_unit: 'mm',
-        }),
+        ...(projectCanvasSettings || DEFAULT_PROJECT_CANVAS_SETTINGS),
         grid_style: style,
       },
     });
     activeDocumentState?.setGridStyle(style);
   }, [updateProjectConfig, projectCanvasSettings, activeDocumentState]);
 
-  const setGridUnit = useCallback((unit: 'px' | 'mil' | 'mm') => {
+  const setGridUnit = useCallback((unit: RuntimeGridUnit) => {
     updateProjectConfig({
       canvas: {
-        ...(projectCanvasSettings || {
-          grid_size: 4,
-          snap_to_grid: true,
-          show_grid: true,
-          grid_style: 'dots',
-          grid_unit: 'mm',
-        }),
+        ...(projectCanvasSettings || DEFAULT_PROJECT_CANVAS_SETTINGS),
         grid_unit: unit,
       },
     });
@@ -164,13 +169,7 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
     const nextValue = !showGrid;
     updateProjectConfig({
       canvas: {
-        ...(projectCanvasSettings || {
-          grid_size: 4,
-          snap_to_grid: true,
-          show_grid: true,
-          grid_style: 'dots',
-          grid_unit: 'mm',
-        }),
+        ...(projectCanvasSettings || DEFAULT_PROJECT_CANVAS_SETTINGS),
         show_grid: nextValue,
       },
     });
@@ -181,13 +180,7 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
     const nextValue = !snapToGrid;
     updateProjectConfig({
       canvas: {
-        ...(projectCanvasSettings || {
-          grid_size: 4,
-          snap_to_grid: true,
-          show_grid: true,
-          grid_style: 'dots',
-          grid_unit: 'mm',
-        }),
+        ...(projectCanvasSettings || DEFAULT_PROJECT_CANVAS_SETTINGS),
         snap_to_grid: nextValue,
       },
     });
@@ -401,19 +394,25 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
   const getDocumentCircuitData = useCallback((): SerializableCircuitState => {
     if (!activeDocumentState) {
       return {
+        version: GRID_VERSION,
         components: {},
         wires: [],
-        metadata: { name: 'Untitled Circuit', description: '', tags: [] },
+        metadata: { name: 'Untitled Circuit', description: '', tags: [], version: GRID_VERSION },
+        gridSize: GRID_MODULE_MM,
+        showGrid: true,
+        gridStyle: 'dots',
+        gridUnit: 'mm',
       };
     }
     return {
+      version: GRID_VERSION,
       components: Object.fromEntries(activeDocumentState.components),
       junctions:
         activeDocumentState.junctions.size > 0
           ? Object.fromEntries(activeDocumentState.junctions)
           : undefined,
       wires: activeDocumentState.wires,
-      metadata: activeDocumentState.metadata,
+      metadata: { ...activeDocumentState.metadata, version: GRID_VERSION },
       viewport: {
         zoom: activeDocumentState.zoom,
         panX: activeDocumentState.pan.x,
@@ -429,22 +428,23 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
   const loadDocumentCircuit = useCallback(
     (data: SerializableCircuitState) => {
       if (!documentId) return;
+      const normalized = normalizeSerializableCircuitState(data);
       if (document && isCanvasDocument(document)) {
         updateCanvasData(documentId, (docData) => {
-          docData.components = new Map(Object.entries(data.components)) as Map<string, Block>;
-          docData.junctions = data.junctions
-            ? (new Map(Object.entries(data.junctions)) as Map<string, Junction>)
+          docData.components = new Map(Object.entries(normalized.components)) as Map<string, Block>;
+          docData.junctions = normalized.junctions
+            ? (new Map(Object.entries(normalized.junctions)) as Map<string, Junction>)
             : new Map();
-          docData.wires = [...data.wires];
-          docData.metadata = { ...data.metadata };
-          if (data.viewport) {
-            docData.zoom = data.viewport.zoom;
-            docData.pan = { x: data.viewport.panX, y: data.viewport.panY };
+          docData.wires = [...normalized.wires];
+          docData.metadata = { ...normalized.metadata };
+          if (normalized.viewport) {
+            docData.zoom = normalized.viewport.zoom;
+            docData.pan = { x: normalized.viewport.panX, y: normalized.viewport.panY };
           }
-          docData.gridSize = data.gridSize ?? docData.gridSize;
-          docData.showGrid = data.showGrid ?? docData.showGrid;
-          docData.gridStyle = data.gridStyle ?? docData.gridStyle;
-          docData.gridUnit = data.gridUnit ?? docData.gridUnit;
+          docData.gridSize = normalized.gridSize ?? docData.gridSize;
+          docData.showGrid = normalized.showGrid ?? docData.showGrid;
+          docData.gridStyle = normalized.gridStyle ?? docData.gridStyle;
+          docData.gridUnit = ensureRuntimeGridUnit(normalized.gridUnit);
         });
         return;
       }
@@ -456,9 +456,10 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
             ) ?? null;
           if (!page) return;
           page.circuit = {
-            components: { ...data.components },
-            junctions: data.junctions ? { ...data.junctions } : undefined,
-            wires: data.wires.map((wire) => ({
+            version: GRID_VERSION,
+            components: { ...normalized.components },
+            junctions: normalized.junctions ? { ...normalized.junctions } : undefined,
+            wires: normalized.wires.map((wire) => ({
               ...wire,
               from: { ...wire.from },
               to: { ...wire.to },
@@ -469,18 +470,18 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
                 }))
                 : undefined,
             })),
-            metadata: { ...data.metadata },
-            viewport: data.viewport
+            metadata: { ...normalized.metadata, version: GRID_VERSION },
+            viewport: normalized.viewport
               ? {
-                zoom: data.viewport.zoom,
-                panX: data.viewport.panX,
-                panY: data.viewport.panY,
+                zoom: normalized.viewport.zoom,
+                panX: normalized.viewport.panX,
+                panY: normalized.viewport.panY,
               }
               : { zoom: 1, panX: 0, panY: 0 },
-            gridSize: data.gridSize,
-            showGrid: data.showGrid,
-            gridStyle: data.gridStyle,
-            gridUnit: data.gridUnit,
+            gridSize: normalized.gridSize,
+            showGrid: normalized.showGrid,
+            gridStyle: normalized.gridStyle,
+            gridUnit: ensureRuntimeGridUnit(normalized.gridUnit),
           };
           page.updatedAt = new Date().toISOString();
           docData.schematic.updatedAt = new Date().toISOString();

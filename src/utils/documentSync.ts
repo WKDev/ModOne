@@ -1,4 +1,5 @@
 import type { SerializableCircuitState } from '../components/OneCanvas/types';
+import { GRID_VERSION } from '../components/OneCanvas/canvasUnits';
 
 export const DOC_SYNC_EVENT = 'modone:document-sync';
 
@@ -50,10 +51,11 @@ export function mergeCanvasDocumentData(
   remote: SerializableCircuitState,
 ): SerializableCircuitState {
   return {
+    version: remote.version ?? local.version ?? GRID_VERSION,
     components: { ...local.components, ...remote.components },
     junctions: { ...(local.junctions ?? {}), ...(remote.junctions ?? {}) },
     wires: remote.wires,
-    metadata: remote.metadata,
+    metadata: { ...remote.metadata, version: remote.metadata.version ?? GRID_VERSION },
     viewport: remote.viewport ?? local.viewport,
     gridSize: remote.gridSize ?? local.gridSize,
     showGrid: remote.showGrid ?? local.showGrid,

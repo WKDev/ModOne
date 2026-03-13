@@ -1,36 +1,20 @@
-/**
- * LadderSyncEngine
- *
- * Synchronizes the Zustand store state (elements, wires, grid config, selection)
- * with the Pixi.js rendering layer.
- *
- * Responsibilities:
- * - Initial full render from store snapshot
- * - Incremental updates (add/remove/update elements)
- * - Grid/rail re-render on config change
- * - Selection visual sync
- */
-
 import type { Container } from 'pixi.js';
 import type { LadderLayerManager } from './LadderLayerManager';
 import type {
+  DerivedTopology,
+  HorizontalEdgeEntity,
   LadderElement,
-  LadderWire,
   LadderGridConfig,
-  WireElement,
-  VerticalLinkEntity,
+  LadderMonitoringState,
+  VerticalEdgeEntity,
 } from '../../../types/ladder';
-import { getMainGridRowFromVerticalLinkRow, isWireType, WireDirection } from '../../../types/ladder';
 import { LadderGridRenderer } from './renderers/LadderGridRenderer';
 import { LadderRailRenderer } from './renderers/LadderRailRenderer';
 import { LadderWireRenderer } from './renderers/LadderWireRenderer';
 import { LadderSelectionRenderer } from './renderers/LadderSelectionRenderer';
 import { LadderElementFactory } from './renderers/LadderElementFactory';
 import { LadderMonitoringRenderer } from './renderers/LadderMonitoringRenderer';
-import type { LadderMonitoringState } from '../../../types/ladder';
-import { getElementDirections } from '../utils/wireGenerator';
 
-/** Default grid config fallback */
 const DEFAULT_CONFIG: LadderGridConfig = {
   columns: 10,
   cellWidth: 80,
@@ -48,14 +32,8 @@ export class LadderSyncEngine {
   private elementFactory: LadderElementFactory;
   private monitoringRenderer: LadderMonitoringRenderer;
 
-  /** Map of element id → Pixi Container for fast lookup */
   private elementContainers = new Map<string, Container>();
-  /** Map of wire element id → Pixi Container */
-  private wireContainers = new Map<string, Container>();
-  /** Map of wire element id → latest wire element data */
-  private wireElements = new Map<string, WireElement>();
-  /** Map of vertical-link id → latest vertical-link data */
-  private verticalLinkElements = new Map<string, VerticalLinkEntity>();
+  private edgeContainers = new Map<string, Container>();
 
   private currentConfig: LadderGridConfig = DEFAULT_CONFIG;
   private currentRowCount = 20;
@@ -70,42 +48,19 @@ export class LadderSyncEngine {
     this.monitoringRenderer = new LadderMonitoringRenderer(layers.overlayLayer);
   }
 
-  // ===========================================================================
-  // Full Sync
-  // ===========================================================================
-
-  /**
-   * Perform a full sync — clears and re-renders everything from a store snapshot.
-   */
   fullSync(
     elements: Map<string, LadderElement>,
-    verticalLinks: Map<string, VerticalLinkEntity>,
-    _wires: LadderWire[],
+    horizontalEdges: Map<string, HorizontalEdgeEntity>,
+    verticalEdges: Map<string, VerticalEdgeEntity>,
+    topology: DerivedTopology | undefined,
     config: LadderGridConfig,
     selectedIds: Set<string>,
     cursorCell?: { row: number; col: number } | null,
   ): void {
     this.currentConfig = config;
+    this.currentRowCount = this.computeRowCount(elements, horizontalEdges, verticalEdges);
 
-    // Determine row count from elements
-    let maxRow = 20;
-    for (const el of elements.values()) {
-      if (el.position.row + 1 > maxRow) {
-        maxRow = el.position.row + 1;
-      }
-    }
-    for (const verticalLink of verticalLinks.values()) {
-      if (verticalLink.position.row + 1 > maxRow) {
-        maxRow = verticalLink.position.row + 1;
-      }
-    }
-    // Add some buffer rows
-    this.currentRowCount = maxRow + 5;
-
-    // 1. Grid
     this.gridRenderer.render(config, this.currentRowCount);
-
-    // 2. Rails
     this.railRenderer.render(
       config.columns,
       config.cellWidth,
@@ -113,159 +68,85 @@ export class LadderSyncEngine {
       this.currentRowCount,
     );
 
-    // 3. Clear existing element/wire containers
     this.clearElements();
-    this.clearWires();
+    this.clearEdges();
 
-    // 4. Render logic elements
     for (const element of elements.values()) {
-      if (isWireType(element.type)) {
-        this.addWireContainer(element as WireElement);
-      } else {
-        this.addElementContainer(element);
-      }
-    }
-
-    // 5. Render standalone vertical links
-    for (const verticalLink of verticalLinks.values()) {
-      this.addVerticalLinkContainer(verticalLink);
-    }
-
-    // 6. Selection
-    this.syncSelection(selectedIds, cursorCell, config);
-  }
-
-  // ===========================================================================
-  // Incremental Operations
-  // ===========================================================================
-
-  /**
-   * Add a single element to the canvas.
-   */
-  addElement(element: LadderElement): void {
-    if (isWireType(element.type)) {
-      this.addWireContainer(element as WireElement);
-    } else {
       this.addElementContainer(element);
     }
-  }
-
-  /**
-   * Remove an element from the canvas by id.
-   */
-  removeElement(id: string): void {
-    const elContainer = this.elementContainers.get(id);
-    if (elContainer) {
-      elContainer.destroy({ children: true });
-      this.elementContainers.delete(id);
-      return;
+    for (const edge of horizontalEdges.values()) {
+      this.addHorizontalEdgeContainer(edge);
+    }
+    for (const edge of verticalEdges.values()) {
+      this.addVerticalEdgeContainer(edge);
     }
 
-    const wireContainer = this.wireContainers.get(id);
-    if (wireContainer) {
-      wireContainer.destroy({ children: true });
-      this.wireContainers.delete(id);
-      this.wireElements.delete(id);
-    }
+    this.syncSelection(selectedIds, cursorCell, config, elements, horizontalEdges, verticalEdges, topology);
   }
 
-  /**
-   * Update an existing element's visual.
-   */
-  updateElement(element: LadderElement): void {
-    if (isWireType(element.type)) {
-      const container = this.wireContainers.get(element.id);
-      if (container) {
-        this.wireRenderer.update(container, element as WireElement, this.currentConfig.cellWidth, this.currentConfig.cellHeight);
-        this.wireElements.set(element.id, element as WireElement);
-      }
-    } else {
-      const container = this.elementContainers.get(element.id);
-      if (container) {
-        this.elementFactory.updateElement(container, element);
-        // Update position
-        container.position.set(
-          element.position.col * this.currentConfig.cellWidth,
-          element.position.row * this.currentConfig.cellHeight,
-        );
-      }
-    }
-  }
-
-  /**
-   * Sync selection highlights.
-   */
   syncSelection(
     selectedIds: Set<string>,
-    cursorCellOrConfig?: { row: number; col: number } | null | LadderGridConfig,
-    config?: LadderGridConfig,
+    cursorCell: { row: number; col: number } | null | undefined,
+    config: LadderGridConfig,
+    elements: Map<string, LadderElement>,
+    horizontalEdges: Map<string, HorizontalEdgeEntity>,
+    verticalEdges: Map<string, VerticalEdgeEntity>,
+    topology?: DerivedTopology,
   ): void {
-    // Handle overloaded signature: (ids, config) or (ids, cursorCell, config)
-    let cfg: LadderGridConfig;
-    let cursorCell: { row: number; col: number } | null | undefined;
+    const selectedCells: Array<{ row: number; col: number }> = [];
+    const selectedHorizontalEdges: Array<{ row: number; startBoundaryCol: number; endBoundaryCol: number }> = [];
+    const selectedVerticalEdges: Array<{ row: number; col: number }> = [];
 
-    if (config !== undefined) {
-      // Called as syncSelection(ids, cursorCell, config)
-      cursorCell = cursorCellOrConfig as { row: number; col: number } | null;
-      cfg = config;
-    } else if (
-      cursorCellOrConfig !== null &&
-      cursorCellOrConfig !== undefined &&
-      'cellWidth' in cursorCellOrConfig
-    ) {
-      // Called as syncSelection(ids, config)
-      cfg = cursorCellOrConfig as LadderGridConfig;
-      cursorCell = null;
-    } else {
-      cfg = this.currentConfig;
-      cursorCell = cursorCellOrConfig as { row: number; col: number } | null | undefined;
-    }
-
-    const cells: Array<{ row: number; col: number }> = [];
-    const verticalCells: Array<{ row: number; col: number }> = [];
-
-    // Find grid positions for selected elements
     for (const id of selectedIds) {
-      // 1. Regular logic elements (Contacts, Coils, etc.)
-      const elContainer = this.elementContainers.get(id);
-      if (elContainer) {
-        cells.push({
-          row: Math.round(elContainer.position.y / cfg.cellHeight),
-          col: Math.round(elContainer.position.x / cfg.cellWidth),
+      const element = elements.get(id);
+      if (element) {
+        selectedCells.push({ row: element.position.row, col: element.position.col });
+        continue;
+      }
+
+      const horizontalEdge = horizontalEdges.get(id);
+      if (horizontalEdge) {
+        selectedHorizontalEdges.push({
+          row: horizontalEdge.position.row,
+          startBoundaryCol: horizontalEdge.position.startBoundaryCol,
+          endBoundaryCol: horizontalEdge.position.endBoundaryCol,
         });
         continue;
       }
 
-      // 2. Wires (Horizontal/Vertical)
-      const wireContainer = this.wireContainers.get(id);
-      if (wireContainer) {
-        const verticalLink = this.verticalLinkElements.get(id);
-        if (verticalLink) {
-          verticalCells.push({ row: verticalLink.position.row, col: verticalLink.position.col });
-          continue;
-        }
+      const verticalEdge = verticalEdges.get(id);
+      if (verticalEdge) {
+        selectedVerticalEdges.push({
+          row: verticalEdge.position.row,
+          col: verticalEdge.position.col,
+        });
+        continue;
+      }
 
-        const row = Math.round(wireContainer.position.y / cfg.cellHeight);
-        const col = Math.round(wireContainer.position.x / cfg.cellWidth);
-
-        const wireElement = this.wireElements.get(id);
-        const directions = wireElement?.properties.connectedDirections ?? (wireElement ? getElementDirections(wireElement) : WireDirection.NONE);
-
-        if ((directions & (WireDirection.TOP | WireDirection.BOTTOM)) !== 0) {
-          verticalCells.push({ row, col });
-        } else {
-          cells.push({ row, col });
+      const chain = topology?.verticalChains.find((item) => item.id === id);
+      if (chain) {
+        for (const edgeId of chain.edgeIds) {
+          const verticalChainEdge = verticalEdges.get(edgeId);
+          if (verticalChainEdge) {
+            selectedVerticalEdges.push({
+              row: verticalChainEdge.position.row,
+              col: verticalChainEdge.position.col,
+            });
+          }
         }
       }
     }
 
-    this.selectionRenderer.renderSelection(cells, verticalCells, cursorCell ?? null, cfg.cellWidth, cfg.cellHeight);
-
+    this.selectionRenderer.renderSelection(
+      selectedCells,
+      selectedHorizontalEdges,
+      selectedVerticalEdges,
+      cursorCell ?? null,
+      config.cellWidth,
+      config.cellHeight,
+    );
   }
 
-  /**
-   * Update grid config (e.g., column count changed).
-   */
   updateGridConfig(config: LadderGridConfig): void {
     this.currentConfig = config;
     this.gridRenderer.render(config, this.currentRowCount);
@@ -277,60 +158,66 @@ export class LadderSyncEngine {
     );
   }
 
-  // ===========================================================================
-  // Overlay / Cursor helpers
-  // ===========================================================================
-
-  /**
-   * Get the overlay layer for temporary visuals (cursor cell, wire preview, etc.)
-   */
   get overlayLayer(): Container {
     return this.layers.overlayLayer;
   }
 
-  /**
-   * Get element containers for monitoring renderer.
-   */
   getElementContainers(): Map<string, Container> {
     return this.elementContainers;
   }
 
-  /**
-   * Get wire containers for monitoring renderer.
-   */
   getWireContainers(): Map<string, Container> {
-    return this.wireContainers;
+    return this.edgeContainers;
   }
 
-  /**
-   * Apply monitoring visualization overlays.
-   */
   applyMonitoring(
     monitoringState: LadderMonitoringState,
     elements: Map<string, LadderElement>,
   ): void {
     this.monitoringRenderer.applyMonitoring(
       this.elementContainers,
-      this.wireContainers,
+      this.edgeContainers,
       monitoringState,
       this.currentConfig,
       elements as Map<string, { id: string; position: { row: number; col: number }; properties?: { address?: string } }>,
     );
   }
 
-  /**
-   * Clear monitoring visualization overlays.
-   */
   clearMonitoring(): void {
     this.monitoringRenderer.clearMonitoring(
       this.elementContainers,
-      this.wireContainers,
+      this.edgeContainers,
     );
   }
 
-  // ===========================================================================
-  // Internal
-  // ===========================================================================
+  destroy(): void {
+    this.clearElements();
+    this.clearEdges();
+    this.gridRenderer.destroy();
+    this.railRenderer.destroy();
+    this.wireRenderer.destroy();
+    this.selectionRenderer.destroy();
+    this.elementFactory.destroy();
+    this.monitoringRenderer.destroy();
+  }
+
+  private computeRowCount(
+    elements: Map<string, LadderElement>,
+    horizontalEdges: Map<string, HorizontalEdgeEntity>,
+    verticalEdges: Map<string, VerticalEdgeEntity>,
+  ): number {
+    let maxRow = 20;
+    for (const element of elements.values()) {
+      maxRow = Math.max(maxRow, element.position.row + 1);
+    }
+    for (const edge of horizontalEdges.values()) {
+      maxRow = Math.max(maxRow, edge.position.row + 1);
+    }
+    for (const edge of verticalEdges.values()) {
+      maxRow = Math.max(maxRow, edge.position.row + 2);
+    }
+    return maxRow + 5;
+  }
 
   private addElementContainer(element: LadderElement): void {
     const container = this.elementFactory.createElement(
@@ -338,42 +225,21 @@ export class LadderSyncEngine {
       this.currentConfig.cellWidth,
       this.currentConfig.cellHeight,
     );
-    if (container) {
-      this.layers.elementLayer.addChild(container);
-      this.elementContainers.set(element.id, container);
-    }
+    if (!container) return;
+    this.layers.elementLayer.addChild(container);
+    this.elementContainers.set(element.id, container);
   }
 
-  private addWireContainer(element: WireElement): void {
-    const container = this.wireRenderer.create(
-      element,
-      this.currentConfig.cellWidth,
-      this.currentConfig.cellHeight,
-    );
+  private addHorizontalEdgeContainer(edge: HorizontalEdgeEntity): void {
+    const container = this.wireRenderer.createHorizontal(edge, this.currentConfig.cellWidth, this.currentConfig.cellHeight);
     this.layers.wireLayer.addChild(container);
-    this.wireContainers.set(element.id, container);
-    this.wireElements.set(element.id, element);
+    this.edgeContainers.set(edge.id, container);
   }
 
-  private addVerticalLinkContainer(verticalLink: VerticalLinkEntity): void {
-    const container = this.wireRenderer.create(
-      {
-        id: verticalLink.id,
-        type: 'wire_v',
-        position: {
-          row: getMainGridRowFromVerticalLinkRow(verticalLink.position.row),
-          col: verticalLink.position.col,
-        },
-        properties: {
-          connectedDirections: WireDirection.TOP | WireDirection.BOTTOM,
-        },
-      } as WireElement,
-      this.currentConfig.cellWidth,
-      this.currentConfig.cellHeight,
-    );
+  private addVerticalEdgeContainer(edge: VerticalEdgeEntity): void {
+    const container = this.wireRenderer.createVertical(edge, this.currentConfig.cellWidth, this.currentConfig.cellHeight);
     this.layers.wireLayer.addChild(container);
-    this.wireContainers.set(verticalLink.id, container);
-    this.verticalLinkElements.set(verticalLink.id, verticalLink);
+    this.edgeContainers.set(edge.id, container);
   }
 
   private clearElements(): void {
@@ -383,27 +249,10 @@ export class LadderSyncEngine {
     this.elementContainers.clear();
   }
 
-  private clearWires(): void {
-    for (const container of this.wireContainers.values()) {
+  private clearEdges(): void {
+    for (const container of this.edgeContainers.values()) {
       container.destroy({ children: true });
     }
-    this.wireContainers.clear();
-    this.wireElements.clear();
-    this.verticalLinkElements.clear();
-  }
-
-  // ===========================================================================
-  // Lifecycle
-  // ===========================================================================
-
-  destroy(): void {
-    this.clearElements();
-    this.clearWires();
-    this.gridRenderer.destroy();
-    this.railRenderer.destroy();
-    this.wireRenderer.destroy();
-    this.selectionRenderer.destroy();
-    this.elementFactory.destroy();
-    this.monitoringRenderer.destroy();
+    this.edgeContainers.clear();
   }
 }

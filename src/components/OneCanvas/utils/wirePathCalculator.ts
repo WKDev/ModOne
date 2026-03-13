@@ -5,6 +5,7 @@
  */
 
 import type { Block, Position, PortPosition, HandleConstraint } from '../types';
+import { normalizeLegacyValueToMm } from '../canvasUnits';
 
 // ============================================================================
 // Position Calculations
@@ -86,7 +87,7 @@ export function getWireEndpoints(
  * Exit distance from port before routing.
  * @deprecated Port exit stubs are being phased out in favor of direct handle placement.
  */
-export const PORT_EXIT_DISTANCE = 20;
+export const PORT_EXIT_DISTANCE = normalizeLegacyValueToMm(20);
 
 /**
  * Generate a port-direction aware orthogonal wire path with rounded corners.

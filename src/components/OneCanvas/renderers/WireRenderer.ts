@@ -12,6 +12,7 @@
  */
 
 import { Graphics, Rectangle, type Container } from 'pixi.js';
+import { LEGACY_MM_PER_PX } from '../canvasUnits';
 import type {
   Wire,
   Position,
@@ -47,9 +48,9 @@ export interface WireStyle {
 
 const DEFAULT_WIRE_STYLE: WireStyle = {
   color: 0x4a4f57,
-  width: 2,
+  width: 2 * LEGACY_MM_PER_PX,
   selectedColor: 0x4dabf7,
-  selectedWidth: 2.5,
+  selectedWidth: 2.5 * LEGACY_MM_PER_PX,
   hoverColor: 0x74c0fc,
   previewColor: 0x4dabf7,
   previewAlpha: 0.6,
@@ -346,7 +347,7 @@ export class WireRenderer {
       if (p.y > maxY) maxY = p.y;
     }
 
-    const pad = 10;
+    const pad = 10 * LEGACY_MM_PER_PX;
     g.cullArea = new Rectangle(
       minX - pad,
       minY - pad,

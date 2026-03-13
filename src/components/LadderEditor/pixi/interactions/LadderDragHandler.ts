@@ -117,7 +117,7 @@ export class LadderDragHandler {
       }
 
       // Activate drag
-      const verticalLink = doc.verticalLinks.get(this.pendingElementId);
+      const verticalLink = doc.verticalEdges.get(this.pendingElementId);
       const element = verticalLink ? undefined : doc.elements.get(this.pendingElementId);
       if (!verticalLink && !element) {
         this.cancel();
@@ -162,7 +162,7 @@ export class LadderDragHandler {
 
         this.ghostGraphics.position.set(
           target.targetCol * config.cellWidth,
-          (target.targetRow - 1) * config.cellHeight + getVerticalWireMidline(config.cellHeight),
+          target.targetRow * config.cellHeight + getVerticalWireMidline(config.cellHeight),
         );
       } else {
         this.dragState.currentRow = event.gridRow;
@@ -196,7 +196,7 @@ export class LadderDragHandler {
     // Only move if position actually changed
     if (currentRow !== startRow || currentCol !== startCol) {
       if (this.dragState.kind === 'verticalLink') {
-        doc.moveVerticalLink(elementId, { row: currentRow, col: currentCol });
+        doc.moveVerticalEdge(elementId, { row: currentRow, col: currentCol });
       } else {
         doc.moveElement(elementId, { row: currentRow, col: currentCol });
       }
@@ -257,7 +257,7 @@ export class LadderDragHandler {
       if (this.dragState.kind === 'verticalLink') {
         ghost.position.set(
           this.dragState.currentCol * config.cellWidth,
-          (this.dragState.currentRow - 1) * config.cellHeight + getVerticalWireMidline(config.cellHeight),
+          this.dragState.currentRow * config.cellHeight + getVerticalWireMidline(config.cellHeight),
         );
       } else {
         ghost.position.set(

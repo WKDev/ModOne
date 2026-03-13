@@ -1,69 +1,118 @@
 import { describe, expect, it } from 'vitest';
-import type { LadderElement, VerticalLinkEntity } from '../../../../types/ladder';
-import { DEFAULT_LADDER_GRID_CONFIG, WireDirection } from '../../../../types/ladder';
-import { mergeWireDirections, resolveWireElementType } from '../wireGenerator';
+import type { LadderDocumentData, } from '../../../../types/document';
+import type { HorizontalEdgeEntity, LadderElement, VerticalEdgeEntity } from '../../../../types/ladder';
+import { DEFAULT_LADDER_DATA } from '../../../../types/document';
+import { rebuildLadderTopologyCache } from '../topologyBuilder';
 
-describe('wireGenerator', () => {
-  it('treats a standalone vertical link as the top connection for the row below', () => {
-    const elements = new Map<string, LadderElement>();
-    const verticalLinks = new Map<string, VerticalLinkEntity>([
+function createDocData(
+  elements: LadderElement[] = [],
+  horizontalEdges: HorizontalEdgeEntity[] = [],
+  verticalEdges: VerticalEdgeEntity[] = [],
+): LadderDocumentData {
+  return {
+    ...DEFAULT_LADDER_DATA,
+    elements: new Map(elements.map((element) => [element.id, element])),
+    horizontalEdges: new Map(horizontalEdges.map((edge) => [edge.id, edge])),
+    verticalEdges: new Map(verticalEdges.map((edge) => [edge.id, edge])),
+    rungLabels: new Map(),
+  };
+}
+
+describe('graph-first ladder topology', () => {
+  it('keeps a two-row branch as an L-shape instead of inventing a T-junction', () => {
+    const docData = createDocData(
+      [],
       [
-        'vertical-link-1',
         {
-          id: 'vertical-link-1',
-          position: { row: 1, col: 0 },
+          id: 'h-2',
+          position: { row: 1, startBoundaryCol: 0, endBoundaryCol: 1 },
           properties: { isValid: true },
         },
       ],
-    ]);
-
-    const resolved = resolveWireElementType(
-      { row: 1, col: 0 },
-      'wire_h',
-      elements,
-      DEFAULT_LADDER_GRID_CONFIG,
-      undefined,
-      verticalLinks
+      [
+        {
+          id: 'v-1',
+          position: { row: 0, col: 0 },
+          properties: { isValid: true },
+        },
+      ],
     );
 
-    expect(resolved.directions & WireDirection.TOP).toBe(WireDirection.TOP);
-    expect(resolved.directions & WireDirection.BOTTOM).toBe(0);
+    const topology = rebuildLadderTopologyCache(docData);
+    const branchNode = topology.nodes.get('node:0:1');
+    expect(branchNode?.degree).toBe(2);
   });
 
-  it('merges horizontal wire directions with vertical-link neighbors', () => {
-    const elements = new Map<string, LadderElement>([
+  it('creates a true T-junction only when the node has degree 3', () => {
+    const docData = createDocData(
+      [],
       [
-        'wire-h-1',
         {
-          id: 'wire-h-1',
-          type: 'wire_h',
-          position: { row: 1, col: 1 },
-          properties: { connectedDirections: WireDirection.LEFT | WireDirection.RIGHT },
-        } as LadderElement,
-      ],
-    ]);
-    const verticalLinks = new Map<string, VerticalLinkEntity>([
-      [
-        'vertical-link-1',
-        {
-          id: 'vertical-link-1',
-          position: { row: 2, col: 1 },
+          id: 'h-1',
+          position: { row: 1, startBoundaryCol: 0, endBoundaryCol: 2 },
           properties: { isValid: true },
         },
       ],
-    ]);
-
-    const merged = mergeWireDirections(
-      elements.get('wire-h-1') as LadderElement,
-      'wire_v',
-      elements,
-      DEFAULT_LADDER_GRID_CONFIG,
-      undefined,
-      verticalLinks
+      [
+        {
+          id: 'v-top',
+          position: { row: 0, col: 1 },
+          properties: { isValid: true },
+        },
+        {
+          id: 'v-bottom',
+          position: { row: 1, col: 1 },
+          properties: { isValid: true },
+        },
+      ],
     );
 
-    expect(merged?.newDirections).toBe(
-      WireDirection.TOP | WireDirection.BOTTOM | WireDirection.LEFT | WireDirection.RIGHT
+    const topology = rebuildLadderTopologyCache(docData);
+    const junctionNode = topology.nodes.get('node:1:1');
+    expect(junctionNode?.degree).toBe(4);
+  });
+
+  it('normalizes adjacent horizontal runs into a single span', () => {
+    const docData = createDocData(
+      [],
+      [
+        {
+          id: 'h-a',
+          position: { row: 2, startBoundaryCol: 0, endBoundaryCol: 1 },
+          properties: { isValid: true },
+        },
+        {
+          id: 'h-b',
+          position: { row: 2, startBoundaryCol: 1, endBoundaryCol: 3 },
+          properties: { isValid: true },
+        },
+      ],
+      [],
     );
+
+    rebuildLadderTopologyCache(docData);
+    expect(docData.horizontalEdges.size).toBe(1);
+    expect(Array.from(docData.horizontalEdges.values())[0].position).toEqual({
+      row: 2,
+      startBoundaryCol: 0,
+      endBoundaryCol: 3,
+    });
+  });
+
+  it('marks isolated vertical chains as invalid', () => {
+    const docData = createDocData(
+      [],
+      [],
+      [
+        {
+          id: 'v-iso',
+          position: { row: 3, col: 2 },
+          properties: { isValid: true },
+        },
+      ],
+    );
+
+    const topology = rebuildLadderTopologyCache(docData);
+    expect(topology.issues.some((issue) => issue.code === 'INVALID_VERTICAL_CHAIN')).toBe(true);
   });
 });

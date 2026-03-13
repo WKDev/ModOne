@@ -5,6 +5,7 @@
  */
 
 import type { BlockType, Port, Size, PowerPolarity } from './types';
+import { normalizeLegacyPortToMm, normalizeLegacySizeToMm } from './canvasUnits';
 
 // ============================================================================
 // Types
@@ -512,7 +513,11 @@ const BLOCK_DEFINITIONS: Partial<Record<BlockType, BlockDefinition>> = {
 export function getBlockDefinition(type: BlockType): BlockDefinition {
   const def = BLOCK_DEFINITIONS[type];
   if (!def) throw new Error(`No block definition for type: ${type}`);
-  return def;
+  return {
+    ...def,
+    size: normalizeLegacySizeToMm(def.size),
+    defaultPorts: def.defaultPorts.map((port) => normalizeLegacyPortToMm(port)),
+  };
 }
 
 /**
@@ -521,7 +526,7 @@ export function getBlockDefinition(type: BlockType): BlockDefinition {
 export function getBlockSize(type: BlockType): Size {
   const def = BLOCK_DEFINITIONS[type];
   if (!def) throw new Error(`No block definition for type: ${type}`);
-  return def.size;
+  return normalizeLegacySizeToMm(def.size);
 }
 
 /**
@@ -530,7 +535,7 @@ export function getBlockSize(type: BlockType): Size {
 export function getDefaultPorts(type: BlockType): Port[] {
   const def = BLOCK_DEFINITIONS[type];
   if (!def) return [];
-  return def.defaultPorts;
+  return def.defaultPorts.map((port) => normalizeLegacyPortToMm(port));
 }
 
 /**

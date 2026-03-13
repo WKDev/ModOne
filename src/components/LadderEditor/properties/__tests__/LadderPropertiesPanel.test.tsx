@@ -7,7 +7,7 @@ import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 import { LadderPropertiesPanel } from '../LadderPropertiesPanel';
 import { useLadderDocument } from '../../../../stores/hooks/useLadderDocument';
 import { useLadderUIStore } from '../../../../stores/ladderUIStore';
-import type { ContactElement, CoilElement, TimerElement, CounterElement, LadderElement, LadderWire } from '../../../../types/ladder';
+import type { ContactElement, CoilElement, TimerElement, CounterElement, LadderElement } from '../../../../types/ladder';
 import type { LadderUIStore } from '../../../../stores/ladderUIStore';
 
 const { mockUIState, mockLadderDoc } = vi.hoisted(() => ({
@@ -20,12 +20,22 @@ const { mockUIState, mockLadderDoc } = vi.hoisted(() => ({
   mockLadderDoc: {
     // Data
     elements: new Map<string, LadderElement>(),
-    verticalLinks: new Map(),
-    wires: [] as LadderWire[],
+    horizontalEdges: new Map(),
+    verticalEdges: new Map(),
+    topologyCache: undefined,
     comment: undefined as string | undefined,
     gridConfig: { columns: 10, cellWidth: 80, cellHeight: 60 },
     rungLabels: new Map<number, string>(),
     isDirty: false,
+
+    placeCell: vi.fn(() => null),
+    placeHorizontalRun: vi.fn(() => null),
+    toggleVerticalEdge: vi.fn(() => null),
+    moveCell: vi.fn(),
+    moveVerticalEdge: vi.fn(),
+    resizeHorizontalRun: vi.fn(),
+    deleteSelection: vi.fn(),
+    rebuildTopology: vi.fn(),
 
     // Element operations
     addElement: vi.fn(() => null),
@@ -41,9 +51,7 @@ const { mockUIState, mockLadderDoc } = vi.hoisted(() => ({
     moveVerticalLink: vi.fn(),
     getVerticalLinkAt: vi.fn(() => undefined),
     placeVerticalLinkSpan: vi.fn(),
-
-    // Wire-specific operations
-    mergeWireElement: vi.fn(),
+    getHorizontalEdgeAt: vi.fn(() => undefined),
 
     // Comment & Labels
     updateComment: vi.fn(),

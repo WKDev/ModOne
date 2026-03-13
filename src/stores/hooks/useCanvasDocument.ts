@@ -20,6 +20,7 @@ import type {
   PortPosition,
   HandleConstraint,
   CircuitMetadata,
+  RuntimeGridUnit,
 } from '../../components/OneCanvas/types';
 import { isPortEndpoint, isFloatingEndpoint, isJunctionEndpoint } from '../../components/OneCanvas/types';
 import { createBlockInstance } from '../../components/OneCanvas/runtime/blockFactory';
@@ -88,7 +89,7 @@ export interface UseCanvasDocumentReturn {
   snapToGrid: boolean;
   showGrid: boolean;
   gridStyle: 'dots' | 'lines';
-  gridUnit: 'px' | 'mil' | 'mm';
+  gridUnit: RuntimeGridUnit;
   isDirty: boolean;
 
   // Component operations
@@ -124,7 +125,7 @@ export interface UseCanvasDocumentReturn {
   toggleSnap: () => void;
   setGridSize: (size: number) => void;
   setGridStyle: (style: 'dots' | 'lines') => void;
-  setGridUnit: (unit: 'px' | 'mil' | 'mm') => void;
+  setGridUnit: (unit: RuntimeGridUnit) => void;
 
   // History operations
   undo: () => void;
@@ -196,7 +197,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
 
       const id = generateId(type);
       const finalPosition = data.snapToGrid
-        ? snapToGridPosition(position, data.gridSize)
+        ? snapToGridPosition(position, data.gridSize, data.gridUnit)
         : position;
 
       const newBlock = createBlockInstance(id, type, finalPosition, props);
@@ -249,7 +250,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       if (!documentId || !data) return;
 
       const finalPosition = data.snapToGrid
-        ? snapToGridPosition(position, data.gridSize)
+        ? snapToGridPosition(position, data.gridSize, data.gridUnit)
         : position;
 
       if (!skipHistory) {
@@ -286,7 +287,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       if (!documentId || !data) return;
 
       const finalPosition = data.snapToGrid
-        ? snapToGridPosition(position, data.gridSize)
+        ? snapToGridPosition(position, data.gridSize, data.gridUnit)
         : position;
 
       if (!skipHistory) {
@@ -802,7 +803,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
   );
 
   const setGridUnit = useCallback(
-    (unit: 'px' | 'mil' | 'mm') => {
+    (unit: RuntimeGridUnit) => {
       if (!documentId) return;
 
       updateCanvasData(documentId, (docData) => {
@@ -872,7 +873,7 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
       snapToGrid: data.snapToGrid,
       showGrid: data.showGrid,
       gridStyle: data.gridStyle,
-      gridUnit: (data as any).gridUnit ?? 'mm',
+      gridUnit: data.gridUnit,
       isDirty: canvasDoc.isDirty,
 
       // Component operations

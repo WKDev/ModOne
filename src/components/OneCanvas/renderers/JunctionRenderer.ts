@@ -11,6 +11,7 @@
  */
 
 import { Graphics, GraphicsContext, type Container } from 'pixi.js';
+import { LEGACY_MM_PER_PX } from '../canvasUnits';
 import type { Junction } from '../types';
 
 // ============================================================================
@@ -29,7 +30,7 @@ export interface JunctionStyle {
 }
 
 const DEFAULT_JUNCTION_STYLE: JunctionStyle = {
-  radius: 5,
+  radius: 5 * LEGACY_MM_PER_PX,
   color: 0xd0d4da,
   selectedColor: 0x4dabf7,
   hoverColor: 0x74c0fc,

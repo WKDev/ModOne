@@ -10,12 +10,14 @@ import type {
   Wire,
   Junction,
   CircuitMetadata,
+  RuntimeGridUnit,
 } from '../components/OneCanvas/types';
 import type {
   LadderGridConfig,
   LadderElement,
-  LadderWire,
-  VerticalLinkEntity,
+  DerivedTopology,
+  HorizontalEdgeEntity,
+  VerticalEdgeEntity,
 } from './ladder';
 import type {
   Scenario,
@@ -111,7 +113,7 @@ export interface CanvasDocumentData {
   /** Grid style */
   gridStyle: 'dots' | 'lines';
   /** Grid unit */
-  gridUnit: 'px' | 'mil' | 'mm';
+  gridUnit: RuntimeGridUnit;
 }
 
 /** Complete canvas document state */
@@ -129,8 +131,8 @@ export interface CanvasDocumentState extends DocumentMeta {
 /** Snapshot data for ladder history */
 export interface LadderHistoryData {
   elements: Array<[string, LadderElement]>;
-  verticalLinks: Array<[string, VerticalLinkEntity]>;
-  wires: LadderWire[];
+  horizontalEdges: Array<[string, HorizontalEdgeEntity]>;
+  verticalEdges: Array<[string, VerticalEdgeEntity]>;
   comment?: string;
   rungLabels?: Array<[number, string]>;
 }
@@ -139,16 +141,18 @@ export interface LadderHistoryData {
 export interface LadderDocumentData {
   /** Elements by ID */
   elements: Map<string, LadderElement>;
-  /** Standalone vertical links keyed by ID */
-  verticalLinks: Map<string, VerticalLinkEntity>;
-  /** Wire connections */
-  wires: LadderWire[];
+  /** Horizontal edge runs keyed by ID */
+  horizontalEdges: Map<string, HorizontalEdgeEntity>;
+  /** Vertical edges keyed by ID */
+  verticalEdges: Map<string, VerticalEdgeEntity>;
   /** Ladder comment (overall) */
   comment?: string;
   /** Rung labels by row index */
   rungLabels: Map<number, string>;
   /** Grid configuration */
   gridConfig: LadderGridConfig;
+  /** Derived topology cache rebuilt after mutations */
+  topologyCache?: DerivedTopology;
 }
 
 /** Complete ladder document state */
@@ -260,7 +264,7 @@ export const DEFAULT_CANVAS_DATA: CanvasDocumentData = {
   },
   zoom: 1.0,
   pan: { x: 0, y: 0 },
-  gridSize: 4,
+  gridSize: 5,
   snapToGrid: true,
   showGrid: true,
   gridStyle: 'dots',
@@ -270,8 +274,8 @@ export const DEFAULT_CANVAS_DATA: CanvasDocumentData = {
 /** Default ladder document data */
 export const DEFAULT_LADDER_DATA: LadderDocumentData = {
   elements: new Map(),
-  verticalLinks: new Map(),
-  wires: [],
+  horizontalEdges: new Map(),
+  verticalEdges: new Map(),
   comment: undefined,
   rungLabels: new Map(),
   gridConfig: {
@@ -359,8 +363,9 @@ export function createEmptyLadderDocument(
     data: {
       ...DEFAULT_LADDER_DATA,
       elements: new Map(),
-      verticalLinks: new Map(),
-      wires: [],
+      horizontalEdges: new Map(),
+      verticalEdges: new Map(),
+      topologyCache: undefined,
     },
     history: [],
     historyIndex: -1,

@@ -13,6 +13,7 @@ import type {
   PortPosition,
   HandleConstraint,
   CircuitMetadata,
+  RuntimeGridUnit,
   SerializableCircuitState,
 } from '../../components/OneCanvas/types';
 import { isPortEndpoint, isFloatingEndpoint, isJunctionEndpoint } from '../../components/OneCanvas/types';
@@ -35,6 +36,11 @@ import {
   enforceOrthogonalPolyline,
 } from '../../components/OneCanvas/utils/wireSimplifier';
 import { getPortAbsolutePosition } from '../../components/OneCanvas/utils/wirePathCalculator';
+import {
+  GRID_VERSION,
+  ensureRuntimeGridUnit,
+  normalizeSerializableCircuitState,
+} from '../../components/OneCanvas/canvasUnits';
 
 import type { UseCanvasDocumentReturn } from './useCanvasDocument';
 
@@ -61,7 +67,7 @@ function resolveEndpointPos(
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 4.0;
 const MIN_GRID_SIZE = 5;
-const DEFAULT_GRID_SIZE = 20;
+const DEFAULT_GRID_SIZE = 5;
 
 interface WorkingCircuitData {
   components: Map<string, Block>;
@@ -74,17 +80,18 @@ interface WorkingCircuitData {
   snapToGrid: boolean;
   showGrid: boolean;
   gridStyle: 'dots' | 'lines';
-  gridUnit: 'px' | 'mil' | 'mm';
+  gridUnit: RuntimeGridUnit;
 }
 
 
 function circuitToWorkingData(circuit: SerializableCircuitState): WorkingCircuitData {
+  const normalized = normalizeSerializableCircuitState(circuit);
   return {
-    components: new Map(Object.entries(circuit.components)) as Map<string, Block>,
-    junctions: circuit.junctions
-      ? (new Map(Object.entries(circuit.junctions)) as Map<string, Junction>)
+    components: new Map(Object.entries(normalized.components)) as Map<string, Block>,
+    junctions: normalized.junctions
+      ? (new Map(Object.entries(normalized.junctions)) as Map<string, Junction>)
       : new Map<string, Junction>(),
-    wires: circuit.wires.map((wire) => ({
+    wires: normalized.wires.map((wire) => ({
       ...wire,
       from: { ...wire.from },
       to: { ...wire.to },
@@ -95,22 +102,23 @@ function circuitToWorkingData(circuit: SerializableCircuitState): WorkingCircuit
         }))
         : undefined,
     })),
-    metadata: { ...circuit.metadata },
-    zoom: circuit.viewport?.zoom ?? 1,
+    metadata: { ...normalized.metadata },
+    zoom: normalized.viewport?.zoom ?? 1,
     pan: {
-      x: circuit.viewport?.panX ?? 0,
-      y: circuit.viewport?.panY ?? 0,
+      x: normalized.viewport?.panX ?? 0,
+      y: normalized.viewport?.panY ?? 0,
     },
-    gridSize: circuit.gridSize ?? DEFAULT_GRID_SIZE,
+    gridSize: normalized.gridSize ?? DEFAULT_GRID_SIZE,
     snapToGrid: true,
-    showGrid: circuit.showGrid ?? true,
-    gridStyle: circuit.gridStyle ?? 'dots',
-    gridUnit: circuit.gridUnit ?? 'px',
+    showGrid: normalized.showGrid ?? true,
+    gridStyle: normalized.gridStyle ?? 'dots',
+    gridUnit: ensureRuntimeGridUnit(normalized.gridUnit),
   };
 }
 
 function workingDataToCircuit(data: WorkingCircuitData): SerializableCircuitState {
   return {
+    version: GRID_VERSION,
     components: Object.fromEntries(data.components),
     junctions: data.junctions.size > 0 ? Object.fromEntries(data.junctions) : undefined,
     wires: data.wires.map((wire) => ({
@@ -124,7 +132,7 @@ function workingDataToCircuit(data: WorkingCircuitData): SerializableCircuitStat
         }))
         : undefined,
     })),
-    metadata: { ...data.metadata },
+    metadata: { ...data.metadata, version: GRID_VERSION },
     viewport: {
       zoom: data.zoom,
       panX: data.pan.x,
@@ -189,7 +197,7 @@ export function useSchematicCanvasDocument(
 
       const id = generateId(type);
       const finalPosition = data.snapToGrid
-        ? snapToGridPosition(position, data.gridSize)
+        ? snapToGridPosition(position, data.gridSize, data.gridUnit)
         : position;
 
       const newBlock = createBlockInstance(id, type, finalPosition, props);
@@ -246,7 +254,7 @@ export function useSchematicCanvasDocument(
       if (!documentId || !data) return;
 
       const finalPosition = data.snapToGrid
-        ? snapToGridPosition(position, data.gridSize)
+        ? snapToGridPosition(position, data.gridSize, data.gridUnit)
         : position;
 
       if (!skipHistory) {
@@ -294,7 +302,7 @@ export function useSchematicCanvasDocument(
       if (!documentId || !data) return;
 
       const finalPosition = data.snapToGrid
-        ? snapToGridPosition(position, data.gridSize)
+        ? snapToGridPosition(position, data.gridSize, data.gridUnit)
         : position;
 
       if (!skipHistory) {
@@ -837,7 +845,7 @@ export function useSchematicCanvasDocument(
   );
 
   const setGridUnit = useCallback(
-    (unit: 'px' | 'mil' | 'mm') => {
+    (unit: RuntimeGridUnit) => {
       if (!documentId) return;
 
       updateActivePageCircuit((working) => {
@@ -903,7 +911,7 @@ export function useSchematicCanvasDocument(
       snapToGrid: data.snapToGrid,
       showGrid: data.showGrid,
       gridStyle: data.gridStyle,
-      gridUnit: (data as any).gridUnit ?? 'px',
+      gridUnit: data.gridUnit,
       isDirty: schematicDoc.isDirty,
       addComponent,
       removeComponent,

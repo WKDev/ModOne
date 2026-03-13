@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import goldenPositions from './fixtures/port-positions.json';
 import { getBlockDefinition } from '../components/OneCanvas/blockDefinitions';
+import { normalizeLegacyPositionToMm } from '../components/OneCanvas/canvasUnits';
 import { getPortAbsolutePosition, getWireEndpoints } from '../components/OneCanvas/utils/wirePathCalculator';
 import { computeWireBendPoints } from '../components/OneCanvas/utils/canvasHelpers';
 import type { Block, BlockType, PortPosition, Position } from '../components/OneCanvas/types';
@@ -87,8 +88,8 @@ describe('wire routing verification after port coordinate migration', () => {
 
     const endpoints = assertEndpointsMatchPortPositions(relay, 'no', button, 'in', blocks);
 
-    expect(endpoints.fromPos).toEqual({ x: 180, y: 120 });
-    expect(endpoints.toPos).toEqual({ x: 300, y: 120 });
+    expect(endpoints.fromPos).toEqual({ x: 120, y: 105 });
+    expect(endpoints.toPos).toEqual({ x: 300, y: 105 });
 
     assertRoutedPathIsOrthogonal(
       { componentId: 'relay1', portId: 'no' },
@@ -110,8 +111,8 @@ describe('wire routing verification after port coordinate migration', () => {
 
     const endpoints = assertEndpointsMatchPortPositions(motor, 'pe', overloadRelay, 'l1_in', blocks);
 
-    expect(endpoints.fromPos).toEqual({ x: 140, y: 180 });
-    expect(endpoints.toPos).toEqual({ x: 140, y: 280 });
+    expect(endpoints.fromPos).toEqual({ x: 110, y: 120 });
+    expect(endpoints.toPos).toEqual({ x: 125, y: 280 });
 
     assertRoutedPathIsOrthogonal(
       { componentId: 'motor1', portId: 'pe' },
@@ -133,8 +134,8 @@ describe('wire routing verification after port coordinate migration', () => {
 
     const endpoints = assertEndpointsMatchPortPositions(plcIn, 'out', plcOut, 'in', blocks);
 
-    expect(endpoints.fromPos).toEqual({ x: 180, y: 220 });
-    expect(endpoints.toPos).toEqual({ x: 320, y: 220 });
+    expect(endpoints.fromPos).toEqual({ x: 120, y: 205 });
+    expect(endpoints.toPos).toEqual({ x: 320, y: 205 });
 
     assertRoutedPathIsOrthogonal(
       { componentId: 'plcIn1', portId: 'out' },
@@ -156,7 +157,9 @@ describe('wire routing verification after port coordinate migration', () => {
       const block = createTestBlock(blockType, { x: 0, y: 0 }, `test-${blockType}`);
       for (const [portId, expectedPos] of Object.entries(golden.ports)) {
         const absPos = getPortAbsolutePosition(block, portId);
-        expect(absPos).toEqual(expectedPos);
+        expect(absPos).toEqual(
+          normalizeLegacyPositionToMm(expectedPos as { x: number; y: number })
+        );
       }
     }
   });

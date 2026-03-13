@@ -10,6 +10,7 @@
  */
 
 import { Graphics, type Container } from 'pixi.js';
+import { LEGACY_MM_PER_PX } from '../canvasUnits';
 import type {
   Position,
   Rect,
@@ -47,10 +48,10 @@ const DEFAULT_SELECTION_STYLE: SelectionStyle = {
   marqueeFillAlpha: 0.1,
   marqueeStrokeWidth: 1,
   highlightColor: 0x4dabf7,
-  highlightWidth: 1.5,
-  handleSize: 6,
+  highlightWidth: 1.5 * LEGACY_MM_PER_PX,
+  handleSize: 6 * LEGACY_MM_PER_PX,
   handleFill: 0x4dabf7,
-  highlightPadding: 4,
+  highlightPadding: 4 * LEGACY_MM_PER_PX,
 };
 
 export interface SelectionRendererOptions {

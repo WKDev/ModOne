@@ -21,6 +21,7 @@ import {
   useImperativeHandle,
   forwardRef,
   useCallback,
+  useMemo,
   type CSSProperties,
 } from 'react';
 import type { CanvasFacadeReturn } from '@/types/canvasFacade';
@@ -36,6 +37,7 @@ import type {
   ViewportBounds,
 } from './types';
 import { DEFAULT_CANVAS_CONFIG, isPortEndpoint } from './types';
+import { getGridStepMm } from './canvasUnits';
 import type { SimStatus } from '@/types/onesim';
 
 import { PixiApplication } from './core/PixiApplication';
@@ -205,6 +207,16 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
   function CanvasHost({ documentId, config, facade, onViewportChange, shortcutCallbacks, onPlaceBlock, onInteractionStateChange, style, className }, ref) {
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasConfig = config ?? DEFAULT_CANVAS_CONFIG;
+    const effectiveGridConfig = useMemo(
+      () => ({
+        ...canvasConfig.grid,
+        size: facade.gridSize ?? canvasConfig.grid.size,
+        visible: facade.showGrid ?? canvasConfig.grid.visible ?? true,
+        style: facade.gridStyle ?? canvasConfig.grid.style ?? 'dots',
+        unit: facade.gridUnit ?? canvasConfig.grid.unit ?? 'mm',
+      }),
+      [canvasConfig.grid, facade.gridSize, facade.showGrid, facade.gridStyle, facade.gridUnit]
+    );
 
     // Refs for all systems (persist across renders)
     const pixiAppRef = useRef<PixiApplication | null>(null);
@@ -270,9 +282,9 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
             x: page.circuit.viewport?.panX ?? 0,
             y: page.circuit.viewport?.panY ?? 0,
           },
-          gridSize: 20,
+          gridSize: page.circuit.gridSize ?? facadeRef.current.gridSize,
           snapToGrid: true,
-          showGrid: true,
+          showGrid: page.circuit.showGrid ?? facadeRef.current.showGrid,
         };
       }
       return null;
@@ -354,7 +366,7 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
         // 6. Create Renderers
         gridRendererRef.current = new GridRenderer({
           layer: layerMgr.getLayer('grid'),
-          config: canvasConfig.grid,
+          config: effectiveGridConfig,
         });
 
         blockRendererRef.current = new BlockRenderer({
@@ -444,7 +456,7 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
             ...shortcutCallbacks,
             startWireMode: shortcutCallbacks?.startWireMode ?? (() => controller.startWireMode()),
           },
-          gridSize: canvasConfig.grid.size,
+          gridSize: getGridStepMm(effectiveGridConfig.size, effectiveGridConfig.unit),
         });
         keyboardShortcutsRef.current = shortcuts;
 
@@ -639,6 +651,23 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
       syncEngineRef.current?.setDocumentId(nextDocumentId);
       viewportSyncRef.current?.setDocumentId(nextDocumentId);
     }, [documentId]);
+
+    useEffect(() => {
+      if (gridRendererRef.current) {
+        gridRendererRef.current.config = effectiveGridConfig;
+      }
+      if (keyboardShortcutsRef.current) {
+        keyboardShortcutsRef.current.setGridSize(
+          getGridStepMm(effectiveGridConfig.size, effectiveGridConfig.unit)
+        );
+      }
+      if (gridRendererRef.current && viewportRef.current) {
+        gridRendererRef.current.render(
+          viewportRef.current.visibleBounds,
+          viewportRef.current.state.zoom,
+        );
+      }
+    }, [effectiveGridConfig]);
 
     useEffect(() => {
       if (import.meta.env.DEV) {

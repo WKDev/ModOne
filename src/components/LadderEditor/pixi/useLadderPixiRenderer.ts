@@ -1,43 +1,23 @@
-/**
- * useLadderPixiRenderer Hook
- *
- * Bridges the React/Zustand data layer with the Pixi.js rendering layer.
- *
- * Responsibilities:
- * - Creates and manages LadderSyncEngine lifecycle
- * - Subscribes to useLadderDocument data and ladderUIStore selection
- * - Drives fullSync / incremental updates on data change
- * - Wires LadderEventBridge callbacks for click-to-place, selection, and drag
- */
-
-import { useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { LadderPixiCanvasHostRef } from './LadderPixiCanvasHost';
 import { LadderSyncEngine } from './LadderSyncEngine';
 import { LadderDragHandler } from './interactions/LadderDragHandler';
 import type { LadderPointerEvent } from './LadderEventBridge';
-import type { LadderElement, VerticalLinkEntity } from '../../../types/ladder';
 import type { UseLadderDocumentReturn } from '../../../stores/hooks/useLadderDocument';
 import { useLadderUIStore } from '../../../stores/ladderUIStore';
 import { handlePlacement } from '../utils/ladderPlacement';
-import { getVerticalWireSegmentDistance, resolveVerticalWireHitTarget } from './verticalWireInteraction';
-
-// ============================================================================
-// Types
-// ============================================================================
+import {
+  getHorizontalWireMidline,
+  resolveHorizontalWireHitTarget,
+  resolveVerticalWireHitTarget,
+} from './verticalWireInteraction';
 
 export interface UseLadderPixiRendererOptions {
-  /** The Pixi canvas host ref (app, viewport, layers, eventBridge) */
   hostRef: LadderPixiCanvasHostRef | null;
-  /** The ladder document hook return value */
   ladderDoc: UseLadderDocumentReturn | null;
-  /** Whether the editor is in monitor (read-only) mode */
   readonly?: boolean;
 }
-
-// ============================================================================
-// Hook
-// ============================================================================
 
 export function useLadderPixiRenderer({
   hostRef,
@@ -47,7 +27,6 @@ export function useLadderPixiRenderer({
   const syncEngineRef = useRef<LadderSyncEngine | null>(null);
   const dragHandlerRef = useRef<LadderDragHandler | null>(null);
 
-  // Subscribe to UI store state
   const { selectedElementIds, activeTool, monitoringState, mode, cursorCell } = useLadderUIStore(
     useShallow((state) => ({
       selectedElementIds: state.selectedElementIds,
@@ -55,10 +34,9 @@ export function useLadderPixiRenderer({
       monitoringState: state.monitoringState,
       mode: state.mode,
       cursorCell: state.cursorCell,
-    }))
+    })),
   );
 
-  // Stable references for callbacks
   const ladderDocRef = useRef(ladderDoc);
   const readonlyRef = useRef(readonly);
   const activeToolRef = useRef(activeTool);
@@ -75,17 +53,12 @@ export function useLadderPixiRenderer({
     activeToolRef.current = activeTool;
   }, [activeTool]);
 
-  // ===========================================================================
-  // SyncEngine + DragHandler lifecycle
-  // ===========================================================================
-
   useEffect(() => {
     if (!hostRef) return;
 
     const engine = new LadderSyncEngine(hostRef.layers);
-    syncEngineRef.current = engine;
-
     const dragHandler = new LadderDragHandler(engine, engine.overlayLayer);
+    syncEngineRef.current = engine;
     dragHandlerRef.current = dragHandler;
 
     return () => {
@@ -96,79 +69,112 @@ export function useLadderPixiRenderer({
     };
   }, [hostRef]);
 
-  // ===========================================================================
-  // Full sync when data changes
-  // ===========================================================================
-
   useEffect(() => {
     const engine = syncEngineRef.current;
     if (!engine || !ladderDoc) return;
 
     engine.fullSync(
       ladderDoc.elements,
-      ladderDoc.verticalLinks,
-      ladderDoc.wires,
+      ladderDoc.horizontalEdges,
+      ladderDoc.verticalEdges,
+      ladderDoc.topologyCache,
       ladderDoc.gridConfig,
       selectedElementIds,
       cursorCell,
     );
-  }, [hostRef, ladderDoc?.elements, ladderDoc?.verticalLinks, ladderDoc?.wires, ladderDoc?.gridConfig, ladderDoc, selectedElementIds, cursorCell]);
-
-  // ===========================================================================
-  // Monitoring visualization sync
-  // ===========================================================================
+  }, [
+    hostRef,
+    ladderDoc,
+    ladderDoc?.elements,
+    ladderDoc?.horizontalEdges,
+    ladderDoc?.verticalEdges,
+    ladderDoc?.topologyCache,
+    ladderDoc?.gridConfig,
+    selectedElementIds,
+    cursorCell,
+  ]);
 
   useEffect(() => {
     const engine = syncEngineRef.current;
     if (!engine || !ladderDoc) return;
-
     if (mode === 'monitor' && monitoringState) {
       engine.applyMonitoring(monitoringState, ladderDoc.elements);
     } else {
       engine.clearMonitoring();
     }
-  }, [hostRef, mode, monitoringState, ladderDoc?.elements, ladderDoc]);
-
-  // ===========================================================================
-  // Auto-scroll when cursor cell changes (keyboard navigation)
-  // ===========================================================================
+  }, [hostRef, ladderDoc, mode, monitoringState]);
 
   useEffect(() => {
-    if (!hostRef || !cursorCell || !ladderDoc) return;
+    if (!hostRef || !ladderDoc || !cursorCell) return;
     hostRef.scrollToCell(
       cursorCell.row,
       cursorCell.col,
       ladderDoc.gridConfig.cellWidth,
       ladderDoc.gridConfig.cellHeight,
     );
-  }, [hostRef, cursorCell, ladderDoc?.gridConfig.cellWidth, ladderDoc?.gridConfig.cellHeight, ladderDoc]);
-
-  // ===========================================================================
-  // Grid config → EventBridge & Host sync
-  // ===========================================================================
+  }, [cursorCell, hostRef, ladderDoc]);
 
   useEffect(() => {
     if (!hostRef || !ladderDoc) return;
+    hostRef.eventBridge.setGridConfig(ladderDoc.gridConfig.cellWidth, ladderDoc.gridConfig.cellHeight);
+    hostRef.updateWorldConfig(ladderDoc.gridConfig.columns * ladderDoc.gridConfig.cellWidth);
+  }, [hostRef, ladderDoc]);
 
-    hostRef.eventBridge.setGridConfig(
-      ladderDoc.gridConfig.cellWidth,
-      ladderDoc.gridConfig.cellHeight,
+  const resolveSelectionTarget = useCallback((event: LadderPointerEvent, doc: UseLadderDocumentReturn) => {
+    const cellWidth = doc.gridConfig.cellWidth;
+    const cellHeight = doc.gridConfig.cellHeight;
+
+    const vertical = resolveVerticalWireHitTarget(
+      event.worldX,
+      event.worldY,
+      event.gridCol,
+      event.gridRow,
+      cellWidth,
+      cellHeight,
+    );
+    const horizontal = resolveHorizontalWireHitTarget(
+      event.worldY,
+      event.gridCol,
+      event.gridRow,
+      cellHeight,
     );
 
-    // Sync world width based on grid columns
-    const gridWidth = ladderDoc.gridConfig.columns * ladderDoc.gridConfig.cellWidth;
-    hostRef.updateWorldConfig(gridWidth);
-  }, [hostRef, ladderDoc?.gridConfig.columns, ladderDoc?.gridConfig.cellWidth, ladderDoc?.gridConfig.cellHeight, ladderDoc]);
+    const verticalEdge = vertical.isEdgeClick ? doc.getVerticalLinkAt(vertical.targetRow, vertical.targetCol) : undefined;
+    const horizontalEdge = horizontal.isEdgeClick ? doc.getHorizontalEdgeAt(horizontal.row, horizontal.col) : undefined;
+    const element = doc.getElementAt(event.gridRow, event.gridCol, 'instruction');
 
-  // ===========================================================================
-  // Event callbacks
-  // ===========================================================================
+    const verticalDistance = verticalEdge ? Math.abs(event.worldX - vertical.targetCol * cellWidth) : Number.POSITIVE_INFINITY;
+    const horizontalDistance = horizontalEdge ? Math.abs(event.worldY - (horizontal.row * cellHeight + getHorizontalWireMidline(cellHeight))) : Number.POSITIVE_INFINITY;
+
+    if (verticalEdge || horizontalEdge) {
+      if (verticalDistance <= horizontalDistance) {
+        return {
+          id: verticalEdge?.id,
+          kind: verticalEdge ? 'vertical-edge' as const : null,
+          cursorCell: { row: event.gridRow, col: vertical.targetCol },
+          edgeHover: verticalEdge ? { kind: 'vertical-edge' as const, row: vertical.targetRow, col: vertical.targetCol } : null,
+        };
+      }
+
+      return {
+        id: horizontalEdge?.id,
+        kind: horizontalEdge ? 'horizontal-edge' as const : null,
+        cursorCell: { row: event.gridRow, col: event.gridCol },
+        edgeHover: horizontalEdge ? { kind: 'horizontal-edge' as const, row: horizontal.row, col: horizontal.col } : null,
+      };
+    }
+
+    return {
+      id: element?.id,
+      kind: element ? 'cell' as const : null,
+      cursorCell: { row: event.gridRow, col: event.gridCol },
+      edgeHover: null,
+    };
+  }, []);
 
   const handlePointerDown = useCallback((event: LadderPointerEvent) => {
     const doc = ladderDocRef.current;
     if (!doc || readonlyRef.current) return;
-
-    // If no active tool, let drag handler evaluate
     if (!activeToolRef.current) {
       dragHandlerRef.current?.onPointerDown(event, doc, doc.gridConfig);
     }
@@ -178,84 +184,92 @@ export function useLadderPixiRenderer({
     const doc = ladderDocRef.current;
     if (!doc || readonlyRef.current) return;
 
-    // Forward to drag handler
     dragHandlerRef.current?.onPointerMove(event, doc, doc.gridConfig);
+
+    const uiStore = useLadderUIStore.getState();
+    const cellHeight = doc.gridConfig.cellHeight;
+    const vertical = resolveVerticalWireHitTarget(
+      event.worldX,
+      event.worldY,
+      event.gridCol,
+      event.gridRow,
+      doc.gridConfig.cellWidth,
+      cellHeight,
+    );
+    const horizontal = resolveHorizontalWireHitTarget(
+      event.worldY,
+      event.gridCol,
+      event.gridRow,
+      cellHeight,
+    );
+
+    if (doc.getVerticalLinkAt(vertical.targetRow, vertical.targetCol)) {
+      uiStore.setEdgeHover({ kind: 'vertical-edge', row: vertical.targetRow, col: vertical.targetCol });
+    } else if (horizontal.isEdgeClick && doc.getHorizontalEdgeAt(horizontal.row, horizontal.col)) {
+      uiStore.setEdgeHover({ kind: 'horizontal-edge', row: horizontal.row, col: horizontal.col });
+    } else {
+      uiStore.setEdgeHover(null);
+    }
   }, []);
 
   const handlePointerUp = useCallback((event: LadderPointerEvent) => {
     const doc = ladderDocRef.current;
     if (!doc || readonlyRef.current) return;
-
-    // If drag handler was active, let it handle pointer up
     if (dragHandlerRef.current?.isActive) {
       dragHandlerRef.current.onPointerUp(event, doc, doc.gridConfig);
-      return; // Don't pass to click handler
+      return;
     }
-
-    // Cancel any pending drag (didn't reach threshold)
     dragHandlerRef.current?.cancel();
   }, []);
 
   const handleCellClick = useCallback((event: LadderPointerEvent) => {
     const doc = ladderDocRef.current;
     if (!doc || readonlyRef.current) return;
-
-    // If drag was active (consumed the pointer up), skip click
     if (dragHandlerRef.current?.isActive) return;
 
-    const tool = activeToolRef.current;
-    const { gridRow, gridCol, shiftKey, ctrlKey, worldX } = event;
     const uiStore = useLadderUIStore.getState();
+    const tool = activeToolRef.current;
 
-    // --- Edge Hit Testing for Vertical Wires ---
-    const cellWidth = doc.gridConfig.cellWidth;
-    const cellHeight = doc.gridConfig.cellHeight;
-    const { targetCol, targetRow, isEdgeClick } = resolveVerticalWireHitTarget(
-      worldX,
+    const verticalTarget = resolveVerticalWireHitTarget(
+      event.worldX,
       event.worldY,
-      gridCol,
-      gridRow,
-      cellWidth,
-      cellHeight,
+      event.gridCol,
+      event.gridRow,
+      doc.gridConfig.cellWidth,
+      doc.gridConfig.cellHeight,
     );
 
-    // --- Click-to-place: active tool is set ---
     if (tool) {
       if (tool === 'wire_v') {
-        // Force placement on nearest edge if using vertical wire tool
-        handlePlacement(doc, tool, gridRow, targetCol, shiftKey, targetRow);
-        uiStore.setCursorCell({ row: gridRow, col: targetCol });
-        uiStore.setSelectionAnchor({ row: gridRow, col: targetCol });
+        handlePlacement(doc, tool, event.gridRow, verticalTarget.targetCol, event.shiftKey, verticalTarget.targetRow);
+        uiStore.setCursorCell({ row: event.gridRow, col: verticalTarget.targetCol });
+        uiStore.setSelectionAnchor({ row: event.gridRow, col: verticalTarget.targetCol });
       } else {
-        handlePlacement(doc, tool, gridRow, gridCol, shiftKey);
-        uiStore.setCursorCell({ row: gridRow, col: gridCol });
-        uiStore.setSelectionAnchor({ row: gridRow, col: gridCol });
+        handlePlacement(doc, tool, event.gridRow, event.gridCol, event.shiftKey);
+        uiStore.setCursorCell({ row: event.gridRow, col: event.gridCol });
+        uiStore.setSelectionAnchor({ row: event.gridRow, col: event.gridCol });
       }
       return;
     }
 
-    // --- Always update cursor cell on click ---
-    // If it's a clear edge click, we might want to move cursor to that boundary?
-    // For now, keep standard cell cursor but prioritize selection.
-    uiStore.setCursorCell({ row: gridRow, col: gridCol });
+    const target = resolveSelectionTarget(event, doc);
+    uiStore.setCursorCell(target.cursorCell);
+    uiStore.setEdgeHover(target.edgeHover);
 
-    // --- Range selection via Shift+Click ---
-    if (shiftKey && !ctrlKey) {
+    if (event.shiftKey && !event.ctrlKey) {
       const anchor = uiStore.selectionAnchor;
       if (anchor) {
-        // Select all elements within the rectangular range anchor → cursor
-        const minRow = Math.min(anchor.row, gridRow);
-        const maxRow = Math.max(anchor.row, gridRow);
-        const minCol = Math.min(anchor.col, gridCol);
-        const maxCol = Math.max(anchor.col, gridCol);
-
+        const minRow = Math.min(anchor.row, event.gridRow);
+        const maxRow = Math.max(anchor.row, event.gridRow);
+        const minCol = Math.min(anchor.col, event.gridCol);
+        const maxCol = Math.max(anchor.col, event.gridCol);
         const rangeIds: string[] = [];
-        for (const el of doc.elements.values()) {
+        for (const element of doc.elements.values()) {
           if (
-            el.position.row >= minRow && el.position.row <= maxRow &&
-            el.position.col >= minCol && el.position.col <= maxCol
+            element.position.row >= minRow && element.position.row <= maxRow &&
+            element.position.col >= minCol && element.position.col <= maxCol
           ) {
-            rangeIds.push(el.id);
+            rangeIds.push(element.id);
           }
         }
         uiStore.setSelection(rangeIds);
@@ -263,89 +277,38 @@ export function useLadderPixiRenderer({
       }
     }
 
-    // --- Selection: no active tool ---
-    // 1. Try to find a vertical wire if click was near an edge
-    let targetElement: LadderElement | undefined;
-    let targetVerticalLink: VerticalLinkEntity | undefined;
-    if (isEdgeClick) {
-      let bestDistance = Number.POSITIVE_INFINITY;
-      for (const verticalLink of doc.verticalLinks.values()) {
-        if (verticalLink.position.col !== targetCol) continue;
-        if (Math.abs(verticalLink.position.row - targetRow) > 1) continue;
-
-        const distance = getVerticalWireSegmentDistance(event.worldY, verticalLink.position.row, cellHeight);
-        if (distance <= cellHeight * 0.4 && distance < bestDistance) {
-          targetVerticalLink = verticalLink;
-          bestDistance = distance;
-        }
-      }
-    }
-
-    if (!targetVerticalLink) {
-      targetElement = doc.getElementAt(gridRow, gridCol, 'instruction');
-    }
-
-    const selectedId = targetVerticalLink?.id ?? targetElement?.id;
-
-    if (selectedId) {
-      if (ctrlKey) {
-        uiStore.toggleSelection(selectedId);
-        if (!uiStore.selectionAnchor) {
-          uiStore.setSelectionAnchor({ row: gridRow, col: gridCol });
-        }
+    if (target.id) {
+      if (event.ctrlKey) {
+        uiStore.toggleSelection(target.id);
       } else {
-        uiStore.setSelection([selectedId]);
-        uiStore.setSelectionAnchor({ row: gridRow, col: gridCol });
+        uiStore.setSelection([target.id]);
       }
-    } else {
-      // Click empty cell
-      if (!ctrlKey && !shiftKey) {
-        uiStore.clearSelection();
-        uiStore.setSelectionAnchor({ row: gridRow, col: gridCol });
-      }
+      uiStore.setSelectionAnchor({ row: event.gridRow, col: event.gridCol });
+      return;
     }
-  }, []);
 
+    if (!event.ctrlKey && !event.shiftKey) {
+      uiStore.clearSelection();
+      uiStore.setSelectionAnchor({ row: event.gridRow, col: event.gridCol });
+    }
+  }, [resolveSelectionTarget]);
 
   const handleCellRightClick = useCallback((event: LadderPointerEvent) => {
     const doc = ladderDocRef.current;
     if (!doc) return;
-
-    // Cancel drag on right-click
     dragHandlerRef.current?.cancel();
 
-    const { gridRow, gridCol, worldX, worldY } = event;
-    const { targetCol, targetRow, isEdgeClick } = resolveVerticalWireHitTarget(
-      worldX,
-      worldY,
-      gridCol,
-      gridRow,
-      doc.gridConfig.cellWidth,
-      doc.gridConfig.cellHeight,
-    );
-
-    const existingVerticalLink = isEdgeClick ? doc.getVerticalLinkAt(targetRow, targetCol) : undefined;
-    const existingElement = existingVerticalLink ? undefined : doc.getElementAt(gridRow, gridCol);
-
-    if (existingVerticalLink || existingElement) {
-      const state = useLadderUIStore.getState();
-      const id = existingVerticalLink?.id ?? existingElement?.id;
-      if (id && !state.selectedElementIds.has(id)) {
-        state.setSelection([id]);
+    const target = resolveSelectionTarget(event, doc);
+    if (target.id) {
+      const uiStore = useLadderUIStore.getState();
+      if (!uiStore.selectedElementIds.has(target.id)) {
+        uiStore.setSelection([target.id]);
       }
     }
-
-    // Context menu will be handled by the React layer (LadderEditor)
-    // via the native contextmenu event on the canvas container
-  }, []);
-
-  // ===========================================================================
-  // Wire EventBridge callbacks
-  // ===========================================================================
+  }, [resolveSelectionTarget]);
 
   useEffect(() => {
     if (!hostRef) return;
-
     hostRef.eventBridge.setCallbacks({
       onPointerDown: handlePointerDown,
       onPointerMove: handlePointerMove,
@@ -357,6 +320,5 @@ export function useLadderPixiRenderer({
     return () => {
       hostRef.eventBridge.setCallbacks({});
     };
-  }, [hostRef, handlePointerDown, handlePointerMove, handlePointerUp, handleCellClick, handleCellRightClick]);
+  }, [handleCellClick, handleCellRightClick, handlePointerDown, handlePointerMove, handlePointerUp, hostRef]);
 }
-

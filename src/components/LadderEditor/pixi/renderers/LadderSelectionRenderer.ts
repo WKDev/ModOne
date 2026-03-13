@@ -8,7 +8,12 @@
  */
 
 import { Container, Graphics } from 'pixi.js';
-import { getVerticalWireHighlightWidth } from '../verticalWireInteraction';
+import {
+  getHorizontalWireHighlightHeight,
+  getHorizontalWireMidline,
+  getVerticalWireHighlightWidth,
+  getVerticalWireMidline,
+} from '../verticalWireInteraction';
 
 // Excel-style blue palette
 const SELECTION_FILL_COLOR = 0x4f8de8;    // Slightly vivid blue fill
@@ -27,6 +32,7 @@ const RUBBER_BAND_STROKE_COLOR = 0x60a5fa; // blue-400
 export class LadderSelectionRenderer {
   private layer: Container;
   private rangeFill: Graphics;
+  private horizontalSelection: Graphics;
   private verticalSelection: Graphics;
   private cursorBorder: Graphics;
   private rubberBand: Graphics;
@@ -38,6 +44,10 @@ export class LadderSelectionRenderer {
     this.rangeFill = new Graphics();
     this.rangeFill.label = 'selectionRangeFill';
     this.layer.addChild(this.rangeFill);
+
+    this.horizontalSelection = new Graphics();
+    this.horizontalSelection.label = 'horizontalSelection';
+    this.layer.addChild(this.horizontalSelection);
 
     // Vertical selection
     this.verticalSelection = new Graphics();
@@ -60,6 +70,7 @@ export class LadderSelectionRenderer {
    * Render selection: all selected cells as a highlighted range, plus the cursor cell.
    *
    * @param selectedCells - All selected grid cells (may form a rectangular range)
+   * @param horizontalEdges - Selected horizontal edge runs
    * @param verticalCells - Cells with selected vertical wires
    * @param cursorCell    - The active cursor cell (null = no cursor)
    * @param cellWidth     - Cell width in pixels
@@ -67,16 +78,22 @@ export class LadderSelectionRenderer {
    */
   renderSelection(
     selectedCells: Array<{ row: number; col: number }>,
+    horizontalEdges: Array<{ row: number; startBoundaryCol: number; endBoundaryCol: number }>,
     verticalCells: Array<{ row: number; col: number }>,
     cursorCell: { row: number; col: number } | null,
     cellWidth: number,
     cellHeight: number,
   ): void {
     this.rangeFill.clear();
+    this.horizontalSelection.clear();
     this.verticalSelection.clear();
     this.cursorBorder.clear();
 
-    if (selectedCells.length === 0 && verticalCells.length === 0 && !cursorCell) return;
+    if (selectedCells.length === 0 && horizontalEdges.length === 0 && verticalCells.length === 0 && !cursorCell) return;
+
+    for (const edge of horizontalEdges) {
+      this.drawHorizontalHighlight(edge.row, edge.startBoundaryCol, edge.endBoundaryCol, cellWidth, cellHeight);
+    }
 
     // ---------- Vertical wire selection highlights ----------
     for (const { row, col } of verticalCells) {
@@ -115,6 +132,7 @@ export class LadderSelectionRenderer {
     cellHeight: number,
   ): void {
     this.rangeFill.clear();
+    this.horizontalSelection.clear();
     this.verticalSelection.clear();
     this.cursorBorder.clear();
     this.drawCursorCell(row, col, cellWidth, cellHeight);
@@ -143,6 +161,7 @@ export class LadderSelectionRenderer {
   /** Clear all selection visuals. */
   clear(): void {
     this.rangeFill.clear();
+    this.horizontalSelection.clear();
     this.verticalSelection.clear();
     this.cursorBorder.clear();
     this.hideRubberBand();
@@ -150,6 +169,7 @@ export class LadderSelectionRenderer {
 
   destroy(): void {
     this.rangeFill.destroy();
+    this.horizontalSelection.destroy();
     this.verticalSelection.destroy();
     this.cursorBorder.destroy();
     this.rubberBand.destroy();
@@ -159,6 +179,28 @@ export class LadderSelectionRenderer {
   // ===========================================================================
   // Internal helpers
   // ===========================================================================
+
+  private drawHorizontalHighlight(
+    row: number,
+    startBoundaryCol: number,
+    endBoundaryCol: number,
+    cellWidth: number,
+    cellHeight: number,
+  ): void {
+    const highlightHeight = getHorizontalWireHighlightHeight();
+    const halfHeight = highlightHeight / 2;
+    const x = startBoundaryCol * cellWidth;
+    const y = row * cellHeight + getHorizontalWireMidline(cellHeight) - halfHeight;
+    const width = (endBoundaryCol - startBoundaryCol) * cellWidth;
+
+    this.horizontalSelection
+      .rect(x, y, width, highlightHeight)
+      .fill({ color: SELECTION_FILL_COLOR, alpha: SELECTION_FILL_ALPHA * 2.2 });
+
+    this.horizontalSelection
+      .rect(x, y, width, highlightHeight)
+      .stroke({ width: VERTICAL_SELECTION_STROKE_WIDTH, color: VERTICAL_SELECTION_BORDER_COLOR });
+  }
 
   /**
    * Draw a narrow vertical highlight at the left edge of the cell,
@@ -170,9 +212,9 @@ export class LadderSelectionRenderer {
     cellWidth: number,
     cellHeight: number,
   ): void {
-    const midY = cellHeight * 0.65;
+    const midY = getVerticalWireMidline(cellHeight);
     const x = col * cellWidth;
-    const y = (row - 1) * cellHeight + midY;
+    const y = row * cellHeight + midY;
 
     const highlightWidth = getVerticalWireHighlightWidth();
     const halfWidth = highlightWidth / 2;

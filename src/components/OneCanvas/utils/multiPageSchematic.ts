@@ -6,6 +6,7 @@
  */
 
 import type { CircuitMetadata, SerializableCircuitState } from '../types';
+import { GRID_VERSION } from '../canvasUnits';
 
 // ============================================================================
 // Types
@@ -126,11 +127,16 @@ function createEmptyCircuit(): SerializableCircuitState {
       author: '',
       createdAt: now,
       modifiedAt: now,
-      version: '1.0',
+      version: GRID_VERSION,
     },
+    version: GRID_VERSION,
     components: {},
     junctions: {},
     wires: [],
+    gridSize: 5,
+    showGrid: true,
+    gridStyle: 'dots',
+    gridUnit: 'mm',
   };
 }
 
@@ -152,7 +158,7 @@ export function createMultiPageSchematic(
     id: generateSchematicId(),
     name,
     description,
-    version: '1.0',
+    version: GRID_VERSION,
     pages: [firstPage],
     activePageId: firstPage.id,
     metadata: {

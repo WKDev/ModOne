@@ -13,8 +13,10 @@ import type {
   Junction,
   Position,
   PortPosition,
+  SerializableGridUnit,
 } from '../types';
 import { isPortEndpoint, isJunctionEndpoint, isFloatingEndpoint } from '../types';
+import { getGridStepMm } from '../canvasUnits';
 import {
   getPortRelativePosition,
   getPortAbsolutePosition,
@@ -34,11 +36,16 @@ export function generateId(type: string): string {
 // Grid Snapping
 // ============================================================================
 
-/** Snap position to grid */
-export function snapToGridPosition(position: Position, gridSize: number): Position {
+/** Snap position to the effective runtime grid step (mm world units). */
+export function snapToGridPosition(
+  position: Position,
+  gridSize: number,
+  gridUnit: SerializableGridUnit = 'mm',
+): Position {
+  const gridStep = getGridStepMm(gridSize, gridUnit);
   return {
-    x: Math.round(position.x / gridSize) * gridSize,
-    y: Math.round(position.y / gridSize) * gridSize,
+    x: Math.round(position.x / gridStep) * gridStep,
+    y: Math.round(position.y / gridStep) * gridStep,
   };
 }
 

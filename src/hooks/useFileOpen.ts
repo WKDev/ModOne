@@ -14,7 +14,7 @@ import { useEditorAreaStore } from '../stores/editorAreaStore';
 import { useToolPanelStore } from '../stores/toolPanelStore';
 import { useDocumentRegistry } from '../stores/documentRegistry';
 import { canvasService } from '../services/canvasService';
-import type { CircuitState, SerializableCircuitState } from '../components/OneCanvas/types';
+import { circuitStateToVersionedSerializable } from '../components/OneCanvas/canvasUnits';
 import type { PanelType } from '../types/panel';
 import { getPanelZone } from '../types/panel';
 import type { ProjectFileNode } from '../types/fileTypes';
@@ -38,20 +38,6 @@ interface UseFileOpenResult {
   openFileNode: (node: ProjectFileNode) => void;
   /** Check if a file can be opened in an editor */
   canOpen: (path: string) => boolean;
-}
-
-function circuitStateToSerializable(state: CircuitState): SerializableCircuitState {
-  return {
-    components: Object.fromEntries(state.components),
-    junctions: state.junctions.size > 0 ? Object.fromEntries(state.junctions) : undefined,
-    wires: state.wires,
-    metadata: state.metadata,
-    viewport: state.viewport,
-    gridSize: state.gridSize,
-    showGrid: state.showGrid,
-    gridStyle: state.gridStyle,
-    gridUnit: state.gridUnit,
-  };
 }
 
 /**
@@ -161,7 +147,7 @@ export function useFileOpen(): UseFileOpenResult {
             try {
               setDocumentStatus(documentId, 'loading');
               const circuitState = await canvasService.loadCircuit(absolutePath);
-              const serializableData = circuitStateToSerializable(circuitState);
+              const serializableData = circuitStateToVersionedSerializable(circuitState);
               loadCanvasCircuit(documentId, serializableData);
             } catch (error) {
               console.error('Failed to load canvas file:', error);

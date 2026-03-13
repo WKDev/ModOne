@@ -1,77 +1,62 @@
-/**
- * LadderWireRenderer
- *
- * Convention: all wires route through the horizontal midline (midY) of each cell.
- *
- *  - wire_h  : (0, midY) → (w, midY)          — full horizontal
- *  - wire_v  : (0, midY) → (0, h+midY)        — LEFT edge, from this row's midY
- *                                                 to the NEXT row's midY (spans the row boundary)
- *  - Corners / junctions use the same ref points:
- *      TOP direction    → draw (0, 0) → (0, midY)       upper half, left edge
- *      BOTTOM direction → draw (0, midY) → (0, h+midY)  lower half, left edge (extends into next row)
- *      LEFT/RIGHT dir.  → draw (0, midY) → (w, midY)    horizontal
- */
-
 import { Container, Graphics } from 'pixi.js';
-import type { WireElement } from '../../../../types/ladder';
-import { WireDirection } from '../../../../types/ladder';
-import { getElementDirections } from '../../utils/wireGenerator';
+import type { HorizontalEdgeEntity, VerticalEdgeEntity } from '../../../../types/ladder';
+import { getHorizontalWireMidline, getVerticalWireMidline } from '../verticalWireInteraction';
 
-
-const WIRE_COLOR = 0x6b7280;  // neutral-500
+const WIRE_COLOR = 0x6b7280;
 const WIRE_WIDTH = 2;
 
 export class LadderWireRenderer {
-  create(element: WireElement, cellWidth: number, cellHeight: number): Container {
+  createHorizontal(edge: HorizontalEdgeEntity, cellWidth: number, cellHeight: number): Container {
     const container = new Container();
-    container.label = element.id;
+    container.label = edge.id;
     container.eventMode = 'none';
-    container.position.set(
-      element.position.col * cellWidth,
-      element.position.row * cellHeight,
-    );
+    container.position.set(0, 0);
     const gfx = new Graphics();
     gfx.label = 'wire';
-    this.drawWire(gfx, element, cellWidth, cellHeight);
+    this.drawHorizontal(gfx, edge, cellWidth, cellHeight);
     container.addChild(gfx);
     return container;
   }
 
-  update(container: Container, element: WireElement, cellWidth = 80, cellHeight = 60): void {
-    const gfx = container.getChildByLabel('wire') as Graphics | null;
-    if (gfx) {
-      gfx.clear();
-      this.drawWire(gfx, element, cellWidth, cellHeight);
-    }
+  createVertical(edge: VerticalEdgeEntity, cellWidth: number, cellHeight: number): Container {
+    const container = new Container();
+    container.label = edge.id;
+    container.eventMode = 'none';
+    container.position.set(0, 0);
+    const gfx = new Graphics();
+    gfx.label = 'wire';
+    this.drawVertical(gfx, edge, cellWidth, cellHeight);
+    container.addChild(gfx);
+    return container;
   }
 
-  destroy(): void { }
+  updateHorizontal(container: Container, edge: HorizontalEdgeEntity, cellWidth = 80, cellHeight = 60): void {
+    const gfx = container.getChildByLabel('wire') as Graphics | null;
+    if (!gfx) return;
+    gfx.clear();
+    this.drawHorizontal(gfx, edge, cellWidth, cellHeight);
+  }
 
-  // ---------------------------------------------------------------------------
+  updateVertical(container: Container, edge: VerticalEdgeEntity, cellWidth = 80, cellHeight = 60): void {
+    const gfx = container.getChildByLabel('wire') as Graphics | null;
+    if (!gfx) return;
+    gfx.clear();
+    this.drawVertical(gfx, edge, cellWidth, cellHeight);
+  }
 
-  private drawWire(gfx: Graphics, element: WireElement, w: number, h: number): void {
-    const midY = h * 0.65; // Shifted down for label space
+  destroy(): void {}
 
-    // Stroke styles: 'butt' for horizontal to join seamlessly, 'round' for vertical/internal
-    const strokeH = { width: WIRE_WIDTH, color: WIRE_COLOR, cap: 'butt' } as const;
-    const strokeV = { width: WIRE_WIDTH, color: WIRE_COLOR, cap: 'round' } as const;
+  private drawHorizontal(gfx: Graphics, edge: HorizontalEdgeEntity, cellWidth: number, cellHeight: number): void {
+    const y = edge.position.row * cellHeight + getHorizontalWireMidline(cellHeight);
+    const x1 = edge.position.startBoundaryCol * cellWidth;
+    const x2 = edge.position.endBoundaryCol * cellWidth;
+    gfx.moveTo(x1, y).lineTo(x2, y).stroke({ width: WIRE_WIDTH, color: WIRE_COLOR, cap: 'butt' });
+  }
 
-    const connected = element.properties.connectedDirections;
-
-    // Shared drawing helpers
-    const drawH = () => gfx.moveTo(0, midY).lineTo(w, midY).stroke(strokeH);
-    const drawVUp = () => gfx.moveTo(0, midY - h).lineTo(0, midY).stroke(strokeV);
-    const drawVDown = () => gfx.moveTo(0, midY).lineTo(0, midY + h).stroke(strokeV);
-
-    const directions = connected ?? getElementDirections(element);
-
-    if (directions & WireDirection.TOP) drawVUp();
-    if (directions & WireDirection.BOTTOM) drawVDown();
-    if (directions & (WireDirection.LEFT | WireDirection.RIGHT) || element.type === 'wire_h') {
-      drawH();
-    }
-
+  private drawVertical(gfx: Graphics, edge: VerticalEdgeEntity, cellWidth: number, cellHeight: number): void {
+    const x = edge.position.col * cellWidth;
+    const y1 = edge.position.row * cellHeight + getVerticalWireMidline(cellHeight);
+    const y2 = (edge.position.row + 1) * cellHeight + getVerticalWireMidline(cellHeight);
+    gfx.moveTo(x, y1).lineTo(x, y2).stroke({ width: WIRE_WIDTH, color: WIRE_COLOR, cap: 'round' });
   }
 }
-
-

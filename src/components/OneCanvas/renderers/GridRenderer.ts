@@ -9,9 +9,8 @@
 
 import { Graphics, type Container } from 'pixi.js';
 import type { GridConfig, ViewportBounds } from '../types';
-import { DEFAULT_GRID, unitToPx } from '../types';
-
-export type GridUnit = 'px' | 'mil' | 'mm';
+import { DEFAULT_GRID } from '../types';
+import { getGridStepMm, type RuntimeGridUnit } from '../canvasUnits';
 
 export interface GridRendererOptions {
   /** The grid layer container (viewport child, world-space). */
@@ -67,7 +66,7 @@ export class GridRenderer {
   private _config: GridConfig;
   private _layer: Container;
   private _destroyed = false;
-  private _unit: GridUnit = 'mm';
+  private _unit: RuntimeGridUnit = 'mm';
 
   constructor(options: GridRendererOptions) {
     this._config = options.config ?? DEFAULT_GRID;
@@ -85,7 +84,7 @@ export class GridRenderer {
     this._unit = value.unit ?? 'mm';
   }
 
-  set unit(value: GridUnit) {
+  set unit(value: RuntimeGridUnit) {
     this._unit = value;
   }
 
@@ -99,7 +98,7 @@ export class GridRenderer {
     this._graphics.clear();
 
     const style = this._config.style ?? 'dots';
-    const baseMinorStep = Math.max(1, unitToPx(this._config.size, this._unit));
+    const baseMinorStep = Math.max(1, getGridStepMm(this._config.size, this._unit));
     const baseMajorStep = Math.max(baseMinorStep, baseMinorStep * getMajorFactor(this._config));
 
     const effectiveMinorStep = getEffectiveStep(

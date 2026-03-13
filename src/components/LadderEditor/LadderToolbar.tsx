@@ -160,8 +160,7 @@ export function LadderToolbar({ className }: LadderToolbarProps) {
   // Handle delete selected elements
   const handleDelete = useCallback(() => {
     if (!isEditMode) return;
-    const ids = Array.from(selectedElementIds);
-    ids.forEach((id) => ladderDoc?.removeElement(id));
+    ladderDoc?.deleteSelection(selectedElementIds);
     clearSelection();
   }, [selectedElementIds, ladderDoc, isEditMode, clearSelection]);
 

@@ -12,6 +12,7 @@
  */
 
 import { Graphics, GraphicsContext, type Container } from 'pixi.js';
+import { LEGACY_MM_PER_PX } from '../canvasUnits';
 import type {
   Block,
   PortType,
@@ -48,7 +49,7 @@ export interface PortStyle {
 }
 
 const DEFAULT_PORT_STYLE: PortStyle = {
-  radius: 4,
+  radius: 4 * LEGACY_MM_PER_PX,
   defaultColor: 0xa5b0bb,
   inputColor: 0x51cf66,
   outputColor: 0xff6b6b,
@@ -56,8 +57,8 @@ const DEFAULT_PORT_STYLE: PortStyle = {
   connectedAlpha: 1.0,
   unconnectedAlpha: 0.7,
   snapHighlightColor: 0x4dabf7,
-  snapHighlightRadius: 8,
-  strokeWidth: 1.5,
+  snapHighlightRadius: 8 * LEGACY_MM_PER_PX,
+  strokeWidth: 1.5 * LEGACY_MM_PER_PX,
   strokeColor: 0xd0d4da,
 };
 

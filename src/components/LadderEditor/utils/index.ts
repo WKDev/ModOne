@@ -71,3 +71,12 @@ export {
   type VerticalContinuityChain,
   type VerticalLink,
 } from './dualGrid';
+
+// Graph-first ladder topology utilities
+export {
+  buildCellCoordKey,
+  buildVerticalEdgeCoordKey,
+  findHorizontalEdgeContainingCell,
+  normalizeHorizontalEdges,
+  rebuildLadderTopologyCache,
+} from './topologyBuilder';

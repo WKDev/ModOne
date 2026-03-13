@@ -21,12 +21,14 @@ function makeBlock(id: string, x: number, y: number, w: number, h: number): Bloc
 
 function emptyCircuit(components: Record<string, Block> = {}): SerializableCircuitState {
   return {
+    version: '2.0',
     components,
     wires: [],
     metadata: {
       name: 'Contract Test',
       description: '',
       tags: [],
+      version: '2.0',
     },
     viewport: {
       zoom: 1,

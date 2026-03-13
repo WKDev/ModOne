@@ -9,6 +9,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { MultiPageSchematic, SchematicPage } from '../components/OneCanvas/utils/multiPageSchematic';
 import type { SerializableCircuitState } from '../components/OneCanvas/types';
 import { createSelectionState } from '../components/OneCanvas/types';
+import { GRID_MODULE_MM, GRID_VERSION, normalizeSerializableCircuitState } from '../components/OneCanvas/canvasUnits';
 import { circuitToYaml, yamlToCircuit } from '../components/OneCanvas/utils/serialization';
 
 // ============================================================================
@@ -72,13 +73,13 @@ function serializePageCircuit(circuit: SerializableCircuitState): string {
  */
 function deserializePageCircuit(yamlStr: string): SerializableCircuitState {
   const circuitState = yamlToCircuit(yamlStr);
-  return {
+  return normalizeSerializableCircuitState({
     components: Object.fromEntries(circuitState.components),
     junctions: circuitState.junctions.size > 0 ? Object.fromEntries(circuitState.junctions) : undefined,
     wires: circuitState.wires,
-    metadata: circuitState.metadata,
+    metadata: { ...circuitState.metadata, version: GRID_VERSION },
     viewport: circuitState.viewport,
-  };
+  });
 }
 
 // ============================================================================
@@ -128,6 +129,7 @@ function serializePage(page: SchematicPage, index: number): PageSaveData {
     description: page.description,
     created_at: page.createdAt,
     updated_at: page.updatedAt,
+    circuit_version: page.circuit.version ?? GRID_VERSION,
     grid_size: page.circuit.gridSize,
     show_grid: page.circuit.showGrid,
     grid_style: page.circuit.gridStyle,
@@ -212,13 +214,14 @@ function parsePage(content: string): SchematicPage {
   const data = JSON.parse(content) as Record<string, unknown>;
 
   const fallbackCircuit: SerializableCircuitState = {
+    version: GRID_VERSION,
     components: {},
     wires: [],
-    metadata: { name: '', description: '', tags: [] },
-    gridSize: 20,
+    metadata: { name: '', description: '', tags: [], version: GRID_VERSION },
+    gridSize: GRID_MODULE_MM,
     showGrid: true,
     gridStyle: 'dots',
-    gridUnit: 'px',
+    gridUnit: 'mm',
   };
 
   const circuitSource =
@@ -226,9 +229,10 @@ function parsePage(content: string): SchematicPage {
       ? deserializePageCircuit(data.circuit)
       : ((data.circuit as SerializableCircuitState | undefined) ?? fallbackCircuit);
 
-  const circuit: SerializableCircuitState = {
+  const circuit = normalizeSerializableCircuitState({
     ...fallbackCircuit,
     ...circuitSource,
+    version: String(data.circuit_version ?? circuitSource.version ?? fallbackCircuit.version),
     gridSize: Number(data.grid_size ?? circuitSource.gridSize ?? fallbackCircuit.gridSize),
     showGrid: Boolean(data.show_grid ?? circuitSource.showGrid ?? fallbackCircuit.showGrid),
     gridStyle: (data.grid_style as SerializableCircuitState['gridStyle'] | undefined)
@@ -237,7 +241,7 @@ function parsePage(content: string): SchematicPage {
     gridUnit: (data.grid_unit as SerializableCircuitState['gridUnit'] | undefined)
       ?? circuitSource.gridUnit
       ?? fallbackCircuit.gridUnit,
-  };
+  });
 
   return {
     id: String(data.page_id ?? ''),

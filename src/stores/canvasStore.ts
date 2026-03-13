@@ -58,6 +58,11 @@ import {
 } from '../components/OneCanvas/utils/canvasHelpers';
 import { polylineToHandles, simplifyWireHandles, enforceOrthogonalPolyline } from '../components/OneCanvas/utils/wireSimplifier';
 import { alignComponents, distributeComponents, flipComponents } from '../components/OneCanvas/utils/canvas-commands';
+import {
+  GRID_MODULE_MM,
+  GRID_VERSION,
+  normalizeSerializableCircuitState,
+} from '../components/OneCanvas/canvasUnits';
 import { isValidConnection } from '../components/OneCanvas/utils/connectionValidator';
 import { createBlockInstance } from '../components/OneCanvas/runtime/blockFactory';
 
@@ -300,7 +305,7 @@ const MAX_HISTORY_SIZE = 50;
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 4.0;
 const MIN_GRID_SIZE = 5;
-const DEFAULT_GRID_SIZE = 20;
+const DEFAULT_GRID_SIZE = GRID_MODULE_MM;
 
 // ============================================================================
 // Initial State
@@ -1457,7 +1462,8 @@ export const useCanvasStore = create<CanvasStore>()(
       loadCircuit: (data) => {
         set(
           (state) => {
-            const rawComponents = new Map(Object.entries(data.components));
+            const normalized = normalizeSerializableCircuitState(data);
+            const rawComponents = new Map(Object.entries(normalized.components));
 
             // Migrate: separate junction blocks into junctions map
             const migratedJunctions = new Map<string, Junction>();
@@ -1505,7 +1511,7 @@ export const useCanvasStore = create<CanvasStore>()(
             }
 
             // Migrate wires: convert junction block endpoints to junction endpoints
-            state.wires = data.wires.map((wire) => {
+            state.wires = normalized.wires.map((wire) => {
               const fromRaw = wire.from as unknown as Record<string, string>;
               const toRaw = wire.to as unknown as Record<string, string>;
 
@@ -1542,8 +1548,8 @@ export const useCanvasStore = create<CanvasStore>()(
             });
 
             // Merge migrated junctions with any existing junctions in data
-            state.junctions = data.junctions
-              ? new Map(Object.entries(data.junctions))
+            state.junctions = normalized.junctions
+              ? new Map(Object.entries(normalized.junctions))
               : new Map();
             for (const [id, j] of migratedJunctions) {
               if (!state.junctions.has(id)) {
@@ -1551,19 +1557,19 @@ export const useCanvasStore = create<CanvasStore>()(
               }
             }
 
-            state.metadata = { ...data.metadata };
+            state.metadata = { ...normalized.metadata };
             state.selection = createSelectionState([]);
             syncSelectedIdsCache(state);
             state.history = [];
             state.historyIndex = -1;
             state.isDirty = false;
-            if (data.viewport) {
-              state.zoom = data.viewport.zoom;
-              state.pan = { x: data.viewport.panX, y: data.viewport.panY };
+            if (normalized.viewport) {
+              state.zoom = normalized.viewport.zoom;
+              state.pan = { x: normalized.viewport.panX, y: normalized.viewport.panY };
             }
-            state.gridSize = data.gridSize ?? state.gridSize;
-            state.showGrid = data.showGrid ?? state.showGrid;
-            state.gridStyle = data.gridStyle ?? state.gridStyle;
+            state.gridSize = normalized.gridSize ?? state.gridSize;
+            state.showGrid = normalized.showGrid ?? state.showGrid;
+            state.gridStyle = normalized.gridStyle ?? state.gridStyle;
           },
           false,
           'loadCircuit'
@@ -1573,10 +1579,11 @@ export const useCanvasStore = create<CanvasStore>()(
       getCircuitData: () => {
         const state = get();
         return {
+          version: GRID_VERSION,
           components: Object.fromEntries(state.components) as Record<string, Block>,
           junctions: state.junctions.size > 0 ? Object.fromEntries(state.junctions) : undefined,
           wires: state.wires,
-          metadata: state.metadata,
+          metadata: { ...state.metadata, version: GRID_VERSION },
           viewport: {
             zoom: state.zoom,
             panX: state.pan.x,
@@ -1585,6 +1592,7 @@ export const useCanvasStore = create<CanvasStore>()(
           gridSize: state.gridSize,
           showGrid: state.showGrid,
           gridStyle: state.gridStyle,
+          gridUnit: 'mm',
         };
       },
 

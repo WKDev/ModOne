@@ -11,8 +11,10 @@ import type {
   DirtyFlag,
   Junction,
   Rect,
+  RuntimeGridUnit,
   Wire,
 } from '../types';
+import { ensureRuntimeGridUnit } from '../canvasUnits';
 import type { DocumentState } from '@/types/document';
 import type {
   BlockRenderer,
@@ -36,7 +38,7 @@ interface CanvasSnapshot {
   gridSize: number;
   showGrid: boolean;
   gridStyle: 'dots' | 'lines';
-  gridUnit: 'px' | 'mil' | 'mm';
+  gridUnit: RuntimeGridUnit;
 }
 
 export interface SyncEngineConfig {
@@ -421,10 +423,10 @@ export class SyncEngine {
         zoom: circuit.viewport?.zoom ?? 1.0,
         panX: circuit.viewport?.panX ?? 0,
         panY: circuit.viewport?.panY ?? 0,
-        gridSize: circuit.gridSize ?? 20,
+        gridSize: circuit.gridSize ?? 5,
         showGrid: circuit.showGrid ?? true,
         gridStyle: circuit.gridStyle ?? 'dots',
-        gridUnit: circuit.gridUnit ?? 'px',
+        gridUnit: ensureRuntimeGridUnit(circuit.gridUnit),
       };
     }
 

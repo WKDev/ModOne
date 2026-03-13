@@ -12,6 +12,7 @@ import type {
   Block,
   BlockType,
   Junction,
+  RuntimeGridUnit,
   Wire,
   WireEndpoint,
   Position,
@@ -212,7 +213,7 @@ export interface CanvasFacadeReturn {
   /** Grid style mode */
   gridStyle: 'dots' | 'lines';
   /** Grid unit mode */
-  gridUnit: 'px' | 'mil' | 'mm';
+  gridUnit: RuntimeGridUnit;
 
   /** Toggle grid visibility */
   toggleGrid: () => void;
@@ -223,7 +224,7 @@ export interface CanvasFacadeReturn {
   /** Setup new grid style */
   setGridStyle: (style: 'dots' | 'lines') => void;
   /** Setup new grid unit */
-  setGridUnit: (unit: 'px' | 'mil' | 'mm') => void;
+  setGridUnit: (unit: RuntimeGridUnit) => void;
 
   // --------------------------------------------------------------------------
   // History (Undo / Redo)

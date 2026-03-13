@@ -10,6 +10,7 @@
 
 import RBush from 'rbush';
 import type { Position, Rect, Block, Wire, Junction } from '../types';
+import { LEGACY_MM_PER_PX } from '../canvasUnits';
 import { isFloatingEndpoint } from '../types';
 
 // ============================================================================
@@ -98,10 +99,10 @@ export class SpatialIndex {
         const portX = block.position.x + (port.absolutePosition?.x ?? 0);
         const portY = block.position.y + (port.absolutePosition?.y ?? 0);
         const portItem: SpatialItem = {
-          minX: portX - 6,
-          minY: portY - 6,
-          maxX: portX + 6,
-          maxY: portY + 6,
+          minX: portX - (6 * LEGACY_MM_PER_PX),
+          minY: portY - (6 * LEGACY_MM_PER_PX),
+          maxX: portX + (6 * LEGACY_MM_PER_PX),
+          maxY: portY + (6 * LEGACY_MM_PER_PX),
           type: 'port',
           id: port.id,
           subIndex: i,
@@ -127,7 +128,7 @@ export class SpatialIndex {
 
     // Index junctions
     for (const junction of Object.values(junctions)) {
-      const r = 5; // junction visual radius
+      const r = 5 * LEGACY_MM_PER_PX; // junction visual radius
       const item: SpatialItem = {
         minX: junction.position.x - r,
         minY: junction.position.y - r,
@@ -187,10 +188,10 @@ export class SpatialIndex {
        const portX = block.position.x + (port.absolutePosition?.x ?? 0);
        const portY = block.position.y + (port.absolutePosition?.y ?? 0);
       const portItem: SpatialItem = {
-        minX: portX - 6,
-        minY: portY - 6,
-        maxX: portX + 6,
-        maxY: portY + 6,
+        minX: portX - (6 * LEGACY_MM_PER_PX),
+        minY: portY - (6 * LEGACY_MM_PER_PX),
+        maxX: portX + (6 * LEGACY_MM_PER_PX),
+        maxY: portY + (6 * LEGACY_MM_PER_PX),
         type: 'port',
         id: port.id,
         subIndex: i,
@@ -240,7 +241,7 @@ export class SpatialIndex {
   /**
    * Find all items near a point within a radius.
    */
-  queryPoint(pos: Position, radius: number = 10): SpatialItem[] {
+  queryPoint(pos: Position, radius: number = 10 * LEGACY_MM_PER_PX): SpatialItem[] {
     return this._tree.search({
       minX: pos.x - radius,
       minY: pos.y - radius,
@@ -254,7 +255,7 @@ export class SpatialIndex {
    */
   queryNearest(
     pos: Position,
-    radius: number = 20,
+    radius: number = 20 * LEGACY_MM_PER_PX,
     typeFilter?: SpatialItemType
   ): SpatialItem | null {
     const candidates = this.queryPoint(pos, radius);

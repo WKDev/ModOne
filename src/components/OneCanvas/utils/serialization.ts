@@ -26,6 +26,12 @@ import { createSelectionState } from '../types';
 import { getBlockSize, getPowerSourcePorts } from '../blockDefinitions';
 import { getBuiltinSymbolForBlockType } from '@/assets/builtin-symbols';
 import type { SymbolPin } from '@/types/symbol';
+import {
+  GRID_MODULE_MM,
+  GRID_VERSION,
+  ensureRuntimeGridUnit,
+  normalizeSerializableCircuitState,
+} from '../canvasUnits';
 
 // ============================================================================
 // Serialization (CircuitState -> YAML String)
@@ -107,7 +113,7 @@ export function circuitToYamlSchema(state: CircuitState): YamlCircuitSchema {
   }
 
   return {
-    version: '1.1',
+    version: GRID_VERSION,
     metadata: {
       name: state.metadata.name,
       description: state.metadata.description,
@@ -437,7 +443,27 @@ export function yamlToCircuit(yamlString: string): CircuitState {
 
   const wires: Wire[] = validatedData.wires.map(yamlToWire).filter((w): w is Wire => w !== null);
 
+  const normalized = normalizeSerializableCircuitState({
+    version: validatedData.version,
+    components: Object.fromEntries(components),
+    junctions: {},
+    wires,
+    metadata: {
+      name: validatedData.metadata.name,
+      description: validatedData.metadata.description || '',
+      tags: validatedData.metadata.tags || [],
+      createdAt: validatedData.metadata.created,
+      modifiedAt: validatedData.metadata.modified,
+      version: GRID_VERSION,
+    },
+    gridSize: GRID_MODULE_MM,
+    showGrid: true,
+    gridStyle: 'dots',
+    gridUnit: 'mm',
+  });
+
   const metadata: CircuitMetadata = {
+    ...normalized.metadata,
     name: validatedData.metadata.name,
     description: validatedData.metadata.description || '',
     tags: validatedData.metadata.tags || [],
@@ -446,11 +472,15 @@ export function yamlToCircuit(yamlString: string): CircuitState {
   };
 
   return {
-    components,
-    junctions: new Map(),
-    wires,
+    components: new Map(Object.entries(normalized.components)),
+    junctions: normalized.junctions ? new Map(Object.entries(normalized.junctions)) : new Map(),
+    wires: normalized.wires,
     metadata,
     selection: createSelectionState([]),
+    gridSize: normalized.gridSize,
+    showGrid: normalized.showGrid,
+    gridStyle: normalized.gridStyle,
+    gridUnit: ensureRuntimeGridUnit(normalized.gridUnit),
   };
 }
 
@@ -471,8 +501,13 @@ export function createDefaultCircuit(name: string): CircuitState {
       description: '',
       tags: [],
       createdAt: new Date().toISOString(),
+      version: GRID_VERSION,
     },
     selection: createSelectionState([]),
+    gridSize: GRID_MODULE_MM,
+    showGrid: true,
+    gridStyle: 'dots',
+    gridUnit: 'mm',
   };
 }
 

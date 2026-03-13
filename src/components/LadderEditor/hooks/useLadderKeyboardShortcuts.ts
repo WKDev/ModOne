@@ -123,6 +123,23 @@ export function useLadderKeyboardShortcuts(
     uiStore.clearSelection();
   }, [selectedElementIds, onEditElement, documentId]);
 
+  const handleTab = useCallback((shiftKey: boolean) => {
+    if (!documentId) return;
+    const registry = useDocumentRegistry.getState();
+    const doc = registry.getDocument(documentId);
+    if (!doc || !isLadderDocument(doc)) return;
+    const uiStore = useLadderUIStore.getState();
+    const cursor = uiStore.cursorCell;
+    if (!cursor) return;
+
+    const delta = shiftKey ? -1 : 1;
+    const newCol = Math.max(0, Math.min(doc.data.gridConfig.columns - 1, cursor.col + delta));
+    const newCursor = { row: cursor.row, col: newCol };
+    uiStore.setCursorCell(newCursor);
+    uiStore.setSelectionAnchor(newCursor);
+    uiStore.clearSelection();
+  }, [documentId]);
+
   // Handle arrow key navigation — moves cursor, Shift+Arrow extends selection range
   const handleArrowKey = useCallback(
     (direction: 'up' | 'down' | 'left' | 'right', shiftKey: boolean) => {
@@ -209,6 +226,12 @@ export function useLadderKeyboardShortcuts(
         return;
       }
 
+      if (key === 'Tab' && !isModifierPressed) {
+        event.preventDefault();
+        handleTab(shiftKey);
+        return;
+      }
+
       // Arrow keys - navigate cells
       if (key === 'ArrowUp') {
         event.preventDefault();
@@ -255,6 +278,7 @@ export function useLadderKeyboardShortcuts(
       enabled,
       handleEscape,
       handleEnter,
+      handleTab,
       handleArrowKey,
       documentId,
       ladderDoc,

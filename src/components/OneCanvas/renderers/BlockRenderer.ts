@@ -18,6 +18,7 @@ import { Graphics, GraphicsContext, Text, Container, Rectangle, type TextStyle a
 import type {
   Block,
 } from '../types';
+import { LEGACY_MM_PER_PX } from '../canvasUnits';
 import { getSymbolContext, getSymbolSize, getCustomSymbolContext, getCustomSymbolSize, getSymbolContextForBlockType, getSymbolSizeForBlockType } from './symbols';
 
 // ============================================================================
@@ -102,15 +103,16 @@ function resolveSymbolContext(block: Block): GraphicsContext {
 }
 
 function resolveSymbolSize(block: Block): { width: number; height: number } {
-  // Try unified bridge by block type
+  return block.size;
+}
+
+function resolveSymbolGeometrySize(block: Block): { width: number; height: number } {
   const sizeByType = getSymbolSizeForBlockType(block.type);
   if (sizeByType) return sizeByType;
-  // Try by explicit symbolId
   if ('symbolId' in block && block.symbolId) {
     const sizeById = getCustomSymbolSize(block.symbolId);
     if (sizeById) return sizeById;
   }
-  // Fallback to legacy SymbolLibrary
   return getSymbolSize(block.type);
 }
 
@@ -259,6 +261,7 @@ export class BlockRenderer {
     const ctx = resolveSymbolContext(block);
     const symbol = new Graphics(ctx);
     symbol.label = 'symbol';
+    symbol.scale.set(LEGACY_MM_PER_PX, LEGACY_MM_PER_PX);
     container.addChild(symbol);
 
     return {
@@ -271,20 +274,21 @@ export class BlockRenderer {
 
   private _applyTransform(dobj: BlockDisplayObject, block: Block): void {
     const size = resolveSymbolSize(block);
+    const geometrySize = resolveSymbolGeometrySize(block);
     const symbol = dobj.symbol;
 
     // Reset transform
     symbol.position.set(0, 0);
     symbol.rotation = 0;
-    symbol.scale.set(1, 1);
+    symbol.scale.set(LEGACY_MM_PER_PX, LEGACY_MM_PER_PX);
 
     // Apply rotation around center
     const rotation = block.rotation ?? 0;
     if (rotation !== 0) {
-      const cx = size.width / 2;
-      const cy = size.height / 2;
+      const cx = geometrySize.width / 2;
+      const cy = geometrySize.height / 2;
       symbol.pivot.set(cx, cy);
-      symbol.position.set(cx, cy);
+      symbol.position.set(size.width / 2, size.height / 2);
       symbol.rotation = (rotation * Math.PI) / 180;
     } else {
       symbol.pivot.set(0, 0);
@@ -296,14 +300,14 @@ export class BlockRenderer {
       if (flip.horizontal) {
         symbol.scale.x = -1;
         if (rotation === 0) {
-          symbol.pivot.set(size.width, symbol.pivot.y);
+          symbol.pivot.set(geometrySize.width, symbol.pivot.y);
           symbol.position.set(size.width, symbol.position.y);
         }
       }
       if (flip.vertical) {
         symbol.scale.y = -1;
         if (rotation === 0) {
-          symbol.pivot.set(symbol.pivot.x, size.height);
+          symbol.pivot.set(symbol.pivot.x, geometrySize.height);
           symbol.position.set(symbol.position.x, size.height);
         }
       }

@@ -12,6 +12,7 @@
 import type { Position, Block, Wire, Junction, WireEndpoint } from '../types';
 import type { HitTestResult } from '../types';
 import { isPortEndpoint, isFloatingEndpoint, isJunctionEndpoint } from '../types';
+import { LEGACY_MM_PER_PX } from '../canvasUnits';
 import { SpatialIndex } from './SpatialIndex';
 import type { SpatialItem } from './SpatialIndex';
 
@@ -28,9 +29,9 @@ export interface HitTestConfig {
 }
 
 const DEFAULT_HIT_CONFIG: HitTestConfig = {
-  portSnapRadius: 12,
-  wireHitRadius: 8,
-  junctionHitRadius: 8,
+  portSnapRadius: 12 * LEGACY_MM_PER_PX,
+  wireHitRadius: 8 * LEGACY_MM_PER_PX,
+  junctionHitRadius: 8 * LEGACY_MM_PER_PX,
   blockHitRadius: 0, // Blocks use bounds check, not radius
 };
 
@@ -90,7 +91,7 @@ export class HitTester {
       this._config.portSnapRadius,
       this._config.wireHitRadius,
       this._config.junctionHitRadius,
-      20 // minimum search radius
+      20 * LEGACY_MM_PER_PX // minimum search radius
     );
 
     const candidates = this._spatialIndex.queryPoint(worldPos, searchRadius);

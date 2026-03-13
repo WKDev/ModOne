@@ -7,7 +7,15 @@
 import type { CustomSymbolBlock } from '../../types/symbol';
 import type { BlockBehaviorBinding, BlockRuntimeState, BehaviorVisualState } from '../../types/behavior';
 import type { BlockType } from '../../types/circuit';
+import type { RuntimeGridUnit, SerializableGridUnit } from './canvasUnits';
+import {
+  circuitStateToVersionedSerializable,
+  ensureRuntimeGridUnit,
+  normalizeSerializableCircuitState,
+  SCREEN_PX_PER_MM,
+} from './canvasUnits';
 export type { BlockType } from '../../types/circuit';
+export type { RuntimeGridUnit, SerializableGridUnit } from './canvasUnits';
 
 // ============================================================================
 // Block Types
@@ -799,7 +807,7 @@ export interface CircuitState {
   gridSize?: number;
   showGrid?: boolean;
   gridStyle?: 'dots' | 'lines';
-  gridUnit?: 'px' | 'mil' | 'mm';
+  gridUnit?: RuntimeGridUnit;
 }
 
 /** Viewport (pan/zoom) state */
@@ -814,6 +822,7 @@ export interface ViewportState {
 
 /** Serializable version of CircuitState (for JSON) */
 export interface SerializableCircuitState {
+  version?: string;
   components: Record<string, Block>;
   junctions?: Record<string, Junction>;
   wires: Wire[];
@@ -822,7 +831,7 @@ export interface SerializableCircuitState {
   gridSize?: number;
   showGrid?: boolean;
   gridStyle?: 'dots' | 'lines';
-  gridUnit?: 'px' | 'mil' | 'mm';
+  gridUnit?: SerializableGridUnit;
 }
 
 // ============================================================================
@@ -1012,12 +1021,12 @@ export interface GridConfig {
   majorAlpha?: number;
   subdivisions?: number;
   style?: 'dots' | 'lines';
-  /** Physical unit for the `size` value. 'px' (default) | 'mil' | 'mm' */
-  unit?: 'px' | 'mil' | 'mm';
+  /** Physical unit for the `size` value. */
+  unit?: RuntimeGridUnit;
 }
 
 export const DEFAULT_GRID: GridConfig = {
-  size: 4,
+  size: 5,
   unit: 'mm',
   visible: true,
   color: '#cccccc',
@@ -1098,7 +1107,7 @@ export type DirtyFlag =
 /** Pixels per mil (1 mil = 1/1000 inch, 1 inch ≈ 96 CSS px). */
 const PX_PER_MIL = 96 / 1000;
 /** Pixels per millimeter (1 mm = 96/25.4 CSS px ≈ 3.779). */
-const PX_PER_MM = 96 / 25.4;
+const PX_PER_MM = SCREEN_PX_PER_MM;
 
 /**
  * Convert a value from a physical unit to canvas pixels.
@@ -1152,16 +1161,17 @@ export const DEFAULT_SIMULATION_STATE: SimulationState = {
 export function circuitStateToSerializable(
   state: CircuitState
 ): SerializableCircuitState {
+  const serializable = circuitStateToVersionedSerializable(state);
+  if (!state.selection) {
+    return serializable;
+  }
+
   return {
-    components: Object.fromEntries(state.components),
-    junctions: state.junctions.size > 0 ? Object.fromEntries(state.junctions) : undefined,
-    wires: state.wires,
-    metadata: state.metadata,
-    viewport: state.viewport,
-    gridSize: state.selection ? undefined : state.gridSize,
-    showGrid: state.selection ? undefined : state.showGrid,
-    gridStyle: state.selection ? undefined : state.gridStyle,
-    gridUnit: state.selection ? undefined : state.gridUnit,
+    ...serializable,
+    gridSize: undefined,
+    showGrid: undefined,
+    gridStyle: undefined,
+    gridUnit: undefined,
   };
 }
 
@@ -1169,13 +1179,18 @@ export function circuitStateToSerializable(
 export function serializableToCircuitState(
   data: SerializableCircuitState
 ): CircuitState {
+  const normalized = normalizeSerializableCircuitState(data);
   return {
-    components: new Map(Object.entries(data.components)),
-    junctions: data.junctions ? new Map(Object.entries(data.junctions)) : new Map(),
-    wires: data.wires,
-    metadata: data.metadata,
-    viewport: data.viewport,
+    components: new Map(Object.entries(normalized.components)),
+    junctions: normalized.junctions ? new Map(Object.entries(normalized.junctions)) : new Map(),
+    wires: normalized.wires,
+    metadata: normalized.metadata,
+    viewport: normalized.viewport,
     selectedIds: new Set(),
+    gridSize: normalized.gridSize,
+    showGrid: normalized.showGrid,
+    gridStyle: normalized.gridStyle,
+    gridUnit: ensureRuntimeGridUnit(normalized.gridUnit),
   };
 }
 

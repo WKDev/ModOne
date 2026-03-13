@@ -53,9 +53,6 @@ export class EventBridge {
   private _onPointerOut: ((e: FederatedPointerEvent) => void) | null = null;
   private _onContextMenu: ((e: Event) => void) | null = null;
 
-  // Track whether a pointer interaction is active (left button down)
-  private _isPointerActive = false;
-
   /**
    * Initialize the event bridge and attach all listeners.
    */
@@ -150,8 +147,6 @@ export class EventBridge {
       console.debug('[EventBridge] pointerdown', { button, worldPos, screenPos });
     }
 
-    this._isPointerActive = button === 0;
-
     this._controller.handlePointerDown(worldPos, screenPos, button, modifiers);
   }
 
@@ -174,10 +169,6 @@ export class EventBridge {
     const worldPos = this._toWorld(e);
     const screenPos = this._toScreen(e);
     const modifiers = this._extractModifiers(e);
-
-    if (e.button === 0) {
-      this._isPointerActive = false;
-    }
 
     this._controller.handlePointerUp(worldPos, screenPos, e.button, modifiers);
   }

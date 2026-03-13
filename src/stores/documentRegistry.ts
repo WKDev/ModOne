@@ -39,8 +39,18 @@ import {
   isSchematicDocument,
 } from '../types/document';
 import type { SerializableCircuitState } from '../components/OneCanvas/types';
+import {
+  GRID_VERSION,
+  ensureRuntimeGridUnit,
+  normalizeSerializableCircuitState,
+} from '../components/OneCanvas/canvasUnits';
 import type { MultiPageSchematic } from '../components/OneCanvas/utils/multiPageSchematic';
-import type { LadderElement, LadderWire, VerticalLinkEntity } from '../types/ladder';
+import type {
+  LadderElement,
+  HorizontalEdgeEntity,
+  VerticalEdgeEntity,
+} from '../types/ladder';
+import { rebuildLadderTopologyCache } from '../components/LadderEditor/utils/topologyBuilder';
 import type { Scenario, ScenarioExecutionState } from '../types/scenario';
 import {
   broadcastDocumentSync,
@@ -215,6 +225,7 @@ function restoreCanvasFromHistory(snapshot: CanvasHistoryData): Pick<CanvasDocum
 
 function canvasDataToSerializable(data: CanvasDocumentData): SerializableCircuitState {
   return {
+    version: GRID_VERSION,
     components: Object.fromEntries(data.components),
     junctions: data.junctions.size > 0 ? Object.fromEntries(data.junctions) : undefined,
     wires: data.wires.map((wire) => ({
@@ -225,7 +236,7 @@ function canvasDataToSerializable(data: CanvasDocumentData): SerializableCircuit
         ? wire.handles.map((handle) => ({ ...handle, position: { ...handle.position } }))
         : undefined,
     })),
-    metadata: { ...data.metadata },
+    metadata: { ...data.metadata, version: GRID_VERSION },
     viewport: {
       zoom: data.zoom,
       panX: data.pan.x,
@@ -239,9 +250,11 @@ function canvasDataToSerializable(data: CanvasDocumentData): SerializableCircuit
 }
 
 function applySerializableToCanvasData(doc: CanvasDocumentState, circuit: SerializableCircuitState): void {
-  doc.data.components = new Map(Object.entries(circuit.components));
-  doc.data.junctions = circuit.junctions ? new Map(Object.entries(circuit.junctions)) : new Map();
-  doc.data.wires = circuit.wires.map((wire) => ({
+  const normalized = normalizeSerializableCircuitState(circuit);
+
+  doc.data.components = new Map(Object.entries(normalized.components));
+  doc.data.junctions = normalized.junctions ? new Map(Object.entries(normalized.junctions)) : new Map();
+  doc.data.wires = normalized.wires.map((wire) => ({
     ...wire,
     from: { ...wire.from },
     to: { ...wire.to },
@@ -249,18 +262,18 @@ function applySerializableToCanvasData(doc: CanvasDocumentState, circuit: Serial
       ? wire.handles.map((handle) => ({ ...handle, position: { ...handle.position } }))
       : undefined,
   }));
-  doc.data.metadata = { ...circuit.metadata };
-  if (circuit.viewport) {
-    doc.data.zoom = circuit.viewport.zoom;
+  doc.data.metadata = { ...normalized.metadata };
+  if (normalized.viewport) {
+    doc.data.zoom = normalized.viewport.zoom;
     doc.data.pan = {
-      x: circuit.viewport.panX,
-      y: circuit.viewport.panY,
+      x: normalized.viewport.panX,
+      y: normalized.viewport.panY,
     };
   }
-  doc.data.gridSize = circuit.gridSize ?? doc.data.gridSize;
-  doc.data.showGrid = circuit.showGrid ?? doc.data.showGrid;
-  doc.data.gridStyle = circuit.gridStyle ?? doc.data.gridStyle;
-  doc.data.gridUnit = circuit.gridUnit ?? doc.data.gridUnit;
+  doc.data.gridSize = normalized.gridSize ?? doc.data.gridSize;
+  doc.data.showGrid = normalized.showGrid ?? doc.data.showGrid;
+  doc.data.gridStyle = normalized.gridStyle ?? doc.data.gridStyle;
+  doc.data.gridUnit = ensureRuntimeGridUnit(normalized.gridUnit);
 }
 
 /** Create ladder history snapshot */
@@ -270,47 +283,52 @@ function createLadderHistorySnapshot(data: LadderDocumentData): LadderHistoryDat
     elements.push([id, JSON.parse(JSON.stringify(element))]);
   });
 
-  const verticalLinks: Array<[string, VerticalLinkEntity]> = [];
-  data.verticalLinks.forEach((verticalLink, id) => {
-    verticalLinks.push([id, JSON.parse(JSON.stringify(verticalLink))]);
+  const horizontalEdges: Array<[string, HorizontalEdgeEntity]> = [];
+  data.horizontalEdges.forEach((horizontalEdge, id) => {
+    horizontalEdges.push([id, JSON.parse(JSON.stringify(horizontalEdge))]);
+  });
+
+  const verticalEdges: Array<[string, VerticalEdgeEntity]> = [];
+  data.verticalEdges.forEach((verticalEdge, id) => {
+    verticalEdges.push([id, JSON.parse(JSON.stringify(verticalEdge))]);
   });
 
   return {
     elements,
-    verticalLinks,
-    wires: data.wires.map((wire: LadderWire) => ({
-      ...wire,
-      from: { ...wire.from },
-      to: { ...wire.to },
-    })),
+    horizontalEdges,
+    verticalEdges,
     comment: data.comment,
     rungLabels: Array.from(data.rungLabels.entries()),
   };
 }
 
 /** Restore ladder data from history snapshot */
-function restoreLadderFromHistory(snapshot: LadderHistoryData): Pick<LadderDocumentData, 'elements' | 'verticalLinks' | 'wires' | 'comment' | 'rungLabels'> {
+function restoreLadderFromHistory(snapshot: LadderHistoryData): Pick<LadderDocumentData, 'elements' | 'horizontalEdges' | 'verticalEdges' | 'comment' | 'rungLabels' | 'topologyCache'> {
   const elements = new Map<string, LadderElement>();
   snapshot.elements.forEach(([id, element]) => {
     elements.set(id, JSON.parse(JSON.stringify(element)));
   });
 
-  const verticalLinks = new Map<string, VerticalLinkEntity>();
-  (snapshot.verticalLinks ?? []).forEach(([id, verticalLink]) => {
-    verticalLinks.set(id, JSON.parse(JSON.stringify(verticalLink)));
+  const horizontalEdges = new Map<string, HorizontalEdgeEntity>();
+  (snapshot.horizontalEdges ?? []).forEach(([id, horizontalEdge]) => {
+    horizontalEdges.set(id, JSON.parse(JSON.stringify(horizontalEdge)));
   });
 
-  return {
+  const verticalEdges = new Map<string, VerticalEdgeEntity>();
+  (snapshot.verticalEdges ?? []).forEach(([id, verticalEdge]) => {
+    verticalEdges.set(id, JSON.parse(JSON.stringify(verticalEdge)));
+  });
+
+  const restored: Pick<LadderDocumentData, 'elements' | 'horizontalEdges' | 'verticalEdges' | 'comment' | 'rungLabels' | 'topologyCache'> = {
     elements,
-    verticalLinks,
-    wires: snapshot.wires.map((wire: LadderWire) => ({
-      ...wire,
-      from: { ...wire.from },
-      to: { ...wire.to },
-    })),
+    horizontalEdges,
+    verticalEdges,
     comment: snapshot.comment,
     rungLabels: new Map(snapshot.rungLabels ?? []),
+    topologyCache: undefined,
   };
+  rebuildLadderTopologyCache(restored as LadderDocumentData);
+  return restored;
 }
 
 /** Create scenario history snapshot */
@@ -825,9 +843,11 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
               const snapshot = doc.history[doc.historyIndex];
               const restored = restoreLadderFromHistory(snapshot.data);
               doc.data.elements = restored.elements;
-              doc.data.wires = restored.wires;
+              doc.data.horizontalEdges = restored.horizontalEdges;
+              doc.data.verticalEdges = restored.verticalEdges;
               doc.data.comment = restored.comment;
               doc.data.rungLabels = restored.rungLabels;
+              doc.data.topologyCache = restored.topologyCache;
               doc.historyIndex--;
               doc.isDirty = true;
             } else if (isScenarioDocument(doc)) {
@@ -891,9 +911,11 @@ export const useDocumentRegistry = create<DocumentRegistryStore>()(
               if (snapshot) {
                 const restored = restoreLadderFromHistory(snapshot.data);
                 doc.data.elements = restored.elements;
-                doc.data.wires = restored.wires;
+                doc.data.horizontalEdges = restored.horizontalEdges;
+                doc.data.verticalEdges = restored.verticalEdges;
                 doc.data.comment = restored.comment;
                 doc.data.rungLabels = restored.rungLabels;
+                doc.data.topologyCache = restored.topologyCache;
                 doc.isDirty = true;
               }
             } else if (isScenarioDocument(doc)) {

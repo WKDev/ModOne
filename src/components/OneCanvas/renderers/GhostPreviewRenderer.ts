@@ -13,6 +13,8 @@
 
 import { Container, Graphics, Rectangle } from 'pixi.js';
 import type { BlockType } from '../types';
+import { LEGACY_MM_PER_PX } from '../canvasUnits';
+import { getBlockSize } from '../blockDefinitions';
 import { getSymbolContextForBlockType, getSymbolSizeForBlockType } from './symbols/symbolBridge';
 import { getSymbolContext, getSymbolSize } from './symbols';
 
@@ -134,10 +136,11 @@ export class GhostPreviewRenderer {
     const symbol = new Graphics(ctx);
     symbol.label = 'ghost-symbol';
     symbol.tint = GHOST_TINT;
+    symbol.scale.set(LEGACY_MM_PER_PX, LEGACY_MM_PER_PX);
     container.addChild(symbol);
 
     // Set cull area for performance
-    const size = getSymbolSizeForBlockType(blockType) ?? getSymbolSize(blockType as BlockType);
+    const size = getBlockSize(blockType as BlockType);
     container.cullArea = new Rectangle(
       -10,
       -20,
@@ -154,20 +157,21 @@ export class GhostPreviewRenderer {
     const symbol = this._symbol;
     if (!symbol) return;
 
-    const size = getSymbolSizeForBlockType(state.blockType) ?? getSymbolSize(state.blockType as BlockType);
+    const size = getBlockSize(state.blockType as BlockType);
+    const geometrySize = getSymbolSizeForBlockType(state.blockType) ?? getSymbolSize(state.blockType as BlockType);
 
     // Reset transform
     symbol.position.set(0, 0);
     symbol.rotation = 0;
-    symbol.scale.set(1, 1);
+    symbol.scale.set(LEGACY_MM_PER_PX, LEGACY_MM_PER_PX);
     symbol.pivot.set(0, 0);
 
     // Apply rotation around center
     if (state.rotation !== 0) {
-      const cx = size.width / 2;
-      const cy = size.height / 2;
+      const cx = geometrySize.width / 2;
+      const cy = geometrySize.height / 2;
       symbol.pivot.set(cx, cy);
-      symbol.position.set(cx, cy);
+      symbol.position.set(size.width / 2, size.height / 2);
       symbol.rotation = (state.rotation * Math.PI) / 180;
     }
 
@@ -175,14 +179,14 @@ export class GhostPreviewRenderer {
     if (state.flipH) {
       symbol.scale.x = -1;
       if (state.rotation === 0) {
-        symbol.pivot.set(size.width, symbol.pivot.y);
+        symbol.pivot.set(geometrySize.width, symbol.pivot.y);
         symbol.position.set(size.width, symbol.position.y);
       }
     }
     if (state.flipV) {
       symbol.scale.y = -1;
       if (state.rotation === 0) {
-        symbol.pivot.set(symbol.pivot.x, size.height);
+        symbol.pivot.set(symbol.pivot.x, geometrySize.height);
         symbol.position.set(symbol.position.x, size.height);
       }
     }

@@ -16,6 +16,7 @@
  */
 
 import type { Position } from '../types';
+import { GRID_MODULE_MM } from '../canvasUnits';
 
 // ============================================================================
 // Types
@@ -74,7 +75,7 @@ export interface KeyboardShortcutsOptions {
   domElement: HTMLElement;
   /** Shortcut callbacks */
   callbacks: ShortcutCallbacks;
-  /** Grid size for nudge distance (default: 20) */
+  /** Grid size for nudge distance (default: 5mm world step) */
   gridSize?: number;
 }
 
@@ -85,7 +86,7 @@ export interface KeyboardShortcutsOptions {
 export class KeyboardShortcuts {
   private _domElement: HTMLElement | null = null;
   private _callbacks: ShortcutCallbacks | null = null;
-  private _gridSize = 20;
+  private _gridSize = GRID_MODULE_MM;
   private _destroyed = false;
   private _onKeyDown: ((e: KeyboardEvent) => void) | null = null;
 
@@ -99,7 +100,7 @@ export class KeyboardShortcuts {
 
     this._domElement = options.domElement;
     this._callbacks = options.callbacks;
-    this._gridSize = options.gridSize ?? 20;
+    this._gridSize = options.gridSize ?? GRID_MODULE_MM;
 
     this._onKeyDown = this._handleKeyDown.bind(this);
     this._domElement.addEventListener('keydown', this._onKeyDown);
