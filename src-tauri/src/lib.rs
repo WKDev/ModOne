@@ -7,6 +7,7 @@ pub mod commands;
 pub mod error;
 pub mod logging;
 pub mod modbus;
+pub mod network;
 pub mod parser;
 pub mod plc_runtime;
 pub mod project;
@@ -106,6 +107,9 @@ use commands::{
     window_focus_floating, window_list_floating, window_get_floating_info,
     window_minimize_floating, window_maximize_floating, window_floating_exists,
     FloatingWindowState, FloatingWindowRegistry,
+    // Network commands
+    network_add_alias, network_check_ip, network_cleanup_aliases, network_get_active_aliases,
+    network_list_interfaces, network_remove_alias, NetworkState,
 };
 use commands::window::close_all_floating_windows;
 
@@ -190,6 +194,7 @@ pub fn run() {
         .manage(error_logger)
         .manage(floating_window_state)
         .manage(scope_state)
+        .manage(NetworkState::default())
         .setup(|app| {
             log::info!("ModOne application starting...");
             if cfg!(debug_assertions) {
@@ -244,6 +249,16 @@ pub fn run() {
                         log::info!("Main window closing - cleaning up floating windows");
                         if let Some(state) = window.try_state::<FloatingWindowState>() {
                             close_all_floating_windows(window.app_handle(), &state);
+                        }
+                        // Clean up IP aliases (best-effort synchronous via Drop)
+                        if let Some(state) = window.try_state::<NetworkState>() {
+                            let mgr = state.manager.clone();
+                            tokio::spawn(async move {
+                                let warnings = mgr.lock().await.cleanup().await;
+                                for w in &warnings {
+                                    log::warn!("Exit network cleanup: {}", w);
+                                }
+                            });
                         }
                     }
                 }
@@ -454,6 +469,13 @@ pub fn run() {
             symbol_delete,
             symbol_list,
             symbol_list_all,
+            // Network commands
+            network_list_interfaces,
+            network_check_ip,
+            network_add_alias,
+            network_remove_alias,
+            network_get_active_aliases,
+            network_cleanup_aliases,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

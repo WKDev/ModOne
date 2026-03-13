@@ -10,6 +10,7 @@ pub mod layout;
 pub mod logging;
 pub mod menu;
 pub mod modbus;
+pub mod network;
 pub mod parser;
 pub mod project;
 pub mod scenario;
@@ -133,4 +134,10 @@ pub use schematic::{
 // Re-export symbol commands
 pub use symbols::{
     symbol_delete, symbol_list, symbol_list_all, symbol_load, symbol_save,
+};
+
+// Re-export network commands
+pub use network::{
+    network_add_alias, network_check_ip, network_cleanup_aliases, network_get_active_aliases,
+    network_list_interfaces, network_remove_alias, NetworkState,
 };

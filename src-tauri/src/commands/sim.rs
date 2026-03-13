@@ -11,6 +11,7 @@ use crate::commands::canvas_sync::CanvasSyncState;
 use crate::commands::modbus::{
     modbus_start_project_simulation, modbus_stop_project_simulation, ModbusState,
 };
+use crate::commands::network::NetworkState;
 use crate::modbus::ModbusMemory;
 use crate::plc_runtime::{
     resolve_vendor_profile, CanonicalAddress, CanonicalAreaKind,
@@ -159,6 +160,7 @@ pub async fn sim_run(
     app: AppHandle,
     state: State<'_, SimState>,
     modbus_state: State<'_, ModbusState>,
+    network_state: State<'_, NetworkState>,
     project_state: State<'_, SharedProjectManager>,
     canvas_sync_state: State<'_, CanvasSyncState>,
     params: Option<SimRunParams>,
@@ -172,7 +174,7 @@ pub async fn sim_run(
 
     if let Some(project_config) = project_config.as_ref() {
         if project_config.modbus.simulation.enabled {
-            modbus_start_project_simulation(&modbus_state, app.clone(), project_config).await?;
+            modbus_start_project_simulation(&modbus_state, &network_state, app.clone(), project_config).await?;
         }
     }
 
@@ -191,9 +193,10 @@ pub async fn sim_stop(
     app: AppHandle,
     state: State<'_, SimState>,
     modbus_state: State<'_, ModbusState>,
+    network_state: State<'_, NetworkState>,
 ) -> Result<(), String> {
     state.host().stop(&app)?;
-    modbus_stop_project_simulation(&modbus_state).await
+    modbus_stop_project_simulation(&modbus_state, &network_state).await
 }
 
 /// Pause the simulation
@@ -214,9 +217,10 @@ pub async fn sim_reset(
     app: AppHandle,
     state: State<'_, SimState>,
     modbus_state: State<'_, ModbusState>,
+    network_state: State<'_, NetworkState>,
 ) -> Result<(), String> {
     state.host().reset(&app);
-    modbus_stop_project_simulation(&modbus_state).await?;
+    modbus_stop_project_simulation(&modbus_state, &network_state).await?;
     Ok(())
 }
 

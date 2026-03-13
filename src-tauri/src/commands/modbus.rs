@@ -13,6 +13,7 @@ use crate::modbus::{
     list_available_ports, MemoryMapSettings, ModbusMemory, ModbusRtuServer, ModbusTcpServer,
     PortInfo, RtuConfig, RtuDataBits, RtuParity, RtuStopBits, TcpConfig,
 };
+use crate::commands::network::NetworkState;
 use crate::project::{ModbusSimulationTransport, Parity as ProjectParity, ProjectConfig};
 
 /// Managed state for Modbus functionality
@@ -118,6 +119,7 @@ async fn stop_rtu_server_internal(state: &ModbusState) -> Result<(), String> {
 
 pub(crate) async fn modbus_start_project_simulation(
     state: &ModbusState,
+    network_state: &NetworkState,
     app_handle: tauri::AppHandle,
     project_config: &ProjectConfig,
 ) -> Result<(), String> {
@@ -130,6 +132,20 @@ pub(crate) async fn modbus_start_project_simulation(
         .memory
         .reconfigure(&build_project_memory_map(project_config));
     state.memory.set_app_handle(app_handle.clone());
+
+    // If plc_ip is configured, ensure the IP alias is set up
+    let network = &project_config.network;
+    let plc_bind_ip = {
+        let mut net_mgr = network_state.manager.lock().await;
+        net_mgr
+            .ensure_alias(
+                network.plc_ip.as_deref(),
+                network.interface_name.as_deref(),
+                network.subnet_mask.as_deref(),
+            )
+            .await
+            .map_err(|e| e.to_string())?
+    };
 
     match simulation.transport {
         ModbusSimulationTransport::Tcp => {
@@ -156,7 +172,13 @@ pub(crate) async fn modbus_start_project_simulation(
                 );
             }
 
-            let (bind_address, port) = parse_tcp_bind_address(&simulation.address)?;
+            let (mut bind_address, port) = parse_tcp_bind_address(&simulation.address)?;
+
+            // Override bind address with PLC IP if configured
+            if let Some(ref plc_ip) = plc_bind_ip {
+                bind_address = plc_ip.clone();
+            }
+
             let mut server = ModbusTcpServer::new(
                 TcpConfig {
                     bind_address,
@@ -225,7 +247,10 @@ pub(crate) async fn modbus_start_project_simulation(
     }
 }
 
-pub(crate) async fn modbus_stop_project_simulation(state: &ModbusState) -> Result<(), String> {
+pub(crate) async fn modbus_stop_project_simulation(
+    state: &ModbusState,
+    network_state: &NetworkState,
+) -> Result<(), String> {
     match *state.project_owned_transport.lock().await {
         Some(ProjectOwnedTransport::Tcp) => stop_tcp_server_internal(state).await?,
         Some(ProjectOwnedTransport::Rtu) => stop_rtu_server_internal(state).await?,
@@ -233,6 +258,16 @@ pub(crate) async fn modbus_stop_project_simulation(state: &ModbusState) -> Resul
     }
 
     *state.project_owned_transport.lock().await = None;
+
+    // Clean up any IP aliases that were set up for this simulation
+    let warnings = {
+        let mut net_mgr = network_state.manager.lock().await;
+        net_mgr.cleanup().await
+    };
+    for warning in &warnings {
+        log::warn!("Network cleanup: {}", warning);
+    }
+
     Ok(())
 }
 
