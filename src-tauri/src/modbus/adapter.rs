@@ -43,7 +43,7 @@ impl DirtyPublishWindow {
         }
 
         let rule_end = rule.count.saturating_sub(1) as u32;
-        self.start_index <= rule_end && self.end_index <= rule_end
+        self.start_index <= rule_end
     }
 }
 
@@ -613,5 +613,31 @@ mod tests {
                 .unwrap(),
             CanonicalValue::U16(4444)
         );
+    }
+
+    #[test]
+    fn dirty_publish_flushes_rule_when_window_only_partially_overlaps() {
+        let canonical = Arc::new(RwLock::new(CanonicalMemory::new()));
+        canonical
+            .write()
+            .write(
+                CanonicalAddress::new(CanonicalAreaKind::InternalBit, 9),
+                CanonicalValue::Bool(true),
+                CanonicalWriteSource::Simulation,
+            )
+            .unwrap();
+
+        let modbus_memory = Arc::new(ModbusMemory::new(&MemoryMapSettings::default()));
+        let adapter = ModbusAdapter::new(Arc::clone(&canonical), Arc::clone(&modbus_memory), test_policy());
+
+        adapter
+            .publish_dirty_state(&[DirtyPublishWindow {
+                area: CanonicalAreaKind::InternalBit,
+                start_index: 9,
+                end_index: 20,
+            }])
+            .unwrap();
+
+        assert!(modbus_memory.read_coils(9, 1).unwrap()[0]);
     }
 }

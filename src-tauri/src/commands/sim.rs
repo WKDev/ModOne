@@ -562,20 +562,29 @@ pub fn sim_add_watch(
     request: WatchBindingRequest,
 ) -> Result<(), String> {
     let (binding, display_address) = resolve_runtime_binding(Some(&project_state), &request)?;
+    let tracked_display_address = display_address.clone();
     let engine_arc = state.engine();
     let engine_guard = engine_arc.lock();
 
     if let Some(ref engine) = *engine_guard {
         state
             .debugger()
-            .add_watch_binding(binding, display_address, engine.runtime());
+            .add_watch_binding(binding.clone(), display_address, engine.runtime());
+        state
+            .host()
+            .monitoring()
+            .register_binding(binding, tracked_display_address);
         Ok(())
     } else {
         // Add watch without initial value
         let runtime = CanonicalRuntimeFacade::new();
         state
             .debugger()
-            .add_watch_binding(binding, display_address, &runtime);
+            .add_watch_binding(binding.clone(), display_address, &runtime);
+        state
+            .host()
+            .monitoring()
+            .register_binding(binding, tracked_display_address);
         Ok(())
     }
 }
@@ -588,6 +597,7 @@ pub fn sim_remove_watch(
     request: WatchBindingRequest,
 ) -> Result<(), String> {
     let (binding, _) = resolve_runtime_binding(Some(&project_state), &request)?;
+    state.host().monitoring().unregister_binding(&binding);
     state
         .debugger()
         .remove_watch_binding(&binding)
@@ -715,7 +725,7 @@ pub fn ladder_release_force(
     project_state: State<'_, SharedProjectManager>,
     request: WatchBindingRequest,
 ) -> Result<(), String> {
-    let (_, display_address) = resolve_runtime_binding(Some(&project_state), &request)?;
-    state.host().monitoring().release_force(&display_address);
+    let (binding, display_address) = resolve_runtime_binding(Some(&project_state), &request)?;
+    state.host().monitoring().release_force(&display_address, &binding);
     Ok(())
 }

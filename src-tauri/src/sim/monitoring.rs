@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use parking_lot::{Mutex, RwLock};
@@ -18,8 +19,10 @@ const MONITORING_ERROR_EVENT: &str = "ladder:monitoring-error";
 const MONITORING_COALESCE_WINDOW: Duration = Duration::from_millis(5);
 
 pub struct MonitoringService {
-    active: Arc<std::sync::atomic::AtomicBool>,
+    active: Arc<AtomicBool>,
+    refresh_requested: Arc<AtomicBool>,
     forced_devices: Arc<RwLock<HashMap<String, ForcedDeviceValue>>>,
+    tracked_bindings: Arc<RwLock<HashMap<RuntimeBinding, String>>>,
     task: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 
@@ -32,8 +35,10 @@ impl Default for MonitoringService {
 impl MonitoringService {
     pub fn new() -> Self {
         Self {
-            active: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            active: Arc::new(AtomicBool::new(false)),
+            refresh_requested: Arc::new(AtomicBool::new(true)),
             forced_devices: Arc::new(RwLock::new(HashMap::new())),
+            tracked_bindings: Arc::new(RwLock::new(HashMap::new())),
             task: Mutex::new(None),
         }
     }
@@ -49,11 +54,13 @@ impl MonitoringService {
         self.stop();
 
         let active = Arc::clone(&self.active);
+        let refresh_requested = Arc::clone(&self.refresh_requested);
         let forced_devices = Arc::clone(&self.forced_devices);
+        let tracked_bindings = Arc::clone(&self.tracked_bindings);
         let mut rx = runtime.handle().read().bus().subscribe();
         let task = tokio::spawn(async move {
             let mut tracked_values: HashMap<CanonicalAddress, CanonicalValue> = HashMap::new();
-            let mut dirty = false;
+            let mut dirty = true;
             let mut interval = tokio::time::interval(MONITORING_COALESCE_WINDOW);
 
             loop {
@@ -71,7 +78,8 @@ impl MonitoringService {
                         }
                     }
                     _ = interval.tick() => {
-                        if !active.load(std::sync::atomic::Ordering::Relaxed) || !dirty {
+                        let requested = refresh_requested.swap(false, Ordering::SeqCst);
+                        if !active.load(Ordering::Relaxed) || (!dirty && !requested) {
                             continue;
                         }
                         dirty = false;
@@ -80,6 +88,7 @@ impl MonitoringService {
                             &runtime,
                             &debugger,
                             &forced_devices,
+                            &tracked_bindings,
                             &tracked_values,
                             &timer_mgr,
                             &counter_mgr,
@@ -107,25 +116,33 @@ impl MonitoringService {
     }
 
     pub fn set_active(&self, active: bool) {
-        self.active.store(active, std::sync::atomic::Ordering::SeqCst);
+        self.active.store(active, Ordering::SeqCst);
+        if active {
+            self.refresh_requested.store(true, Ordering::SeqCst);
+        }
     }
 
     pub fn is_active(&self) -> bool {
-        self.active.load(std::sync::atomic::Ordering::Relaxed)
+        self.active.load(Ordering::Relaxed)
     }
 
     pub fn force_device(&self, forced: ForcedDeviceValue) {
+        self.register_binding(forced.binding.clone(), forced.display_address.clone());
         self.forced_devices
             .write()
             .insert(forced.display_address.clone(), forced);
+        self.refresh_requested.store(true, Ordering::SeqCst);
     }
 
-    pub fn release_force(&self, display_address: &str) {
+    pub fn release_force(&self, display_address: &str, binding: &RuntimeBinding) {
         self.forced_devices.write().remove(display_address);
+        self.unregister_binding(binding);
+        self.refresh_requested.store(true, Ordering::SeqCst);
     }
 
     pub fn clear_forces(&self) {
         self.forced_devices.write().clear();
+        self.refresh_requested.store(true, Ordering::SeqCst);
     }
 
     pub fn apply_forced_values(&self, runtime: &CanonicalRuntimeFacade) -> Result<(), String> {
@@ -165,6 +182,16 @@ impl MonitoringService {
     pub fn forced_devices(&self) -> Arc<RwLock<HashMap<String, ForcedDeviceValue>>> {
         Arc::clone(&self.forced_devices)
     }
+
+    pub fn register_binding(&self, binding: RuntimeBinding, display_address: String) {
+        self.tracked_bindings.write().insert(binding, display_address);
+        self.refresh_requested.store(true, Ordering::SeqCst);
+    }
+
+    pub fn unregister_binding(&self, binding: &RuntimeBinding) {
+        self.tracked_bindings.write().remove(binding);
+        self.refresh_requested.store(true, Ordering::SeqCst);
+    }
 }
 
 fn track_event(
@@ -188,6 +215,7 @@ fn emit_snapshot(
     runtime: &CanonicalRuntimeFacade,
     debugger: &SimDebugger,
     forced_devices: &RwLock<HashMap<String, ForcedDeviceValue>>,
+    tracked_bindings: &RwLock<HashMap<RuntimeBinding, String>>,
     tracked_values: &HashMap<CanonicalAddress, CanonicalValue>,
     timer_mgr: &TimerManager,
     counter_mgr: &CounterManager,
@@ -203,6 +231,21 @@ fn emit_snapshot(
                 "value": canonical_json_value(value)
             }));
         }
+    }
+
+    for (binding, display_address) in tracked_bindings.read().iter() {
+        let Some(address) = binding.canonical_address() else {
+            continue;
+        };
+        if devices.iter().any(|entry| entry["binding"] == serde_json::to_value(binding).unwrap_or_default()) {
+            continue;
+        }
+        let value = runtime.read(address).map_err(|e| e.to_string())?;
+        devices.push(serde_json::json!({
+            "address": display_address,
+            "binding": binding,
+            "value": canonical_json_value(value)
+        }));
     }
 
     for (address, value) in tracked_values {
