@@ -8,7 +8,8 @@ use tauri::State;
 use super::canvas::ScopeState;
 use super::sim::SimState;
 use crate::canvas::scope_sync::ScopeSampleResult;
-use crate::sim::types::{SimBitDeviceType, SimWordDeviceType};
+use crate::plc_runtime::CanonicalValue;
+use crate::sim::types::RuntimeBinding;
 
 // ============================================================================
 // Scope-Simulation Integration Commands
@@ -81,8 +82,8 @@ pub async fn scope_tick(
             Err(e) => {
                 result.channels_skipped += 1;
                 result.errors.push(format!(
-                    "Error reading {}{}: {}",
-                    mapping.device_type, mapping.address, e
+                    "Error reading {}: {}",
+                    mapping.display_address, e
                 ));
                 continue;
             }
@@ -101,85 +102,15 @@ fn read_device_voltage(
     runtime: &std::sync::Arc<crate::sim::memory::CanonicalRuntimeFacade>,
     mapping: &crate::canvas::scope_sync::ScopeChannelMapping,
 ) -> Result<f32, String> {
-    let device_type = mapping.device_type.to_uppercase();
-
-    // Determine if it's a bit or word device and read accordingly
-    match device_type.as_str() {
-        // Bit devices - output scale voltage when true, 0 when false
-        "P" => {
-            let value = runtime
-                .read_bit(SimBitDeviceType::P, mapping.address)
-                .map_err(|e| e.to_string())?;
-            Ok(if value { mapping.scale } else { 0.0 } + mapping.offset)
-        }
-        "M" => {
-            let value = runtime
-                .read_bit(SimBitDeviceType::M, mapping.address)
-                .map_err(|e| e.to_string())?;
-            Ok(if value { mapping.scale } else { 0.0 } + mapping.offset)
-        }
-        "K" => {
-            let value = runtime
-                .read_bit(SimBitDeviceType::K, mapping.address)
-                .map_err(|e| e.to_string())?;
-            Ok(if value { mapping.scale } else { 0.0 } + mapping.offset)
-        }
-        "F" => {
-            let value = runtime
-                .read_bit(SimBitDeviceType::F, mapping.address)
-                .map_err(|e| e.to_string())?;
-            Ok(if value { mapping.scale } else { 0.0 } + mapping.offset)
-        }
-        "T" => {
-            let value = runtime
-                .read_bit(SimBitDeviceType::T, mapping.address)
-                .map_err(|e| e.to_string())?;
-            Ok(if value { mapping.scale } else { 0.0 } + mapping.offset)
-        }
-        "C" => {
-            let value = runtime
-                .read_bit(SimBitDeviceType::C, mapping.address)
-                .map_err(|e| e.to_string())?;
-            Ok(if value { mapping.scale } else { 0.0 } + mapping.offset)
-        }
-        // Word devices - value * scale + offset
-        "D" => {
-            let value = runtime
-                .read_word(SimWordDeviceType::D, mapping.address)
-                .map_err(|e| e.to_string())?;
-            Ok(value as f32 * mapping.scale + mapping.offset)
-        }
-        "R" => {
-            let value = runtime
-                .read_word(SimWordDeviceType::R, mapping.address)
-                .map_err(|e| e.to_string())?;
-            Ok(value as f32 * mapping.scale + mapping.offset)
-        }
-        "Z" => {
-            let value = runtime
-                .read_word(SimWordDeviceType::Z, mapping.address)
-                .map_err(|e| e.to_string())?;
-            Ok(value as f32 * mapping.scale + mapping.offset)
-        }
-        "N" => {
-            let value = runtime
-                .read_word(SimWordDeviceType::N, mapping.address)
-                .map_err(|e| e.to_string())?;
-            Ok(value as f32 * mapping.scale + mapping.offset)
-        }
-        "TD" => {
-            let value = runtime
-                .read_word(SimWordDeviceType::Td, mapping.address)
-                .map_err(|e| e.to_string())?;
-            Ok(value as f32 * mapping.scale + mapping.offset)
-        }
-        "CD" => {
-            let value = runtime
-                .read_word(SimWordDeviceType::Cd, mapping.address)
-                .map_err(|e| e.to_string())?;
-            Ok(value as f32 * mapping.scale + mapping.offset)
-        }
-        _ => Err(format!("Unknown device type: {}", device_type)),
+    match &mapping.binding {
+        RuntimeBinding::Canonical { address } => match runtime.read(*address).map_err(|e| e.to_string())? {
+            CanonicalValue::Bool(value) => Ok(if value { mapping.scale } else { 0.0 } + mapping.offset),
+            CanonicalValue::U16(value) => Ok(value as f32 * mapping.scale + mapping.offset),
+        },
+        RuntimeBinding::Tag { tag_id } => Err(format!(
+            "Tag binding not implemented yet for scope sampling: {}",
+            tag_id
+        )),
     }
 }
 
@@ -195,8 +126,8 @@ fn read_device_voltage(
 #[tauri::command]
 pub async fn scope_read_device_voltage(
     sim_state: State<'_, SimState>,
-    device_type: String,
-    address: u16,
+    binding: RuntimeBinding,
+    display_address: Option<String>,
     scale: Option<f32>,
     offset: Option<f32>,
 ) -> Result<f32, String> {
@@ -207,19 +138,19 @@ pub async fn scope_read_device_voltage(
         .ok_or("Simulation is not running")?;
 
     let runtime = engine.runtime();
-    let device_upper = device_type.to_uppercase();
     let offset_val = offset.unwrap_or(0.0);
-
-    // Determine default scale based on device type
-    let is_bit_device = matches!(device_upper.as_str(), "P" | "M" | "K" | "F" | "T" | "C");
-    let scale_val = scale.unwrap_or(if is_bit_device { 5.0 } else { 0.001 });
+    let scale_val = scale.unwrap_or(match &binding {
+        RuntimeBinding::Canonical { address } if address.area.is_bit_area() || address.bit_index.is_some() => 5.0,
+        RuntimeBinding::Canonical { .. } => 0.001,
+        RuntimeBinding::Tag { .. } => 1.0,
+    });
 
     // Create temporary mapping for reading
     let mapping = crate::canvas::scope_sync::ScopeChannelMapping {
         scope_id: String::new(),
         channel: 0,
-        device_type,
-        address,
+        binding,
+        display_address: display_address.unwrap_or_default(),
         scale: scale_val,
         offset: offset_val,
         enabled: true,

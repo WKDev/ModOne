@@ -7,6 +7,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
+import type { ResolvedBinding, RuntimeBinding } from '../types/onesim';
 
 // ============================================================================
 // Types
@@ -68,6 +69,10 @@ export interface ScopeChannelMapping {
   scopeId: string;
   /** Channel index (0-based) */
   channel: number;
+  /** Canonical/tag binding */
+  binding?: RuntimeBinding;
+  /** Human-readable display address */
+  displayAddress?: string;
   /** Device type (M, P, K, D, etc.) */
   deviceType: string;
   /** Device address number */
@@ -318,7 +323,19 @@ export const scopeService = {
    */
   async registerMapping(mapping: ScopeChannelMapping): Promise<void> {
     try {
-      await invoke('scope_register_mapping', { mapping });
+      const resolved = mapping.binding
+        ? { binding: mapping.binding, displayAddress: `${mapping.deviceType}${mapping.address}` }
+        : await invoke<ResolvedBinding>('sim_resolve_binding_parts', {
+            family: mapping.deviceType,
+            index: mapping.address,
+          });
+      await invoke('scope_register_mapping', {
+        mapping: {
+          ...mapping,
+          binding: resolved.binding,
+          displayAddress: resolved.displayAddress,
+        },
+      });
     } catch (error) {
       toast.error('Failed to register scope mapping', {
         description: error instanceof Error ? error.message : String(error),
@@ -334,7 +351,22 @@ export const scopeService = {
    */
   async registerMappings(mappings: ScopeChannelMapping[]): Promise<void> {
     try {
-      await invoke('scope_register_mappings', { newMappings: mappings });
+      const newMappings = await Promise.all(
+        mappings.map(async (mapping) => {
+          const resolved = mapping.binding
+            ? { binding: mapping.binding, displayAddress: `${mapping.deviceType}${mapping.address}` }
+            : await invoke<ResolvedBinding>('sim_resolve_binding_parts', {
+                family: mapping.deviceType,
+                index: mapping.address,
+              });
+          return {
+            ...mapping,
+            binding: resolved.binding,
+            displayAddress: resolved.displayAddress,
+          };
+        })
+      );
+      await invoke('scope_register_mappings', { newMappings });
     } catch (error) {
       toast.error('Failed to register scope mappings', {
         description: error instanceof Error ? error.message : String(error),
@@ -431,9 +463,13 @@ export const scopeService = {
     offset?: number
   ): Promise<number> {
     try {
+      const resolved = await invoke<ResolvedBinding>('sim_resolve_binding_parts', {
+        family: deviceType,
+        index: address,
+      });
       return await invoke<number>('scope_read_device_voltage', {
-        deviceType,
-        address,
+        binding: resolved.binding,
+        displayAddress: resolved.displayAddress,
         scale,
         offset,
       });

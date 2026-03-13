@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
+import type { ResolvedBinding, RuntimeBinding } from '../types/onesim';
 
 // ============================================================================
 // Types
@@ -22,6 +23,8 @@ export interface PlcBlockMapping {
   blockId: string;
   /** Type of PLC block */
   blockType: PlcBlockType;
+  /** Canonical/tag binding */
+  binding?: RuntimeBinding;
   /** Device type (M, P, K, etc.) */
   deviceType: string;
   /** Device address number */
@@ -82,6 +85,8 @@ export interface MappingSummary {
   blockId: string;
   /** Block type: "plcOut" or "plcIn" */
   blockType: string;
+  /** Canonical/tag binding */
+  binding: RuntimeBinding;
   /** Device address string (e.g., "M0", "P100") */
   deviceAddress: string;
   /** Optional label */
@@ -217,6 +222,10 @@ export function useCanvasSync(options: UseCanvasSyncOptions = {}): UseCanvasSync
         mapping: {
           blockId: mapping.blockId,
           blockType: mapping.blockType,
+          binding: mapping.binding ?? (await invoke<ResolvedBinding>('sim_resolve_binding_parts', {
+            family: mapping.deviceType,
+            index: mapping.address,
+          })).binding,
           deviceType: mapping.deviceType,
           address: mapping.address,
           normallyOpen: mapping.normallyOpen ?? true,
@@ -237,15 +246,19 @@ export function useCanvasSync(options: UseCanvasSyncOptions = {}): UseCanvasSync
   const registerMappings = useCallback(async (mappingsList: PlcBlockMapping[]): Promise<number> => {
     try {
       setError(null);
-      const mappingsData = mappingsList.map((m) => ({
+      const mappingsData = await Promise.all(mappingsList.map(async (m) => ({
         blockId: m.blockId,
         blockType: m.blockType,
+        binding: m.binding ?? (await invoke<ResolvedBinding>('sim_resolve_binding_parts', {
+          family: m.deviceType,
+          index: m.address,
+        })).binding,
         deviceType: m.deviceType,
         address: m.address,
         normallyOpen: m.normallyOpen ?? true,
         inverted: m.inverted ?? false,
         label: m.label,
-      }));
+      })));
       const count = await invoke<number>('canvas_sync_register_mappings', {
         mappings: mappingsData,
       });

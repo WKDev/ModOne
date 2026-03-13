@@ -9,7 +9,9 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use crate::sim::{CanvasSync, CanonicalRuntimeFacade, PlcBlockMapping, PlcBlockType, PlcInputChange};
+use crate::plc_runtime::{resolve_vendor_profile, VendorAddress};
+use crate::project::{PlcSettings, SharedProjectManager};
+use crate::sim::{CanvasSync, CanonicalRuntimeFacade, PlcBlockMapping, PlcBlockType, PlcInputChange, RuntimeBinding};
 
 // ============================================================================
 // Managed State
@@ -66,9 +68,14 @@ pub struct PlcBlockMappingConfig {
     pub block_id: String,
     /// Type of PLC block: "plcOut" or "plcIn"
     pub block_type: String,
+    /// Canonical binding (preferred over legacy deviceType/address fields).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub binding: Option<RuntimeBinding>,
     /// Device type (M, P, K, etc.)
+    #[serde(default)]
     pub device_type: String,
     /// Device address number
+    #[serde(default)]
     pub address: u16,
     /// For contacts: normally open (true) or normally closed (false)
     #[serde(default = "default_true")]
@@ -84,23 +91,41 @@ fn default_true() -> bool {
     true
 }
 
-impl From<PlcBlockMappingConfig> for PlcBlockMapping {
-    fn from(config: PlcBlockMappingConfig) -> Self {
-        let block_type = match config.block_type.to_lowercase().as_str() {
-            "plcin" | "plc_in" | "input" => PlcBlockType::PlcIn,
-            _ => PlcBlockType::PlcOut,
-        };
+fn active_plc_settings(project_state: &State<'_, SharedProjectManager>) -> Result<PlcSettings, String> {
+    let manager = project_state
+        .lock()
+        .map_err(|e| format!("Failed to acquire project manager lock: {}", e))?;
 
-        PlcBlockMapping {
-            block_id: config.block_id,
-            block_type,
-            device_type: config.device_type,
-            address: config.address,
-            normally_open: config.normally_open,
-            inverted: config.inverted,
-            label: config.label,
-        }
+    Ok(manager
+        .get_current_project()
+        .map(|project| project.config.plc.clone())
+        .unwrap_or_default())
+}
+
+fn resolve_binding(
+    project_state: &State<'_, SharedProjectManager>,
+    config: &PlcBlockMappingConfig,
+) -> Result<(RuntimeBinding, String), String> {
+    if let Some(binding) = config.binding.clone() {
+        let display = if !config.device_type.is_empty() {
+            format!("{}{}", config.device_type.to_uppercase(), config.address)
+        } else {
+            format!("{binding:?}")
+        };
+        return Ok((binding, display));
     }
+
+    let plc_settings = active_plc_settings(project_state)?;
+    let profile = resolve_vendor_profile(&plc_settings).map_err(|e| e.to_string())?;
+    let vendor_address = VendorAddress::new(config.device_type.to_uppercase(), config.address as u32);
+    profile
+        .validate_address(&vendor_address)
+        .map_err(|e| e.to_string())?;
+    let canonical = profile.to_canonical(&vendor_address).map_err(|e| e.to_string())?;
+    let display = profile
+        .format_address(&vendor_address)
+        .unwrap_or_else(|_| format!("{}{}", config.device_type.to_uppercase(), config.address));
+    Ok((RuntimeBinding::canonical(canonical), display))
 }
 
 /// Canvas sync status information
@@ -129,6 +154,8 @@ pub struct MappingSummary {
     pub block_id: String,
     /// Block type: "plcOut" or "plcIn"
     pub block_type: String,
+    /// Canonical or tag binding
+    pub binding: RuntimeBinding,
     /// Device address string (e.g., "M0", "P100")
     pub device_address: String,
     /// Optional label
@@ -190,13 +217,26 @@ pub fn canvas_sync_get_status(state: State<'_, CanvasSyncState>) -> CanvasSyncSt
 pub fn canvas_sync_register_mapping(
     mapping: PlcBlockMappingConfig,
     state: State<'_, CanvasSyncState>,
+    project_state: State<'_, SharedProjectManager>,
 ) -> Result<(), String> {
-    let plc_mapping: PlcBlockMapping = mapping.into();
+    let block_type = match mapping.block_type.to_lowercase().as_str() {
+        "plcin" | "plc_in" | "input" => PlcBlockType::PlcIn,
+        _ => PlcBlockType::PlcOut,
+    };
+    let (binding, display_address) = resolve_binding(&project_state, &mapping)?;
+    let plc_mapping = PlcBlockMapping {
+        block_id: mapping.block_id,
+        block_type,
+        binding,
+        display_address,
+        normally_open: mapping.normally_open,
+        inverted: mapping.inverted,
+        label: mapping.label,
+    };
     log::debug!(
-        "Registering PLC block mapping: {} -> {}{}",
+        "Registering PLC block mapping: {} -> {}",
         plc_mapping.block_id,
-        plc_mapping.device_type,
-        plc_mapping.address
+        plc_mapping.display_address
     );
     state.sync.register_mapping(plc_mapping);
     Ok(())
@@ -207,10 +247,12 @@ pub fn canvas_sync_register_mapping(
 pub fn canvas_sync_register_mappings(
     mappings: Vec<PlcBlockMappingConfig>,
     state: State<'_, CanvasSyncState>,
+    project_state: State<'_, SharedProjectManager>,
 ) -> Result<usize, String> {
     let count = mappings.len();
-    let plc_mappings: Vec<PlcBlockMapping> = mappings.into_iter().map(Into::into).collect();
-    state.sync.register_mappings(plc_mappings);
+    for mapping in mappings {
+        canvas_sync_register_mapping(mapping, state.clone(), project_state.clone())?;
+    }
     log::info!("Registered {} PLC block mappings", count);
     Ok(count)
 }
@@ -247,7 +289,8 @@ pub fn canvas_sync_get_mappings(state: State<'_, CanvasSyncState>) -> Vec<Mappin
                 PlcBlockType::PlcOut => "plcOut".to_string(),
                 PlcBlockType::PlcIn => "plcIn".to_string(),
             },
-            device_address: format!("{}{}", m.device_type, m.address),
+            binding: m.binding,
+            device_address: m.display_address,
             label: m.label,
         })
         .collect()

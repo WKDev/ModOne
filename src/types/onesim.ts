@@ -17,6 +17,37 @@ export type StepType = 'network' | 'scan';
 /** Breakpoint types */
 export type BreakpointType = 'network' | 'device' | 'condition' | 'scanCount';
 
+export type CanonicalAreaKind =
+  | 'InputBit'
+  | 'OutputBit'
+  | 'InternalBit'
+  | 'RetentiveBit'
+  | 'SpecialBit'
+  | 'DataWord'
+  | 'RetentiveWord'
+  | 'IndexWord'
+  | 'TimerDoneBit'
+  | 'TimerValueWord'
+  | 'CounterDoneBit'
+  | 'CounterValueWord'
+  | 'SystemBit'
+  | 'SystemWord';
+
+export interface CanonicalAddress {
+  area: CanonicalAreaKind;
+  index: number;
+  bitIndex?: number;
+}
+
+export type RuntimeBinding =
+  | { kind: 'canonical'; address: CanonicalAddress }
+  | { kind: 'tag'; tagId: string };
+
+export interface ResolvedBinding {
+  binding: RuntimeBinding;
+  displayAddress: string;
+}
+
 // ============================================================================
 // Timing & Stats Types
 // ============================================================================
@@ -59,6 +90,8 @@ export interface BreakpointHit {
   networkId?: number;
   /** Device address (for device breakpoints) */
   address?: string;
+  /** Canonical/tag binding (for device breakpoints) */
+  binding?: RuntimeBinding;
   /** Old value (for device breakpoints) */
   oldValue?: unknown;
   /** New value (for device breakpoints) */
@@ -81,6 +114,8 @@ export interface Breakpoint {
   networkId?: number;
   /** Device address (for device breakpoints) */
   deviceAddress?: string;
+  /** Canonical/tag binding (for device breakpoints) */
+  deviceBinding?: RuntimeBinding;
   /** Condition expression (for condition breakpoints) */
   condition?: string;
   /** Target scan count (for scan count breakpoints) */
@@ -103,6 +138,8 @@ export interface ValueHistoryEntry {
 
 /** Watch variable information */
 export interface WatchVariable {
+  /** Canonical/tag binding */
+  binding: RuntimeBinding;
   /** Device address */
   address: string;
   /** Current value */

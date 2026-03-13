@@ -12,7 +12,7 @@ use tauri::Emitter;
 use thiserror::Error;
 
 use super::memory::CanonicalRuntimeFacade;
-use super::types::SimBitDeviceType;
+use super::types::RuntimeBinding;
 
 // ============================================================================
 // Error Types
@@ -63,10 +63,10 @@ pub struct PlcBlockMapping {
     pub block_id: String,
     /// Type of PLC block
     pub block_type: PlcBlockType,
-    /// Device type (M, P, K, etc.)
-    pub device_type: String,
-    /// Device address number
-    pub address: u16,
+    /// Canonical or tag binding for this PLC block.
+    pub binding: RuntimeBinding,
+    /// Human-readable display address.
+    pub display_address: String,
     /// For contacts: normally open (true) or normally closed (false)
     #[serde(default = "default_normally_open")]
     pub normally_open: bool,
@@ -84,12 +84,16 @@ fn default_normally_open() -> bool {
 
 impl PlcBlockMapping {
     /// Create a new PLC output mapping
-    pub fn new_plc_out(block_id: impl Into<String>, device_type: impl Into<String>, address: u16) -> Self {
+    pub fn new_plc_out(
+        block_id: impl Into<String>,
+        binding: RuntimeBinding,
+        display_address: impl Into<String>,
+    ) -> Self {
         Self {
             block_id: block_id.into(),
             block_type: PlcBlockType::PlcOut,
-            device_type: device_type.into(),
-            address,
+            binding,
+            display_address: display_address.into(),
             normally_open: true,
             inverted: false,
             label: None,
@@ -97,12 +101,16 @@ impl PlcBlockMapping {
     }
 
     /// Create a new PLC input mapping
-    pub fn new_plc_in(block_id: impl Into<String>, device_type: impl Into<String>, address: u16) -> Self {
+    pub fn new_plc_in(
+        block_id: impl Into<String>,
+        binding: RuntimeBinding,
+        display_address: impl Into<String>,
+    ) -> Self {
         Self {
             block_id: block_id.into(),
             block_type: PlcBlockType::PlcIn,
-            device_type: device_type.into(),
-            address,
+            binding,
+            display_address: display_address.into(),
             normally_open: true,
             inverted: false,
             label: None,
@@ -322,11 +330,16 @@ impl CanvasSync {
 
     /// Read device state from memory based on mapping
     fn read_device_state(&self, mapping: &PlcBlockMapping) -> CanvasSyncResult<bool> {
-        let device_type = self.parse_device_type(&mapping.device_type)?;
-
-        self.runtime
-            .read_bit(device_type, mapping.address)
-            .map_err(|e| CanvasSyncError::RuntimeMemoryError(e.to_string()))
+        match &mapping.binding {
+            RuntimeBinding::Canonical { address } => self
+                .runtime
+                .read_bool(*address)
+                .map_err(|e| CanvasSyncError::RuntimeMemoryError(e.to_string())),
+            RuntimeBinding::Tag { tag_id } => Err(CanvasSyncError::InvalidAddress(format!(
+                "Tag binding not implemented yet for canvas sync: {}",
+                tag_id
+            ))),
+        }
     }
 
     /// Apply normally_open and inverted logic to output state
@@ -416,30 +429,19 @@ impl CanvasSync {
 
     /// Write device state to memory based on mapping
     fn write_device_state(&self, mapping: &PlcBlockMapping, state: bool) -> CanvasSyncResult<()> {
-        let device_type = self.parse_device_type(&mapping.device_type)?;
-
-        // P relays can be written for input simulation
-        self.runtime
-            .write_bit(device_type, mapping.address, state)
-            .map_err(|e| CanvasSyncError::RuntimeMemoryError(e.to_string()))
-    }
-
-    // ========================================================================
-    // Device Type Parsing
-    // ========================================================================
-
-    /// Parse device type string to SimBitDeviceType
-    fn parse_device_type(&self, device_type: &str) -> CanvasSyncResult<SimBitDeviceType> {
-        match device_type.to_uppercase().as_str() {
-            "P" => Ok(SimBitDeviceType::P),
-            "M" => Ok(SimBitDeviceType::M),
-            "K" => Ok(SimBitDeviceType::K),
-            "F" => Ok(SimBitDeviceType::F),
-            "T" => Ok(SimBitDeviceType::T),
-            "C" => Ok(SimBitDeviceType::C),
-            _ => Err(CanvasSyncError::InvalidAddress(
-                format!("Unknown device type: {}", device_type)
-            )),
+        match &mapping.binding {
+            RuntimeBinding::Canonical { address } => self
+                .runtime
+                .write_bool(
+                    *address,
+                    state,
+                    crate::plc_runtime::CanonicalWriteSource::Simulation,
+                )
+                .map_err(|e| CanvasSyncError::RuntimeMemoryError(e.to_string())),
+            RuntimeBinding::Tag { tag_id } => Err(CanvasSyncError::InvalidAddress(format!(
+                "Tag binding not implemented yet for canvas sync: {}",
+                tag_id
+            ))),
         }
     }
 
@@ -504,6 +506,11 @@ impl CanvasSync {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::plc_runtime::{CanonicalAddress, CanonicalAreaKind};
+
+    fn bit_binding(area: CanonicalAreaKind, index: u32) -> RuntimeBinding {
+        RuntimeBinding::canonical(CanonicalAddress::new(area, index))
+    }
 
     fn create_test_sync() -> CanvasSync {
         let runtime = Arc::new(CanonicalRuntimeFacade::new());
@@ -518,7 +525,7 @@ mod tests {
     fn test_register_mapping() {
         let sync = create_test_sync();
 
-        let mapping = PlcBlockMapping::new_plc_out("block1", "M", 0);
+        let mapping = PlcBlockMapping::new_plc_out("block1", bit_binding(CanonicalAreaKind::InternalBit, 0), "M0");
         sync.register_mapping(mapping.clone());
 
         assert_eq!(sync.mapping_count(), 1);
@@ -529,22 +536,35 @@ mod tests {
     fn test_register_mapping_replaces_existing() {
         let sync = create_test_sync();
 
-        let mapping1 = PlcBlockMapping::new_plc_out("block1", "M", 0);
-        let mapping2 = PlcBlockMapping::new_plc_out("block1", "M", 100);
+        let mapping1 =
+            PlcBlockMapping::new_plc_out("block1", bit_binding(CanonicalAreaKind::InternalBit, 0), "M0");
+        let mapping2 = PlcBlockMapping::new_plc_out(
+            "block1",
+            bit_binding(CanonicalAreaKind::InternalBit, 100),
+            "M100",
+        );
 
         sync.register_mapping(mapping1);
         sync.register_mapping(mapping2);
 
         assert_eq!(sync.mapping_count(), 1);
-        assert_eq!(sync.get_mapping("block1").unwrap().address, 100);
+        assert_eq!(sync.get_mapping("block1").unwrap().display_address, "M100");
     }
 
     #[test]
     fn test_remove_mapping() {
         let sync = create_test_sync();
 
-        sync.register_mapping(PlcBlockMapping::new_plc_out("block1", "M", 0));
-        sync.register_mapping(PlcBlockMapping::new_plc_out("block2", "M", 1));
+        sync.register_mapping(PlcBlockMapping::new_plc_out(
+            "block1",
+            bit_binding(CanonicalAreaKind::InternalBit, 0),
+            "M0",
+        ));
+        sync.register_mapping(PlcBlockMapping::new_plc_out(
+            "block2",
+            bit_binding(CanonicalAreaKind::InternalBit, 1),
+            "M1",
+        ));
 
         assert_eq!(sync.mapping_count(), 2);
 
@@ -559,8 +579,16 @@ mod tests {
     fn test_clear_mappings() {
         let sync = create_test_sync();
 
-        sync.register_mapping(PlcBlockMapping::new_plc_out("block1", "M", 0));
-        sync.register_mapping(PlcBlockMapping::new_plc_out("block2", "M", 1));
+        sync.register_mapping(PlcBlockMapping::new_plc_out(
+            "block1",
+            bit_binding(CanonicalAreaKind::InternalBit, 0),
+            "M0",
+        ));
+        sync.register_mapping(PlcBlockMapping::new_plc_out(
+            "block2",
+            bit_binding(CanonicalAreaKind::InternalBit, 1),
+            "M1",
+        ));
 
         sync.clear_mappings();
 
@@ -577,9 +605,16 @@ mod tests {
         let sync = CanvasSync::new(Arc::clone(&runtime));
 
         // Set M0 to true
-        runtime.write_bit(SimBitDeviceType::M, 0, true).unwrap();
+        runtime
+            .write_bool(
+                CanonicalAddress::new(CanonicalAreaKind::InternalBit, 0),
+                true,
+                crate::plc_runtime::CanonicalWriteSource::Simulation,
+            )
+            .unwrap();
 
-        let mapping = PlcBlockMapping::new_plc_out("block1", "M", 0);
+        let mapping =
+            PlcBlockMapping::new_plc_out("block1", bit_binding(CanonicalAreaKind::InternalBit, 0), "M0");
         let state = sync.read_device_state(&mapping).unwrap();
 
         assert!(state);
@@ -589,7 +624,11 @@ mod tests {
     fn test_apply_output_logic_normally_open() {
         let sync = create_test_sync();
 
-        let mapping = PlcBlockMapping::new_plc_out("block1", "M", 0)
+        let mapping = PlcBlockMapping::new_plc_out(
+            "block1",
+            bit_binding(CanonicalAreaKind::InternalBit, 0),
+            "M0",
+        )
             .with_normally_open(true);
 
         assert!(sync.apply_output_logic(true, &mapping));
@@ -600,7 +639,11 @@ mod tests {
     fn test_apply_output_logic_normally_closed() {
         let sync = create_test_sync();
 
-        let mapping = PlcBlockMapping::new_plc_out("block1", "M", 0)
+        let mapping = PlcBlockMapping::new_plc_out(
+            "block1",
+            bit_binding(CanonicalAreaKind::InternalBit, 0),
+            "M0",
+        )
             .with_normally_open(false);
 
         // NC contact: output is inverted
@@ -612,7 +655,11 @@ mod tests {
     fn test_apply_output_logic_inverted() {
         let sync = create_test_sync();
 
-        let mapping = PlcBlockMapping::new_plc_out("block1", "M", 0)
+        let mapping = PlcBlockMapping::new_plc_out(
+            "block1",
+            bit_binding(CanonicalAreaKind::InternalBit, 0),
+            "M0",
+        )
             .with_inverted(true);
 
         assert!(!sync.apply_output_logic(true, &mapping));
@@ -623,7 +670,11 @@ mod tests {
     fn test_apply_output_logic_nc_and_inverted() {
         let sync = create_test_sync();
 
-        let mapping = PlcBlockMapping::new_plc_out("block1", "M", 0)
+        let mapping = PlcBlockMapping::new_plc_out(
+            "block1",
+            bit_binding(CanonicalAreaKind::InternalBit, 0),
+            "M0",
+        )
             .with_normally_open(false)
             .with_inverted(true);
 
@@ -641,18 +692,23 @@ mod tests {
         let runtime = Arc::new(CanonicalRuntimeFacade::new());
         let sync = CanvasSync::new(Arc::clone(&runtime));
 
-        let mapping = PlcBlockMapping::new_plc_in("sensor1", "P", 0);
+        let mapping =
+            PlcBlockMapping::new_plc_in("sensor1", bit_binding(CanonicalAreaKind::InputBit, 0), "P0");
         sync.register_mapping(mapping);
 
         // Handle input change
         sync.handle_plc_input_change("sensor1", true).unwrap();
 
         // Verify P0 is set
-        assert!(runtime.read_bit(SimBitDeviceType::P, 0).unwrap());
+        assert!(runtime
+            .read_bool(CanonicalAddress::new(CanonicalAreaKind::InputBit, 0))
+            .unwrap());
 
         // Handle input change to false
         sync.handle_plc_input_change("sensor1", false).unwrap();
-        assert!(!runtime.read_bit(SimBitDeviceType::P, 0).unwrap());
+        assert!(!runtime
+            .read_bool(CanonicalAddress::new(CanonicalAreaKind::InputBit, 0))
+            .unwrap());
     }
 
     #[test]
@@ -660,16 +716,24 @@ mod tests {
         let runtime = Arc::new(CanonicalRuntimeFacade::new());
         let sync = CanvasSync::new(Arc::clone(&runtime));
 
-        let mapping = PlcBlockMapping::new_plc_in("sensor1", "P", 0)
+        let mapping = PlcBlockMapping::new_plc_in(
+            "sensor1",
+            bit_binding(CanonicalAreaKind::InputBit, 0),
+            "P0",
+        )
             .with_inverted(true);
         sync.register_mapping(mapping);
 
         // Handle input change with inversion
         sync.handle_plc_input_change("sensor1", true).unwrap();
-        assert!(!runtime.read_bit(SimBitDeviceType::P, 0).unwrap());
+        assert!(!runtime
+            .read_bool(CanonicalAddress::new(CanonicalAreaKind::InputBit, 0))
+            .unwrap());
 
         sync.handle_plc_input_change("sensor1", false).unwrap();
-        assert!(runtime.read_bit(SimBitDeviceType::P, 0).unwrap());
+        assert!(runtime
+            .read_bool(CanonicalAddress::new(CanonicalAreaKind::InputBit, 0))
+            .unwrap());
     }
 
     #[test]
@@ -685,36 +749,12 @@ mod tests {
         let sync = create_test_sync();
 
         // Register as PlcOut, not PlcIn
-        let mapping = PlcBlockMapping::new_plc_out("block1", "M", 0);
+        let mapping =
+            PlcBlockMapping::new_plc_out("block1", bit_binding(CanonicalAreaKind::InternalBit, 0), "M0");
         sync.register_mapping(mapping);
 
         let result = sync.handle_plc_input_change("block1", true);
         assert!(matches!(result, Err(CanvasSyncError::MappingNotFound(_))));
-    }
-
-    // ========================================================================
-    // Device Type Parsing Tests
-    // ========================================================================
-
-    #[test]
-    fn test_parse_device_type() {
-        let sync = create_test_sync();
-
-        assert_eq!(sync.parse_device_type("M").unwrap(), SimBitDeviceType::M);
-        assert_eq!(sync.parse_device_type("m").unwrap(), SimBitDeviceType::M);
-        assert_eq!(sync.parse_device_type("P").unwrap(), SimBitDeviceType::P);
-        assert_eq!(sync.parse_device_type("K").unwrap(), SimBitDeviceType::K);
-        assert_eq!(sync.parse_device_type("T").unwrap(), SimBitDeviceType::T);
-        assert_eq!(sync.parse_device_type("C").unwrap(), SimBitDeviceType::C);
-        assert_eq!(sync.parse_device_type("F").unwrap(), SimBitDeviceType::F);
-    }
-
-    #[test]
-    fn test_parse_device_type_invalid() {
-        let sync = create_test_sync();
-
-        let result = sync.parse_device_type("X");
-        assert!(matches!(result, Err(CanvasSyncError::InvalidAddress(_))));
     }
 
     // ========================================================================
@@ -730,7 +770,11 @@ mod tests {
         assert_eq!(sync.input_change_count(), 0);
 
         // Register and trigger input change
-        sync.register_mapping(PlcBlockMapping::new_plc_in("sensor1", "P", 0));
+        sync.register_mapping(PlcBlockMapping::new_plc_in(
+            "sensor1",
+            bit_binding(CanonicalAreaKind::InputBit, 0),
+            "P0",
+        ));
         sync.handle_plc_input_change("sensor1", true).unwrap();
 
         assert_eq!(sync.input_change_count(), 1);
@@ -745,15 +789,18 @@ mod tests {
 
     #[test]
     fn test_mapping_builder() {
-        let mapping = PlcBlockMapping::new_plc_out("led1", "M", 100)
+        let mapping = PlcBlockMapping::new_plc_out(
+            "led1",
+            bit_binding(CanonicalAreaKind::InternalBit, 100),
+            "M100",
+        )
             .with_normally_open(false)
             .with_inverted(true)
             .with_label("Status LED");
 
         assert_eq!(mapping.block_id, "led1");
         assert_eq!(mapping.block_type, PlcBlockType::PlcOut);
-        assert_eq!(mapping.device_type, "M");
-        assert_eq!(mapping.address, 100);
+        assert_eq!(mapping.display_address, "M100");
         assert!(!mapping.normally_open);
         assert!(mapping.inverted);
         assert_eq!(mapping.label, Some("Status LED".to_string()));

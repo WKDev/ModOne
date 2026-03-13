@@ -29,7 +29,7 @@ use crate::sim::{
     timer::TimerManager,
     types::{
         Breakpoint, MemorySnapshot, ScanCycleInfo, SimulationConfig, SimulationStatus,
-        WatchVariable,
+        RuntimeBinding, WatchVariable,
     },
 };
 
@@ -129,6 +129,24 @@ pub enum DeviceValue {
     /// Word value (16-bit unsigned)
     #[serde(rename = "word")]
     Word { value: u16 },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WatchBindingRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub binding: Option<RuntimeBinding>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub address: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_address: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResolvedBinding {
+    pub binding: RuntimeBinding,
+    pub display_address: String,
 }
 
 /// Simulation run parameters
@@ -541,6 +559,58 @@ fn resolve_sim_address(
     resolve_sim_address_for_settings(&plc_settings, address)
 }
 
+fn resolve_runtime_binding(
+    project_state: Option<&State<'_, SharedProjectManager>>,
+    request: &WatchBindingRequest,
+) -> Result<(RuntimeBinding, String), String> {
+    if let Some(binding) = request.binding.clone() {
+        let display = request
+            .display_address
+            .clone()
+            .or_else(|| request.address.clone())
+            .unwrap_or_else(|| format!("{binding:?}"));
+        return Ok((binding, display));
+    }
+
+    let address = request
+        .address
+        .as_deref()
+        .ok_or_else(|| "Watch/breakpoint request must include binding or address".to_string())?;
+    let (normalized, canonical) = resolve_sim_address(project_state, address)?;
+    Ok((RuntimeBinding::canonical(canonical), normalized))
+}
+
+#[tauri::command]
+pub fn sim_resolve_binding(
+    project_state: State<'_, SharedProjectManager>,
+    address: String,
+) -> Result<ResolvedBinding, String> {
+    let (display_address, canonical) = resolve_sim_address(Some(&project_state), &address)?;
+    Ok(ResolvedBinding {
+        binding: RuntimeBinding::canonical(canonical),
+        display_address,
+    })
+}
+
+#[tauri::command]
+pub fn sim_resolve_binding_parts(
+    project_state: State<'_, SharedProjectManager>,
+    family: String,
+    index: u32,
+) -> Result<ResolvedBinding, String> {
+    let plc_settings = active_plc_settings(Some(&project_state))?;
+    let profile = resolve_vendor_profile(&plc_settings).map_err(|e| e.to_string())?;
+    let vendor_address = VendorAddress::new(family.to_uppercase(), index);
+    let display_address = profile
+        .format_address(&vendor_address)
+        .unwrap_or_else(|_| format!("{}{}", family.to_uppercase(), index));
+    let canonical = profile.to_canonical(&vendor_address).map_err(|e| e.to_string())?;
+    Ok(ResolvedBinding {
+        binding: RuntimeBinding::canonical(canonical),
+        display_address,
+    })
+}
+
 fn resolve_sim_address_for_settings(
     plc_settings: &PlcSettings,
     address: &str,
@@ -632,6 +702,7 @@ pub fn sim_write_device(
 
     let runtime = engine.runtime();
     let (normalized_address, canonical) = resolve_sim_address(Some(&project_state), &address)?;
+    let binding = RuntimeBinding::canonical(canonical);
 
     // Get old value for change event
     let old_value = read_canonical_device(runtime, canonical)?;
@@ -642,6 +713,7 @@ pub fn sim_write_device(
         SIM_DEVICE_CHANGE_EVENT,
         serde_json::json!({
             "address": normalized_address,
+            "binding": binding,
             "oldValue": old_value,
             "newValue": value
         }),
@@ -650,6 +722,7 @@ pub fn sim_write_device(
     // Check device breakpoints
     let debugger = state.debugger();
     if let Some(hit) = debugger.check_device_change(
+        &binding,
         &normalized_address,
         serde_json::to_value(&old_value).unwrap_or_default(),
         serde_json::to_value(&value).unwrap_or_default(),
@@ -769,8 +842,19 @@ pub fn sim_get_memory_snapshot(state: State<'_, SimState>) -> Result<MemorySnaps
 #[tauri::command]
 pub fn sim_add_breakpoint(
     state: State<'_, SimState>,
+    project_state: State<'_, SharedProjectManager>,
     breakpoint: Breakpoint,
 ) -> Result<String, String> {
+    let mut breakpoint = breakpoint;
+    if breakpoint.breakpoint_type == crate::sim::types::BreakpointType::Device
+        && breakpoint.device_binding.is_none()
+    {
+        if let Some(address) = breakpoint.device_address.as_deref() {
+            let (_, canonical) = resolve_sim_address(Some(&project_state), address)?;
+            breakpoint.device_binding = Some(RuntimeBinding::canonical(canonical));
+        }
+    }
+
     let id = state.debugger.add_breakpoint(breakpoint);
     Ok(id)
 }
@@ -806,27 +890,38 @@ pub fn sim_get_breakpoints(state: State<'_, SimState>) -> Result<Vec<Breakpoint>
 
 /// Add a watch variable
 #[tauri::command]
-pub fn sim_add_watch(state: State<'_, SimState>, address: String) -> Result<(), String> {
+pub fn sim_add_watch(
+    state: State<'_, SimState>,
+    project_state: State<'_, SharedProjectManager>,
+    request: WatchBindingRequest,
+) -> Result<(), String> {
+    let (binding, display_address) = resolve_runtime_binding(Some(&project_state), &request)?;
     let engine_guard = state.engine.lock();
 
     if let Some(ref engine) = *engine_guard {
-        state.debugger.add_watch(&address, engine.runtime());
+        state
+            .debugger
+            .add_watch_binding(binding, display_address, engine.runtime());
         Ok(())
     } else {
         // Add watch without initial value
         let runtime = CanonicalRuntimeFacade::new();
-        state.debugger.add_watch(&address, &runtime);
+        state
+            .debugger
+            .add_watch_binding(binding, display_address, &runtime);
         Ok(())
     }
 }
 
 /// Remove a watch variable
 #[tauri::command]
-pub fn sim_remove_watch(state: State<'_, SimState>, address: String) -> Result<(), String> {
-    state
-        .debugger
-        .remove_watch(&address)
-        .map_err(|e| e.to_string())
+pub fn sim_remove_watch(
+    state: State<'_, SimState>,
+    project_state: State<'_, SharedProjectManager>,
+    request: WatchBindingRequest,
+) -> Result<(), String> {
+    let (binding, _) = resolve_runtime_binding(Some(&project_state), &request)?;
+    state.debugger.remove_watch_binding(&binding).map_err(|e| e.to_string())
 }
 
 /// Get all watch variables

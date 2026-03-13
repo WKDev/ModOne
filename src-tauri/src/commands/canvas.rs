@@ -12,6 +12,7 @@ use tauri::State;
 
 use crate::canvas::scope::{ScopeDisplayData, ScopeEngine, ScopeSettings};
 use crate::canvas::scope_sync::ScopeChannelMapping;
+use crate::project::SharedProjectManager;
 
 // ============================================================================
 // Scope State Management
@@ -495,9 +496,13 @@ pub async fn scope_exists(
 /// * `mapping` - The channel mapping configuration
 #[tauri::command]
 pub async fn scope_register_mapping(
-    mapping: ScopeChannelMapping,
+    mut mapping: ScopeChannelMapping,
     state: State<'_, ScopeState>,
+    _project_state: State<'_, SharedProjectManager>,
 ) -> Result<(), String> {
+    if mapping.display_address.is_empty() {
+        mapping.display_address = format!("{:?}", mapping.binding);
+    }
     let mut mappings = state
         .mappings
         .write()
@@ -507,11 +512,10 @@ pub async fn scope_register_mapping(
     mappings.retain(|m| !(m.scope_id == mapping.scope_id && m.channel == mapping.channel));
 
     log::info!(
-        "Registered scope mapping: {} ch{} -> {}{}",
+        "Registered scope mapping: {} ch{} -> {}",
         mapping.scope_id,
         mapping.channel,
-        mapping.device_type,
-        mapping.address
+        mapping.display_address
     );
 
     mappings.push(mapping);
@@ -526,9 +530,10 @@ pub async fn scope_register_mapping(
 pub async fn scope_register_mappings(
     new_mappings: Vec<ScopeChannelMapping>,
     state: State<'_, ScopeState>,
+    project_state: State<'_, SharedProjectManager>,
 ) -> Result<(), String> {
     for mapping in new_mappings {
-        scope_register_mapping(mapping, state.clone()).await?;
+        scope_register_mapping(mapping, state.clone(), project_state.clone()).await?;
     }
     Ok(())
 }

@@ -10,8 +10,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use crate::plc_runtime::CanonicalValue;
+
 use super::memory::CanonicalRuntimeFacade;
-use super::types::{Breakpoint, BreakpointType, SimBitDeviceType, SimWordDeviceType, WatchVariable};
+use super::types::{Breakpoint, BreakpointType, RuntimeBinding, SimBitDeviceType, SimWordDeviceType, WatchVariable};
 
 // ============================================================================
 // Types
@@ -48,6 +50,7 @@ pub enum BreakpointHit {
     Device {
         breakpoint_id: String,
         address: String,
+        binding: RuntimeBinding,
         old_value: serde_json::Value,
         new_value: serde_json::Value,
     },
@@ -124,7 +127,7 @@ pub struct SimDebugger {
     /// Collection of breakpoints
     breakpoints: RwLock<Vec<Breakpoint>>,
     /// Watch variables indexed by address
-    watches: RwLock<HashMap<String, WatchVariable>>,
+    watches: RwLock<HashMap<RuntimeBinding, WatchVariable>>,
     /// Whether step mode is enabled
     step_mode: AtomicBool,
     /// Current step type
@@ -253,6 +256,7 @@ impl SimDebugger {
     /// Check device breakpoints after a memory write
     pub fn check_device_change(
         &self,
+        binding: &RuntimeBinding,
         address: &str,
         old_value: serde_json::Value,
         new_value: serde_json::Value,
@@ -266,11 +270,12 @@ impl SimDebugger {
 
         for bp in breakpoints.iter_mut().filter(|b| b.enabled) {
             if bp.breakpoint_type == BreakpointType::Device {
-                if bp.device_address.as_deref() == Some(address) {
+                if bp.device_binding.as_ref() == Some(binding) {
                     bp.hit_count += 1;
                     return Some(BreakpointHit::Device {
                         breakpoint_id: bp.id.clone(),
                         address: address.to_string(),
+                        binding: binding.clone(),
                         old_value,
                         new_value,
                     });
@@ -406,22 +411,41 @@ impl SimDebugger {
 
     /// Add a watch variable
     pub fn add_watch(&self, address: &str, memory: &CanonicalRuntimeFacade) {
-        let initial_value = self.read_device_json_value(address, memory);
-        let watch = WatchVariable::new(
+        self.add_watch_binding(
+            RuntimeBinding::tag(address.to_string()),
             address.to_string(),
+            memory,
+        );
+    }
+
+    pub fn add_watch_binding(
+        &self,
+        binding: RuntimeBinding,
+        display_address: String,
+        memory: &CanonicalRuntimeFacade,
+    ) {
+        let initial_value = self.read_binding_json_value(&binding, memory);
+        let watch = WatchVariable::new(
+            binding.clone(),
+            display_address,
             initial_value,
             self.max_watch_history,
         );
-        self.watches.write().insert(address.to_string(), watch);
+        self.watches.write().insert(binding, watch);
     }
 
     /// Remove a watch variable
     pub fn remove_watch(&self, address: &str) -> DebuggerResult<()> {
+        let binding = RuntimeBinding::tag(address.to_string());
+        self.remove_watch_binding(&binding)
+    }
+
+    pub fn remove_watch_binding(&self, binding: &RuntimeBinding) -> DebuggerResult<()> {
         self.watches
             .write()
-            .remove(address)
+            .remove(binding)
             .map(|_| ())
-            .ok_or_else(|| DebuggerError::WatchNotFound(address.to_string()))
+            .ok_or_else(|| DebuggerError::WatchNotFound(format!("{binding:?}")))
     }
 
     /// Get all watch variables
@@ -430,9 +454,9 @@ impl SimDebugger {
     }
 
     /// Update a single watch variable
-    pub fn update_watch(&self, address: &str, memory: &CanonicalRuntimeFacade) {
-        if let Some(watch) = self.watches.write().get_mut(address) {
-            let new_value = self.read_device_json_value(address, memory);
+    pub fn update_watch(&self, binding: &RuntimeBinding, memory: &CanonicalRuntimeFacade) {
+        if let Some(watch) = self.watches.write().get_mut(binding) {
+            let new_value = self.read_binding_json_value(binding, memory);
             watch.update(new_value);
         }
     }
@@ -440,8 +464,8 @@ impl SimDebugger {
     /// Update all watch variables
     pub fn update_all_watches(&self, memory: &CanonicalRuntimeFacade) {
         let mut watches = self.watches.write();
-        for (address, watch) in watches.iter_mut() {
-            let new_value = self.read_device_json_value(address, memory);
+        for (binding, watch) in watches.iter_mut() {
+            let new_value = self.read_binding_json_value(binding, memory);
             watch.update(new_value);
         }
     }
@@ -470,6 +494,21 @@ impl SimDebugger {
         }
 
         serde_json::Value::Null
+    }
+
+    fn read_binding_json_value(
+        &self,
+        binding: &RuntimeBinding,
+        memory: &CanonicalRuntimeFacade,
+    ) -> serde_json::Value {
+        match binding {
+            RuntimeBinding::Canonical { address } => match memory.read(*address) {
+                Ok(CanonicalValue::Bool(value)) => serde_json::json!(value),
+                Ok(CanonicalValue::U16(value)) => serde_json::json!(value),
+                Err(_) => serde_json::Value::Null,
+            },
+            RuntimeBinding::Tag { tag_id } => self.read_device_json_value(tag_id, memory),
+        }
     }
 
     // ========================================================================
@@ -683,15 +722,18 @@ mod tests {
     #[test]
     fn test_check_device_change_triggers() {
         let debugger = SimDebugger::new(100);
+        let binding = RuntimeBinding::tag("M0000");
 
         // Add device breakpoint for M0000
         let mut bp = Breakpoint::new(BreakpointType::Device);
         bp.device_address = Some("M0000".to_string());
+        bp.device_binding = Some(binding.clone());
         let id = bp.id.clone();
         debugger.add_breakpoint(bp);
 
         // Check device change - should trigger when value changes
         let result = debugger.check_device_change(
+            &binding,
             "M0000",
             serde_json::json!(false),
             serde_json::json!(true),
@@ -711,14 +753,17 @@ mod tests {
     #[test]
     fn test_check_device_change_no_trigger_same_value() {
         let debugger = SimDebugger::new(100);
+        let binding = RuntimeBinding::tag("M0000");
 
         // Add device breakpoint
         let mut bp = Breakpoint::new(BreakpointType::Device);
         bp.device_address = Some("M0000".to_string());
+        bp.device_binding = Some(binding.clone());
         debugger.add_breakpoint(bp);
 
         // Check device change with same value - should NOT trigger
         let result = debugger.check_device_change(
+            &binding,
             "M0000",
             serde_json::json!(true),
             serde_json::json!(true),
@@ -729,14 +774,17 @@ mod tests {
     #[test]
     fn test_check_device_change_wrong_address() {
         let debugger = SimDebugger::new(100);
+        let binding = RuntimeBinding::tag("M0000");
 
         // Add device breakpoint for M0000
         let mut bp = Breakpoint::new(BreakpointType::Device);
         bp.device_address = Some("M0000".to_string());
+        bp.device_binding = Some(binding.clone());
         debugger.add_breakpoint(bp);
 
         // Check different device - should NOT trigger
         let result = debugger.check_device_change(
+            &RuntimeBinding::tag("M0001"),
             "M0001",
             serde_json::json!(false),
             serde_json::json!(true),
@@ -747,16 +795,19 @@ mod tests {
     #[test]
     fn test_disabled_breakpoint_skipped() {
         let debugger = SimDebugger::new(100);
+        let binding = RuntimeBinding::tag("M0000");
 
         // Add device breakpoint and disable it
         let mut bp = Breakpoint::new(BreakpointType::Device);
         bp.device_address = Some("M0000".to_string());
+        bp.device_binding = Some(binding.clone());
         let id = bp.id.clone();
         debugger.add_breakpoint(bp);
         debugger.set_breakpoint_enabled(&id, false).unwrap();
 
         // Check device change - should NOT trigger (disabled)
         let result = debugger.check_device_change(
+            &binding,
             "M0000",
             serde_json::json!(false),
             serde_json::json!(true),
@@ -854,7 +905,12 @@ mod tests {
     fn test_watch_variable_creation() {
         // Test WatchVariable::new
         let initial = serde_json::json!(100);
-        let watch = WatchVariable::new("D0001".to_string(), initial.clone(), 50);
+        let watch = WatchVariable::new(
+            RuntimeBinding::tag("D0001"),
+            "D0001".to_string(),
+            initial.clone(),
+            50,
+        );
 
         assert_eq!(watch.address, "D0001");
         assert_eq!(watch.current_value, initial);
@@ -866,7 +922,12 @@ mod tests {
 
     #[test]
     fn test_watch_variable_update() {
-        let mut watch = WatchVariable::new("M0000".to_string(), serde_json::json!(false), 100);
+        let mut watch = WatchVariable::new(
+            RuntimeBinding::tag("M0000"),
+            "M0000".to_string(),
+            serde_json::json!(false),
+            100,
+        );
 
         // Update to true
         watch.update(serde_json::json!(true));
@@ -879,7 +940,12 @@ mod tests {
 
     #[test]
     fn test_watch_variable_no_update_same_value() {
-        let mut watch = WatchVariable::new("M0000".to_string(), serde_json::json!(false), 100);
+        let mut watch = WatchVariable::new(
+            RuntimeBinding::tag("M0000"),
+            "M0000".to_string(),
+            serde_json::json!(false),
+            100,
+        );
 
         // Update with same value - should NOT count as change
         watch.update(serde_json::json!(false));
@@ -890,7 +956,12 @@ mod tests {
 
     #[test]
     fn test_watch_variable_history_limit() {
-        let mut watch = WatchVariable::new("D0000".to_string(), serde_json::json!(0), 5);
+        let mut watch = WatchVariable::new(
+            RuntimeBinding::tag("D0000"),
+            "D0000".to_string(),
+            serde_json::json!(0),
+            5,
+        );
 
         // Make 10 changes
         for i in 1..=10 {

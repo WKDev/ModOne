@@ -4,6 +4,7 @@
 //! Routes device memory values to scope channels for oscilloscope-like visualization.
 
 use serde::{Deserialize, Serialize};
+use crate::sim::RuntimeBinding;
 
 // ============================================================================
 // Scope Channel Mapping
@@ -17,10 +18,10 @@ pub struct ScopeChannelMapping {
     pub scope_id: String,
     /// Channel index (0-based)
     pub channel: usize,
-    /// Device type (M, P, K, D, etc.)
-    pub device_type: String,
-    /// Device address number
-    pub address: u16,
+    /// Canonical or tag binding for this channel.
+    pub binding: RuntimeBinding,
+    /// Human-readable display address.
+    pub display_address: String,
     /// Voltage scale factor (device value * scale = voltage)
     /// For bit devices: true=scale, false=0
     /// For word devices: value * scale
@@ -54,14 +55,14 @@ impl ScopeChannelMapping {
     pub fn new_bit(
         scope_id: impl Into<String>,
         channel: usize,
-        device_type: impl Into<String>,
-        address: u16,
+        binding: RuntimeBinding,
+        display_address: impl Into<String>,
     ) -> Self {
         Self {
             scope_id: scope_id.into(),
             channel,
-            device_type: device_type.into(),
-            address,
+            binding,
+            display_address: display_address.into(),
             scale: 5.0, // Default 5V for logic high
             offset: 0.0,
             enabled: true,
@@ -76,14 +77,14 @@ impl ScopeChannelMapping {
     pub fn new_word(
         scope_id: impl Into<String>,
         channel: usize,
-        device_type: impl Into<String>,
-        address: u16,
+        binding: RuntimeBinding,
+        display_address: impl Into<String>,
     ) -> Self {
         Self {
             scope_id: scope_id.into(),
             channel,
-            device_type: device_type.into(),
-            address,
+            binding,
+            display_address: display_address.into(),
             scale: 0.001, // Default: 1mV per unit (0-65535 = 0-65.535V)
             offset: 0.0,
             enabled: true,
@@ -148,27 +149,35 @@ mod tests {
 
     #[test]
     fn test_bit_mapping_creation() {
-        let mapping = ScopeChannelMapping::new_bit("scope1", 0, "M", 10);
+        let mapping = ScopeChannelMapping::new_bit(
+            "scope1",
+            0,
+            RuntimeBinding::tag("M10"),
+            "M10",
+        );
 
         assert_eq!(mapping.scope_id, "scope1");
         assert_eq!(mapping.channel, 0);
-        assert_eq!(mapping.device_type, "M");
-        assert_eq!(mapping.address, 10);
+        assert_eq!(mapping.display_address, "M10");
         assert_eq!(mapping.scale, 5.0);
         assert!(mapping.enabled);
     }
 
     #[test]
     fn test_word_mapping_creation() {
-        let mapping = ScopeChannelMapping::new_word("scope1", 1, "D", 100)
+        let mapping = ScopeChannelMapping::new_word(
+            "scope1",
+            1,
+            RuntimeBinding::tag("D100"),
+            "D100",
+        )
             .with_scale(0.01)
             .with_offset(-10.0)
             .with_label("Temperature");
 
         assert_eq!(mapping.scope_id, "scope1");
         assert_eq!(mapping.channel, 1);
-        assert_eq!(mapping.device_type, "D");
-        assert_eq!(mapping.address, 100);
+        assert_eq!(mapping.display_address, "D100");
         assert_eq!(mapping.scale, 0.01);
         assert_eq!(mapping.offset, -10.0);
         assert_eq!(mapping.label, Some("Temperature".to_string()));
@@ -176,7 +185,13 @@ mod tests {
 
     #[test]
     fn test_mapping_disabled() {
-        let mapping = ScopeChannelMapping::new_bit("scope1", 0, "P", 0).with_enabled(false);
+        let mapping = ScopeChannelMapping::new_bit(
+            "scope1",
+            0,
+            RuntimeBinding::tag("P0"),
+            "P0",
+        )
+        .with_enabled(false);
 
         assert!(!mapping.enabled);
     }

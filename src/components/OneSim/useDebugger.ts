@@ -15,6 +15,7 @@ import type {
   BreakpointHit,
   BreakpointHitPayload,
   DebuggerState,
+  ResolvedBinding,
 } from '../../types/onesim';
 
 // ============================================================================
@@ -118,11 +119,19 @@ export function useDebugger(): UseDebuggerResult {
       setError(null);
 
       try {
+        let resolvedBinding: ResolvedBinding | null = null;
+        if (params.breakpointType === 'device' && params.deviceAddress) {
+          resolvedBinding = await invoke<ResolvedBinding>('sim_resolve_binding', {
+            address: params.deviceAddress,
+          });
+        }
+
         const breakpoint: Omit<Breakpoint, 'id' | 'hitCount'> = {
           breakpointType: params.breakpointType,
           enabled: params.enabled ?? true,
           networkId: params.networkId,
           deviceAddress: params.deviceAddress,
+          deviceBinding: resolvedBinding?.binding,
           condition: params.condition,
           scanCount: params.scanCount,
         };
@@ -246,7 +255,14 @@ export function useDebugger(): UseDebuggerResult {
     setError(null);
 
     try {
-      await invoke('sim_add_watch', { address });
+      const resolved = await invoke<ResolvedBinding>('sim_resolve_binding', { address });
+      await invoke('sim_add_watch', {
+        request: {
+          binding: resolved.binding,
+          address,
+          displayAddress: resolved.displayAddress,
+        },
+      });
 
       // Refresh watches to get the current value
       const result = await invoke<WatchVariable[]>('sim_get_watches');
@@ -271,7 +287,14 @@ export function useDebugger(): UseDebuggerResult {
     setError(null);
 
     try {
-      await invoke('sim_remove_watch', { address });
+      const resolved = await invoke<ResolvedBinding>('sim_resolve_binding', { address });
+      await invoke('sim_remove_watch', {
+        request: {
+          binding: resolved.binding,
+          address,
+          displayAddress: resolved.displayAddress,
+        },
+      });
 
       if (mountedRef.current) {
         setWatches((prev) => prev.filter((w) => w.address !== address));
@@ -296,7 +319,13 @@ export function useDebugger(): UseDebuggerResult {
     try {
       const currentWatches = [...watches];
       for (const w of currentWatches) {
-        await invoke('sim_remove_watch', { address: w.address });
+        await invoke('sim_remove_watch', {
+          request: {
+            binding: w.binding,
+            address: w.address,
+            displayAddress: w.address,
+          },
+        });
       }
 
       if (mountedRef.current) {

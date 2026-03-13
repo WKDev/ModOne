@@ -6,6 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use crate::plc_runtime::CanonicalAddress;
 
 // ============================================================================
 // Device Memory Configuration Types
@@ -387,6 +388,37 @@ pub struct ScanCycleInfo {
 // Debugger Types
 // ============================================================================
 
+/// Public runtime binding identity for debugger/watch/scope/canvas APIs.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+pub enum RuntimeBinding {
+    Canonical {
+        address: CanonicalAddress,
+    },
+    Tag {
+        tag_id: String,
+    },
+}
+
+impl RuntimeBinding {
+    pub fn canonical(address: CanonicalAddress) -> Self {
+        Self::Canonical { address }
+    }
+
+    pub fn tag(tag_id: impl Into<String>) -> Self {
+        Self::Tag {
+            tag_id: tag_id.into(),
+        }
+    }
+
+    pub fn canonical_address(&self) -> Option<CanonicalAddress> {
+        match self {
+            Self::Canonical { address } => Some(*address),
+            Self::Tag { .. } => None,
+        }
+    }
+}
+
 /// Breakpoint types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -418,6 +450,9 @@ pub struct Breakpoint {
     /// Device address for device breakpoints
     #[serde(skip_serializing_if = "Option::is_none")]
     pub device_address: Option<String>,
+    /// Canonical or tag binding for device breakpoints
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub device_binding: Option<RuntimeBinding>,
     /// Condition expression for condition breakpoints
     #[serde(skip_serializing_if = "Option::is_none")]
     pub condition: Option<String>,
@@ -440,6 +475,7 @@ impl Breakpoint {
             enabled: true,
             network_id: None,
             device_address: None,
+            device_binding: None,
             condition: None,
             scan_count: None,
             hit_count: 0,
@@ -466,6 +502,8 @@ pub struct ValueHistoryEntry {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WatchVariable {
+    /// Canonical or tag binding
+    pub binding: RuntimeBinding,
     /// Device address
     pub address: String,
     /// Current value (number or boolean)
@@ -484,9 +522,15 @@ pub struct WatchVariable {
 
 impl WatchVariable {
     /// Create a new watch variable
-    pub fn new(address: String, initial_value: serde_json::Value, max_history: usize) -> Self {
+    pub fn new(
+        binding: RuntimeBinding,
+        address: String,
+        initial_value: serde_json::Value,
+        max_history: usize,
+    ) -> Self {
         let now = chrono::Utc::now().timestamp_millis() as u64;
         Self {
+            binding,
             address,
             current_value: initial_value.clone(),
             previous_value: initial_value.clone(),
@@ -636,6 +680,7 @@ mod tests {
     #[test]
     fn test_watch_variable_update() {
         let mut watch = WatchVariable::new(
+            RuntimeBinding::canonical(CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::InternalBit, 0)),
             "M0000".to_string(),
             serde_json::json!(false),
             10,
