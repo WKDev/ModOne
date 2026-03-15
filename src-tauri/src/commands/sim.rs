@@ -17,8 +17,7 @@ use crate::commands::opcua::{
 };
 use crate::modbus::ModbusMemory;
 use crate::plc_runtime::{
-    resolve_vendor_profile, CanonicalAddress, CanonicalAreaKind,
-    CanonicalValue, CanonicalWriteSource, VendorAddress,
+    resolve_vendor_profile, CanonicalAddress, CanonicalValue, CanonicalWriteSource, VendorAddress,
 };
 use crate::project::{PlcSettings, ProjectConfig, SharedProjectManager};
 use crate::sim::{
@@ -478,6 +477,7 @@ pub fn sim_write_binding(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::plc_runtime::CanonicalAreaKind;
     use crate::project::{PlcHardwareTopology, PlcManufacturer};
 
     #[test]
