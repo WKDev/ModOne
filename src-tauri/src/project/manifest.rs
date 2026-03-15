@@ -7,7 +7,8 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use super::config::{
-    AutoSaveSettings, MemoryMapSettings, ModbusSettings, PlcSettings, ProjectSettings,
+    AutoSaveSettings, MemoryMapSettings, ModbusSettings, NetworkSettings, OpcUaSettings,
+    PlcSettings, ProjectSettings,
 };
 
 /// Current manifest version
@@ -49,6 +50,14 @@ pub struct ProjectManifest {
     /// Canvas settings
     #[serde(default)]
     pub canvas: super::config::CanvasSettings,
+
+    /// Network settings
+    #[serde(default)]
+    pub network: NetworkSettings,
+
+    /// OPC UA settings
+    #[serde(default)]
+    pub opcua: OpcUaSettings,
 }
 
 impl ProjectManifest {
@@ -69,6 +78,8 @@ impl ProjectManifest {
             memory_map: MemoryMapSettings::default(),
             auto_save: AutoSaveSettings::default(),
             canvas: super::config::CanvasSettings::default(),
+            network: NetworkSettings::default(),
+            opcua: OpcUaSettings::default(),
         }
     }
 
@@ -83,6 +94,8 @@ impl ProjectManifest {
             memory_map: config.memory_map.clone(),
             auto_save: config.auto_save.clone(),
             canvas: config.canvas.clone(),
+            network: config.network.clone(),
+            opcua: config.opcua.clone(),
         }
     }
 
@@ -96,8 +109,8 @@ impl ProjectManifest {
             memory_map: self.memory_map.clone(),
             auto_save: self.auto_save.clone(),
             canvas: self.canvas.clone(),
-            network: super::config::NetworkSettings::default(),
-            opcua: super::config::OpcUaSettings::default(),
+            network: self.network.clone(),
+            opcua: self.opcua.clone(),
         }
     }
 
@@ -177,7 +190,9 @@ mod tests {
         let manifest = ProjectManifest::new("Test Project");
         let yaml = serde_yaml::to_string(&manifest).unwrap();
 
-        assert!(yaml.contains("manifest_version: '2.0'") || yaml.contains("manifest_version: \"2.0\""));
+        assert!(
+            yaml.contains("manifest_version: '2.0'") || yaml.contains("manifest_version: \"2.0\"")
+        );
         assert!(yaml.contains("name: Test Project"));
         assert!(yaml.contains("canvas:"));
         assert!(yaml.contains("ladder:"));
@@ -217,5 +232,30 @@ mod tests {
         let converted_back = manifest.to_legacy_config();
         assert_eq!(converted_back.project.name, "Legacy Project");
         assert_eq!(converted_back.version, "1.0");
+    }
+
+    #[test]
+    fn test_legacy_conversion_preserves_network_and_opcua_settings() {
+        let mut legacy = super::super::config::ProjectConfig::new("Legacy Project");
+        legacy.network.plc_ip = Some("127.0.0.2".to_string());
+        legacy.network.interface_name = Some("Loopback".to_string());
+        legacy.opcua.enabled = true;
+        legacy.opcua.port = 4940;
+        legacy.opcua.server_name = "Secure Test".to_string();
+        legacy.opcua.username = Some("secure-user".to_string());
+        legacy.opcua.password = Some("secure-pass".to_string());
+
+        let manifest = ProjectManifest::from_legacy_config(&legacy);
+        let converted_back = manifest.to_legacy_config();
+
+        assert_eq!(manifest.network.plc_ip.as_deref(), Some("127.0.0.2"));
+        assert_eq!(manifest.opcua.username.as_deref(), Some("secure-user"));
+        assert!(manifest.opcua.enabled);
+        assert_eq!(converted_back.network.plc_ip.as_deref(), Some("127.0.0.2"));
+        assert_eq!(converted_back.opcua.port, 4940);
+        assert_eq!(
+            converted_back.opcua.password.as_deref(),
+            Some("secure-pass")
+        );
     }
 }

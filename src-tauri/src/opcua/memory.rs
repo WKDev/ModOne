@@ -10,14 +10,12 @@ use crate::plc_runtime::{CanonicalAddress, CanonicalValue};
 /// so that the memory module can be compiled without the opcua feature.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OpcUaNodeId {
-    pub namespace: u16,
     pub identifier: String,
 }
 
 impl OpcUaNodeId {
-    pub fn new(namespace: u16, identifier: impl Into<String>) -> Self {
+    pub fn new(identifier: impl Into<String>) -> Self {
         Self {
-            namespace,
             identifier: identifier.into(),
         }
     }
@@ -25,7 +23,7 @@ impl OpcUaNodeId {
 
 impl std::fmt::Display for OpcUaNodeId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ns={};s=\"{}\"", self.namespace, self.identifier)
+        write!(f, "s=\"{}\"", self.identifier)
     }
 }
 
@@ -48,7 +46,7 @@ pub struct OpcUaMemory {
     /// Canonical address → all OPC UA NodeIds that should mirror this value.
     publish_map: parking_lot::RwLock<HashMap<CanonicalAddress, Vec<OpcUaNodeId>>>,
     /// Reverse mapping: OPC UA NodeId → CanonicalAddress (used in write callbacks).
-    reverse_map: parking_lot::RwLock<HashMap<OpcUaNodeId, CanonicalAddress>>,
+    reverse_map: parking_lot::RwLock<HashMap<String, CanonicalAddress>>,
 }
 
 impl OpcUaMemory {
@@ -82,7 +80,7 @@ impl OpcUaMemory {
         let mut reverse = HashMap::new();
         for (address, node_ids) in &publish_map {
             for node_id in node_ids {
-                reverse.insert(node_id.clone(), *address);
+                reverse.insert(node_id.identifier.clone(), *address);
             }
         }
         *self.primary_node_map.write() = primary_map;
@@ -92,7 +90,12 @@ impl OpcUaMemory {
 
     /// Look up the canonical address for a given OPC UA NodeId.
     pub fn resolve_node(&self, node_id: &OpcUaNodeId) -> Option<CanonicalAddress> {
-        self.reverse_map.read().get(node_id).copied()
+        self.resolve_identifier(&node_id.identifier)
+    }
+
+    /// Look up the canonical address for a given logical node identifier.
+    pub fn resolve_identifier(&self, identifier: &str) -> Option<CanonicalAddress> {
+        self.reverse_map.read().get(identifier).copied()
     }
 
     /// Look up the OPC UA NodeId for a given canonical address.
@@ -150,7 +153,10 @@ mod tests {
 
         let writes = memory.take_external_writes();
         assert_eq!(writes.len(), 2);
-        assert_eq!(writes[0].address, CanonicalAddress::new(CanonicalAreaKind::DataWord, 42));
+        assert_eq!(
+            writes[0].address,
+            CanonicalAddress::new(CanonicalAreaKind::DataWord, 42)
+        );
         assert!(matches!(writes[0].value, CanonicalValue::U16(1234)));
 
         // Second drain should be empty
@@ -164,7 +170,7 @@ mod tests {
         let mut map = HashMap::new();
         let mut publish_map = HashMap::new();
         let addr = CanonicalAddress::new(CanonicalAreaKind::DataWord, 0);
-        let node_id = OpcUaNodeId::new(2, "DataWord.0");
+        let node_id = OpcUaNodeId::new("DataWord.0");
         map.insert(addr, node_id.clone());
         publish_map.insert(addr, vec![node_id.clone()]);
 
@@ -173,5 +179,23 @@ mod tests {
         assert_eq!(memory.resolve_address(&addr), Some(node_id.clone()));
         assert_eq!(memory.resolve_node(&node_id), Some(addr));
         assert_eq!(memory.node_count(), 1);
+    }
+
+    #[test]
+    fn resolve_identifier_uses_logical_id_without_namespace_assumptions() {
+        let memory = OpcUaMemory::new();
+
+        let mut map = HashMap::new();
+        let mut publish_map = HashMap::new();
+        let addr = CanonicalAddress::new(CanonicalAreaKind::OutputBit, 3);
+        let primary = OpcUaNodeId::new("raw/OutputBit/3");
+        let alias = OpcUaNodeId::new("tag/motor-run");
+        map.insert(addr, primary.clone());
+        publish_map.insert(addr, vec![primary, alias.clone()]);
+
+        memory.register_nodes(map, publish_map);
+
+        assert_eq!(memory.resolve_identifier("tag/motor-run"), Some(addr));
+        assert_eq!(memory.resolve_node(&alias), Some(addr));
     }
 }

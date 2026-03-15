@@ -2,12 +2,13 @@
 //!
 //! Provides comprehensive validation for project configuration values.
 
-use crate::error::ModOneError;
 use super::config::{
     AutoSaveSettings, MemoryMapSettings, ModbusExposureMode, ModbusExposureSettings,
     ModbusRtuSettings, ModbusServerSimulationSettings, ModbusSimulationTransport,
-    ModbusTcpSettings, PlcHardwareTopology, ProjectConfig,
+    ModbusTcpSettings, NetworkSettings, OpcUaSettings, PlcHardwareTopology, ProjectConfig,
 };
+use crate::error::ModOneError;
+use std::net::IpAddr;
 
 /// Standard baud rates supported for serial communication
 const STANDARD_BAUD_RATES: &[u32] = &[
@@ -101,10 +102,7 @@ impl ValidationResult {
 /// Validate a TCP/UDP port number
 pub fn validate_port(port: u16, field: &str) -> Option<(String, String)> {
     if port == 0 {
-        return Some((
-            field.to_string(),
-            "Port must be greater than 0".to_string(),
-        ));
+        return Some((field.to_string(), "Port must be greater than 0".to_string()));
     }
     // Note: port is u16 so max is already 65535
     None
@@ -138,11 +136,7 @@ pub fn validate_baud_rate(rate: u32, field: &str) -> Option<(String, String)> {
 }
 
 /// Validate a memory range (start + count must not overflow u16)
-pub fn validate_memory_range(
-    start: u16,
-    count: u16,
-    field: &str,
-) -> Option<(String, String)> {
+pub fn validate_memory_range(start: u16, count: u16, field: &str) -> Option<(String, String)> {
     if count == 0 {
         return Some((
             field.to_string(),
@@ -214,14 +208,20 @@ pub fn validate_auto_save_interval(secs: u64, field: &str) -> Option<(String, St
     if secs < MIN_AUTO_SAVE_INTERVAL_SECS {
         return Some((
             field.to_string(),
-            format!("Auto-save interval must be at least {} seconds", MIN_AUTO_SAVE_INTERVAL_SECS),
+            format!(
+                "Auto-save interval must be at least {} seconds",
+                MIN_AUTO_SAVE_INTERVAL_SECS
+            ),
         ));
     }
 
     if secs > MAX_AUTO_SAVE_INTERVAL_SECS {
         return Some((
             field.to_string(),
-            format!("Auto-save interval must be at most {} seconds (24 hours)", MAX_AUTO_SAVE_INTERVAL_SECS),
+            format!(
+                "Auto-save interval must be at most {} seconds (24 hours)",
+                MAX_AUTO_SAVE_INTERVAL_SECS
+            ),
         ));
     }
 
@@ -266,7 +266,10 @@ pub fn validate_rtu_settings(settings: &ModbusRtuSettings, result: &mut Validati
     }
 
     if settings.com_port.trim().is_empty() {
-        result.add_error("modbus.rtu.com_port", "COM port must not be empty when RTU is enabled");
+        result.add_error(
+            "modbus.rtu.com_port",
+            "COM port must not be empty when RTU is enabled",
+        );
     }
 
     if let Some((field, msg)) = validate_baud_rate(settings.baud_rate, "modbus.rtu.baud_rate") {
@@ -280,11 +283,9 @@ pub fn validate_rtu_settings(settings: &ModbusRtuSettings, result: &mut Validati
 
 /// Validate memory map settings
 pub fn validate_memory_map(settings: &MemoryMapSettings, result: &mut ValidationResult) {
-    if let Some((field, msg)) = validate_memory_range(
-        settings.coil_start,
-        settings.coil_count,
-        "memory_map.coils",
-    ) {
+    if let Some((field, msg)) =
+        validate_memory_range(settings.coil_start, settings.coil_count, "memory_map.coils")
+    {
         result.add_error(field, msg);
     }
 
@@ -319,17 +320,15 @@ pub fn validate_auto_save(settings: &AutoSaveSettings, result: &mut ValidationRe
         return;
     }
 
-    if let Some((field, msg)) = validate_auto_save_interval(
-        settings.interval_secs,
-        "auto_save.interval_secs",
-    ) {
+    if let Some((field, msg)) =
+        validate_auto_save_interval(settings.interval_secs, "auto_save.interval_secs")
+    {
         result.add_error(field, msg);
     }
 
-    if let Some((field, msg)) = validate_backup_count(
-        settings.backup_count,
-        "auto_save.backup_count",
-    ) {
+    if let Some((field, msg)) =
+        validate_backup_count(settings.backup_count, "auto_save.backup_count")
+    {
         result.add_error(field, msg);
     }
 }
@@ -348,9 +347,7 @@ pub fn validate_hardware_topology(settings: &PlcHardwareTopology, result: &mut V
         for (module_idx, module) in rack.modules.iter().enumerate() {
             if !seen_slots.insert(module.slot) {
                 result.add_error(
-                    format!(
-                        "plc.hardware_topology.racks[{rack_idx}].modules[{module_idx}].slot"
-                    ),
+                    format!("plc.hardware_topology.racks[{rack_idx}].modules[{module_idx}].slot"),
                     format!("Duplicate slot {} in rack {}", module.slot, rack.rack_id),
                 );
             }
@@ -379,9 +376,7 @@ pub fn validate_hardware_topology(settings: &PlcHardwareTopology, result: &mut V
                     );
                 }
 
-                if window.io_direction.is_none()
-                    && window.family.eq_ignore_ascii_case("P")
-                {
+                if window.io_direction.is_none() && window.family.eq_ignore_ascii_case("P") {
                     result.add_error(
                         format!("plc.hardware_topology.racks[{rack_idx}].modules[{module_idx}].address_windows[{window_idx}].io_direction"),
                         "Ambiguous P-address windows must declare io_direction",
@@ -475,6 +470,83 @@ pub fn validate_modbus_simulation(
     }
 }
 
+/// Validate OPC UA settings against the v1 security baseline.
+pub fn validate_opcua_settings(
+    settings: &OpcUaSettings,
+    network: &NetworkSettings,
+    result: &mut ValidationResult,
+) {
+    if !settings.enabled {
+        return;
+    }
+
+    if let Some((field, msg)) = validate_port(settings.port, "opcua.port") {
+        result.add_error(field, msg);
+    }
+
+    if settings.server_name.trim().is_empty() {
+        result.add_error(
+            "opcua.server_name",
+            "Server name must not be empty when OPC UA is enabled",
+        );
+    }
+
+    let username = settings
+        .username
+        .as_deref()
+        .map(str::trim)
+        .unwrap_or_default();
+    if username.is_empty() {
+        result.add_error(
+            "opcua.username",
+            "Username is required when OPC UA is enabled",
+        );
+    }
+
+    let password = settings
+        .password
+        .as_deref()
+        .map(str::trim)
+        .unwrap_or_default();
+    if password.is_empty() {
+        result.add_error(
+            "opcua.password",
+            "Password is required when OPC UA is enabled",
+        );
+    }
+
+    if username.eq_ignore_ascii_case("modone") && password == "modone" {
+        result.add_error(
+            "opcua.password",
+            "Default OPC UA credentials are not allowed; choose a project-specific username and password",
+        );
+    }
+
+    if let Some(plc_ip) = network
+        .plc_ip
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        match plc_ip.parse::<IpAddr>() {
+            Ok(ip) => {
+                if ip.is_unspecified() {
+                    result.add_error(
+                        "network.plc_ip",
+                        "PLC IP must not be an unspecified address",
+                    );
+                }
+            }
+            Err(_) => {
+                result.add_error(
+                    "network.plc_ip",
+                    "PLC IP must be a valid IPv4 or IPv6 address",
+                );
+            }
+        }
+    }
+}
+
 // ============================================================================
 // Main Validation Function
 // ============================================================================
@@ -510,6 +582,9 @@ pub fn validate_project_config(config: &ProjectConfig) -> Result<(), ModOneError
 
     // Validate Modbus simulation preferences
     validate_modbus_simulation(&config.modbus.simulation, &mut result);
+
+    // Validate OPC UA preferences
+    validate_opcua_settings(&config.opcua, &config.network, &mut result);
 
     // Validate memory map
     validate_memory_map(&config.memory_map, &mut result);
@@ -811,5 +886,68 @@ mod tests {
             &mut result,
         );
         assert!(!result.is_valid());
+    }
+
+    #[test]
+    fn test_validate_opcua_requires_credentials_when_enabled() {
+        let settings = OpcUaSettings {
+            enabled: true,
+            username: None,
+            password: None,
+            ..OpcUaSettings::default()
+        };
+        let mut result = ValidationResult::new();
+
+        validate_opcua_settings(&settings, &NetworkSettings::default(), &mut result);
+
+        assert!(!result.is_valid());
+        let errors = result.errors();
+        assert!(errors.iter().any(|(field, _)| field == "opcua.username"));
+        assert!(errors.iter().any(|(field, _)| field == "opcua.password"));
+    }
+
+    #[test]
+    fn test_validate_opcua_rejects_default_credentials() {
+        let settings = OpcUaSettings {
+            enabled: true,
+            username: Some("modone".to_string()),
+            password: Some("modone".to_string()),
+            ..OpcUaSettings::default()
+        };
+        let mut result = ValidationResult::new();
+
+        validate_opcua_settings(&settings, &NetworkSettings::default(), &mut result);
+
+        assert!(!result.is_valid());
+        assert!(result
+            .errors()
+            .iter()
+            .any(|(field, message)| field == "opcua.password"
+                && message.contains("Default OPC UA credentials")));
+    }
+
+    #[test]
+    fn test_validate_opcua_rejects_invalid_network_bind_address() {
+        let settings = OpcUaSettings {
+            enabled: true,
+            username: Some("user".to_string()),
+            password: Some("secret".to_string()),
+            ..OpcUaSettings::default()
+        };
+        let network = NetworkSettings {
+            plc_ip: Some("not-an-ip".to_string()),
+            interface_name: None,
+            subnet_mask: None,
+        };
+        let mut result = ValidationResult::new();
+
+        validate_opcua_settings(&settings, &network, &mut result);
+
+        assert!(!result.is_valid());
+        assert!(result
+            .errors()
+            .iter()
+            .any(|(field, message)| field == "network.plc_ip"
+                && message.contains("valid IP address")));
     }
 }

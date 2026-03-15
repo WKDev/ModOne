@@ -55,11 +55,10 @@ pub use auto_save::{AutoSaveManager, SharedAutoSaveManager};
 pub use config::{
     AutoSaveSettings, ConfigValidationError, MemoryMapSettings as ProjectMemoryMapSettings,
     ModbusExposureAddressSpace, ModbusExposureMode, ModbusExposureRule, ModbusExposureSettings,
-    ModbusRtuSettings, ModbusServerSimulationSettings, ModbusSettings,
-    ModbusSimulationTransport, ModbusTcpSettings, Parity, PlcAddressWindow, PlcHardwareModule,
-    PlcHardwareTopology, PlcIoDirection, PlcManufacturer, PlcModuleKind, PlcRackKind,
-    PlcRackTopology, PlcSettings, ProjectConfig, ProjectSettings,
-    OpcUaSettings, OpcUaSecurityPolicySetting,
+    ModbusRtuSettings, ModbusServerSimulationSettings, ModbusSettings, ModbusSimulationTransport,
+    ModbusTcpSettings, OpcUaSecurityPolicySetting, OpcUaSettings, Parity, PlcAddressWindow,
+    PlcHardwareModule, PlcHardwareTopology, PlcIoDirection, PlcManufacturer, PlcModuleKind,
+    PlcRackKind, PlcRackTopology, PlcSettings, ProjectConfig, ProjectSettings,
 };
 pub use folder_project::{is_folder_project, is_legacy_project, FolderProject, FolderProjectError};
 pub use manifest::{DirectoryConfig, ProjectManifest, MANIFEST_VERSION};
@@ -421,7 +420,7 @@ impl ProjectManager {
         }
 
         // Detect project format
-        let (storage, config) = if is_folder_project(&path) {
+        let (storage, mut config) = if is_folder_project(&path) {
             // v2.0 folder-based project
             let folder_project = FolderProject::open(&path).map_err(|e| {
                 ProjectError::Io(std::io::Error::new(
@@ -448,6 +447,8 @@ impl ProjectManager {
                 "Unknown project format".to_string(),
             )));
         };
+
+        log_project_config_migrations(&mut config);
 
         // Validate config before proceeding
         validate_project_config(&config)?;
@@ -529,6 +530,9 @@ impl ProjectManager {
                 manifest.modbus = project.config.modbus.clone();
                 manifest.memory_map = project.config.memory_map.clone();
                 manifest.auto_save = project.config.auto_save.clone();
+                manifest.canvas = project.config.canvas.clone();
+                manifest.network = project.config.network.clone();
+                manifest.opcua = project.config.opcua.clone();
 
                 if let Some(new_dir) = path {
                     // Save As - to new directory
@@ -626,6 +630,27 @@ impl ProjectManager {
         self.recent_projects.clear();
         let _ = save_recent_projects(&self.recent_projects);
     }
+}
+
+fn log_project_config_migrations(config: &mut ProjectConfig) {
+    for warning in take_project_config_migration_warnings(config) {
+        log::warn!("{warning}");
+    }
+}
+
+fn take_project_config_migration_warnings(config: &mut ProjectConfig) -> Vec<String> {
+    let mut warnings = Vec::new();
+    if config.opcua.legacy_insecure_policy_seen {
+        warnings.push("Migrated legacy OPC UA security_policy=None to Basic256Sha256.".to_string());
+        config.opcua.legacy_insecure_policy_seen = false;
+    }
+    if config.opcua.legacy_anonymous_access_seen {
+        warnings.push(
+            "Migrated legacy OPC UA anonymous_access=true to anonymous_access=false.".to_string(),
+        );
+        config.opcua.legacy_anonymous_access_seen = false;
+    }
+    warnings
 }
 
 // ============================================================================
@@ -820,6 +845,47 @@ mod tests {
         // Save
         manager.save_project(None).unwrap();
         assert!(!manager.is_modified());
+    }
+
+    #[test]
+    fn test_save_and_reopen_preserves_network_and_opcua_settings() {
+        let mut manager = ProjectManager::new();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let project_dir = temp_dir.path().join("OpcUaPersist");
+
+        let info = manager
+            .create_project(
+                "Persist Test".to_string(),
+                project_dir,
+                PlcSettings::default(),
+            )
+            .unwrap();
+
+        {
+            let project = manager.current.as_mut().unwrap();
+            project.config.network.plc_ip = Some("127.0.0.2".to_string());
+            project.config.opcua.enabled = true;
+            project.config.opcua.port = 4940;
+            project.config.opcua.server_name = "Persisted OPC UA".to_string();
+            project.config.opcua.username = Some("persist-user".to_string());
+            project.config.opcua.password = Some("persist-pass".to_string());
+        }
+
+        manager.save_project(None).unwrap();
+        manager.close_project().unwrap();
+
+        let reopened = manager.open_project(info.path).unwrap();
+        assert_eq!(reopened.config.network.plc_ip.as_deref(), Some("127.0.0.2"));
+        assert!(reopened.config.opcua.enabled);
+        assert_eq!(reopened.config.opcua.port, 4940);
+        assert_eq!(
+            reopened.config.opcua.username.as_deref(),
+            Some("persist-user")
+        );
+        assert_eq!(
+            reopened.config.opcua.password.as_deref(),
+            Some("persist-pass")
+        );
     }
 
     #[test]

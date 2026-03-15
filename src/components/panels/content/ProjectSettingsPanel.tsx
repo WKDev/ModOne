@@ -3,7 +3,6 @@ import { useProjectStore } from '../../../stores/projectStore';
 import { CanvasProperties } from './properties/CanvasProperties';
 import type {
   ModbusSimulationTransport,
-  OpcUaSecurityPolicy,
   PlcManufacturer,
 } from '../../../types/project';
 
@@ -66,10 +65,8 @@ export const ProjectSettingsPanel = memo(function ProjectSettingsPanel() {
         enabled: false,
         port: 4840,
         server_name: 'ModOne PLC Simulator',
-        security_policy: 'Basic256Sha256' as OpcUaSecurityPolicy,
-        anonymous_access: false,
-        username: 'modone',
-        password: 'modone',
+        username: '',
+        password: '',
       };
       updateConfig({
         opcua: {
@@ -429,35 +426,6 @@ export const ProjectSettingsPanel = memo(function ProjectSettingsPanel() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>Security Policy</label>
-                <select
-                  value={currentProject.config.opcua?.security_policy ?? 'Basic256Sha256'}
-                  onChange={(e) => handleOpcUaChange('security_policy', e.target.value as OpcUaSecurityPolicy)}
-                  className="w-full px-3 py-1.5 text-sm rounded outline-none appearance-none"
-                  style={{
-                    background: 'var(--bg-primary)',
-                    border: '1px solid var(--border-color)',
-                    color: 'var(--text-primary)',
-                  }}
-                >
-                  <option value="Basic256Sha256">Basic256Sha256</option>
-                  <option value="None">None (No Encryption)</option>
-                </select>
-              </div>
-              <div className="flex items-end pb-1">
-                <label className="inline-flex items-center gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                  <input
-                    type="checkbox"
-                    checked={currentProject.config.opcua?.anonymous_access ?? false}
-                    onChange={(e) => handleOpcUaChange('anonymous_access', e.target.checked)}
-                  />
-                  Anonymous Access
-                </label>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
                 <label className="block text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>Username</label>
                 <input
                   type="text"
@@ -469,6 +437,7 @@ export const ProjectSettingsPanel = memo(function ProjectSettingsPanel() {
                     border: '1px solid var(--border-color)',
                     color: 'var(--text-primary)',
                   }}
+                  placeholder="opcua-user"
                 />
               </div>
               <div>
@@ -483,6 +452,7 @@ export const ProjectSettingsPanel = memo(function ProjectSettingsPanel() {
                     border: '1px solid var(--border-color)',
                     color: 'var(--text-primary)',
                   }}
+                  placeholder="Project-specific password"
                 />
               </div>
             </div>

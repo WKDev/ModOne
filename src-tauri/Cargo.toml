@@ -15,7 +15,7 @@ name = "app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
-default = []
+default = ["opcua-server"]
 opcua-server = ["dep:opcua"]
 webdriver = ["dep:tauri-plugin-webdriver"]
 
@@ -61,8 +61,8 @@ parking_lot = "0.12"
 tokio-serial = "5"
 serialport = "4"
 
-# OPC UA server
-opcua = { version = "0.12", features = ["server", "vendored-openssl"], optional = true }
+# OPC UA server/client
+opcua = { version = "0.12", features = ["server", "client", "vendored-openssl"], optional = true }
 
 # App directories
 directories = "5"
@@ -72,3 +72,7 @@ csv = "1.3"
 
 # UUID generation
 uuid = { version = "1", features = ["v4"] }
+
+# Certificate metadata parsing
+sha2 = "0.10"
+x509-parser = "0.16"

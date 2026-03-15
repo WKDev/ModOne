@@ -177,7 +177,13 @@ pub async fn sim_run(
 
     if let Some(project_config) = project_config.as_ref() {
         if project_config.modbus.simulation.enabled {
-            modbus_start_project_simulation(&modbus_state, &network_state, app.clone(), project_config).await?;
+            modbus_start_project_simulation(
+                &modbus_state,
+                &network_state,
+                app.clone(),
+                project_config,
+            )
+            .await?;
         }
 
         // Start OPC UA server if enabled
@@ -368,7 +374,9 @@ pub fn sim_resolve_binding_parts(
     let display_address = profile
         .format_address(&vendor_address)
         .unwrap_or_else(|_| format!("{}{}", family.to_uppercase(), index));
-    let canonical = profile.to_canonical(&vendor_address).map_err(|e| e.to_string())?;
+    let canonical = profile
+        .to_canonical(&vendor_address)
+        .map_err(|e| e.to_string())?;
     Ok(ResolvedBinding {
         binding: RuntimeBinding::canonical(canonical),
         display_address,
@@ -384,7 +392,9 @@ fn resolve_sim_address_for_settings(
     let normalized_address = profile
         .format_address(&vendor_address)
         .unwrap_or_else(|_| address.to_uppercase());
-    let canonical = profile.to_canonical(&vendor_address).map_err(|e| e.to_string())?;
+    let canonical = profile
+        .to_canonical(&vendor_address)
+        .map_err(|e| e.to_string())?;
     Ok((normalized_address, canonical))
 }
 
@@ -405,6 +415,18 @@ fn resolve_binding_to_canonical(
     registry.resolve_binding(binding).map_err(|e| e.to_string())
 }
 
+fn ensure_opcua_namespace_mutable(opcua_state: &OpcUaState) -> Result<(), String> {
+    let server_guard = opcua_state.server.lock();
+    if server_guard
+        .as_ref()
+        .map(|server| server.is_running())
+        .unwrap_or(false)
+    {
+        return Err("namespace frozen during active OPC UA session".to_string());
+    }
+    Ok(())
+}
+
 fn write_canonical_device(
     runtime: &Arc<CanonicalRuntimeFacade>,
     address: CanonicalAddress,
@@ -412,10 +434,18 @@ fn write_canonical_device(
 ) -> Result<(), String> {
     match value {
         DeviceValue::Bit { value } => runtime
-            .write(address, CanonicalValue::Bool(*value), CanonicalWriteSource::Simulation)
+            .write(
+                address,
+                CanonicalValue::Bool(*value),
+                CanonicalWriteSource::Simulation,
+            )
             .map_err(|e| e.to_string()),
         DeviceValue::Word { value } => runtime
-            .write(address, CanonicalValue::U16(*value), CanonicalWriteSource::Simulation)
+            .write(
+                address,
+                CanonicalValue::U16(*value),
+                CanonicalWriteSource::Simulation,
+            )
             .map_err(|e| e.to_string()),
     }
 }
@@ -479,8 +509,14 @@ pub fn sim_write_binding(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::opcua::OpcUaState;
+    use crate::opcua::{OpcUaConfig, OpcUaMemory, OpcUaServer};
     use crate::plc_runtime::CanonicalAreaKind;
+    use crate::plc_runtime::{CanonicalMemory, CanonicalValue, CanonicalWriteSource};
     use crate::project::{PlcHardwareTopology, PlcManufacturer};
+    use crate::sim::tag_registry::TagRegistry;
+    use parking_lot::RwLock;
+    use std::sync::Arc;
 
     #[test]
     fn resolves_ls_word_bit_addresses_through_profile_bridge() {
@@ -514,7 +550,10 @@ mod tests {
         assert_eq!(x, CanonicalAddress::new(CanonicalAreaKind::InputBit, 0o10));
 
         let (_, m) = resolve_sim_address_for_settings(&settings, "M100").expect("M should map");
-        assert_eq!(m, CanonicalAddress::new(CanonicalAreaKind::InternalBit, 100));
+        assert_eq!(
+            m,
+            CanonicalAddress::new(CanonicalAreaKind::InternalBit, 100)
+        );
 
         let (_, y) = resolve_sim_address_for_settings(&settings, "Y17").expect("Y should map");
         assert_eq!(y, CanonicalAddress::new(CanonicalAreaKind::OutputBit, 0o17));
@@ -530,10 +569,74 @@ mod tests {
         };
 
         let (_, input) = resolve_sim_address_for_settings(&settings, "P0019").expect("P19");
-        assert_eq!(input, CanonicalAddress::new(CanonicalAreaKind::InputBit, 19));
+        assert_eq!(
+            input,
+            CanonicalAddress::new(CanonicalAreaKind::InputBit, 19)
+        );
 
         let (_, output) = resolve_sim_address_for_settings(&settings, "P0020").expect("P20");
-        assert_eq!(output, CanonicalAddress::new(CanonicalAreaKind::OutputBit, 20));
+        assert_eq!(
+            output,
+            CanonicalAddress::new(CanonicalAreaKind::OutputBit, 20)
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn opcua_running_session_freezes_tag_namespace_mutations() {
+        let settings = PlcSettings {
+            manufacturer: PlcManufacturer::LS,
+            model: "XGK".to_string(),
+            scan_time_ms: 10,
+            hardware_topology: PlcHardwareTopology::default(),
+        };
+        let profile = resolve_vendor_profile(&settings).unwrap();
+        let canonical_memory = Arc::new(RwLock::new(CanonicalMemory::new()));
+        canonical_memory
+            .write()
+            .write(
+                CanonicalAddress::new(CanonicalAreaKind::OutputBit, 0),
+                CanonicalValue::Bool(false),
+                CanonicalWriteSource::Simulation,
+            )
+            .unwrap();
+        let tag_registry = Arc::new(TagRegistry::new());
+        let temp = tempfile::tempdir().unwrap();
+        let port_listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = port_listener.local_addr().unwrap().port();
+        drop(port_listener);
+
+        let server = Arc::new(OpcUaServer::new(
+            OpcUaConfig {
+                bind_address: "127.0.0.1".to_string(),
+                port,
+                server_name: "Namespace Freeze Test".to_string(),
+                pki_dir: temp.path().join("pki"),
+                certificate_path: "own/cert.der".into(),
+                private_key_path: "private/private.pem".into(),
+                username: Some("freeze-user".to_string()),
+                password: Some("freeze-pass".to_string()),
+            },
+            Arc::new(OpcUaMemory::new()),
+        ));
+        server
+            .start(
+                &canonical_memory,
+                profile.as_ref(),
+                &settings,
+                &tag_registry,
+            )
+            .unwrap();
+
+        let opcua_state = OpcUaState {
+            server: parking_lot::Mutex::new(Some(server.clone())),
+            memory: Arc::new(OpcUaMemory::new()),
+            project_owned: parking_lot::Mutex::new(false),
+        };
+
+        let err = ensure_opcua_namespace_mutable(&opcua_state).unwrap_err();
+        assert_eq!(err, "namespace frozen during active OPC UA session");
+
+        server.stop().unwrap();
     }
 }
 
@@ -548,19 +651,34 @@ pub fn sim_get_memory_snapshot(state: State<'_, SimState>) -> Result<MemorySnaps
     Ok(engine.runtime().get_snapshot(
         "sim",
         engine.get_status().scan_count,
-        engine.timer_mgr().get_all_states().into_iter().map(|(k, v)| (k as u32, v)).collect(),
-        engine.counter_mgr().get_all_states().into_iter().map(|(k, v)| (k as u32, v)).collect(),
+        engine
+            .timer_mgr()
+            .get_all_states()
+            .into_iter()
+            .map(|(k, v)| (k as u32, v))
+            .collect(),
+        engine
+            .counter_mgr()
+            .get_all_states()
+            .into_iter()
+            .map(|(k, v)| (k as u32, v))
+            .collect(),
     ))
 }
 
 #[tauri::command]
 pub fn sim_register_tag(
     state: State<'_, SimState>,
+    opcua_state: State<'_, OpcUaState>,
     mut request: RegisterTagRequest,
 ) -> Result<TagDefinition, String> {
+    ensure_opcua_namespace_mutable(&opcua_state)?;
     if request.canonical_address.is_none() {
         if let Some(binding) = request.binding.clone() {
-            request.canonical_address = Some(resolve_binding_to_canonical(&state.tag_registry(), &binding)?);
+            request.canonical_address = Some(resolve_binding_to_canonical(
+                &state.tag_registry(),
+                &binding,
+            )?);
         }
     }
 
@@ -570,7 +688,9 @@ pub fn sim_register_tag(
 
     if request.vendor_aliases.is_empty() {
         if let Some(RuntimeBinding::Canonical { address }) = request.binding.as_ref() {
-            request.vendor_aliases.push(format!("{:?}:{}", address.area, address.index));
+            request
+                .vendor_aliases
+                .push(format!("{:?}:{}", address.area, address.index));
         }
     }
 
@@ -582,7 +702,10 @@ pub fn sim_register_tag(
 
 #[tauri::command]
 pub fn sim_get_tag(state: State<'_, SimState>, tag_id: String) -> Result<TagDefinition, String> {
-    state.tag_registry().resolve(&tag_id).map_err(|e| e.to_string())
+    state
+        .tag_registry()
+        .resolve(&tag_id)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -594,21 +717,33 @@ pub fn sim_list_tags(
 }
 
 #[tauri::command]
-pub fn sim_remove_tag(state: State<'_, SimState>, tag_id: String) -> Result<(), String> {
-    state.tag_registry().remove(&tag_id).map_err(|e| e.to_string())
+pub fn sim_remove_tag(
+    state: State<'_, SimState>,
+    opcua_state: State<'_, OpcUaState>,
+    tag_id: String,
+) -> Result<(), String> {
+    ensure_opcua_namespace_mutable(&opcua_state)?;
+    state
+        .tag_registry()
+        .remove(&tag_id)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn sim_create_raw_tag(
     state: State<'_, SimState>,
+    opcua_state: State<'_, OpcUaState>,
     project_state: State<'_, SharedProjectManager>,
     request: WatchBindingRequest,
 ) -> Result<TagDefinition, String> {
+    ensure_opcua_namespace_mutable(&opcua_state)?;
     let (binding, display_address) = resolve_runtime_binding(Some(&project_state), &request)?;
     let canonical = resolve_binding_to_canonical(&state.tag_registry(), &binding)?;
-    Ok(state
-        .tag_registry()
-        .register_raw(canonical, Some(display_address.clone()), vec![display_address]))
+    Ok(state.tag_registry().register_raw(
+        canonical,
+        Some(display_address.clone()),
+        vec![display_address],
+    ))
 }
 
 // ============================================================================
@@ -837,6 +972,9 @@ pub fn ladder_release_force(
     request: WatchBindingRequest,
 ) -> Result<(), String> {
     let (binding, display_address) = resolve_runtime_binding(Some(&project_state), &request)?;
-    state.host().monitoring().release_force(&display_address, &binding);
+    state
+        .host()
+        .monitoring()
+        .release_force(&display_address, &binding);
     Ok(())
 }

@@ -3,7 +3,7 @@
 //! Defines the structure for config.yml files in project packages.
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 /// Main project configuration structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -88,7 +88,7 @@ impl Default for NetworkSettings {
 }
 
 /// OPC UA server settings for the project.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct OpcUaSettings {
     /// Whether the OPC UA server is enabled during simulation.
     pub enabled: bool,
@@ -96,16 +96,18 @@ pub struct OpcUaSettings {
     pub port: u16,
     /// Display name for the OPC UA server.
     pub server_name: String,
-    /// Security policy.
-    pub security_policy: OpcUaSecurityPolicySetting,
-    /// Allow anonymous access.
-    pub anonymous_access: bool,
     /// Optional username for UA user/password authentication.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub username: Option<String>,
     /// Optional password for UA user/password authentication.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub password: Option<String>,
+    /// True when an old `security_policy: None` value was migrated on load.
+    #[serde(skip)]
+    pub legacy_insecure_policy_seen: bool,
+    /// True when an old `anonymous_access: true` value was migrated on load.
+    #[serde(skip)]
+    pub legacy_anonymous_access_seen: bool,
 }
 
 impl Default for OpcUaSettings {
@@ -114,17 +116,55 @@ impl Default for OpcUaSettings {
             enabled: false,
             port: 4840,
             server_name: "ModOne PLC Simulator".to_string(),
-            security_policy: OpcUaSecurityPolicySetting::Basic256Sha256,
-            anonymous_access: false,
-            username: Some("modone".to_string()),
-            password: Some("modone".to_string()),
+            username: None,
+            password: None,
+            legacy_insecure_policy_seen: false,
+            legacy_anonymous_access_seen: false,
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for OpcUaSettings {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct RawOpcUaSettings {
+            #[serde(default)]
+            enabled: bool,
+            #[serde(default = "default_opcua_port")]
+            port: u16,
+            #[serde(default = "default_opcua_server_name")]
+            server_name: String,
+            #[serde(default)]
+            security_policy: Option<LegacyOpcUaSecurityPolicySetting>,
+            #[serde(default)]
+            anonymous_access: Option<bool>,
+            #[serde(default)]
+            username: Option<String>,
+            #[serde(default)]
+            password: Option<String>,
+        }
+
+        let raw = RawOpcUaSettings::deserialize(deserializer)?;
+        Ok(Self {
+            enabled: raw.enabled,
+            port: raw.port,
+            server_name: raw.server_name,
+            username: raw.username,
+            password: raw.password,
+            legacy_insecure_policy_seen: matches!(
+                raw.security_policy,
+                Some(LegacyOpcUaSecurityPolicySetting::None)
+            ),
+            legacy_anonymous_access_seen: raw.anonymous_access.unwrap_or(false),
+        })
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OpcUaSecurityPolicySetting {
-    None,
     Basic256Sha256,
 }
 
@@ -132,6 +172,20 @@ impl Default for OpcUaSecurityPolicySetting {
     fn default() -> Self {
         Self::Basic256Sha256
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+enum LegacyOpcUaSecurityPolicySetting {
+    None,
+    Basic256Sha256,
+}
+
+fn default_opcua_port() -> u16 {
+    4840
+}
+
+fn default_opcua_server_name() -> String {
+    "ModOne PLC Simulator".to_string()
 }
 
 /// Canvas grid and interaction settings
@@ -708,13 +762,41 @@ mod tests {
         assert_eq!(parsed.project.name, config.project.name);
         assert_eq!(parsed.plc.scan_time_ms, config.plc.scan_time_ms);
         assert_eq!(parsed.modbus.tcp.port, config.modbus.tcp.port);
+        assert!(!yaml.contains("security_policy"));
+        assert!(!yaml.contains("anonymous_access"));
+    }
+
+    #[test]
+    fn test_opcua_legacy_security_fields_migrate_to_secure_defaults() {
+        let yaml = r#"
+enabled: true
+port: 4840
+server_name: Legacy OPC UA
+security_policy: None
+anonymous_access: true
+username: legacy-user
+password: legacy-pass
+"#;
+
+        let parsed: OpcUaSettings = serde_yaml::from_str(yaml).unwrap();
+
+        assert!(parsed.enabled);
+        assert_eq!(parsed.port, 4840);
+        assert_eq!(parsed.server_name, "Legacy OPC UA");
+        assert_eq!(parsed.username.as_deref(), Some("legacy-user"));
+        assert_eq!(parsed.password.as_deref(), Some("legacy-pass"));
+        assert!(parsed.legacy_insecure_policy_seen);
+        assert!(parsed.legacy_anonymous_access_seen);
     }
 
     #[test]
     fn test_validation_empty_name() {
         let config = ProjectConfig::default();
         let result = config.validate();
-        assert!(matches!(result, Err(ConfigValidationError::EmptyProjectName)));
+        assert!(matches!(
+            result,
+            Err(ConfigValidationError::EmptyProjectName)
+        ));
     }
 
     #[test]
@@ -764,9 +846,18 @@ mod tests {
 
     #[test]
     fn test_plc_manufacturer_from_str() {
-        assert_eq!("ls".parse::<PlcManufacturer>().unwrap(), PlcManufacturer::LS);
-        assert_eq!("Mitsubishi".parse::<PlcManufacturer>().unwrap(), PlcManufacturer::Mitsubishi);
-        assert_eq!("SIEMENS".parse::<PlcManufacturer>().unwrap(), PlcManufacturer::Siemens);
+        assert_eq!(
+            "ls".parse::<PlcManufacturer>().unwrap(),
+            PlcManufacturer::LS
+        );
+        assert_eq!(
+            "Mitsubishi".parse::<PlcManufacturer>().unwrap(),
+            PlcManufacturer::Mitsubishi
+        );
+        assert_eq!(
+            "SIEMENS".parse::<PlcManufacturer>().unwrap(),
+            PlcManufacturer::Siemens
+        );
         assert!("Unknown".parse::<PlcManufacturer>().is_err());
     }
 

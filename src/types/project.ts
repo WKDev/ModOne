@@ -173,7 +173,7 @@ export interface NetworkSettings {
   subnet_mask: string | null;
 }
 
-export type OpcUaSecurityPolicy = 'None' | 'Basic256Sha256';
+export type OpcUaSecurityPolicy = 'Basic256Sha256';
 
 export interface OpcUaSettings {
   /** Whether the OPC UA server is enabled during simulation */
@@ -182,10 +182,6 @@ export interface OpcUaSettings {
   port: number;
   /** Server display name */
   server_name: string;
-  /** Security policy */
-  security_policy: OpcUaSecurityPolicy;
-  /** Allow anonymous access */
-  anonymous_access: boolean;
   /** Optional username for user/password authentication */
   username?: string | null;
   /** Optional password for user/password authentication */
@@ -196,8 +192,12 @@ export interface OpcUaStatus {
   running: boolean;
   port: number;
   endpoint: string;
+  endpointPath: string;
   sessionCount: number;
   sessionCountSupported: boolean;
+  certificateFingerprint?: string | null;
+  certificateValidTo?: string | null;
+  featureEnabled: boolean;
 }
 
 // Placeholder types (to be fully implemented in later units)
@@ -325,9 +325,7 @@ export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
     enabled: false,
     port: 4840,
     server_name: 'ModOne PLC Simulator',
-    security_policy: 'Basic256Sha256',
-    anonymous_access: false,
-    username: 'modone',
-    password: 'modone',
+    username: '',
+    password: '',
   },
 };

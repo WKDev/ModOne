@@ -1,14 +1,16 @@
 use std::fs;
+use std::net::{IpAddr, TcpListener};
+use std::str::FromStr;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State};
 
-use crate::opcua::{OpcUaConfig, OpcUaMemory, OpcUaSecurityPolicy, OpcUaServer, OpcUaStatus};
-use crate::plc_runtime::{CanonicalMemory, VendorProfile, resolve_vendor_profile};
-use crate::project::{OpcUaSecurityPolicySetting, ProjectConfig, SharedProjectManager};
-use crate::sim::tag_registry::SharedTagRegistry;
 use crate::commands::sim::SimState;
+use crate::opcua::{OpcUaConfig, OpcUaMemory, OpcUaServer, OpcUaStatus};
+use crate::plc_runtime::{resolve_vendor_profile, CanonicalMemory, VendorProfile};
+use crate::project::{validate_project_config, ProjectConfig, SharedProjectManager};
+use crate::sim::tag_registry::SharedTagRegistry;
 
 const OPCUA_STATUS_UPDATE_EVENT: &str = "opcua:status-update";
 
@@ -69,10 +71,7 @@ pub async fn opcua_start_server(
 }
 
 #[tauri::command]
-pub async fn opcua_stop_server(
-    app: AppHandle,
-    state: State<'_, OpcUaState>,
-) -> Result<(), String> {
+pub async fn opcua_stop_server(app: AppHandle, state: State<'_, OpcUaState>) -> Result<(), String> {
     stop_server_common(&app, &state)
 }
 
@@ -92,14 +91,9 @@ pub fn opcua_start_project_simulation(
             .unwrap_or_else(|| "127.0.0.1".to_string()),
         port: project_config.opcua.port,
         server_name: project_config.opcua.server_name.clone(),
-        security_policy: match project_config.opcua.security_policy {
-            OpcUaSecurityPolicySetting::None => OpcUaSecurityPolicy::None,
-            OpcUaSecurityPolicySetting::Basic256Sha256 => OpcUaSecurityPolicy::Basic256Sha256,
-        },
-        anonymous_access: project_config.opcua.anonymous_access,
-        certificate_path: None,
-        private_key_path: None,
-        pki_dir: None,
+        pki_dir: Default::default(),
+        certificate_path: Default::default(),
+        private_key_path: Default::default(),
         username: project_config.opcua.username.clone(),
         password: project_config.opcua.password.clone(),
     };
@@ -130,7 +124,9 @@ fn current_project_config(
     let manager = project_state
         .lock()
         .map_err(|e| format!("Failed to acquire project manager lock: {e}"))?;
-    Ok(manager.get_current_project().map(|project| project.config.clone()))
+    Ok(manager
+        .get_current_project()
+        .map(|project| project.config.clone()))
 }
 
 fn finalize_opcua_config(
@@ -156,16 +152,45 @@ fn finalize_opcua_config(
                 config.bind_address.clone()
             }
         });
-    config.certificate_path.get_or_insert_with(|| "own/cert.der".into());
-    config.private_key_path
-        .get_or_insert_with(|| "private/private.pem".into());
-    config.pki_dir.get_or_insert(pki_dir);
-    if config.username.as_deref().map_or(true, str::is_empty) {
-        config.username = Some("modone".to_string());
+    config.certificate_path = "own/cert.der".into();
+    config.private_key_path = "private/private.pem".into();
+    config.pki_dir = pki_dir;
+
+    let ip = IpAddr::from_str(&config.bind_address)
+        .map_err(|_| format!("Invalid OPC UA bind address: {}", config.bind_address))?;
+    if ip.is_unspecified() {
+        return Err("OPC UA bind address must not be unspecified".into());
     }
-    if config.password.as_deref().map_or(true, str::is_empty) {
-        config.password = Some("modone".to_string());
+    if TcpListener::bind((ip, 0)).is_err() {
+        return Err(format!(
+            "OPC UA bind address {} is not currently assigned to a local interface",
+            config.bind_address
+        ));
     }
+
+    if let Some(project_config) = project_config {
+        validate_project_config(project_config).map_err(|e| e.to_string())?;
+    }
+
+    if config
+        .username
+        .as_deref()
+        .map(str::trim)
+        .unwrap_or_default()
+        .is_empty()
+    {
+        return Err("OPC UA username is required".into());
+    }
+    if config
+        .password
+        .as_deref()
+        .map(str::trim)
+        .unwrap_or_default()
+        .is_empty()
+    {
+        return Err("OPC UA password is required".into());
+    }
+
     Ok(())
 }
 

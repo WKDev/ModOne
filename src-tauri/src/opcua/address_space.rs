@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
-use crate::plc_runtime::{CanonicalAccess, CanonicalAddress, CanonicalAreaKind, CanonicalMemory, VendorProfile};
+use crate::plc_runtime::{
+    CanonicalAccess, CanonicalAddress, CanonicalAreaKind, CanonicalMemory, VendorProfile,
+};
 use crate::project::{PlcAddressWindow, PlcHardwareTopology, PlcIoDirection, PlcSettings};
 use crate::sim::tag_registry::SharedTagRegistry;
 use crate::sim::types::{TagAccessLevel, TagClass};
 
 use super::memory::OpcUaNodeId;
-
-pub const APP_NAMESPACE: u16 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpcUaAccessLevel {
@@ -104,12 +104,10 @@ fn window_matches_area(area: CanonicalAreaKind, window: &PlcAddressWindow) -> bo
     let family = window.family.trim().to_uppercase();
     match area {
         CanonicalAreaKind::InputBit => {
-            family == "X"
-                || (family == "P" && window.io_direction != Some(PlcIoDirection::Output))
+            family == "X" || (family == "P" && window.io_direction != Some(PlcIoDirection::Output))
         }
         CanonicalAreaKind::OutputBit => {
-            family == "Y"
-                || (family == "P" && window.io_direction != Some(PlcIoDirection::Input))
+            family == "Y" || (family == "P" && window.io_direction != Some(PlcIoDirection::Input))
         }
         CanonicalAreaKind::InternalBit => family == "M",
         CanonicalAreaKind::RetentiveBit => family == "K" || family == "L",
@@ -117,8 +115,12 @@ fn window_matches_area(area: CanonicalAreaKind, window: &PlcAddressWindow) -> bo
         CanonicalAreaKind::DataWord => family == "D",
         CanonicalAreaKind::RetentiveWord => family == "R",
         CanonicalAreaKind::IndexWord => family == "Z",
-        CanonicalAreaKind::TimerDoneBit | CanonicalAreaKind::TimerValueWord => family == "T" || family == "TD",
-        CanonicalAreaKind::CounterDoneBit | CanonicalAreaKind::CounterValueWord => family == "C" || family == "CD",
+        CanonicalAreaKind::TimerDoneBit | CanonicalAreaKind::TimerValueWord => {
+            family == "T" || family == "TD"
+        }
+        CanonicalAreaKind::CounterDoneBit | CanonicalAreaKind::CounterValueWord => {
+            family == "C" || family == "CD"
+        }
         CanonicalAreaKind::SystemBit => family == "SB",
         CanonicalAreaKind::SystemWord => family == "SW" || family == "N",
     }
@@ -174,7 +176,7 @@ pub fn build_address_space_spec(
         for index in 0..count {
             let canonical_address = CanonicalAddress::new(area, index);
             let browse_name = format!("{area_name}[{index}]");
-            let node_id = OpcUaNodeId::new(APP_NAMESPACE, format!("raw/{area_name}/{index}"));
+            let node_id = OpcUaNodeId::new(format!("raw/{area_name}/{index}"));
 
             nodes.push(OpcUaNodeSpec {
                 node_id: node_id.clone(),
@@ -183,7 +185,11 @@ pub fn build_address_space_spec(
                 canonical_address,
                 access_level,
                 is_bool: is_bool_address(canonical_address),
-                path_segments: vec!["ModOne".to_string(), "RawMemory".to_string(), area_name.clone()],
+                path_segments: vec![
+                    "ModOne".to_string(),
+                    "RawMemory".to_string(),
+                    area_name.clone(),
+                ],
                 kind: OpcUaNodeKind::RawPrimary,
             });
 
@@ -196,10 +202,10 @@ pub fn build_address_space_spec(
                     let alias_str = vendor_profile
                         .format_address(&alias)
                         .unwrap_or_else(|_| format!("{}{}", alias.family, alias.index));
-                    let alias_node_id = OpcUaNodeId::new(
-                        APP_NAMESPACE,
-                        format!("alias/{}/{}", alias_policy.namespace_segment, alias_str),
-                    );
+                    let alias_node_id = OpcUaNodeId::new(format!(
+                        "alias/{}/{}",
+                        alias_policy.namespace_segment, alias_str
+                    ));
                     nodes.push(OpcUaNodeSpec {
                         node_id: alias_node_id.clone(),
                         browse_name: alias_str.clone(),
@@ -226,7 +232,7 @@ pub fn build_address_space_spec(
             TagClass::RawBacked => "Raw",
             TagClass::Semantic => "Semantic",
         };
-        let node_id = OpcUaNodeId::new(APP_NAMESPACE, format!("tag/{}", tag.tag_id));
+        let node_id = OpcUaNodeId::new(format!("tag/{}", tag.tag_id));
         let access_level = access_level_from_tag(tag.access);
 
         nodes.push(OpcUaNodeSpec {
@@ -278,15 +284,15 @@ mod tests {
         let tag_registry = std::sync::Arc::new(TagRegistry::new());
         let spec = build_address_space_spec(&memory, profile.as_ref(), &settings, &tag_registry);
 
-        assert!(spec
-            .nodes
-            .iter()
-            .any(|node| node.path_segments == vec![
+        assert!(spec.nodes.iter().any(|node| node.path_segments
+            == vec![
                 "ModOne".to_string(),
                 "RawMemory".to_string(),
                 "DataWord".to_string(),
             ]));
-        assert!(spec.primary_node_map.contains_key(&CanonicalAddress::new(CanonicalAreaKind::DataWord, 0)));
+        assert!(spec
+            .primary_node_map
+            .contains_key(&CanonicalAddress::new(CanonicalAreaKind::DataWord, 0)));
     }
 
     #[test]
@@ -299,10 +305,9 @@ mod tests {
             .register_semantic(RegisterTagRequest {
                 tag_id: Some("motor-run".to_string()),
                 display_name: "Motor Run".to_string(),
-                binding: Some(crate::sim::types::RuntimeBinding::canonical(CanonicalAddress::new(
-                    CanonicalAreaKind::OutputBit,
-                    3,
-                ))),
+                binding: Some(crate::sim::types::RuntimeBinding::canonical(
+                    CanonicalAddress::new(CanonicalAreaKind::OutputBit, 3),
+                )),
                 canonical_address: None,
                 vendor_aliases: vec!["Y3".to_string()],
                 description: None,
@@ -315,11 +320,12 @@ mod tests {
         assert!(spec.nodes.iter().any(|node| {
             node.kind == OpcUaNodeKind::Tag
                 && node.node_id.identifier == "tag/motor-run"
-                && node.path_segments == vec![
-                    "ModOne".to_string(),
-                    "Tags".to_string(),
-                    "Semantic".to_string(),
-                ]
+                && node.path_segments
+                    == vec![
+                        "ModOne".to_string(),
+                        "Tags".to_string(),
+                        "Semantic".to_string(),
+                    ]
         }));
     }
 }

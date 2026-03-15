@@ -11,16 +11,12 @@ pub struct OpcUaConfig {
     pub port: u16,
     /// Server display name
     pub server_name: String,
-    /// Security policy
-    pub security_policy: OpcUaSecurityPolicy,
-    /// Allow anonymous access
-    pub anonymous_access: bool,
-    /// Optional custom certificate path
-    pub certificate_path: Option<PathBuf>,
-    /// Optional custom private key path
-    pub private_key_path: Option<PathBuf>,
-    /// Optional PKI directory
-    pub pki_dir: Option<PathBuf>,
+    /// PKI directory for server-owned certificates and trust stores.
+    pub pki_dir: PathBuf,
+    /// Optional custom certificate path relative to the PKI directory
+    pub certificate_path: PathBuf,
+    /// Optional custom private key path relative to the PKI directory
+    pub private_key_path: PathBuf,
     /// Optional username for local username/password auth.
     pub username: Option<String>,
     /// Optional password for local username/password auth.
@@ -33,20 +29,17 @@ impl Default for OpcUaConfig {
             bind_address: "127.0.0.1".to_string(),
             port: 4840,
             server_name: "ModOne PLC Simulator".to_string(),
-            security_policy: OpcUaSecurityPolicy::Basic256Sha256,
-            anonymous_access: false,
-            certificate_path: None,
-            private_key_path: None,
-            pki_dir: None,
-            username: Some("modone".to_string()),
-            password: Some("modone".to_string()),
+            pki_dir: PathBuf::from("pki"),
+            certificate_path: PathBuf::from("own/cert.der"),
+            private_key_path: PathBuf::from("private/private.pem"),
+            username: None,
+            password: None,
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OpcUaSecurityPolicy {
-    None,
     Basic256Sha256,
 }
 
@@ -63,8 +56,12 @@ pub struct OpcUaStatus {
     pub running: bool,
     pub port: u16,
     pub endpoint: String,
+    pub endpoint_path: String,
     pub session_count: u32,
     pub session_count_supported: bool,
+    pub certificate_fingerprint: Option<String>,
+    pub certificate_valid_to: Option<String>,
+    pub feature_enabled: bool,
 }
 
 impl Default for OpcUaStatus {
@@ -73,8 +70,12 @@ impl Default for OpcUaStatus {
             running: false,
             port: 4840,
             endpoint: String::new(),
+            endpoint_path: "/".to_string(),
             session_count: 0,
             session_count_supported: false,
+            certificate_fingerprint: None,
+            certificate_valid_to: None,
+            feature_enabled: cfg!(feature = "opcua-server"),
         }
     }
 }
