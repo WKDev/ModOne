@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 /// OPC UA server configuration for runtime use.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpcUaConfig {
-    /// Bind address ("0.0.0.0" or specific plc_ip)
+    /// Bind address ("127.0.0.1" or specific plc_ip)
     pub bind_address: String,
     /// TCP port (default 4840)
     pub port: u16,
@@ -19,18 +19,27 @@ pub struct OpcUaConfig {
     pub certificate_path: Option<PathBuf>,
     /// Optional custom private key path
     pub private_key_path: Option<PathBuf>,
+    /// Optional PKI directory
+    pub pki_dir: Option<PathBuf>,
+    /// Optional username for local username/password auth.
+    pub username: Option<String>,
+    /// Optional password for local username/password auth.
+    pub password: Option<String>,
 }
 
 impl Default for OpcUaConfig {
     fn default() -> Self {
         Self {
-            bind_address: "0.0.0.0".to_string(),
+            bind_address: "127.0.0.1".to_string(),
             port: 4840,
             server_name: "ModOne PLC Simulator".to_string(),
-            security_policy: OpcUaSecurityPolicy::None,
-            anonymous_access: true,
+            security_policy: OpcUaSecurityPolicy::Basic256Sha256,
+            anonymous_access: false,
             certificate_path: None,
             private_key_path: None,
+            pki_dir: None,
+            username: Some("modone".to_string()),
+            password: Some("modone".to_string()),
         }
     }
 }
@@ -43,7 +52,7 @@ pub enum OpcUaSecurityPolicy {
 
 impl Default for OpcUaSecurityPolicy {
     fn default() -> Self {
-        Self::None
+        Self::Basic256Sha256
     }
 }
 
@@ -55,6 +64,7 @@ pub struct OpcUaStatus {
     pub port: u16,
     pub endpoint: String,
     pub session_count: u32,
+    pub session_count_supported: bool,
 }
 
 impl Default for OpcUaStatus {
@@ -64,6 +74,7 @@ impl Default for OpcUaStatus {
             port: 4840,
             endpoint: String::new(),
             session_count: 0,
+            session_count_supported: false,
         }
     }
 }

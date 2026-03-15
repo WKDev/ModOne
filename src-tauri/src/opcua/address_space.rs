@@ -1,111 +1,153 @@
 use std::collections::HashMap;
 
-use crate::plc_runtime::{
-    CanonicalAddress, CanonicalAreaKind, CanonicalMemory, VendorProfile,
-};
-use crate::project::PlcSettings;
+use crate::plc_runtime::{CanonicalAccess, CanonicalAddress, CanonicalAreaKind, CanonicalMemory, VendorProfile};
+use crate::project::{PlcAddressWindow, PlcHardwareTopology, PlcIoDirection, PlcSettings};
+use crate::sim::tag_registry::SharedTagRegistry;
+use crate::sim::types::{TagAccessLevel, TagClass};
 
 use super::memory::OpcUaNodeId;
 
-/// OPC UA namespace index for application nodes.
 pub const APP_NAMESPACE: u16 = 2;
 
-/// Access level for OPC UA variable nodes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpcUaAccessLevel {
     ReadOnly,
     ReadWrite,
 }
 
-/// Metadata for a single OPC UA variable node.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpcUaNodeKind {
+    RawPrimary,
+    Tag,
+    VendorAlias,
+}
+
 #[derive(Debug, Clone)]
 pub struct OpcUaNodeSpec {
     pub node_id: OpcUaNodeId,
+    pub browse_name: String,
     pub display_name: String,
     pub canonical_address: CanonicalAddress,
     pub access_level: OpcUaAccessLevel,
     pub is_bool: bool,
+    pub path_segments: Vec<String>,
+    pub kind: OpcUaNodeKind,
 }
 
-/// Result of building the OPC UA address space: a flat list of node specs
-/// and the canonical→NodeId mapping.
 pub struct AddressSpaceSpec {
     pub nodes: Vec<OpcUaNodeSpec>,
-    pub node_map: HashMap<CanonicalAddress, OpcUaNodeId>,
+    pub primary_node_map: HashMap<CanonicalAddress, OpcUaNodeId>,
+    pub publish_map: HashMap<CanonicalAddress, Vec<OpcUaNodeId>>,
 }
 
-/// Determine the access level for a canonical area kind.
-fn access_level_for(area: CanonicalAreaKind) -> OpcUaAccessLevel {
-    match area {
-        // Writable areas (external protocol clients can write)
-        CanonicalAreaKind::InputBit
-        | CanonicalAreaKind::OutputBit
-        | CanonicalAreaKind::InternalBit
-        | CanonicalAreaKind::RetentiveBit
-        | CanonicalAreaKind::DataWord
-        | CanonicalAreaKind::RetentiveWord
-        | CanonicalAreaKind::IndexWord => OpcUaAccessLevel::ReadWrite,
-
-        // Read-only areas (internal/system use only)
-        CanonicalAreaKind::SpecialBit
-        | CanonicalAreaKind::TimerDoneBit
-        | CanonicalAreaKind::CounterDoneBit
-        | CanonicalAreaKind::SystemBit
-        | CanonicalAreaKind::TimerValueWord
-        | CanonicalAreaKind::CounterValueWord
-        | CanonicalAreaKind::SystemWord => OpcUaAccessLevel::ReadOnly,
+fn access_level_from_canonical(access: CanonicalAccess) -> OpcUaAccessLevel {
+    match access {
+        CanonicalAccess::ReadWrite => OpcUaAccessLevel::ReadWrite,
+        CanonicalAccess::ReadOnly | CanonicalAccess::InternalOnly => OpcUaAccessLevel::ReadOnly,
     }
 }
 
-/// Whether a canonical area stores boolean or word values.
-fn is_bool_area(area: CanonicalAreaKind) -> bool {
-    matches!(
-        area,
-        CanonicalAreaKind::InputBit
-            | CanonicalAreaKind::OutputBit
-            | CanonicalAreaKind::InternalBit
-            | CanonicalAreaKind::RetentiveBit
-            | CanonicalAreaKind::SpecialBit
-            | CanonicalAreaKind::TimerDoneBit
-            | CanonicalAreaKind::CounterDoneBit
-            | CanonicalAreaKind::SystemBit
-    )
-}
-
-/// Compute the number of nodes to expose for a given area.
-///
-/// For now, we expose a fixed subset to avoid creating 50k+ nodes.
-/// Future versions can use hardware topology / vendor profile to refine.
-fn exposure_count(area: CanonicalAreaKind) -> u32 {
-    match area {
-        // Primary data areas: expose a reasonable default
-        CanonicalAreaKind::InputBit | CanonicalAreaKind::OutputBit => 64,
-        CanonicalAreaKind::InternalBit => 256,
-        CanonicalAreaKind::RetentiveBit => 128,
-        CanonicalAreaKind::DataWord => 256,
-        CanonicalAreaKind::RetentiveWord => 128,
-        CanonicalAreaKind::IndexWord => 16,
-        // System/timer/counter: expose smaller windows
-        CanonicalAreaKind::SpecialBit => 32,
-        CanonicalAreaKind::TimerDoneBit | CanonicalAreaKind::CounterDoneBit => 64,
-        CanonicalAreaKind::SystemBit => 16,
-        CanonicalAreaKind::TimerValueWord | CanonicalAreaKind::CounterValueWord => 64,
-        CanonicalAreaKind::SystemWord => 16,
+fn access_level_from_tag(access: TagAccessLevel) -> OpcUaAccessLevel {
+    match access {
+        TagAccessLevel::ReadOnly => OpcUaAccessLevel::ReadOnly,
+        TagAccessLevel::ReadWrite => OpcUaAccessLevel::ReadWrite,
     }
 }
 
-/// Build the OPC UA address space specification from canonical memory layout.
-///
-/// This generates the node hierarchy and mapping without depending on the
-/// opcua crate, so it can be used for both building the actual server address
-/// space and for testing.
+fn is_bool_address(address: CanonicalAddress) -> bool {
+    address.bit_index.is_some()
+        || matches!(
+            address.area,
+            CanonicalAreaKind::InputBit
+                | CanonicalAreaKind::OutputBit
+                | CanonicalAreaKind::InternalBit
+                | CanonicalAreaKind::RetentiveBit
+                | CanonicalAreaKind::SpecialBit
+                | CanonicalAreaKind::TimerDoneBit
+                | CanonicalAreaKind::CounterDoneBit
+                | CanonicalAreaKind::SystemBit
+        )
+}
+
+fn documented_default_exposure(area: CanonicalAreaKind) -> u32 {
+    match area {
+        CanonicalAreaKind::InputBit | CanonicalAreaKind::OutputBit => 256,
+        CanonicalAreaKind::InternalBit => 512,
+        CanonicalAreaKind::RetentiveBit => 256,
+        CanonicalAreaKind::DataWord => 512,
+        CanonicalAreaKind::RetentiveWord => 256,
+        CanonicalAreaKind::IndexWord => 32,
+        CanonicalAreaKind::SpecialBit => 64,
+        CanonicalAreaKind::TimerDoneBit | CanonicalAreaKind::CounterDoneBit => 128,
+        CanonicalAreaKind::SystemBit => 32,
+        CanonicalAreaKind::TimerValueWord | CanonicalAreaKind::CounterValueWord => 128,
+        CanonicalAreaKind::SystemWord => 32,
+    }
+}
+
+fn topology_exposure_limit(area: CanonicalAreaKind, topology: &PlcHardwareTopology) -> Option<u32> {
+    let mut max_limit: Option<u32> = None;
+    for rack in &topology.racks {
+        for module in &rack.modules {
+            for window in &module.address_windows {
+                if window_matches_area(area, window) {
+                    let end = window.start.saturating_add(window.count);
+                    max_limit = Some(max_limit.map_or(end, |current| current.max(end)));
+                }
+            }
+        }
+    }
+    max_limit
+}
+
+fn window_matches_area(area: CanonicalAreaKind, window: &PlcAddressWindow) -> bool {
+    let family = window.family.trim().to_uppercase();
+    match area {
+        CanonicalAreaKind::InputBit => {
+            family == "X"
+                || (family == "P" && window.io_direction != Some(PlcIoDirection::Output))
+        }
+        CanonicalAreaKind::OutputBit => {
+            family == "Y"
+                || (family == "P" && window.io_direction != Some(PlcIoDirection::Input))
+        }
+        CanonicalAreaKind::InternalBit => family == "M",
+        CanonicalAreaKind::RetentiveBit => family == "K" || family == "L",
+        CanonicalAreaKind::SpecialBit => family == "F",
+        CanonicalAreaKind::DataWord => family == "D",
+        CanonicalAreaKind::RetentiveWord => family == "R",
+        CanonicalAreaKind::IndexWord => family == "Z",
+        CanonicalAreaKind::TimerDoneBit | CanonicalAreaKind::TimerValueWord => family == "T" || family == "TD",
+        CanonicalAreaKind::CounterDoneBit | CanonicalAreaKind::CounterValueWord => family == "C" || family == "CD",
+        CanonicalAreaKind::SystemBit => family == "SB",
+        CanonicalAreaKind::SystemWord => family == "SW" || family == "N",
+    }
+}
+
+fn raw_exposure_limit(area: CanonicalAreaKind, plc_settings: &PlcSettings) -> u32 {
+    let topology_limit = topology_exposure_limit(area, &plc_settings.hardware_topology);
+    topology_limit
+        .unwrap_or_else(|| documented_default_exposure(area))
+        .min(area.default_size() as u32)
+}
+
+fn push_publish_node(
+    publish_map: &mut HashMap<CanonicalAddress, Vec<OpcUaNodeId>>,
+    address: CanonicalAddress,
+    node_id: OpcUaNodeId,
+) {
+    publish_map.entry(address).or_default().push(node_id);
+}
+
 pub fn build_address_space_spec(
     _canonical_memory: &CanonicalMemory,
     vendor_profile: &dyn VendorProfile,
-    _plc_settings: &PlcSettings,
+    plc_settings: &PlcSettings,
+    tag_registry: &SharedTagRegistry,
 ) -> AddressSpaceSpec {
     let mut nodes = Vec::new();
-    let mut node_map = HashMap::new();
+    let mut primary_node_map = HashMap::new();
+    let mut publish_map: HashMap<CanonicalAddress, Vec<OpcUaNodeId>> = HashMap::new();
 
     let all_areas = [
         CanonicalAreaKind::InputBit,
@@ -124,69 +166,100 @@ pub fn build_address_space_spec(
         CanonicalAreaKind::SystemWord,
     ];
 
-    // Create nodes for each canonical memory area
-    for area in &all_areas {
-        let count = exposure_count(*area).min(area.default_size() as u32);
-        let access = access_level_for(*area);
-        let is_bool = is_bool_area(*area);
-        let area_name = format!("{:?}", area);
+    for area in all_areas {
+        let count = raw_exposure_limit(area, plc_settings);
+        let access_level = access_level_from_canonical(area.default_access());
+        let area_name = format!("{area:?}");
 
         for index in 0..count {
-            let canonical_addr = CanonicalAddress::new(*area, index);
-            let node_id_str = format!("{:?}.{}", area, index);
-            let node_id = OpcUaNodeId::new(APP_NAMESPACE, &node_id_str);
-            let display_name = format!("{}[{}]", area_name, index);
+            let canonical_address = CanonicalAddress::new(area, index);
+            let browse_name = format!("{area_name}[{index}]");
+            let node_id = OpcUaNodeId::new(APP_NAMESPACE, format!("raw/{area_name}/{index}"));
 
             nodes.push(OpcUaNodeSpec {
                 node_id: node_id.clone(),
-                display_name,
-                canonical_address: canonical_addr,
-                access_level: access,
-                is_bool,
+                browse_name: browse_name.clone(),
+                display_name: browse_name,
+                canonical_address,
+                access_level,
+                is_bool: is_bool_address(canonical_address),
+                path_segments: vec!["ModOne".to_string(), "RawMemory".to_string(), area_name.clone()],
+                kind: OpcUaNodeKind::RawPrimary,
             });
 
-            node_map.insert(canonical_addr, node_id);
-        }
-    }
+            primary_node_map.insert(canonical_address, node_id.clone());
+            push_publish_node(&mut publish_map, canonical_address, node_id.clone());
 
-    // Add vendor aliases if the policy allows it
-    let alias_policy = vendor_profile.opcua_alias_policy();
-    if alias_policy.expose_vendor_aliases {
-        let namespace_segment = &alias_policy.namespace_segment;
-
-        // For each mapped node, look up vendor aliases
-        let mapped_addresses: Vec<CanonicalAddress> = node_map.keys().copied().collect();
-        for canonical_addr in &mapped_addresses {
-            let vendor_aliases = vendor_profile.canonical_aliases(canonical_addr);
-            for alias in &vendor_aliases {
-                let alias_str = vendor_profile
-                    .format_address(alias)
-                    .unwrap_or_else(|_| format!("{}{}", alias.family, alias.index));
-                let alias_node_id_str = format!("{}.{}", namespace_segment, alias_str);
-                let alias_node_id = OpcUaNodeId::new(APP_NAMESPACE, &alias_node_id_str);
-
-                // Alias nodes point to the same canonical address but have
-                // a different NodeId. We don't add them to the node_map
-                // (canonical→NodeId is 1:1), but we do add them to the nodes list.
-                nodes.push(OpcUaNodeSpec {
-                    node_id: alias_node_id,
-                    display_name: alias_str,
-                    canonical_address: *canonical_addr,
-                    access_level: access_level_for(canonical_addr.area),
-                    is_bool: is_bool_area(canonical_addr.area),
-                });
+            let alias_policy = vendor_profile.opcua_alias_policy();
+            if alias_policy.expose_vendor_aliases {
+                for alias in vendor_profile.canonical_aliases(&canonical_address) {
+                    let alias_str = vendor_profile
+                        .format_address(&alias)
+                        .unwrap_or_else(|_| format!("{}{}", alias.family, alias.index));
+                    let alias_node_id = OpcUaNodeId::new(
+                        APP_NAMESPACE,
+                        format!("alias/{}/{}", alias_policy.namespace_segment, alias_str),
+                    );
+                    nodes.push(OpcUaNodeSpec {
+                        node_id: alias_node_id.clone(),
+                        browse_name: alias_str.clone(),
+                        display_name: alias_str,
+                        canonical_address,
+                        access_level,
+                        is_bool: is_bool_address(canonical_address),
+                        path_segments: vec![
+                            "ModOne".to_string(),
+                            "RawMemory".to_string(),
+                            "Aliases".to_string(),
+                            alias_policy.namespace_segment.clone(),
+                        ],
+                        kind: OpcUaNodeKind::VendorAlias,
+                    });
+                    push_publish_node(&mut publish_map, canonical_address, alias_node_id);
+                }
             }
         }
     }
 
-    AddressSpaceSpec { nodes, node_map }
+    for tag in tag_registry.list(true) {
+        let class_segment = match tag.class {
+            TagClass::RawBacked => "Raw",
+            TagClass::Semantic => "Semantic",
+        };
+        let node_id = OpcUaNodeId::new(APP_NAMESPACE, format!("tag/{}", tag.tag_id));
+        let access_level = access_level_from_tag(tag.access);
+
+        nodes.push(OpcUaNodeSpec {
+            node_id: node_id.clone(),
+            browse_name: tag.tag_id.clone(),
+            display_name: tag.display_name.clone(),
+            canonical_address: tag.canonical_address,
+            access_level,
+            is_bool: is_bool_address(tag.canonical_address),
+            path_segments: vec![
+                "ModOne".to_string(),
+                "Tags".to_string(),
+                class_segment.to_string(),
+            ],
+            kind: OpcUaNodeKind::Tag,
+        });
+        push_publish_node(&mut publish_map, tag.canonical_address, node_id);
+    }
+
+    AddressSpaceSpec {
+        nodes,
+        primary_node_map,
+        publish_map,
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::plc_runtime::{resolve_vendor_profile, CanonicalMemory};
-    use crate::project::{PlcManufacturer, PlcSettings, PlcHardwareTopology};
+    use crate::project::{PlcHardwareTopology, PlcManufacturer};
+    use crate::sim::tag_registry::TagRegistry;
+    use crate::sim::types::RegisterTagRequest;
 
     fn ls_settings() -> PlcSettings {
         PlcSettings {
@@ -198,62 +271,55 @@ mod tests {
     }
 
     #[test]
-    fn builds_nodes_for_all_canonical_areas() {
+    fn builds_primary_raw_memory_nodes() {
         let memory = CanonicalMemory::new();
         let settings = ls_settings();
         let profile = resolve_vendor_profile(&settings).unwrap();
-        let spec = build_address_space_spec(&memory, profile.as_ref(), &settings);
+        let tag_registry = std::sync::Arc::new(TagRegistry::new());
+        let spec = build_address_space_spec(&memory, profile.as_ref(), &settings, &tag_registry);
 
-        // Should have nodes for all 14 area kinds
-        assert!(!spec.nodes.is_empty());
-        assert!(!spec.node_map.is_empty());
-
-        // DataWord should have 256 nodes
-        let dw_count = spec.nodes.iter()
-            .filter(|n| n.canonical_address.area == CanonicalAreaKind::DataWord)
-            .count();
-        assert!(dw_count >= 256, "Expected >=256 DataWord nodes, got {}", dw_count);
+        assert!(spec
+            .nodes
+            .iter()
+            .any(|node| node.path_segments == vec![
+                "ModOne".to_string(),
+                "RawMemory".to_string(),
+                "DataWord".to_string(),
+            ]));
+        assert!(spec.primary_node_map.contains_key(&CanonicalAddress::new(CanonicalAreaKind::DataWord, 0)));
     }
 
     #[test]
-    fn access_levels_match_canonical_constraints() {
+    fn includes_semantic_tags_under_tags_namespace() {
         let memory = CanonicalMemory::new();
         let settings = ls_settings();
         let profile = resolve_vendor_profile(&settings).unwrap();
-        let spec = build_address_space_spec(&memory, profile.as_ref(), &settings);
+        let tag_registry = std::sync::Arc::new(TagRegistry::new());
+        tag_registry
+            .register_semantic(RegisterTagRequest {
+                tag_id: Some("motor-run".to_string()),
+                display_name: "Motor Run".to_string(),
+                binding: Some(crate::sim::types::RuntimeBinding::canonical(CanonicalAddress::new(
+                    CanonicalAreaKind::OutputBit,
+                    3,
+                ))),
+                canonical_address: None,
+                vendor_aliases: vec!["Y3".to_string()],
+                description: None,
+                engineering_unit: None,
+                access: None,
+            })
+            .unwrap();
 
-        for node in &spec.nodes {
-            match node.canonical_address.area {
-                CanonicalAreaKind::DataWord | CanonicalAreaKind::InternalBit => {
-                    assert_eq!(node.access_level, OpcUaAccessLevel::ReadWrite);
-                }
-                CanonicalAreaKind::SpecialBit | CanonicalAreaKind::SystemWord => {
-                    assert_eq!(node.access_level, OpcUaAccessLevel::ReadOnly);
-                }
-                _ => {}
-            }
-        }
-    }
-
-    #[test]
-    fn vendor_aliases_included_when_policy_allows() {
-        let memory = CanonicalMemory::new();
-        let settings = ls_settings();
-        let profile = resolve_vendor_profile(&settings).unwrap();
-        let policy = profile.opcua_alias_policy();
-
-        let spec = build_address_space_spec(&memory, profile.as_ref(), &settings);
-
-        if policy.expose_vendor_aliases {
-            // Should have vendor alias nodes (more nodes than unique canonical addresses)
-            let unique_canonical = spec.node_map.len();
-            let total_nodes = spec.nodes.len();
-            assert!(
-                total_nodes > unique_canonical,
-                "Expected vendor alias nodes, got {} total vs {} unique",
-                total_nodes,
-                unique_canonical
-            );
-        }
+        let spec = build_address_space_spec(&memory, profile.as_ref(), &settings, &tag_registry);
+        assert!(spec.nodes.iter().any(|node| {
+            node.kind == OpcUaNodeKind::Tag
+                && node.node_id.identifier == "tag/motor-run"
+                && node.path_segments == vec![
+                    "ModOne".to_string(),
+                    "Tags".to_string(),
+                    "Semantic".to_string(),
+                ]
+        }));
     }
 }

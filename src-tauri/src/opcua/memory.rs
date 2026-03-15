@@ -43,8 +43,10 @@ pub struct ExternalWrite {
 pub struct OpcUaMemory {
     /// Writes from OPC UA clients, drained by the adapter each flush cycle.
     external_writes: Mutex<Vec<ExternalWrite>>,
-    /// Canonical address → OPC UA NodeId mapping (built during address space creation).
-    node_map: parking_lot::RwLock<HashMap<CanonicalAddress, OpcUaNodeId>>,
+    /// Canonical address → primary OPC UA NodeId mapping for raw memory nodes.
+    primary_node_map: parking_lot::RwLock<HashMap<CanonicalAddress, OpcUaNodeId>>,
+    /// Canonical address → all OPC UA NodeIds that should mirror this value.
+    publish_map: parking_lot::RwLock<HashMap<CanonicalAddress, Vec<OpcUaNodeId>>>,
     /// Reverse mapping: OPC UA NodeId → CanonicalAddress (used in write callbacks).
     reverse_map: parking_lot::RwLock<HashMap<OpcUaNodeId, CanonicalAddress>>,
 }
@@ -53,7 +55,8 @@ impl OpcUaMemory {
     pub fn new() -> Self {
         Self {
             external_writes: Mutex::new(Vec::new()),
-            node_map: parking_lot::RwLock::new(HashMap::new()),
+            primary_node_map: parking_lot::RwLock::new(HashMap::new()),
+            publish_map: parking_lot::RwLock::new(HashMap::new()),
             reverse_map: parking_lot::RwLock::new(HashMap::new()),
         }
     }
@@ -71,12 +74,19 @@ impl OpcUaMemory {
     }
 
     /// Register the full node mapping after building the address space.
-    pub fn register_nodes(&self, map: HashMap<CanonicalAddress, OpcUaNodeId>) {
-        let reverse: HashMap<OpcUaNodeId, CanonicalAddress> = map
-            .iter()
-            .map(|(addr, node_id)| (node_id.clone(), *addr))
-            .collect();
-        *self.node_map.write() = map;
+    pub fn register_nodes(
+        &self,
+        primary_map: HashMap<CanonicalAddress, OpcUaNodeId>,
+        publish_map: HashMap<CanonicalAddress, Vec<OpcUaNodeId>>,
+    ) {
+        let mut reverse = HashMap::new();
+        for (address, node_ids) in &publish_map {
+            for node_id in node_ids {
+                reverse.insert(node_id.clone(), *address);
+            }
+        }
+        *self.primary_node_map.write() = primary_map;
+        *self.publish_map.write() = publish_map;
         *self.reverse_map.write() = reverse;
     }
 
@@ -87,23 +97,29 @@ impl OpcUaMemory {
 
     /// Look up the OPC UA NodeId for a given canonical address.
     pub fn resolve_address(&self, address: &CanonicalAddress) -> Option<OpcUaNodeId> {
-        self.node_map.read().get(address).cloned()
+        self.primary_node_map.read().get(address).cloned()
     }
 
     /// Get a snapshot of all mapped canonical addresses and their node IDs.
-    pub fn node_map_snapshot(&self) -> HashMap<CanonicalAddress, OpcUaNodeId> {
-        self.node_map.read().clone()
+    pub fn primary_node_map_snapshot(&self) -> HashMap<CanonicalAddress, OpcUaNodeId> {
+        self.primary_node_map.read().clone()
+    }
+
+    /// Get a snapshot of all publishable node IDs for each canonical address.
+    pub fn publish_map_snapshot(&self) -> HashMap<CanonicalAddress, Vec<OpcUaNodeId>> {
+        self.publish_map.read().clone()
     }
 
     /// Number of registered nodes.
     pub fn node_count(&self) -> usize {
-        self.node_map.read().len()
+        self.reverse_map.read().len()
     }
 
     /// Clear all mappings and pending writes.
     pub fn clear(&self) {
         self.external_writes.lock().clear();
-        self.node_map.write().clear();
+        self.primary_node_map.write().clear();
+        self.publish_map.write().clear();
         self.reverse_map.write().clear();
     }
 }
@@ -146,11 +162,13 @@ mod tests {
         let memory = OpcUaMemory::new();
 
         let mut map = HashMap::new();
+        let mut publish_map = HashMap::new();
         let addr = CanonicalAddress::new(CanonicalAreaKind::DataWord, 0);
         let node_id = OpcUaNodeId::new(2, "DataWord.0");
         map.insert(addr, node_id.clone());
+        publish_map.insert(addr, vec![node_id.clone()]);
 
-        memory.register_nodes(map);
+        memory.register_nodes(map, publish_map);
 
         assert_eq!(memory.resolve_address(&addr), Some(node_id.clone()));
         assert_eq!(memory.resolve_node(&node_id), Some(addr));

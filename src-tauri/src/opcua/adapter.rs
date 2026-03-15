@@ -57,20 +57,20 @@ impl OpcUaAdapter {
         }
 
         let mem = self.canonical_memory.read();
-        let node_map = self.opcua_memory.node_map_snapshot();
+        let publish_map = self.opcua_memory.publish_map_snapshot();
 
         self.server
-            .update_node_values(windows, &mem, &node_map)
+            .update_node_values(windows, &mem, &publish_map)
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
     }
 
     /// Publish full runtime state into OPC UA address space.
     fn publish_all(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mem = self.canonical_memory.read();
-        let node_map = self.opcua_memory.node_map_snapshot();
+        let publish_map = self.opcua_memory.publish_map_snapshot();
 
         self.server
-            .sync_all_node_values(&mem, &node_map)
+            .sync_all_node_values(&mem, &publish_map)
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
     }
 }

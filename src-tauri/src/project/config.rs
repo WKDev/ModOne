@@ -59,14 +59,14 @@ impl Default for ProjectConfig {
 /// Network settings for PLC IP simulation.
 ///
 /// When `plc_ip` is set, the simulator will bind Modbus TCP (and future OPC UA)
-/// servers to this IP address instead of the default `0.0.0.0`. The IP can be
+/// servers to this IP address instead of the default `127.0.0.1`. The IP can be
 /// assigned to a network interface as an alias using OS-level commands
 /// (e.g., `netsh interface ip add address` on Windows).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkSettings {
     /// IP address that the simulated PLC should use on the network.
     /// When set, protocol servers (Modbus TCP, OPC UA) bind to this IP.
-    /// When None, servers bind to 0.0.0.0 (all interfaces).
+    /// When None, servers bind to 127.0.0.1.
     pub plc_ip: Option<String>,
 
     /// Network interface name for IP alias assignment.
@@ -100,6 +100,12 @@ pub struct OpcUaSettings {
     pub security_policy: OpcUaSecurityPolicySetting,
     /// Allow anonymous access.
     pub anonymous_access: bool,
+    /// Optional username for UA user/password authentication.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub username: Option<String>,
+    /// Optional password for UA user/password authentication.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub password: Option<String>,
 }
 
 impl Default for OpcUaSettings {
@@ -108,8 +114,10 @@ impl Default for OpcUaSettings {
             enabled: false,
             port: 4840,
             server_name: "ModOne PLC Simulator".to_string(),
-            security_policy: OpcUaSecurityPolicySetting::None,
-            anonymous_access: true,
+            security_policy: OpcUaSecurityPolicySetting::Basic256Sha256,
+            anonymous_access: false,
+            username: Some("modone".to_string()),
+            password: Some("modone".to_string()),
         }
     }
 }
@@ -122,7 +130,7 @@ pub enum OpcUaSecurityPolicySetting {
 
 impl Default for OpcUaSecurityPolicySetting {
     fn default() -> Self {
-        Self::None
+        Self::Basic256Sha256
     }
 }
 

@@ -28,6 +28,7 @@ pub type TagRegistryResult<T> = Result<T, TagRegistryError>;
 
 #[derive(Default)]
 pub struct TagRegistry {
+    raw_tags: RwLock<HashMap<String, TagDefinition>>,
     semantic_tags: RwLock<HashMap<String, TagDefinition>>,
 }
 
@@ -37,6 +38,10 @@ impl TagRegistry {
     }
 
     pub fn resolve(&self, tag_id: &str) -> TagRegistryResult<TagDefinition> {
+        if let Some(raw) = self.raw_tags.read().get(tag_id).cloned() {
+            return Ok(raw);
+        }
+
         if let Some(raw) = self.try_resolve_raw(tag_id) {
             return Ok(raw);
         }
@@ -121,6 +126,19 @@ impl TagRegistry {
         Ok(definition)
     }
 
+    pub fn register_raw(
+        &self,
+        address: CanonicalAddress,
+        display_name: Option<String>,
+        vendor_aliases: Vec<String>,
+    ) -> TagDefinition {
+        let definition = self.raw_tag_for_address(address, display_name, vendor_aliases);
+        self.raw_tags
+            .write()
+            .insert(definition.tag_id.clone(), definition.clone());
+        definition
+    }
+
     pub fn remove(&self, tag_id: &str) -> TagRegistryResult<()> {
         if tag_id.starts_with(RAW_TAG_PREFIX) {
             return Err(TagRegistryError::TagNotFound(tag_id.to_string()));
@@ -136,11 +154,7 @@ impl TagRegistry {
     pub fn list(&self, include_raw: bool) -> Vec<TagDefinition> {
         let mut tags: Vec<_> = self.semantic_tags.read().values().cloned().collect();
         if include_raw {
-            let raw_tags: Vec<_> = tags
-                .iter()
-                .map(|tag| self.raw_tag_for_address(tag.canonical_address, Some(tag.display_name.clone()), tag.vendor_aliases.clone()))
-                .collect();
-            tags.extend(raw_tags);
+            tags.extend(self.raw_tags.read().values().cloned());
         }
 
         tags.sort_by(|a, b| a.tag_id.cmp(&b.tag_id));
@@ -261,5 +275,19 @@ mod tests {
 
         assert_eq!(tag.tag_id, "motor-run");
         assert_eq!(registry.resolve("motor-run").unwrap().canonical_address, tag.canonical_address);
+    }
+
+    #[test]
+    fn persists_explicit_raw_tags_for_listing() {
+        let registry = TagRegistry::new();
+        let tag = registry.register_raw(
+            CanonicalAddress::new(CanonicalAreaKind::DataWord, 5),
+            Some("D5 Raw".to_string()),
+            vec!["D0005".to_string()],
+        );
+
+        let listed = registry.list(true);
+        assert!(listed.iter().any(|item| item.tag_id == tag.tag_id));
+        assert_eq!(registry.resolve(&tag.tag_id).unwrap().display_name, "D5 Raw");
     }
 }

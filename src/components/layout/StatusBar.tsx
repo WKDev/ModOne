@@ -1,6 +1,10 @@
+import { useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { Activity, Wifi, WifiOff, Cpu, Sun, Moon, Radio } from 'lucide-react';
 import { useLayoutStore, SimulationStatus } from '../../stores/layoutStore';
 import { useTheme } from '../../providers/ThemeProvider';
+import type { OpcUaStatus } from '../../types/project';
 
 interface StatusIndicatorProps {
   status: SimulationStatus;
@@ -36,6 +40,8 @@ export function StatusBar() {
     opcuaRunning,
     opcuaPort,
     memoryUsageMb,
+    setOpcuaRunning,
+    setOpcuaPort,
   } = useLayoutStore();
 
   const { isDark, setTheme } = useTheme();
@@ -43,6 +49,33 @@ export function StatusBar() {
   const toggleTheme = () => {
     setTheme(isDark ? 'light' : 'dark');
   };
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+
+    const syncStatus = async () => {
+      try {
+        const status = await invoke<OpcUaStatus>('opcua_get_status');
+        setOpcuaRunning(status.running);
+        setOpcuaPort(status.port);
+      } catch {
+        setOpcuaRunning(false);
+      }
+    };
+
+    void syncStatus();
+
+    void listen<OpcUaStatus>('opcua:status-update', (event) => {
+      setOpcuaRunning(event.payload.running);
+      setOpcuaPort(event.payload.port);
+    }).then((dispose) => {
+      unlisten = dispose;
+    });
+
+    return () => {
+      unlisten?.();
+    };
+  }, [setOpcuaPort, setOpcuaRunning]);
 
   return (
     <div data-testid="status-bar" className="h-6 bg-[var(--color-bg-secondary)] border-t border-[var(--color-border)] flex items-center justify-between px-4 text-xs font-mono">

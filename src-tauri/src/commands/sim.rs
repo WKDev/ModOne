@@ -184,10 +184,12 @@ pub async fn sim_run(
         if project_config.opcua.enabled {
             let canonical_memory_arc = state.runtime().handle();
             let opcua_server = opcua_start_project_simulation(
+                &app,
                 &opcua_state,
                 &canonical_memory_arc,
                 profile.as_ref(),
                 project_config,
+                &state.tag_registry(),
             )?;
 
             // Create OPC UA adapter and attach to protocol runtime
@@ -223,7 +225,7 @@ pub async fn sim_stop(
     opcua_state: State<'_, OpcUaState>,
 ) -> Result<(), String> {
     state.host().stop(&app)?;
-    opcua_stop_project_simulation(&opcua_state)?;
+    opcua_stop_project_simulation(&app, &opcua_state)?;
     modbus_stop_project_simulation(&modbus_state, &network_state).await
 }
 
@@ -249,7 +251,7 @@ pub async fn sim_reset(
     opcua_state: State<'_, OpcUaState>,
 ) -> Result<(), String> {
     state.host().reset(&app);
-    opcua_stop_project_simulation(&opcua_state)?;
+    opcua_stop_project_simulation(&app, &opcua_state)?;
     modbus_stop_project_simulation(&modbus_state, &network_state).await?;
     Ok(())
 }
@@ -606,7 +608,7 @@ pub fn sim_create_raw_tag(
     let canonical = resolve_binding_to_canonical(&state.tag_registry(), &binding)?;
     Ok(state
         .tag_registry()
-        .raw_tag_for_address(canonical, Some(display_address.clone()), vec![display_address]))
+        .register_raw(canonical, Some(display_address.clone()), vec![display_address]))
 }
 
 // ============================================================================

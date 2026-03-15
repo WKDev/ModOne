@@ -165,7 +165,7 @@ export interface ProjectConfig {
 }
 
 export interface NetworkSettings {
-  /** IP address the simulated PLC uses on the network. Null means bind to 0.0.0.0 */
+  /** IP address the simulated PLC uses on the network. Null means bind to 127.0.0.1 */
   plc_ip: string | null;
   /** Network interface name for IP alias assignment */
   interface_name: string | null;
@@ -186,6 +186,10 @@ export interface OpcUaSettings {
   security_policy: OpcUaSecurityPolicy;
   /** Allow anonymous access */
   anonymous_access: boolean;
+  /** Optional username for user/password authentication */
+  username?: string | null;
+  /** Optional password for user/password authentication */
+  password?: string | null;
 }
 
 export interface OpcUaStatus {
@@ -193,6 +197,7 @@ export interface OpcUaStatus {
   port: number;
   endpoint: string;
   sessionCount: number;
+  sessionCountSupported: boolean;
 }
 
 // Placeholder types (to be fully implemented in later units)
@@ -310,5 +315,19 @@ export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
     snap_to_grid: true,
     show_grid: true,
     grid_style: 'dots',
+  },
+  network: {
+    plc_ip: null,
+    interface_name: null,
+    subnet_mask: null,
+  },
+  opcua: {
+    enabled: false,
+    port: 4840,
+    server_name: 'ModOne PLC Simulator',
+    security_policy: 'Basic256Sha256',
+    anonymous_access: false,
+    username: 'modone',
+    password: 'modone',
   },
 };
