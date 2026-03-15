@@ -12,6 +12,9 @@ use crate::commands::modbus::{
     modbus_start_project_simulation, modbus_stop_project_simulation, ModbusState,
 };
 use crate::commands::network::NetworkState;
+use crate::commands::opcua::{
+    opcua_start_project_simulation, opcua_stop_project_simulation, OpcUaState,
+};
 use crate::modbus::ModbusMemory;
 use crate::plc_runtime::{
     resolve_vendor_profile, CanonicalAddress, CanonicalAreaKind,
@@ -161,6 +164,7 @@ pub async fn sim_run(
     state: State<'_, SimState>,
     modbus_state: State<'_, ModbusState>,
     network_state: State<'_, NetworkState>,
+    opcua_state: State<'_, OpcUaState>,
     project_state: State<'_, SharedProjectManager>,
     canvas_sync_state: State<'_, CanvasSyncState>,
     params: Option<SimRunParams>,
@@ -170,11 +174,34 @@ pub async fn sim_run(
         .as_ref()
         .map(|config| config.plc.clone())
         .unwrap_or_default();
-    let _profile = resolve_vendor_profile(&plc_settings).map_err(|e| e.to_string())?;
+    let profile = resolve_vendor_profile(&plc_settings).map_err(|e| e.to_string())?;
 
     if let Some(project_config) = project_config.as_ref() {
         if project_config.modbus.simulation.enabled {
             modbus_start_project_simulation(&modbus_state, &network_state, app.clone(), project_config).await?;
+        }
+
+        // Start OPC UA server if enabled
+        if project_config.opcua.enabled {
+            let canonical_memory_arc = state.runtime().handle();
+            let opcua_server = opcua_start_project_simulation(
+                &opcua_state,
+                &canonical_memory_arc,
+                profile.as_ref(),
+                project_config,
+            )?;
+
+            // Create OPC UA adapter and attach to protocol runtime
+            let opcua_adapter = std::sync::Arc::new(crate::opcua::OpcUaAdapter::new(
+                state.runtime().handle(),
+                std::sync::Arc::clone(&opcua_state.memory),
+                opcua_server,
+            ));
+            state.host().protocol_runtime().attach_adapter(
+                "opcua",
+                std::sync::Arc::clone(state.runtime()),
+                opcua_adapter,
+            )?;
         }
     }
 
@@ -194,8 +221,10 @@ pub async fn sim_stop(
     state: State<'_, SimState>,
     modbus_state: State<'_, ModbusState>,
     network_state: State<'_, NetworkState>,
+    opcua_state: State<'_, OpcUaState>,
 ) -> Result<(), String> {
     state.host().stop(&app)?;
+    opcua_stop_project_simulation(&opcua_state)?;
     modbus_stop_project_simulation(&modbus_state, &network_state).await
 }
 
@@ -218,8 +247,10 @@ pub async fn sim_reset(
     state: State<'_, SimState>,
     modbus_state: State<'_, ModbusState>,
     network_state: State<'_, NetworkState>,
+    opcua_state: State<'_, OpcUaState>,
 ) -> Result<(), String> {
     state.host().reset(&app);
+    opcua_stop_project_simulation(&opcua_state)?;
     modbus_stop_project_simulation(&modbus_state, &network_state).await?;
     Ok(())
 }

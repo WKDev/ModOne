@@ -11,6 +11,7 @@ pub mod logging;
 pub mod menu;
 pub mod modbus;
 pub mod network;
+pub mod opcua;
 pub mod parser;
 pub mod project;
 pub mod scenario;
@@ -134,6 +135,11 @@ pub use schematic::{
 // Re-export symbol commands
 pub use symbols::{
     symbol_delete, symbol_list, symbol_list_all, symbol_load, symbol_save,
+};
+
+// Re-export OPC UA commands and state
+pub use opcua::{
+    opcua_get_status, opcua_start_server, opcua_stop_server, OpcUaState,
 };
 
 // Re-export network commands

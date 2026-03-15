@@ -161,6 +161,7 @@ export interface ProjectConfig {
   auto_save?: AutoSaveSettings;
   canvas?: CanvasSettings;
   network?: NetworkSettings;
+  opcua?: OpcUaSettings;
 }
 
 export interface NetworkSettings {
@@ -170,6 +171,28 @@ export interface NetworkSettings {
   interface_name: string | null;
   /** Subnet mask (e.g., "255.255.255.0") */
   subnet_mask: string | null;
+}
+
+export type OpcUaSecurityPolicy = 'None' | 'Basic256Sha256';
+
+export interface OpcUaSettings {
+  /** Whether the OPC UA server is enabled during simulation */
+  enabled: boolean;
+  /** TCP port (default 4840) */
+  port: number;
+  /** Server display name */
+  server_name: string;
+  /** Security policy */
+  security_policy: OpcUaSecurityPolicy;
+  /** Allow anonymous access */
+  anonymous_access: boolean;
+}
+
+export interface OpcUaStatus {
+  running: boolean;
+  port: number;
+  endpoint: string;
+  sessionCount: number;
 }
 
 // Placeholder types (to be fully implemented in later units)

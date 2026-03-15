@@ -97,6 +97,7 @@ impl ProjectManifest {
             auto_save: self.auto_save.clone(),
             canvas: self.canvas.clone(),
             network: super::config::NetworkSettings::default(),
+            opcua: super::config::OpcUaSettings::default(),
         }
     }
 

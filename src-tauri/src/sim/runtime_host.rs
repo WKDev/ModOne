@@ -180,7 +180,7 @@ impl SimulationRuntimeHost {
             handle.abort();
         }
 
-        self.protocol_runtime.detach_modbus();
+        self.protocol_runtime.detach_all();
         self.monitoring.stop();
         emit_stopped(app);
         Ok(())
@@ -222,7 +222,7 @@ impl SimulationRuntimeHost {
             handle.abort();
         }
 
-        self.protocol_runtime.detach_modbus();
+        self.protocol_runtime.detach_all();
         self.monitoring.stop();
         self.monitoring.clear_forces();
         self.monitoring.set_active(false);
@@ -271,7 +271,7 @@ impl SimulationRuntimeHost {
             policy,
         ));
         self.protocol_runtime
-            .attach_adapter(Arc::clone(&self.runtime), adapter)
+            .attach_adapter("modbus", Arc::clone(&self.runtime), adapter)
     }
 
     fn spawn_event_forwarder(&self, app: AppHandle, engine: Arc<OneSimEngine>) {

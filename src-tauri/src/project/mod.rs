@@ -59,6 +59,7 @@ pub use config::{
     ModbusSimulationTransport, ModbusTcpSettings, Parity, PlcAddressWindow, PlcHardwareModule,
     PlcHardwareTopology, PlcIoDirection, PlcManufacturer, PlcModuleKind, PlcRackKind,
     PlcRackTopology, PlcSettings, ProjectConfig, ProjectSettings,
+    OpcUaSettings, OpcUaSecurityPolicySetting,
 };
 pub use folder_project::{is_folder_project, is_legacy_project, FolderProject, FolderProjectError};
 pub use manifest::{DirectoryConfig, ProjectManifest, MANIFEST_VERSION};

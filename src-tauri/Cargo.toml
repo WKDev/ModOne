@@ -16,6 +16,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
 default = []
+opcua-server = ["dep:opcua"]
 webdriver = ["dep:tauri-plugin-webdriver"]
 
 [build-dependencies]
@@ -59,6 +60,9 @@ parking_lot = "0.12"
 # Serial port for Modbus RTU
 tokio-serial = "5"
 serialport = "4"
+
+# OPC UA server
+opcua = { version = "0.12", features = ["server", "vendored-openssl"], optional = true }
 
 # App directories
 directories = "5"

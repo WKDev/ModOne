@@ -34,6 +34,10 @@ pub struct ProjectConfig {
     /// Network settings for PLC IP simulation
     #[serde(default)]
     pub network: NetworkSettings,
+
+    /// OPC UA server settings
+    #[serde(default)]
+    pub opcua: OpcUaSettings,
 }
 
 impl Default for ProjectConfig {
@@ -47,6 +51,7 @@ impl Default for ProjectConfig {
             auto_save: AutoSaveSettings::default(),
             canvas: CanvasSettings::default(),
             network: NetworkSettings::default(),
+            opcua: OpcUaSettings::default(),
         }
     }
 }
@@ -79,6 +84,45 @@ impl Default for NetworkSettings {
             interface_name: None,
             subnet_mask: None,
         }
+    }
+}
+
+/// OPC UA server settings for the project.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpcUaSettings {
+    /// Whether the OPC UA server is enabled during simulation.
+    pub enabled: bool,
+    /// TCP port for the OPC UA server.
+    pub port: u16,
+    /// Display name for the OPC UA server.
+    pub server_name: String,
+    /// Security policy.
+    pub security_policy: OpcUaSecurityPolicySetting,
+    /// Allow anonymous access.
+    pub anonymous_access: bool,
+}
+
+impl Default for OpcUaSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            port: 4840,
+            server_name: "ModOne PLC Simulator".to_string(),
+            security_policy: OpcUaSecurityPolicySetting::None,
+            anonymous_access: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum OpcUaSecurityPolicySetting {
+    None,
+    Basic256Sha256,
+}
+
+impl Default for OpcUaSecurityPolicySetting {
+    fn default() -> Self {
+        Self::None
     }
 }
 

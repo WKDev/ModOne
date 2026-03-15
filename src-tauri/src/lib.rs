@@ -8,6 +8,7 @@ pub mod error;
 pub mod logging;
 pub mod modbus;
 pub mod network;
+pub mod opcua;
 pub mod parser;
 pub mod plc_runtime;
 pub mod project;
@@ -110,6 +111,8 @@ use commands::{
     // Network commands
     network_add_alias, network_check_ip, network_cleanup_aliases, network_get_active_aliases,
     network_list_interfaces, network_remove_alias, NetworkState,
+    // OPC UA commands
+    opcua_get_status, opcua_start_server, opcua_stop_server, OpcUaState,
 };
 use commands::window::close_all_floating_windows;
 
@@ -195,6 +198,7 @@ pub fn run() {
         .manage(floating_window_state)
         .manage(scope_state)
         .manage(NetworkState::default())
+        .manage(OpcUaState::default())
         .setup(|app| {
             log::info!("ModOne application starting...");
             if cfg!(debug_assertions) {
@@ -490,6 +494,10 @@ pub fn run() {
             network_remove_alias,
             network_get_active_aliases,
             network_cleanup_aliases,
+            // OPC UA commands
+            opcua_get_status,
+            opcua_start_server,
+            opcua_stop_server,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
