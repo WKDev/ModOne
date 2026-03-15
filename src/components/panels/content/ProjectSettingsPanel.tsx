@@ -3,6 +3,7 @@ import { useProjectStore } from '../../../stores/projectStore';
 import { CanvasProperties } from './properties/CanvasProperties';
 import type {
   ModbusSimulationTransport,
+  OpcUaSecurityPolicy,
   PlcManufacturer,
 } from '../../../types/project';
 
@@ -49,6 +50,30 @@ export const ProjectSettingsPanel = memo(function ProjectSettingsPanel() {
             ...currentProject.config.modbus.simulation,
             [field]: value,
           },
+        },
+      });
+    },
+    [currentProject, updateConfig]
+  );
+
+  const handleOpcUaChange = useCallback(
+    <K extends keyof NonNullable<NonNullable<typeof currentProject>['config']['opcua']>>(
+      field: K,
+      value: NonNullable<NonNullable<typeof currentProject>['config']['opcua']>[K]
+    ) => {
+      if (!currentProject) return;
+      const defaults = {
+        enabled: false,
+        port: 4840,
+        server_name: 'ModOne PLC Simulator',
+        security_policy: 'None' as OpcUaSecurityPolicy,
+        anonymous_access: true,
+      };
+      updateConfig({
+        opcua: {
+          ...defaults,
+          ...currentProject.config.opcua,
+          [field]: value,
         },
       });
     },
@@ -336,6 +361,97 @@ export const ProjectSettingsPanel = memo(function ProjectSettingsPanel() {
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        </section>
+
+        <div style={{ borderTop: '1px solid var(--border-color)' }} />
+
+        {/* OPC UA Configuration */}
+        <section>
+          <h2 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
+            OPC UA Server
+          </h2>
+          <div className="rounded-lg p-4 space-y-4" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                  Enable OPC UA Server
+                </div>
+                <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                  Expose PLC memory as OPC UA variables for HMI/SCADA integration.
+                </div>
+              </div>
+              <label className="inline-flex items-center gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                <input
+                  type="checkbox"
+                  checked={currentProject.config.opcua?.enabled ?? false}
+                  onChange={(e) => handleOpcUaChange('enabled', e.target.checked)}
+                />
+                Enabled
+              </label>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>Port</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={65535}
+                  value={currentProject.config.opcua?.port ?? 4840}
+                  onChange={(e) => handleOpcUaChange('port', Math.max(1, Math.min(65535, parseInt(e.target.value) || 4840)))}
+                  className="w-full px-3 py-1.5 text-sm rounded outline-none"
+                  style={{
+                    background: 'var(--bg-primary)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+              </div>
+              <div>
+                <label className="block text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>Server Name</label>
+                <input
+                  type="text"
+                  value={currentProject.config.opcua?.server_name ?? 'ModOne PLC Simulator'}
+                  onChange={(e) => handleOpcUaChange('server_name', e.target.value)}
+                  className="w-full px-3 py-1.5 text-sm rounded outline-none"
+                  style={{
+                    background: 'var(--bg-primary)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>Security Policy</label>
+                <select
+                  value={currentProject.config.opcua?.security_policy ?? 'None'}
+                  onChange={(e) => handleOpcUaChange('security_policy', e.target.value as OpcUaSecurityPolicy)}
+                  className="w-full px-3 py-1.5 text-sm rounded outline-none appearance-none"
+                  style={{
+                    background: 'var(--bg-primary)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <option value="None">None (No Encryption)</option>
+                  <option value="Basic256Sha256">Basic256Sha256</option>
+                </select>
+              </div>
+              <div className="flex items-end pb-1">
+                <label className="inline-flex items-center gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  <input
+                    type="checkbox"
+                    checked={currentProject.config.opcua?.anonymous_access ?? true}
+                    onChange={(e) => handleOpcUaChange('anonymous_access', e.target.checked)}
+                  />
+                  Anonymous Access
+                </label>
+              </div>
             </div>
           </div>
         </section>

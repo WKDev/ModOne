@@ -16,6 +16,10 @@ interface LayoutState {
   modbusConnected: boolean;
   modbusPort: number;
 
+  // OPC UA state
+  opcuaRunning: boolean;
+  opcuaPort: number;
+
   // System state
   memoryUsageMb: number;
 
@@ -39,6 +43,10 @@ interface LayoutActions {
   setModbusConnected: (connected: boolean) => void;
   setModbusPort: (port: number) => void;
 
+  // OPC UA actions
+  setOpcuaRunning: (running: boolean) => void;
+  setOpcuaPort: (port: number) => void;
+
   // System actions
   setMemoryUsage: (mb: number) => void;
 
@@ -59,6 +67,8 @@ const initialState: LayoutState = {
   scanTime: 10,
   modbusConnected: false,
   modbusPort: 502,
+  opcuaRunning: false,
+  opcuaPort: 4840,
   memoryUsageMb: 0,
   sidebarVisible: true,
   panelVisible: false,
@@ -89,6 +99,11 @@ export const useLayoutStore = create<LayoutStore>()(
       setModbusConnected: (connected) =>
         set({ modbusConnected: connected }, false, 'setModbusConnected'),
       setModbusPort: (port) => set({ modbusPort: port }, false, 'setModbusPort'),
+
+      // OPC UA actions
+      setOpcuaRunning: (running) =>
+        set({ opcuaRunning: running }, false, 'setOpcuaRunning'),
+      setOpcuaPort: (port) => set({ opcuaPort: port }, false, 'setOpcuaPort'),
 
       // System actions
       setMemoryUsage: (mb) =>

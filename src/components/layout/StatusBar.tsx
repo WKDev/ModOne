@@ -1,4 +1,4 @@
-import { Activity, Wifi, WifiOff, Cpu, Sun, Moon } from 'lucide-react';
+import { Activity, Wifi, WifiOff, Cpu, Sun, Moon, Radio } from 'lucide-react';
 import { useLayoutStore, SimulationStatus } from '../../stores/layoutStore';
 import { useTheme } from '../../providers/ThemeProvider';
 
@@ -33,6 +33,8 @@ export function StatusBar() {
     scanTime,
     modbusConnected,
     modbusPort,
+    opcuaRunning,
+    opcuaPort,
     memoryUsageMb,
   } = useLayoutStore();
 
@@ -72,6 +74,17 @@ export function StatusBar() {
           )}
           <span className={modbusConnected ? 'text-[var(--color-text-secondary)]' : 'text-[var(--color-text-muted)]'}>
             TCP:{modbusPort}
+          </span>
+        </div>
+
+        {/* OPC UA Status */}
+        <div
+          className="flex items-center gap-1.5"
+          title={opcuaRunning ? 'OPC UA Running' : 'OPC UA Stopped'}
+        >
+          <Radio size={12} className={opcuaRunning ? 'text-[var(--color-success)]' : 'text-[var(--color-text-muted)]'} />
+          <span className={opcuaRunning ? 'text-[var(--color-text-secondary)]' : 'text-[var(--color-text-muted)]'}>
+            UA:{opcuaPort}
           </span>
         </div>
 
