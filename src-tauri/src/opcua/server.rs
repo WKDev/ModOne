@@ -22,6 +22,8 @@ use sha2::{Digest, Sha256};
 
 const DEFAULT_ENDPOINT_PATH: &str = "/";
 #[cfg(feature = "opcua-server")]
+const DISCOVERY_ENDPOINT_PATH: &str = "/discovery";
+#[cfg(feature = "opcua-server")]
 const LOCAL_USER_TOKEN_ID: &str = "MODONE_LOCAL_USER";
 #[cfg(feature = "opcua-server")]
 const RESERVED_NAMESPACE_URI: &str = "urn:modone:internal:reserved";
@@ -221,6 +223,10 @@ impl OpcUaServer {
         *self.certificate_metadata.lock() = certificate_metadata;
 
         let user_token_ids = vec![LOCAL_USER_TOKEN_ID.to_string()];
+        let trust_client_certs = std::env::var("MODONE_OPCUA_TRUST_CLIENT_CERTS")
+            .ok()
+            .as_deref()
+            == Some("1");
 
         let mut builder = ServerBuilder::new()
             .application_name(&self.config.server_name)
@@ -231,15 +237,25 @@ impl OpcUaServer {
             .certificate_path(&self.config.certificate_path)
             .private_key_path(&self.config.private_key_path)
             .create_sample_keypair(false)
-            .discovery_urls(vec![DEFAULT_ENDPOINT_PATH.to_string()])
+            .discovery_urls(vec![
+                DEFAULT_ENDPOINT_PATH.to_string(),
+                DISCOVERY_ENDPOINT_PATH.to_string(),
+            ])
             .user_token(
                 LOCAL_USER_TOKEN_ID,
                 ServerUserToken::user_pass(username.to_string(), password.to_string()),
             );
+        if trust_client_certs {
+            builder = builder.trust_client_certs();
+        }
 
         let endpoint =
             ServerEndpoint::new_basic256sha256_sign_encrypt(DEFAULT_ENDPOINT_PATH, &user_token_ids);
         builder = builder.endpoint("default", endpoint);
+        builder = builder.endpoint(
+            "discovery",
+            ServerEndpoint::new_none(DISCOVERY_ENDPOINT_PATH, &[]),
+        );
 
         let server = builder.server().ok_or_else(|| {
             OpcUaError::Server("Failed to build OPC UA server from config".into())
@@ -500,7 +516,10 @@ fn bootstrap_server_pki(config: &OpcUaConfig) -> Result<CertificateMetadata, Opc
             .certificate_path(&config.certificate_path)
             .private_key_path(&config.private_key_path)
             .create_sample_keypair(true)
-            .discovery_urls(vec![DEFAULT_ENDPOINT_PATH.to_string()])
+            .discovery_urls(vec![
+                DEFAULT_ENDPOINT_PATH.to_string(),
+                DISCOVERY_ENDPOINT_PATH.to_string(),
+            ])
             .user_token(
                 LOCAL_USER_TOKEN_ID,
                 ServerUserToken::user_pass(
@@ -514,6 +533,10 @@ fn bootstrap_server_pki(config: &OpcUaConfig) -> Result<CertificateMetadata, Opc
                     DEFAULT_ENDPOINT_PATH,
                     &bootstrap_user_token_ids,
                 ),
+            )
+            .endpoint(
+                "bootstrap-discovery",
+                ServerEndpoint::new_none(DISCOVERY_ENDPOINT_PATH, &[]),
             );
 
         bootstrap.server().ok_or_else(|| {
