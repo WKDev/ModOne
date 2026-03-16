@@ -111,7 +111,7 @@ impl TagEventBridge {
         let watched_tags = Arc::clone(&self.watched_tags);
         let app_handle = Arc::clone(&self.app_handle);
 
-        tokio::spawn(async move {
+        tauri::async_runtime::spawn(async move {
             Self::subscriber_loop(rx, tag_registry, watched_tags, app_handle).await;
         });
     }
