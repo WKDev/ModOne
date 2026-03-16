@@ -6,7 +6,7 @@
  * and library management.
  */
 import type { BaseBlock } from '../components/OneCanvas/types';
-import type { SymbolBehaviorBinding } from './behavior';
+import type { BehaviorVisualState, SymbolBehaviorBinding } from './behavior';
 
 // ============================================================================
 // Pin Types (PLC-Optimized)
@@ -58,7 +58,13 @@ export interface SymbolPin {
 // ============================================================================
 
 /** Rectangle primitive */
-export interface RectPrimitive {
+export interface GraphicPrimitiveBase {
+  /** Stable identifier for stateful visual overrides */
+  id?: string;
+}
+
+/** Rectangle primitive */
+export interface RectPrimitive extends GraphicPrimitiveBase {
   kind: 'rect';
   x: number;
   y: number;
@@ -70,7 +76,7 @@ export interface RectPrimitive {
 }
 
 /** Circle primitive */
-export interface CirclePrimitive {
+export interface CirclePrimitive extends GraphicPrimitiveBase {
   kind: 'circle';
   cx: number;
   cy: number;
@@ -81,7 +87,7 @@ export interface CirclePrimitive {
 }
 
 /** Polyline primitive */
-export interface PolylinePrimitive {
+export interface PolylinePrimitive extends GraphicPrimitiveBase {
   kind: 'polyline';
   points: Array<{ x: number; y: number }>;
   stroke: string;
@@ -90,7 +96,7 @@ export interface PolylinePrimitive {
 }
 
 /** Arc primitive */
-export interface ArcPrimitive {
+export interface ArcPrimitive extends GraphicPrimitiveBase {
   kind: 'arc';
   cx: number;
   cy: number;
@@ -103,7 +109,7 @@ export interface ArcPrimitive {
 }
 
 /** Text primitive */
-export interface TextPrimitive {
+export interface TextPrimitive extends GraphicPrimitiveBase {
   kind: 'text';
   x: number;
   y: number;
@@ -121,6 +127,47 @@ export type GraphicPrimitive =
   | PolylinePrimitive
   | ArcPrimitive
   | TextPrimitive;
+
+export interface SymbolVisualTransform {
+  translateX?: number;
+  translateY?: number;
+  rotation?: number;
+  scaleX?: number;
+  scaleY?: number;
+  pivotX?: number;
+  pivotY?: number;
+}
+
+export interface GraphicPrimitiveOverride {
+  visible?: boolean;
+  opacity?: number;
+  stroke?: string;
+  fill?: string;
+  strokeWidth?: number;
+  text?: string;
+  fontSize?: number;
+  fontFamily?: string;
+  anchor?: TextPrimitive['anchor'];
+  transform?: SymbolVisualTransform;
+}
+
+export interface SymbolVisualVariant {
+  /** Replace the base graphics entirely for this state */
+  graphics?: GraphicPrimitive[];
+  /** Override individual primitives in the base graphics by primitive ID */
+  primitiveOverrides?: Record<string, GraphicPrimitiveOverride>;
+}
+
+export interface SymbolAnimationSpec {
+  /** Animation type. v1 only supports lightweight rotation. */
+  type: 'rotate';
+  /** Target primitive ID to animate */
+  target: string;
+  /** Degrees per second */
+  speed?: number;
+  /** Optional pivot override in symbol coordinates */
+  pivot?: { x: number; y: number };
+}
 
 // ============================================================================
 // Symbol Units (Multi-Unit Support)
@@ -196,6 +243,10 @@ export interface SymbolDefinition {
   behavior?: SymbolBehaviorBinding;
   /** Optional runtime state schema (JSON Schema) */
   runtimeStateSchema?: Record<string, unknown>;
+  /** Optional state-driven visual variants */
+  visualStates?: Partial<Record<BehaviorVisualState, SymbolVisualVariant>>;
+  /** Optional animations for active visual states */
+  animations?: Partial<Record<BehaviorVisualState, SymbolAnimationSpec[]>>;
 }
 
 // ============================================================================

@@ -61,6 +61,40 @@ function createSerializableSymbol(): SymbolDefinition {
       },
       required: ['energized'],
     },
+    visualStates: {
+      energized: {
+        primitiveOverrides: {
+          body: {
+            stroke: '#22c55e',
+            fill: '#dcfce7',
+          },
+        },
+      },
+      lit: {
+        graphics: [
+          {
+            id: 'glow',
+            kind: 'circle',
+            cx: 40,
+            cy: 40,
+            r: 28,
+            stroke: 'transparent',
+            fill: '#fef08a',
+            strokeWidth: 0,
+          },
+        ],
+      },
+    },
+    animations: {
+      running: [
+        {
+          type: 'rotate',
+          target: 'rotor',
+          speed: 180,
+          pivot: { x: 40, y: 40 },
+        },
+      ],
+    },
   };
 }
 
@@ -149,11 +183,15 @@ describe('symbol serialization', () => {
     expect(restoredWithOptional.author).toBeDefined();
     expect(restoredWithOptional.units).toBeDefined();
     expect(restoredWithOptional.runtimeStateSchema).toBeDefined();
+    expect(restoredWithOptional.visualStates).toBeDefined();
+    expect(restoredWithOptional.animations).toBeDefined();
 
     expect(restoredWithoutOptional.description).toBeUndefined();
     expect(restoredWithoutOptional.author).toBeUndefined();
     expect(restoredWithoutOptional.units).toBeUndefined();
     expect(restoredWithoutOptional.runtimeStateSchema).toBeUndefined();
+    expect(restoredWithoutOptional.visualStates).toBeUndefined();
+    expect(restoredWithoutOptional.animations).toBeUndefined();
   });
 
   it('supports backward-compatible pin payload without absolutePosition metadata', () => {

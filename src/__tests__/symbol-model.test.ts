@@ -178,6 +178,42 @@ describe('symbol data model', () => {
     expect(symbol.units?.map((unit) => unit.name)).toEqual(['Coil', 'Contact']);
   });
 
+  it('supports stateful visual variants and animations', () => {
+    const symbol: SymbolDefinition = {
+      ...createMinimalSymbolDefinition(),
+      graphics: [
+        { id: 'body', kind: 'rect', x: 10, y: 10, width: 20, height: 20, stroke: '#000', fill: 'none', strokeWidth: 1 },
+        { id: 'label', kind: 'text', x: 20, y: 20, text: 'M', fontSize: 10, fontFamily: 'Arial', fill: '#000', anchor: 'middle' },
+      ],
+      visualStates: {
+        energized: {
+          primitiveOverrides: {
+            body: {
+              fill: '#22c55e',
+            },
+          },
+        },
+      },
+      animations: {
+        running: [
+          {
+            type: 'rotate',
+            target: 'label',
+            speed: 240,
+            pivot: { x: 20, y: 20 },
+          },
+        ],
+      },
+    };
+
+    expect(symbol.graphics[0].id).toBe('body');
+    expect(symbol.visualStates?.energized?.primitiveOverrides?.body?.fill).toBe('#22c55e');
+    expect(symbol.animations?.running?.[0]).toMatchObject({
+      type: 'rotate',
+      target: 'label',
+    });
+  });
+
   it('extracts a SymbolSummary from a SymbolDefinition', () => {
     const symbol: SymbolDefinition = {
       ...createMinimalSymbolDefinition(),

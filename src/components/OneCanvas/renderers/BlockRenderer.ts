@@ -1,42 +1,58 @@
 /**
  * BlockRenderer — Circuit Block Rendering
  *
- * Renders circuit blocks using shared GraphicsContext from the SymbolLibrary.
- * Each block gets its own Graphics instance (positioned at block.position)
- * and an optional Text label.
+ * The previous implementation assumed a single shared GraphicsContext per block.
+ * That was efficient, but it prevented stateful visuals, text primitives, and
+ * animation targets. This renderer now manages a small visual tree per block:
  *
- * Performance strategy:
- * - GraphicsContext is shared across all instances of the same block type
- *   (memory-efficient: geometry defined once, referenced many times)
- * - Text labels use Pixi Text with caching
- * - Per-block culling via cullable + cullArea
- * - Selection/hover via tint (no redraw)
- * - Rotation/flip via Graphics transform
+ * - block container
+ * - symbol root (rotation/flip at block level)
+ * - symbol layer (primitive/text nodes in symbol coordinates)
+ * - label/designation text
+ *
+ * Visual state transitions rebuild only the affected block's symbol subtree.
  */
 
-import { Graphics, GraphicsContext, Text, Container, Rectangle, type TextStyle as PixiTextStyle } from 'pixi.js';
+import {
+  Container,
+  Graphics,
+  Rectangle,
+  Text,
+  type GraphicsContext,
+  type TextStyle as PixiTextStyle,
+} from 'pixi.js';
+import type { ComponentBehaviorState } from '@/types/behavior';
 import type {
-  Block,
-} from '../types';
-import { LEGACY_MM_PER_PX } from '../canvasUnits';
-import { getSymbolContext, getSymbolSize, getCustomSymbolContext, getCustomSymbolSize, getSymbolContextForBlockType, getSymbolSizeForBlockType } from './symbols';
+  GraphicPrimitive,
+  GraphicPrimitiveOverride,
+  SymbolAnimationSpec,
+  SymbolDefinition,
+  SymbolVisualTransform,
+  TextPrimitive,
+} from '@/types/symbol';
+import type { Block } from '../types';
+import { SYMBOL_PX_TO_MM } from '../canvasUnits';
+import {
+  getCustomSymbolDefinition,
+  getCustomSymbolContext,
+  getCustomSymbolSize,
+  getSymbolContext,
+  getSymbolContextForBlockType,
+  getSymbolDefinitionForBlockType,
+  getSymbolSize,
+  getSymbolSizeForBlockType,
+} from './symbols';
 
 // ============================================================================
 // Configuration
 // ============================================================================
 
 export interface BlockStyle {
-  /** Selected block tint color */
   selectedTint: number;
-  /** Hovered block tint color */
   hoverTint: number;
-  /** Label font size */
   labelFontSize: number;
-  /** Label color */
   labelColor: string;
-  /** Designation font size */
   designationFontSize: number;
-  /** Designation color */
   designationColor: string;
 }
 
@@ -63,43 +79,113 @@ const DESIGNATION_STYLE: Partial<PixiTextStyle> = {
   align: 'center',
 };
 
+const DEFAULT_TINT = 0xffffff;
+
 export interface BlockRendererOptions {
-  /** The block layer container */
   layer: Container;
-  /** Block visual style */
   style?: Partial<BlockStyle>;
 }
 
-// ============================================================================
-// Internal types
-// ============================================================================
+type PrimitiveDisplayObject = Graphics | Text;
+type TintableDisplayNode = PrimitiveDisplayObject & { tint: number; alpha: number };
+
+export interface BlockAnimationTarget {
+  displayObject: PrimitiveDisplayObject;
+  baseRotation: number;
+  spec: SymbolAnimationSpec;
+}
+
+export interface BlockVisualHandle {
+  container: Container;
+  symbolRoot: Container;
+  tintables: readonly TintableDisplayNode[];
+  animationTargets: ReadonlyMap<string, BlockAnimationTarget>;
+  activeVisualState: string | null;
+  definitionId: string | null;
+}
 
 interface BlockDisplayObject {
-  /** Container holding symbol + labels */
   container: Container;
-  /** The symbol graphics */
-  symbol: Graphics;
-  /** Label text (block type or custom label) */
+  symbolRoot: Container;
+  symbolLayer: Container;
   label: Text | null;
-  /** Designation text (e.g., "K1", "M1") */
   designation: Text | null;
+  tintables: TintableDisplayNode[];
+  animationTargets: Map<string, BlockAnimationTarget>;
+  primaryGraphics: Graphics | null;
+  definitionId: string | null;
+  activeVisualState: string | null;
+  runtimeTint: number;
+  fallbackContext: GraphicsContext | null;
+}
+
+interface ResolvedSymbolSource {
+  definition: SymbolDefinition | null;
+  definitionId: string | null;
+  fallbackContext: GraphicsContext;
 }
 
 // ============================================================================
-// BlockRenderer
+// Helpers
 // ============================================================================
 
-function resolveSymbolContext(block: Block): GraphicsContext {
-  // Try unified bridge by block type (covers all registered builtins)
+function cssColorToHex(color: string): number {
+  if (!color || color === 'none' || color === 'transparent') return 0x000000;
+
+  if (color.startsWith('#')) {
+    const hex = color.slice(1);
+    if (hex.length === 3) {
+      const r = hex[0];
+      const g = hex[1];
+      const b = hex[2];
+      return parseInt(`${r}${r}${g}${g}${b}${b}`, 16);
+    }
+    return parseInt(hex, 16);
+  }
+
+  return 0xd0d4da;
+}
+
+function isTransparent(color: string): boolean {
+  return !color || color === 'none' || color === 'transparent' || color === '';
+}
+
+function resolveSymbolDefinition(block: Block): SymbolDefinition | null {
+  const byType = getSymbolDefinitionForBlockType(block.type);
+  if (byType) return byType;
+  if ('symbolId' in block && block.symbolId) {
+    return getCustomSymbolDefinition(block.symbolId);
+  }
+  return null;
+}
+
+function resolveSymbolSource(block: Block): ResolvedSymbolSource {
+  const definition = resolveSymbolDefinition(block);
   const ctxByType = getSymbolContextForBlockType(block.type);
-  if (ctxByType) return ctxByType;
-  // Try by explicit symbolId (custom user symbols)
+  if (ctxByType) {
+    return {
+      definition,
+      definitionId: definition?.id ?? null,
+      fallbackContext: ctxByType,
+    };
+  }
+
   if ('symbolId' in block && block.symbolId) {
     const ctxById = getCustomSymbolContext(block.symbolId);
-    if (ctxById) return ctxById;
+    if (ctxById) {
+      return {
+        definition,
+        definitionId: definition?.id ?? block.symbolId,
+        fallbackContext: ctxById,
+      };
+    }
   }
-  // Fallback to legacy SymbolLibrary (hardcoded Pixi.js drawing)
-  return getSymbolContext(block.type);
+
+  return {
+    definition,
+    definitionId: definition?.id ?? null,
+    fallbackContext: getSymbolContext(block.type),
+  };
 }
 
 function resolveSymbolSize(block: Block): { width: number; height: number } {
@@ -116,6 +202,133 @@ function resolveSymbolGeometrySize(block: Block): { width: number; height: numbe
   return getSymbolSize(block.type);
 }
 
+function resolvePrimitiveOverride(
+  primitive: GraphicPrimitive,
+  state: ComponentBehaviorState | null,
+  definition: SymbolDefinition | null,
+): GraphicPrimitiveOverride | undefined {
+  if (!definition || !primitive.id) return undefined;
+  const visualState = state?.visualState ?? 'idle';
+  return definition.visualStates?.[visualState]?.primitiveOverrides?.[primitive.id];
+}
+
+function resolveGraphicsForState(
+  definition: SymbolDefinition | null,
+  state: ComponentBehaviorState | null,
+): GraphicPrimitive[] | null {
+  if (!definition) return null;
+  return definition.visualStates?.[state?.visualState ?? 'idle']?.graphics ?? definition.graphics;
+}
+
+function applyTransform(display: PrimitiveDisplayObject, transform?: SymbolVisualTransform): void {
+  if (!transform) return;
+
+  display.position.set(
+    display.position.x + (transform.translateX ?? 0),
+    display.position.y + (transform.translateY ?? 0),
+  );
+  display.rotation = ((transform.rotation ?? 0) * Math.PI) / 180;
+  display.scale.set(transform.scaleX ?? 1, transform.scaleY ?? 1);
+  if ('pivot' in display) {
+    display.pivot.set(transform.pivotX ?? 0, transform.pivotY ?? 0);
+  }
+}
+
+function anchorToValue(anchor: TextPrimitive['anchor']): number {
+  switch (anchor) {
+    case 'end':
+      return 1;
+    case 'middle':
+      return 0.5;
+    case 'start':
+    default:
+      return 0;
+  }
+}
+
+function drawPrimitive(
+  graphics: Graphics,
+  primitive: GraphicPrimitive,
+  override?: GraphicPrimitiveOverride,
+): void {
+  const stroke = override?.stroke ?? ('stroke' in primitive ? primitive.stroke : 'transparent');
+  const fill = override?.fill ?? ('fill' in primitive ? primitive.fill : 'transparent');
+  const strokeWidth = override?.strokeWidth ?? ('strokeWidth' in primitive ? primitive.strokeWidth : 0);
+
+  switch (primitive.kind) {
+    case 'rect':
+      graphics.rect(primitive.x, primitive.y, primitive.width, primitive.height);
+      break;
+    case 'circle':
+      graphics.circle(primitive.cx, primitive.cy, primitive.r);
+      break;
+    case 'polyline':
+      if (primitive.points.length < 2) return;
+      graphics.moveTo(primitive.points[0].x, primitive.points[0].y);
+      for (let i = 1; i < primitive.points.length; i += 1) {
+        graphics.lineTo(primitive.points[i].x, primitive.points[i].y);
+      }
+      break;
+    case 'arc':
+      graphics.arc(primitive.cx, primitive.cy, primitive.r, primitive.startAngle, primitive.endAngle);
+      break;
+    case 'text':
+      return;
+  }
+
+  if (!isTransparent(fill)) {
+    graphics.fill({ color: cssColorToHex(fill) });
+  }
+  if (!isTransparent(stroke) && strokeWidth > 0) {
+    graphics.stroke({ color: cssColorToHex(stroke), width: strokeWidth });
+  }
+}
+
+function createDisplayObjectForPrimitive(
+  primitive: GraphicPrimitive,
+  override?: GraphicPrimitiveOverride,
+): { display: PrimitiveDisplayObject; tintable: TintableDisplayNode | null } | null {
+  if (override?.visible === false) {
+    return null;
+  }
+
+  if (primitive.kind === 'text') {
+    const text = new Text({
+      text: override?.text ?? primitive.text,
+      style: {
+        fontFamily: override?.fontFamily ?? primitive.fontFamily,
+        fontSize: override?.fontSize ?? primitive.fontSize,
+        fill: override?.fill ?? primitive.fill,
+      },
+      resolution: 2,
+    });
+    text.anchor.set(anchorToValue(override?.anchor ?? primitive.anchor));
+    text.position.set(primitive.x, primitive.y);
+    text.alpha = override?.opacity ?? 1;
+    applyTransform(text, override?.transform);
+    return { display: text, tintable: text as TintableDisplayNode };
+  }
+
+  const graphics = new Graphics();
+  drawPrimitive(graphics, primitive, override);
+  graphics.alpha = override?.opacity ?? 1;
+  applyTransform(graphics, override?.transform);
+  return { display: graphics, tintable: graphics as TintableDisplayNode };
+}
+
+function getAnimationsForState(
+  definition: SymbolDefinition | null,
+  state: ComponentBehaviorState | null,
+): SymbolAnimationSpec[] {
+  if (!definition) return [];
+  const visualState = state?.visualState ?? 'idle';
+  return definition.animations?.[visualState] ?? [];
+}
+
+// ============================================================================
+// BlockRenderer
+// ============================================================================
+
 export class BlockRenderer {
   private _layer: Container;
   private _style: BlockStyle;
@@ -129,17 +342,9 @@ export class BlockRenderer {
     this._style = { ...DEFAULT_BLOCK_STYLE, ...options.style };
   }
 
-  // --------------------------------------------------------------------------
-  // Full Render
-  // --------------------------------------------------------------------------
-
-  /**
-   * Render all blocks from scratch.
-   */
   renderAll(blocks: Record<string, Block>): void {
     if (this._destroyed) return;
 
-    // Remove stale block display objects
     const blockIds = new Set(Object.keys(blocks));
     for (const [id, dobj] of this._blocks) {
       if (!blockIds.has(id)) {
@@ -148,23 +353,16 @@ export class BlockRenderer {
       }
     }
 
-    // Render each block
     for (const block of Object.values(blocks)) {
       this._renderBlock(block);
     }
   }
 
-  /**
-   * Render/update a single block.
-   */
   renderBlock(block: Block): void {
     if (this._destroyed) return;
     this._renderBlock(block);
   }
 
-  /**
-   * Remove a block from the display.
-   */
   removeBlock(blockId: string): void {
     const dobj = this._blocks.get(blockId);
     if (dobj) {
@@ -173,10 +371,6 @@ export class BlockRenderer {
     }
     this._selectedBlockIds.delete(blockId);
   }
-
-  // --------------------------------------------------------------------------
-  // Selection & Hover
-  // --------------------------------------------------------------------------
 
   setSelectedBlocks(ids: Set<string>): void {
     const changed = new Set<string>();
@@ -202,18 +396,71 @@ export class BlockRenderer {
     if (blockId) this._updateBlockTint(blockId);
   }
 
-  /** Get the symbol Graphics for a block (used by SimulationRenderer) */
-  getBlockGraphics(blockId: string): Graphics | null {
-    return this._blocks.get(blockId)?.symbol ?? null;
+  setBlockRuntimeTint(blockId: string, tint: number): void {
+    const dobj = this._blocks.get(blockId);
+    if (!dobj) return;
+    dobj.runtimeTint = tint;
+    this._updateBlockTint(blockId);
   }
 
-  // --------------------------------------------------------------------------
-  // Internal
-  // --------------------------------------------------------------------------
+  setBlockBehaviorState(blockId: string, state: ComponentBehaviorState | null): void {
+    const dobj = this._blocks.get(blockId);
+    if (!dobj) return;
+
+    const definition = dobj.definitionId ? resolveSymbolDefinitionForId(dobj.definitionId) : null;
+    const rawState = state?.visualState ?? 'idle';
+    const hasVariant = Boolean(definition?.visualStates?.[rawState]);
+    const hasAnimation = Boolean(definition?.animations?.[rawState]?.length);
+    const nextState = hasVariant || hasAnimation ? rawState : null;
+
+    if (dobj.activeVisualState === nextState && !hasAnimation) {
+      return;
+    }
+
+    this._rebuildSymbolVisual(blockId, definition, nextState ? state : null, dobj.fallbackContext);
+  }
+
+  resetBlockRuntimeVisual(blockId: string): void {
+    const dobj = this._blocks.get(blockId);
+    if (!dobj) return;
+    dobj.runtimeTint = DEFAULT_TINT;
+    if (dobj.activeVisualState !== null) {
+      const definition = dobj.definitionId ? resolveSymbolDefinitionForId(dobj.definitionId) : null;
+      this._rebuildSymbolVisual(blockId, definition, null, dobj.fallbackContext);
+    }
+    this._updateBlockTint(blockId);
+  }
+
+  getBlockGraphics(blockId: string): Graphics | null {
+    return this._blocks.get(blockId)?.primaryGraphics ?? null;
+  }
+
+  getBlockVisual(blockId: string): BlockVisualHandle | null {
+    const dobj = this._blocks.get(blockId);
+    if (!dobj) return null;
+
+    return {
+      container: dobj.container,
+      symbolRoot: dobj.symbolRoot,
+      tintables: dobj.tintables,
+      animationTargets: dobj.animationTargets,
+      activeVisualState: dobj.activeVisualState,
+      definitionId: dobj.definitionId,
+    };
+  }
+
+  destroy(): void {
+    if (this._destroyed) return;
+    this._destroyed = true;
+
+    for (const dobj of this._blocks.values()) {
+      this._destroyBlockDO(dobj);
+    }
+    this._blocks.clear();
+  }
 
   private _renderBlock(block: Block): void {
     if (block.visible === false) {
-      // Hide if exists
       const existing = this._blocks.get(block.id);
       if (existing) {
         existing.container.visible = false;
@@ -222,92 +469,156 @@ export class BlockRenderer {
     }
 
     let dobj = this._blocks.get(block.id);
+    const resolved = resolveSymbolSource(block);
 
     if (!dobj) {
-      dobj = this._createBlockDO(block);
+      dobj = this._createBlockDO();
       this._blocks.set(block.id, dobj);
       this._layer.addChild(dobj.container);
     }
 
-    // Update position
     dobj.container.position.set(block.position.x, block.position.y);
     dobj.container.visible = true;
 
-    // Update transform (rotation/flip)
-    this._applyTransform(dobj, block);
+    const shouldRebuild =
+      dobj.definitionId !== resolved.definitionId ||
+      dobj.fallbackContext !== resolved.fallbackContext ||
+      (resolved.definition === null && dobj.primaryGraphics?.context !== resolved.fallbackContext);
 
-    const expectedCtx = resolveSymbolContext(block);
-    if (dobj.symbol.context !== expectedCtx) {
-      dobj.symbol.context = expectedCtx;
+    dobj.definitionId = resolved.definitionId;
+    dobj.fallbackContext = resolved.fallbackContext;
+
+    if (shouldRebuild) {
+      this._rebuildSymbolVisual(block.id, resolved.definition, null, resolved.fallbackContext);
     }
 
+    this._applyTransform(dobj, block);
     this._updateLabels(dobj, block);
     this._updateBlockTint(block.id);
 
     const size = resolveSymbolSize(block);
-    dobj.container.cullArea = new Rectangle(
-      -10,
-      -20,
-      size.width + 20,
-      size.height + 40,
-    );
+    dobj.container.cullArea = new Rectangle(-10, -20, size.width + 20, size.height + 40);
   }
 
-  private _createBlockDO(block: Block): BlockDisplayObject {
+  private _createBlockDO(): BlockDisplayObject {
     const container = new Container();
-    container.label = `block-${block.id}`;
     container.cullable = true;
 
-    const ctx = resolveSymbolContext(block);
-    const symbol = new Graphics(ctx);
-    symbol.label = 'symbol';
-    symbol.scale.set(LEGACY_MM_PER_PX, LEGACY_MM_PER_PX);
-    container.addChild(symbol);
+    const symbolRoot = new Container();
+    symbolRoot.label = 'symbol-root';
+    const symbolLayer = new Container();
+    symbolLayer.label = 'symbol-layer';
+    symbolLayer.scale.set(SYMBOL_PX_TO_MM, SYMBOL_PX_TO_MM);
+    symbolRoot.addChild(symbolLayer);
+    container.addChild(symbolRoot);
 
     return {
       container,
-      symbol,
+      symbolRoot,
+      symbolLayer,
       label: null,
       designation: null,
+      tintables: [],
+      animationTargets: new Map(),
+      primaryGraphics: null,
+      definitionId: null,
+      activeVisualState: null,
+      runtimeTint: DEFAULT_TINT,
+      fallbackContext: null,
     };
+  }
+
+  private _rebuildSymbolVisual(
+    blockId: string,
+    definition: SymbolDefinition | null,
+    state: ComponentBehaviorState | null,
+    fallbackContext: GraphicsContext | null,
+  ): void {
+    const dobj = this._blocks.get(blockId);
+    if (!dobj) return;
+
+    dobj.symbolLayer.removeChildren().forEach((child) => child.destroy());
+    dobj.tintables = [];
+    dobj.animationTargets.clear();
+    dobj.primaryGraphics = null;
+    dobj.activeVisualState = state?.visualState ?? null;
+
+    if (!definition || !fallbackContext) {
+      const symbol = new Graphics(fallbackContext ?? undefined);
+      symbol.label = 'symbol';
+      dobj.symbolLayer.addChild(symbol);
+      dobj.primaryGraphics = symbol;
+      dobj.tintables.push(symbol as TintableDisplayNode);
+      return;
+    }
+
+    const graphics = resolveGraphicsForState(definition, state) ?? definition.graphics;
+    for (const primitive of graphics) {
+      const override = resolvePrimitiveOverride(primitive, state, definition);
+      const rendered = createDisplayObjectForPrimitive(primitive, override);
+      if (!rendered) continue;
+
+      dobj.symbolLayer.addChild(rendered.display);
+      if (rendered.tintable) {
+        dobj.tintables.push(rendered.tintable);
+        if (!dobj.primaryGraphics && rendered.display instanceof Graphics) {
+          dobj.primaryGraphics = rendered.display;
+        }
+      }
+
+      if (primitive.id) {
+        const animationSpec = getAnimationsForState(definition, state).find((spec) => spec.target === primitive.id);
+        if (animationSpec) {
+          dobj.animationTargets.set(primitive.id, {
+            displayObject: rendered.display,
+            baseRotation: rendered.display.rotation,
+            spec: animationSpec,
+          });
+        }
+      }
+    }
+
+    if (dobj.tintables.length === 0 && fallbackContext) {
+      const symbol = new Graphics(fallbackContext);
+      symbol.label = 'symbol-fallback';
+      dobj.symbolLayer.addChild(symbol);
+      dobj.primaryGraphics = symbol;
+      dobj.tintables.push(symbol as TintableDisplayNode);
+    }
   }
 
   private _applyTransform(dobj: BlockDisplayObject, block: Block): void {
     const size = resolveSymbolSize(block);
     const geometrySize = resolveSymbolGeometrySize(block);
-    const symbol = dobj.symbol;
+    const symbol = dobj.symbolRoot;
 
-    // Reset transform
     symbol.position.set(0, 0);
     symbol.rotation = 0;
-    symbol.scale.set(LEGACY_MM_PER_PX, LEGACY_MM_PER_PX);
+    symbol.scale.set(1, 1);
+    symbol.pivot.set(0, 0);
 
-    // Apply rotation around center
     const rotation = block.rotation ?? 0;
     if (rotation !== 0) {
       const cx = geometrySize.width / 2;
       const cy = geometrySize.height / 2;
-      symbol.pivot.set(cx, cy);
+      symbol.pivot.set(cx * SYMBOL_PX_TO_MM, cy * SYMBOL_PX_TO_MM);
       symbol.position.set(size.width / 2, size.height / 2);
       symbol.rotation = (rotation * Math.PI) / 180;
-    } else {
-      symbol.pivot.set(0, 0);
     }
 
-    // Apply flip
     const flip = block.flip;
     if (flip) {
       if (flip.horizontal) {
         symbol.scale.x = -1;
         if (rotation === 0) {
-          symbol.pivot.set(geometrySize.width, symbol.pivot.y);
+          symbol.pivot.set(geometrySize.width * SYMBOL_PX_TO_MM, symbol.pivot.y);
           symbol.position.set(size.width, symbol.position.y);
         }
       }
       if (flip.vertical) {
         symbol.scale.y = -1;
         if (rotation === 0) {
-          symbol.pivot.set(symbol.pivot.x, geometrySize.height);
+          symbol.pivot.set(symbol.pivot.x, geometrySize.height * SYMBOL_PX_TO_MM);
           symbol.position.set(symbol.position.x, size.height);
         }
       }
@@ -317,7 +628,6 @@ export class BlockRenderer {
   private _updateLabels(dobj: BlockDisplayObject, block: Block): void {
     const size = resolveSymbolSize(block);
 
-    // Label (below symbol)
     const labelText = block.label || '';
     if (labelText) {
       if (!dobj.label) {
@@ -333,7 +643,6 @@ export class BlockRenderer {
       dobj.label.visible = false;
     }
 
-    // Designation (above symbol)
     const desText = block.designation || '';
     if (desText) {
       if (!dobj.designation) {
@@ -354,33 +663,28 @@ export class BlockRenderer {
     const dobj = this._blocks.get(blockId);
     if (!dobj) return;
 
-    if (this._selectedBlockIds.has(blockId)) {
-      dobj.symbol.tint = this._style.selectedTint;
-    } else if (this._hoveredBlockId === blockId) {
-      dobj.symbol.tint = this._style.hoverTint;
-    } else {
-      dobj.symbol.tint = 0xffffff;
+    const tint = this._selectedBlockIds.has(blockId)
+      ? this._style.selectedTint
+      : this._hoveredBlockId === blockId
+        ? this._style.hoverTint
+        : dobj.runtimeTint;
+
+    for (const display of dobj.tintables) {
+      display.tint = tint;
     }
   }
 
   private _destroyBlockDO(dobj: BlockDisplayObject): void {
-    dobj.symbol.destroy();
+    dobj.symbolRoot.destroy({ children: true });
     dobj.label?.destroy();
     dobj.designation?.destroy();
     dobj.container.destroy({ children: true });
   }
+}
 
-  // --------------------------------------------------------------------------
-  // Cleanup
-  // --------------------------------------------------------------------------
-
-  destroy(): void {
-    if (this._destroyed) return;
-    this._destroyed = true;
-
-    for (const dobj of this._blocks.values()) {
-      this._destroyBlockDO(dobj);
-    }
-    this._blocks.clear();
+function resolveSymbolDefinitionForId(symbolId: string): SymbolDefinition | null {
+  if (symbolId.startsWith('builtin:')) {
+    return getCustomSymbolDefinition(symbolId) ?? null;
   }
+  return getCustomSymbolDefinition(symbolId);
 }

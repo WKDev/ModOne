@@ -12,10 +12,10 @@ export const buttonSymbol: SymbolDefinition = {
   width: 40,
   height: 40,
   graphics: [
-    { kind: 'polyline', points: [{ x: 0, y: 20 }, { x: 14, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 14, y: 24 }, { x: 26, y: 16 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 26, y: 20 }, { x: 40, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 14, y: 10 }, { x: 26, y: 10 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
+    { id: 'lead-in', kind: 'polyline', points: [{ x: 0, y: 20 }, { x: 14, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { id: 'contact-arm', kind: 'polyline', points: [{ x: 14, y: 24 }, { x: 26, y: 16 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { id: 'lead-out', kind: 'polyline', points: [{ x: 26, y: 20 }, { x: 40, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { id: 'plunger-head', kind: 'polyline', points: [{ x: 14, y: 10 }, { x: 26, y: 10 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
   ],
   pins: [
     { id: 'in', name: 'IN', number: '1', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 0, y: 20 }, orientation: 'left', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
@@ -27,6 +27,16 @@ export const buttonSymbol: SymbolDefinition = {
     interactionMode: 'momentary',
     deviceScoped: false,
     terminalRoles: { in: 'IN', out: 'OUT' },
+  },
+  visualStates: {
+    pressed: {
+      graphics: [
+        { id: 'lead-in', kind: 'polyline', points: [{ x: 0, y: 20 }, { x: 14, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+        { id: 'contact-arm', kind: 'polyline', points: [{ x: 14, y: 20 }, { x: 26, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+        { id: 'lead-out', kind: 'polyline', points: [{ x: 26, y: 20 }, { x: 40, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+        { id: 'plunger-head', kind: 'polyline', points: [{ x: 14, y: 12 }, { x: 26, y: 12 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
+      ],
+    },
   },
   properties: [
     { key: 'mode', value: 'momentary', type: 'string', visible: true, editorType: 'text' },

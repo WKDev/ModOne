@@ -191,6 +191,10 @@ export function getCustomSymbolContext(symbolId: string): GraphicsContext | null
   return ctx;
 }
 
+export function getCustomSymbolDefinition(symbolId: string): SymbolDefinition | null {
+  return definitionCache.get(symbolId) ?? null;
+}
+
 export function getCustomSymbolSize(
   symbolId: string,
 ): { width: number; height: number } | null {

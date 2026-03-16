@@ -95,6 +95,23 @@
       "type": "object",
       "description": "Optional runtime state schema (JSON Schema)"
     },
+    "visualStates": {
+      "type": "object",
+      "description": "Optional state-driven visual variants",
+      "additionalProperties": {
+        "$ref": "#/definitions/SymbolVisualVariant"
+      }
+    },
+    "animations": {
+      "type": "object",
+      "description": "Optional per-state symbol animations",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/SymbolAnimationSpec"
+        }
+      }
+    },
     "extendsSymbol": {
       "type": "string",
       "description": "ID of parent symbol for inheritance"
@@ -308,6 +325,79 @@
         }
       ]
     },
+    "SymbolVisualTransform": {
+      "type": "object",
+      "properties": {
+        "translateX": { "type": "number" },
+        "translateY": { "type": "number" },
+        "rotation": { "type": "number" },
+        "scaleX": { "type": "number" },
+        "scaleY": { "type": "number" },
+        "pivotX": { "type": "number" },
+        "pivotY": { "type": "number" }
+      }
+    },
+    "GraphicPrimitiveOverride": {
+      "type": "object",
+      "properties": {
+        "visible": { "type": "boolean" },
+        "opacity": { "type": "number" },
+        "stroke": { "type": "string" },
+        "fill": { "type": "string" },
+        "strokeWidth": { "type": "number" },
+        "text": { "type": "string" },
+        "fontSize": { "type": "number" },
+        "fontFamily": { "type": "string" },
+        "anchor": {
+          "type": "string",
+          "enum": ["start", "middle", "end"]
+        },
+        "transform": {
+          "$ref": "#/definitions/SymbolVisualTransform"
+        }
+      }
+    },
+    "SymbolVisualVariant": {
+      "type": "object",
+      "properties": {
+        "graphics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/GraphicPrimitive"
+          }
+        },
+        "primitiveOverrides": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/GraphicPrimitiveOverride"
+          }
+        }
+      }
+    },
+    "SymbolAnimationSpec": {
+      "type": "object",
+      "required": ["type", "target"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["rotate"]
+        },
+        "target": {
+          "type": "string"
+        },
+        "speed": {
+          "type": "number"
+        },
+        "pivot": {
+          "type": "object",
+          "required": ["x", "y"],
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+          }
+        }
+      }
+    },
     "RectPrimitive": {
       "type": "object",
       "required": [
@@ -321,6 +411,9 @@
         "strokeWidth"
       ],
       "properties": {
+        "id": {
+          "type": "string"
+        },
         "kind": {
           "const": "rect"
         },
@@ -359,6 +452,9 @@
         "strokeWidth"
       ],
       "properties": {
+        "id": {
+          "type": "string"
+        },
         "kind": {
           "const": "circle"
         },
@@ -392,6 +488,9 @@
         "strokeWidth"
       ],
       "properties": {
+        "id": {
+          "type": "string"
+        },
         "kind": {
           "const": "polyline"
         },
@@ -438,6 +537,9 @@
         "strokeWidth"
       ],
       "properties": {
+        "id": {
+          "type": "string"
+        },
         "kind": {
           "const": "arc"
         },
@@ -479,6 +581,9 @@
         "fill"
       ],
       "properties": {
+        "id": {
+          "type": "string"
+        },
         "kind": {
           "const": "text"
         },

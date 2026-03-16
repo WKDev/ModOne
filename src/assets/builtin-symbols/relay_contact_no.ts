@@ -12,9 +12,9 @@ export const relayContactNoSymbol: SymbolDefinition = {
   width: 60,
   height: 40,
   graphics: [
-    { kind: 'polyline', points: [{ x: 4, y: 20 }, { x: 20, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 40, y: 20 }, { x: 56, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 20, y: 28 }, { x: 40, y: 12 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { id: 'lead-in', kind: 'polyline', points: [{ x: 4, y: 20 }, { x: 20, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { id: 'lead-out', kind: 'polyline', points: [{ x: 40, y: 20 }, { x: 56, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { id: 'contact-arm', kind: 'polyline', points: [{ x: 20, y: 28 }, { x: 40, y: 12 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
   ],
   pins: [
     { id: 'in', name: 'IN', number: '1', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 0, y: 20 }, orientation: 'left', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
@@ -26,6 +26,15 @@ export const relayContactNoSymbol: SymbolDefinition = {
     interactionMode: 'none',
     deviceScoped: true,
     terminalRoles: { in: 'COM', out: 'NO' },
+  },
+  visualStates: {
+    closed: {
+      graphics: [
+        { id: 'lead-in', kind: 'polyline', points: [{ x: 4, y: 20 }, { x: 20, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+        { id: 'lead-out', kind: 'polyline', points: [{ x: 40, y: 20 }, { x: 56, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+        { id: 'contact-arm', kind: 'polyline', points: [{ x: 20, y: 20 }, { x: 40, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+      ],
+    },
   },
   properties: [
     { key: 'designation', value: 'K1', type: 'string', visible: true, editorType: 'text' },

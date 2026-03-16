@@ -1,7 +1,10 @@
 /**
- * SimulationRenderer — Applies live simulation state to Pixi symbols.
+ * SimulationRenderer — Applies live simulation state to canvas visuals.
  *
- * Supports both Tauri PLC events and local behavior-template-driven simulation snapshots.
+ * Blocks now support:
+ * - runtime tint
+ * - state-driven variants
+ * - lightweight ticker animations
  */
 
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
@@ -61,15 +64,37 @@ export interface SimulationRendererConfig {
   getWireIdsForBlock?: (blockId: string) => Iterable<string> | undefined;
 }
 
+interface ActiveBlockAnimation {
+  target: {
+    rotation: number;
+    pivot?: { set(x: number, y: number): void };
+  };
+  baseRotation: number;
+  speed: number;
+}
+
 export class SimulationRenderer {
   private _config: SimulationRendererConfig | null = null;
   private _destroyed = false;
   private _listening = false;
   private _startToken = 0;
   private _unlisten: UnlistenFn | null = null;
+  private _tickerAnimating = false;
 
   private _energizedBlocks = new Set<string>();
   private _energizedWires = new Set<string>();
+  private _blockAnimations = new Map<string, ActiveBlockAnimation[]>();
+
+  private readonly _tickAnimations = (ticker: Ticker): void => {
+    const deltaSeconds = ticker.deltaMS / 1000;
+    if (deltaSeconds <= 0) return;
+
+    for (const animations of this._blockAnimations.values()) {
+      for (const animation of animations) {
+        animation.target.rotation += ((animation.speed ?? 0) * Math.PI / 180) * deltaSeconds;
+      }
+    }
+  };
 
   init(config: SimulationRendererConfig): void {
     if (this._destroyed) {
@@ -127,7 +152,7 @@ export class SimulationRenderer {
 
   applySimulationSnapshot(
     behaviorStates: Map<string, ComponentBehaviorState>,
-    wireIds: Set<string>
+    wireIds: Set<string>,
   ): void {
     if (this._destroyed || !this._config) return;
 
@@ -135,20 +160,22 @@ export class SimulationRenderer {
 
     for (const blockId of this._energizedBlocks) {
       if (nextBlocks.has(blockId)) continue;
-      const graphics = this._config.blockRenderer.getBlockGraphics(blockId);
-      if (graphics) {
-        graphics.tint = COLOR_DEFAULT;
-      }
+      this._config.blockRenderer.resetBlockRuntimeVisual(blockId);
+      this._stopBlockAnimations(blockId);
     }
 
     for (const [blockId, behaviorState] of behaviorStates) {
-      const graphics = this._config.blockRenderer.getBlockGraphics(blockId);
-      if (!graphics) continue;
-      graphics.tint = this._resolveBehaviorTint(behaviorState, blockId);
+      this._config.blockRenderer.setBlockBehaviorState(blockId, behaviorState);
+      this._config.blockRenderer.setBlockRuntimeTint(
+        blockId,
+        this._resolveBehaviorTint(behaviorState, blockId),
+      );
+      this._syncBlockAnimations(blockId);
     }
 
     this._energizedBlocks = nextBlocks;
     this.setEnergizedWires(wireIds);
+    this._ensureTickerSubscription();
   }
 
   setEnergizedWires(wireIds: Set<string>): void {
@@ -178,10 +205,8 @@ export class SimulationRenderer {
     if (!this._config) return;
 
     for (const blockId of this._energizedBlocks) {
-      const graphics = this._config.blockRenderer.getBlockGraphics(blockId);
-      if (graphics) {
-        graphics.tint = COLOR_DEFAULT;
-      }
+      this._config.blockRenderer.resetBlockRuntimeVisual(blockId);
+      this._stopBlockAnimations(blockId);
     }
 
     for (const wireId of this._energizedWires) {
@@ -193,6 +218,7 @@ export class SimulationRenderer {
 
     this._energizedBlocks.clear();
     this._energizedWires.clear();
+    this._ensureTickerSubscription();
   }
 
   getEnergizedBlocks(): ReadonlySet<string> {
@@ -207,6 +233,8 @@ export class SimulationRenderer {
     if (this._destroyed) return;
     this._destroyed = true;
     this.stopListening();
+    this._blockAnimations.clear();
+    this._ensureTickerSubscription();
     this._config = null;
   }
 
@@ -223,18 +251,21 @@ export class SimulationRenderer {
         this._energizedBlocks.delete(blockId);
       }
 
-      this._applyBlockTint(blockId, update.state, update.value ?? null);
+      const fallbackBehaviorState = this._buildFallbackBehaviorState(blockId, update.state);
+      this._config.blockRenderer.setBlockBehaviorState(blockId, fallbackBehaviorState);
+      this._config.blockRenderer.setBlockRuntimeTint(
+        blockId,
+        this._resolveTint(
+          this._config.getBlockType?.(blockId) ?? 'unknown',
+          update.state,
+          blockId,
+          update.value ?? null,
+        ),
+      );
+      this._syncBlockAnimations(blockId);
     }
-  }
 
-  private _applyBlockTint(blockId: string, state: boolean, value: string | null): void {
-    if (!this._config) return;
-
-    const graphics = this._config.blockRenderer.getBlockGraphics(blockId);
-    if (!graphics) return;
-
-    const blockType = this._config.getBlockType?.(blockId) ?? 'unknown';
-    graphics.tint = this._resolveTint(blockType, state, blockId, value);
+    this._ensureTickerSubscription();
   }
 
   private _resolveBehaviorTint(behaviorState: ComponentBehaviorState, blockId: string): number {
@@ -289,6 +320,65 @@ export class SimulationRenderer {
     }
   }
 
+  private _syncBlockAnimations(blockId: string): void {
+    if (!this._config) return;
+
+    this._stopBlockAnimations(blockId);
+
+    const visual = this._config.blockRenderer.getBlockVisual(blockId);
+    if (!visual || visual.animationTargets.size === 0) {
+      this._ensureTickerSubscription();
+      return;
+    }
+
+    const animations: ActiveBlockAnimation[] = [];
+    for (const { displayObject, baseRotation, spec } of visual.animationTargets.values()) {
+      if (spec.type !== 'rotate') continue;
+      if (spec.pivot && 'pivot' in displayObject) {
+        displayObject.pivot.set(spec.pivot.x, spec.pivot.y);
+      }
+      displayObject.rotation = baseRotation;
+      animations.push({
+        target: displayObject,
+        baseRotation,
+        speed: spec.speed ?? 120,
+      });
+    }
+
+    if (animations.length > 0) {
+      this._blockAnimations.set(blockId, animations);
+    }
+
+    this._ensureTickerSubscription();
+  }
+
+  private _stopBlockAnimations(blockId: string): void {
+    const existing = this._blockAnimations.get(blockId);
+    if (!existing) return;
+
+    for (const animation of existing) {
+      animation.target.rotation = animation.baseRotation;
+    }
+    this._blockAnimations.delete(blockId);
+  }
+
+  private _ensureTickerSubscription(): void {
+    const ticker = this._config?.ticker;
+    if (!ticker) return;
+
+    const shouldAnimate = this._blockAnimations.size > 0;
+    if (shouldAnimate && !this._tickerAnimating) {
+      ticker.add(this._tickAnimations);
+      this._tickerAnimating = true;
+      return;
+    }
+
+    if (!shouldAnimate && this._tickerAnimating) {
+      ticker.remove(this._tickAnimations);
+      this._tickerAnimating = false;
+    }
+  }
+
   private _recomputeEnergizedWires(): void {
     if (!this._config) return;
 
@@ -308,6 +398,72 @@ export class SimulationRenderer {
     }
 
     this.setEnergizedWires(next);
+  }
+
+  private _buildFallbackBehaviorState(
+    blockId: string,
+    active: boolean,
+  ): ComponentBehaviorState | null {
+    const blockType = this._config?.getBlockType?.(blockId);
+    if (!blockType) return null;
+
+    if (blockType === 'led' || blockType === 'pilot_lamp') {
+      return {
+        componentId: blockId,
+        templateId: 'archetype:lamp',
+        archetype: 'lamp',
+        visualState: active ? 'lit' : 'dark',
+        powered: active,
+        lit: active,
+      };
+    }
+
+    if (blockType === 'motor') {
+      return {
+        componentId: blockId,
+        templateId: 'archetype:motor',
+        archetype: 'motor',
+        visualState: active ? 'running' : 'stopped',
+        powered: active,
+        running: active,
+      };
+    }
+
+    if (blockType === 'relay' || blockType === 'relay_coil' || blockType === 'relay_contact_no' || blockType === 'relay_contact_nc') {
+      return {
+        componentId: blockId,
+        templateId: 'archetype:relay',
+        archetype: 'relay',
+        visualState: active ? 'energized' : 'deenergized',
+        powered: active,
+        energized: active,
+        conducting: active,
+      };
+    }
+
+    if (
+      blockType === 'button' ||
+      blockType === 'push_button_no' ||
+      blockType === 'push_button_nc' ||
+      blockType === 'switch_no' ||
+      blockType === 'switch_nc' ||
+      blockType === 'switch_changeover' ||
+      blockType === 'selector_switch' ||
+      blockType === 'emergency_stop'
+    ) {
+      return {
+        componentId: blockId,
+        templateId: 'archetype:switch',
+        archetype: 'switch',
+        visualState: active ? 'closed' : 'open',
+        powered: active,
+        conducting: active,
+        pressed: active,
+        energized: active,
+      };
+    }
+
+    return null;
   }
 
   private _normalizePayload(payload: unknown): PlcOutputsEvent | null {

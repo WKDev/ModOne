@@ -12,8 +12,8 @@ export const relaySymbol: SymbolDefinition = {
   width: 80,
   height: 80,
   graphics: [
-    { kind: 'rect', x: 30, y: 16, width: 20, height: 48, stroke: '#888', fill: 'transparent', strokeWidth: 2 },
-    { kind: 'text', x: 40, y: 40, text: 'K', fontSize: 12, fontFamily: 'Arial', fill: '#888', anchor: 'middle' },
+    { id: 'coil-body', kind: 'rect', x: 30, y: 16, width: 20, height: 48, stroke: '#888', fill: 'transparent', strokeWidth: 2 },
+    { id: 'coil-label', kind: 'text', x: 40, y: 40, text: 'K', fontSize: 12, fontFamily: 'Arial', fill: '#888', anchor: 'middle' },
   ],
   pins: [
     { id: 'coil_in', name: 'A1', number: 'A1', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 40, y: 0 }, orientation: 'up', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
@@ -62,6 +62,19 @@ export const relaySymbol: SymbolDefinition = {
     interactionMode: 'none',
     deviceScoped: true,
     terminalRoles: { coil_in: 'A1', coil_out: 'A2', com: 'COM', no: 'NO', nc: 'NC' },
+  },
+  visualStates: {
+    energized: {
+      primitiveOverrides: {
+        'coil-body': {
+          stroke: '#22c55e',
+          fill: '#d1fae5',
+        },
+        'coil-label': {
+          fill: '#15803d',
+        },
+      },
+    },
   },
   properties: [
     { key: 'designation', value: 'K1', type: 'string', visible: true, editorType: 'text' },

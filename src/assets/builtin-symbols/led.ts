@@ -12,12 +12,12 @@ export const ledSymbol: SymbolDefinition = {
   width: 40,
   height: 60,
   graphics: [
-    { kind: 'polyline', points: [{ x: 20, y: 0 }, { x: 20, y: 10 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 10, y: 20 }, { x: 30, y: 20 }, { x: 20, y: 34 }, { x: 10, y: 20 }], stroke: '#888', fill: 'transparent', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 10, y: 38 }, { x: 30, y: 38 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 24, y: 15 }, { x: 30, y: 9 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
-    { kind: 'polyline', points: [{ x: 28, y: 19 }, { x: 34, y: 13 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
-    { kind: 'polyline', points: [{ x: 20, y: 38 }, { x: 20, y: 60 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { id: 'lead-top', kind: 'polyline', points: [{ x: 20, y: 0 }, { x: 20, y: 10 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { id: 'diode-body', kind: 'polyline', points: [{ x: 10, y: 20 }, { x: 30, y: 20 }, { x: 20, y: 34 }, { x: 10, y: 20 }], stroke: '#888', fill: 'transparent', strokeWidth: 2 },
+    { id: 'cathode-bar', kind: 'polyline', points: [{ x: 10, y: 38 }, { x: 30, y: 38 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { id: 'ray-1', kind: 'polyline', points: [{ x: 24, y: 15 }, { x: 30, y: 9 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
+    { id: 'ray-2', kind: 'polyline', points: [{ x: 28, y: 19 }, { x: 34, y: 13 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
+    { id: 'lead-bottom', kind: 'polyline', points: [{ x: 20, y: 38 }, { x: 20, y: 60 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
   ],
   pins: [
     { id: 'anode', name: '+', number: 'A', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 20, y: 0 }, orientation: 'up', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
@@ -29,6 +29,19 @@ export const ledSymbol: SymbolDefinition = {
     interactionMode: 'none',
     deviceScoped: true,
     terminalRoles: { anode: 'L+', cathode: 'L-' },
+  },
+  visualStates: {
+    lit: {
+      graphics: [
+        { id: 'glow', kind: 'circle', cx: 20, cy: 28, r: 16, stroke: 'transparent', fill: '#fca5a5', strokeWidth: 0 },
+        { id: 'lead-top', kind: 'polyline', points: [{ x: 20, y: 0 }, { x: 20, y: 10 }], stroke: '#ef4444', fill: 'none', strokeWidth: 2 },
+        { id: 'diode-body', kind: 'polyline', points: [{ x: 10, y: 20 }, { x: 30, y: 20 }, { x: 20, y: 34 }, { x: 10, y: 20 }], stroke: '#ef4444', fill: '#fecaca', strokeWidth: 2 },
+        { id: 'cathode-bar', kind: 'polyline', points: [{ x: 10, y: 38 }, { x: 30, y: 38 }], stroke: '#ef4444', fill: 'none', strokeWidth: 2 },
+        { id: 'ray-1', kind: 'polyline', points: [{ x: 24, y: 15 }, { x: 30, y: 9 }], stroke: '#ef4444', fill: 'none', strokeWidth: 1.5 },
+        { id: 'ray-2', kind: 'polyline', points: [{ x: 28, y: 19 }, { x: 34, y: 13 }], stroke: '#ef4444', fill: 'none', strokeWidth: 1.5 },
+        { id: 'lead-bottom', kind: 'polyline', points: [{ x: 20, y: 38 }, { x: 20, y: 60 }], stroke: '#ef4444', fill: 'none', strokeWidth: 2 },
+      ],
+    },
   },
   properties: [
     { key: 'color', value: 'red', type: 'string', visible: true, editorType: 'text' },

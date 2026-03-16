@@ -12,13 +12,13 @@ export const pushButtonNoSymbol: SymbolDefinition = {
   width: 60,
   height: 40,
   graphics: [
-    { kind: 'polyline', points: [{ x: 4, y: 20 }, { x: 20, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 40, y: 20 }, { x: 56, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { kind: 'circle', cx: 20, cy: 20, r: 2, stroke: '#888', fill: '#888', strokeWidth: 2 },
-    { kind: 'circle', cx: 40, cy: 20, r: 2, stroke: '#888', fill: '#888', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 20, y: 20 }, { x: 36, y: 8 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 30, y: 12 }, { x: 30, y: 4 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 26, y: 4 }, { x: 34, y: 4 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { id: 'lead-in', kind: 'polyline', points: [{ x: 4, y: 20 }, { x: 20, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { id: 'lead-out', kind: 'polyline', points: [{ x: 40, y: 20 }, { x: 56, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { id: 'terminal-in', kind: 'circle', cx: 20, cy: 20, r: 2, stroke: '#888', fill: '#888', strokeWidth: 2 },
+    { id: 'terminal-out', kind: 'circle', cx: 40, cy: 20, r: 2, stroke: '#888', fill: '#888', strokeWidth: 2 },
+    { id: 'contact-arm', kind: 'polyline', points: [{ x: 20, y: 20 }, { x: 36, y: 8 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { id: 'plunger-shaft', kind: 'polyline', points: [{ x: 30, y: 12 }, { x: 30, y: 4 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { id: 'plunger-head', kind: 'polyline', points: [{ x: 26, y: 4 }, { x: 34, y: 4 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
   ],
   pins: [
     { id: 'in', name: 'IN', number: '1', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 0, y: 20 }, orientation: 'left', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
@@ -30,6 +30,19 @@ export const pushButtonNoSymbol: SymbolDefinition = {
     interactionMode: 'momentary',
     deviceScoped: false,
     terminalRoles: { in: 'IN', out: 'OUT' },
+  },
+  visualStates: {
+    pressed: {
+      graphics: [
+        { id: 'lead-in', kind: 'polyline', points: [{ x: 4, y: 20 }, { x: 20, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+        { id: 'lead-out', kind: 'polyline', points: [{ x: 40, y: 20 }, { x: 56, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+        { id: 'terminal-in', kind: 'circle', cx: 20, cy: 20, r: 2, stroke: '#888', fill: '#888', strokeWidth: 2 },
+        { id: 'terminal-out', kind: 'circle', cx: 40, cy: 20, r: 2, stroke: '#888', fill: '#888', strokeWidth: 2 },
+        { id: 'contact-arm', kind: 'polyline', points: [{ x: 20, y: 20 }, { x: 40, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+        { id: 'plunger-shaft', kind: 'polyline', points: [{ x: 30, y: 16 }, { x: 30, y: 6 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+        { id: 'plunger-head', kind: 'polyline', points: [{ x: 26, y: 6 }, { x: 34, y: 6 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+      ],
+    },
   },
   properties: [
     { key: 'designation', value: 'S1', type: 'string', visible: true, editorType: 'text' },

@@ -12,19 +12,45 @@ export const switchChangeoverSymbol: SymbolDefinition = {
   width: 80,
   height: 80,
   graphics: [
-    { kind: 'polyline', points: [{ x: 4, y: 40 }, { x: 24, y: 40 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 56, y: 20 }, { x: 76, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 56, y: 40 }, { x: 76, y: 40 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { kind: 'circle', cx: 24, cy: 40, r: 2, stroke: '#888', fill: '#888', strokeWidth: 2 },
-    { kind: 'circle', cx: 56, cy: 20, r: 2, stroke: '#888', fill: '#888', strokeWidth: 2 },
-    { kind: 'circle', cx: 56, cy: 40, r: 2, stroke: '#888', fill: '#888', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 24, y: 40 }, { x: 54, y: 22 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { id: 'lead-com', kind: 'polyline', points: [{ x: 4, y: 40 }, { x: 24, y: 40 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { id: 'lead-pos1', kind: 'polyline', points: [{ x: 56, y: 20 }, { x: 76, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { id: 'lead-pos2', kind: 'polyline', points: [{ x: 56, y: 40 }, { x: 76, y: 40 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { id: 'terminal-com', kind: 'circle', cx: 24, cy: 40, r: 2, stroke: '#888', fill: '#888', strokeWidth: 2 },
+    { id: 'terminal-pos1', kind: 'circle', cx: 56, cy: 20, r: 2, stroke: '#888', fill: '#888', strokeWidth: 2 },
+    { id: 'terminal-pos2', kind: 'circle', cx: 56, cy: 40, r: 2, stroke: '#888', fill: '#888', strokeWidth: 2 },
+    { id: 'switch-arm', kind: 'polyline', points: [{ x: 24, y: 40 }, { x: 54, y: 22 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
   ],
   pins: [
     { id: 'com', name: 'COM', number: '1', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 0, y: 40 }, orientation: 'left', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
     { id: 'pos1', name: 'NO', number: '2', type: 'output', electricalType: 'output', functionalRole: 'general', shape: 'line', position: { x: 80, y: 20 }, orientation: 'right', length: 0, sortOrder: 2, nameVisible: true, numberVisible: true },
     { id: 'pos2', name: 'NC', number: '3', type: 'output', electricalType: 'output', functionalRole: 'general', shape: 'line', position: { x: 80, y: 40 }, orientation: 'right', length: 0, sortOrder: 3, nameVisible: true, numberVisible: true },
   ],
+  behavior: {
+    templateId: 'archetype:switch',
+    archetype: 'switch',
+    interactionMode: 'maintained',
+    deviceScoped: false,
+    terminalRoles: { com: 'COM', pos1: 'NO', pos2: 'NC' },
+  },
+  visualStates: {
+    open: {
+      primitiveOverrides: {
+        'switch-arm': {
+          transform: {
+            translateX: -4,
+            translateY: 4,
+          },
+        },
+      },
+    },
+    closed: {
+      primitiveOverrides: {
+        'switch-arm': {
+          stroke: '#eab308',
+        },
+      },
+    },
+  },
   properties: [
     { key: 'designation', value: 'S1', type: 'string', visible: true, editorType: 'text' },
     { key: 'normallyOpen', value: true, type: 'boolean', visible: true, editorType: 'checkbox' },

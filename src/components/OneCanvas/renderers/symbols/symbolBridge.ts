@@ -8,6 +8,7 @@
  *    builtin and custom symbols), then fall back to SymbolLibrary.
  */
 import { GraphicsContext } from 'pixi.js';
+import type { SymbolDefinition } from '../../../../types/symbol';
 import {
   BUILTIN_SYMBOLS,
   getBuiltinSymbolForBlockType,
@@ -15,6 +16,7 @@ import {
 import {
   registerCustomSymbol,
   getCustomSymbolContext,
+  getCustomSymbolDefinition,
   getCustomSymbolSize,
   getCustomSymbolPorts,
 } from './customSymbolBridge';
@@ -55,6 +57,10 @@ export function getSymbolContextForBlockType(blockType: string): GraphicsContext
   return getCustomSymbolContext(def.id);
 }
 
+export function getSymbolDefinitionForBlockType(blockType: string): SymbolDefinition | null {
+  return getBuiltinSymbolForBlockType(blockType) ?? null;
+}
+
 /**
  * Get size for a block type string.
  * Returns null if no builtin symbol is registered for this type.
@@ -77,6 +83,10 @@ export function getSymbolSizeForBlockType(
  */
 export function getSymbolContextFromDef(symbolId: string): GraphicsContext | null {
   return getCustomSymbolContext(symbolId);
+}
+
+export function getSymbolDefinitionFromDef(symbolId: string): SymbolDefinition | null {
+  return getCustomSymbolDefinition(symbolId);
 }
 
 /**

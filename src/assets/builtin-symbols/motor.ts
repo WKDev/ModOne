@@ -12,13 +12,13 @@ export const motorSymbol: SymbolDefinition = {
   width: 80,
   height: 80,
   graphics: [
-    { kind: 'polyline', points: [{ x: 20, y: 0 }, { x: 20, y: 12 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
-    { kind: 'polyline', points: [{ x: 40, y: 0 }, { x: 40, y: 12 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
-    { kind: 'polyline', points: [{ x: 60, y: 0 }, { x: 60, y: 12 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
-    { kind: 'circle', cx: 40, cy: 40, r: 24, stroke: '#888', fill: 'transparent', strokeWidth: 2 },
-    { kind: 'text', x: 40, y: 45, text: 'M', fontSize: 16, fontFamily: 'Arial', fill: '#888', anchor: 'middle' },
-    { kind: 'polyline', points: [{ x: 34, y: 50 }, { x: 37, y: 48 }, { x: 43, y: 52 }, { x: 46, y: 50 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
-    { kind: 'polyline', points: [{ x: 40, y: 64 }, { x: 40, y: 80 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
+    { id: 'lead-u', kind: 'polyline', points: [{ x: 20, y: 0 }, { x: 20, y: 12 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
+    { id: 'lead-v', kind: 'polyline', points: [{ x: 40, y: 0 }, { x: 40, y: 12 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
+    { id: 'lead-w', kind: 'polyline', points: [{ x: 60, y: 0 }, { x: 60, y: 12 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
+    { id: 'motor-body', kind: 'circle', cx: 40, cy: 40, r: 24, stroke: '#888', fill: 'transparent', strokeWidth: 2 },
+    { id: 'motor-label', kind: 'text', x: 40, y: 45, text: 'M', fontSize: 16, fontFamily: 'Arial', fill: '#888', anchor: 'middle' },
+    { id: 'rotor', kind: 'polyline', points: [{ x: 34, y: 50 }, { x: 37, y: 48 }, { x: 43, y: 52 }, { x: 46, y: 50 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
+    { id: 'lead-pe', kind: 'polyline', points: [{ x: 40, y: 64 }, { x: 40, y: 80 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
   ],
   pins: [
     { id: 'l1', name: 'U', number: 'U', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 20, y: 0 }, orientation: 'up', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
@@ -32,6 +32,36 @@ export const motorSymbol: SymbolDefinition = {
     interactionMode: 'none',
     deviceScoped: true,
     terminalRoles: { l1: 'L1', l2: 'L2', l3: 'L3', pe: 'PE' },
+  },
+  visualStates: {
+    running: {
+      primitiveOverrides: {
+        'motor-body': {
+          stroke: '#22c55e',
+          fill: '#dcfce7',
+        },
+        'motor-label': {
+          fill: '#15803d',
+        },
+        rotor: {
+          stroke: '#166534',
+          transform: {
+            pivotX: 40,
+            pivotY: 50,
+          },
+        },
+      },
+    },
+  },
+  animations: {
+    running: [
+      {
+        type: 'rotate',
+        target: 'rotor',
+        speed: 240,
+        pivot: { x: 40, y: 50 },
+      },
+    ],
   },
   properties: [
     { key: 'designation', value: 'M1', type: 'string', visible: true, editorType: 'text' },
