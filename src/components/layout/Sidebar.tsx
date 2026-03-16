@@ -7,6 +7,7 @@ import { ActivityBar } from './ActivityBar';
 import { ExplorerPanel } from '../sidebar/ExplorerPanel';
 import { SearchPanel } from '../sidebar/SearchPanel';
 import { ModbusPanel } from '../sidebar/ModbusPanel';
+import { OpcUaPanel } from '../sidebar/OpcUaPanel';
 import { PanelErrorBoundary } from './PanelErrorBoundary';
 import { RecentProjectsList } from '../project/RecentProjectsList';
 
@@ -60,6 +61,8 @@ export function Sidebar() {
         return <SearchPanel />;
       case 'modbus':
         return <ModbusPanel />;
+      case 'opcua':
+        return <OpcUaPanel />;
       default:
         return null;
     }

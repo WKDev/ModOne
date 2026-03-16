@@ -1,13 +1,14 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Settings, MonitorCog, Network, Palette, Keyboard, X, Search } from 'lucide-react';
+import { Settings, MonitorCog, Network, Palette, Keyboard, X, Search, Radio } from 'lucide-react';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { GeneralSettings } from './GeneralSettings';
 import { SimulationSettings } from './SimulationSettings';
 import { ModbusSettings } from './ModbusSettings';
+import { OpcUaSettings } from './OpcUaSettings';
 import { AppearanceSettings } from './AppearanceSettings';
 import { KeyboardShortcutsSettings } from './KeyboardShortcutsSettings';
 
-type SettingsCategory = 'general' | 'simulation' | 'modbus' | 'appearance' | 'shortcuts';
+type SettingsCategory = 'general' | 'simulation' | 'modbus' | 'opcua' | 'appearance' | 'shortcuts';
 
 interface SettingsDialogProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ const categories: { id: SettingsCategory; label: string; icon: React.ReactNode }
   { id: 'general', label: '일반', icon: <Settings size={18} /> },
   { id: 'simulation', label: '시뮬레이션', icon: <MonitorCog size={18} /> },
   { id: 'modbus', label: 'Modbus', icon: <Network size={18} /> },
+  { id: 'opcua', label: 'OPC UA', icon: <Radio size={18} /> },
   { id: 'appearance', label: '외관', icon: <Palette size={18} /> },
   { id: 'shortcuts', label: '단축키', icon: <Keyboard size={18} /> },
 ];
@@ -167,6 +169,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                     <SimulationSettings searchFilter={searchFilter} />
                   )}
                   {activeCategory === 'modbus' && <ModbusSettings searchFilter={searchFilter} />}
+                  {activeCategory === 'opcua' && <OpcUaSettings searchFilter={searchFilter} />}
                   {activeCategory === 'appearance' && (
                     <AppearanceSettings searchFilter={searchFilter} />
                   )}

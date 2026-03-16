@@ -1,10 +1,8 @@
-import { useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import { Activity, Wifi, WifiOff, Cpu, Sun, Moon, Radio } from 'lucide-react';
 import { useLayoutStore, SimulationStatus } from '../../stores/layoutStore';
+import { useOpcUaStore } from '../../stores/opcuaStore';
+import { useSidebarStore } from '../../stores/sidebarStore';
 import { useTheme } from '../../providers/ThemeProvider';
-import type { OpcUaStatus } from '../../types/project';
 
 interface StatusIndicatorProps {
   status: SimulationStatus;
@@ -40,42 +38,20 @@ export function StatusBar() {
     opcuaRunning,
     opcuaPort,
     memoryUsageMb,
-    setOpcuaRunning,
-    setOpcuaPort,
   } = useLayoutStore();
 
+  const sessionCount = useOpcUaStore((s) => s.status?.sessionCount ?? 0);
+  const sessionCountSupported = useOpcUaStore((s) => s.status?.sessionCountSupported ?? false);
+
   const { isDark, setTheme } = useTheme();
+
+  const handleOpcUaClick = () => {
+    useSidebarStore.getState().showPanel('opcua');
+  };
 
   const toggleTheme = () => {
     setTheme(isDark ? 'light' : 'dark');
   };
-
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-
-    const syncStatus = async () => {
-      try {
-        const status = await invoke<OpcUaStatus>('opcua_get_status');
-        setOpcuaRunning(status.running);
-        setOpcuaPort(status.port);
-      } catch {
-        setOpcuaRunning(false);
-      }
-    };
-
-    void syncStatus();
-
-    void listen<OpcUaStatus>('opcua:status-update', (event) => {
-      setOpcuaRunning(event.payload.running);
-      setOpcuaPort(event.payload.port);
-    }).then((dispose) => {
-      unlisten = dispose;
-    });
-
-    return () => {
-      unlisten?.();
-    };
-  }, [setOpcuaPort, setOpcuaRunning]);
 
   return (
     <div data-testid="status-bar" className="h-6 bg-[var(--color-bg-secondary)] border-t border-[var(--color-border)] flex items-center justify-between px-4 text-xs font-mono">
@@ -111,15 +87,20 @@ export function StatusBar() {
         </div>
 
         {/* OPC UA Status */}
-        <div
-          className="flex items-center gap-1.5"
-          title={opcuaRunning ? 'OPC UA Running' : 'OPC UA Stopped'}
+        <button
+          className="flex items-center gap-1.5 hover:bg-[var(--color-bg-tertiary)] rounded px-1 -mx-1 transition-colors"
+          onClick={handleOpcUaClick}
+          title={
+            opcuaRunning
+              ? `OPC UA Running${sessionCountSupported ? ` (${sessionCount} sessions)` : ''}`
+              : 'OPC UA Stopped'
+          }
         >
           <Radio size={12} className={opcuaRunning ? 'text-[var(--color-success)]' : 'text-[var(--color-text-muted)]'} />
           <span className={opcuaRunning ? 'text-[var(--color-text-secondary)]' : 'text-[var(--color-text-muted)]'}>
             UA:{opcuaPort}
           </span>
-        </div>
+        </button>
 
         {/* Memory Usage */}
         <div className="flex items-center gap-1.5" title="Memory Usage">

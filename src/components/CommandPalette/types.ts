@@ -16,6 +16,7 @@ export type CommandCategory =
   | 'view'
   | 'simulation'
   | 'modbus'
+  | 'opcua'
   | 'ladder'
   | 'canvas'
   | 'scenario'
@@ -91,6 +92,7 @@ export const CATEGORY_LABELS: Record<CommandCategory, string> = {
   view: 'View',
   simulation: 'Simulation',
   modbus: 'Modbus',
+  opcua: 'OPC UA',
   ladder: 'Ladder Editor',
   canvas: 'Canvas',
   scenario: 'Scenario',
@@ -108,6 +110,7 @@ export const CATEGORY_ICONS: Record<CommandCategory, string> = {
   view: 'Eye',
   simulation: 'Play',
   modbus: 'Network',
+  opcua: 'Radio',
   ladder: 'LayoutGrid',
   canvas: 'Palette',
   scenario: 'ListTodo',

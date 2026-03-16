@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 
-export type SidebarPanel = 'explorer' | 'search' | 'modbus';
+export type SidebarPanel = 'explorer' | 'search' | 'modbus' | 'opcua';
 
 const MIN_WIDTH = 150;
 const MAX_WIDTH = 400;

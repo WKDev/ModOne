@@ -1,4 +1,4 @@
-import { FolderTree, Search, Server } from 'lucide-react';
+import { FolderTree, Search, Server, Radio } from 'lucide-react';
 import { useSidebarStore, SidebarPanel } from '../../stores/sidebarStore';
 
 interface ActivityBarItemProps {
@@ -47,6 +47,7 @@ export function ActivityBar() {
     { panel: 'explorer', icon: <FolderTree size={24} />, tooltip: 'Explorer' },
     { panel: 'search', icon: <Search size={24} />, tooltip: 'Search' },
     { panel: 'modbus', icon: <Server size={24} />, tooltip: 'Modbus' },
+    { panel: 'opcua', icon: <Radio size={24} />, tooltip: 'OPC UA' },
   ];
 
   return (

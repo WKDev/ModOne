@@ -17,6 +17,7 @@ import { UnsavedChangesDialog } from './components/project/UnsavedChangesDialog'
 import { Toaster, toast } from 'sonner';
 import { useMacosNativeMenu } from "./hooks/useMacosNativeMenu";
 import { useStartupProject } from "./hooks/useStartupProject";
+import { useOpcUaInit } from "./hooks/useOpcUaInit";
 
 /**
  * Parse URL parameters to detect floating window mode
@@ -66,6 +67,9 @@ function MainWindowContent() {
 
   // Unified global keyboard shortcuts (reads overrides from settings)
   useGlobalShortcuts();
+
+  // Centralized OPC UA event subscription
+  useOpcUaInit();
 
   const isStartupProjectResolved = useStartupProject(isInitialized);
 

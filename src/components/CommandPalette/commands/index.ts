@@ -11,6 +11,7 @@ import { registerViewCommands } from './viewCommands';
 import { registerSimulationCommands } from './simulationCommands';
 import { registerScenarioCommands } from './scenarioCommands';
 import { registerModbusCommands } from './modbusCommands';
+import { registerOpcUaCommands } from './opcuaCommands';
 import { registerLadderCommands } from './ladderCommands';
 import { registerSettingsCommands } from './settingsCommands';
 import { registerHelpCommands } from './helpCommands';
@@ -36,6 +37,7 @@ export function registerAllCommands(): void {
   registerSimulationCommands();
   registerScenarioCommands();
   registerModbusCommands();
+  registerOpcUaCommands();
   registerLadderCommands();
   registerCanvasCommands();
   registerDebugCommands();
@@ -61,6 +63,7 @@ export {
   registerSimulationCommands,
   registerScenarioCommands,
   registerModbusCommands,
+  registerOpcUaCommands,
   registerLadderCommands,
   registerCanvasCommands,
   registerDebugCommands,
