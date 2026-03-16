@@ -111,6 +111,7 @@ export class PixiViewport {
       .pinch()                                  // Two-finger pinch to zoom
       .wheel({ smooth: 3 })                    // Scroll wheel zoom with smoothing
       .decelerate({ friction: 0.92 })           // Inertial scrolling
+      .clamp({ direction: 'all', underflow: 'center' }) // Keep pan inside the active sheet
       .clampZoom({ minScale, maxScale });       // Zoom limits
 
     // Listen for viewport changes
@@ -131,6 +132,7 @@ export class PixiViewport {
     if (state.zoom !== undefined) {
       this._viewport.scale.set(state.zoom, state.zoom);
     }
+    this._clampToWorld();
   }
 
   /**
@@ -142,6 +144,7 @@ export class PixiViewport {
     if (zoom !== undefined) {
       this._viewport.scale.set(zoom, zoom);
     }
+    this._clampToWorld();
   }
 
   /**
@@ -166,6 +169,7 @@ export class PixiViewport {
 
     this._viewport.scale.set(clampedScale, clampedScale);
     this._viewport.moveCenter(centerX, centerY);
+    this._clampToWorld();
   }
 
   /**
@@ -174,6 +178,7 @@ export class PixiViewport {
   resize(screenWidth: number, screenHeight: number): void {
     if (!this._viewport || this._destroyed) return;
     this._viewport.resize(screenWidth, screenHeight);
+    this._clampToWorld();
   }
 
   /**
@@ -197,5 +202,29 @@ export class PixiViewport {
     if (this._onViewportChange && this._viewport && !this._destroyed) {
       this._onViewportChange(this.state);
     }
+  }
+
+  private _clampToWorld(): void {
+    if (!this._viewport) return;
+
+    const visibleWorldWidth = this._viewport.worldScreenWidth;
+    const visibleWorldHeight = this._viewport.worldScreenHeight;
+    const halfVisibleWorldWidth = visibleWorldWidth / 2;
+    const halfVisibleWorldHeight = visibleWorldHeight / 2;
+
+    const minCenterX = halfVisibleWorldWidth;
+    const maxCenterX = this._viewport.worldWidth - halfVisibleWorldWidth;
+    const minCenterY = halfVisibleWorldHeight;
+    const maxCenterY = this._viewport.worldHeight - halfVisibleWorldHeight;
+
+    const currentCenter = this._viewport.center;
+    const clampedCenterX = visibleWorldWidth >= this._viewport.worldWidth
+      ? this._viewport.worldWidth / 2
+      : Math.min(Math.max(currentCenter.x, minCenterX), maxCenterX);
+    const clampedCenterY = visibleWorldHeight >= this._viewport.worldHeight
+      ? this._viewport.worldHeight / 2
+      : Math.min(Math.max(currentCenter.y, minCenterY), maxCenterY);
+
+    this._viewport.moveCenter(clampedCenterX, clampedCenterY);
   }
 }
