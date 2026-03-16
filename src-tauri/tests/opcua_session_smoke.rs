@@ -23,7 +23,7 @@ fn trace_path_from_env(default_value: &str) -> PathBuf {
 }
 
 #[test]
-fn secure_server_session_smoke_uses_discovery_and_activates_without_hanging() {
+fn secure_server_session_smoke_activates_without_hanging() {
     let server_trace = Path::new("target/opcua_session_smoke_server.trace.log");
     let client_trace = Path::new("target/opcua_session_smoke.trace.log");
     let client_pki_dir = PathBuf::from("target/opcua_session_smoke_client_pki");

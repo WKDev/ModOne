@@ -34,6 +34,17 @@ pub struct OpcUaNodeSpec {
     pub kind: OpcUaNodeKind,
 }
 
+impl OpcUaNodeSpec {
+    pub fn requires_live_value_getter(&self) -> bool {
+        match self.kind {
+            OpcUaNodeKind::Tag => true,
+            OpcUaNodeKind::RawPrimary | OpcUaNodeKind::VendorAlias => {
+                self.access_level == OpcUaAccessLevel::ReadWrite
+            }
+        }
+    }
+}
+
 pub struct AddressSpaceSpec {
     pub nodes: Vec<OpcUaNodeSpec>,
     pub primary_node_map: HashMap<CanonicalAddress, OpcUaNodeId>,
@@ -327,5 +338,57 @@ mod tests {
                         "Semantic".to_string(),
                     ]
         }));
+    }
+
+    #[test]
+    fn live_value_getter_targets_tags_and_writable_non_tags_only() {
+        let address = CanonicalAddress::new(CanonicalAreaKind::DataWord, 0);
+        let base = OpcUaNodeSpec {
+            node_id: OpcUaNodeId::new("node/example"),
+            browse_name: "Example".to_string(),
+            display_name: "Example".to_string(),
+            canonical_address: address,
+            access_level: OpcUaAccessLevel::ReadOnly,
+            is_bool: false,
+            path_segments: vec!["ModOne".to_string()],
+            kind: OpcUaNodeKind::RawPrimary,
+        };
+
+        let raw_readonly = base.clone();
+        assert!(!raw_readonly.requires_live_value_getter());
+
+        let raw_writable = OpcUaNodeSpec {
+            access_level: OpcUaAccessLevel::ReadWrite,
+            ..base.clone()
+        };
+        assert!(raw_writable.requires_live_value_getter());
+
+        let alias_readonly = OpcUaNodeSpec {
+            kind: OpcUaNodeKind::VendorAlias,
+            access_level: OpcUaAccessLevel::ReadOnly,
+            ..base.clone()
+        };
+        assert!(!alias_readonly.requires_live_value_getter());
+
+        let alias_writable = OpcUaNodeSpec {
+            kind: OpcUaNodeKind::VendorAlias,
+            access_level: OpcUaAccessLevel::ReadWrite,
+            ..base.clone()
+        };
+        assert!(alias_writable.requires_live_value_getter());
+
+        let tag_readonly = OpcUaNodeSpec {
+            kind: OpcUaNodeKind::Tag,
+            access_level: OpcUaAccessLevel::ReadOnly,
+            ..base.clone()
+        };
+        assert!(tag_readonly.requires_live_value_getter());
+
+        let tag_writable = OpcUaNodeSpec {
+            kind: OpcUaNodeKind::Tag,
+            access_level: OpcUaAccessLevel::ReadWrite,
+            ..base
+        };
+        assert!(tag_writable.requires_live_value_getter());
     }
 }

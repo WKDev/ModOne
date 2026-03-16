@@ -6,7 +6,9 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 
-use crate::plc_runtime::{CanonicalAddress, CanonicalMemory, VendorProfile};
+use crate::plc_runtime::{
+    CanonicalAddress, CanonicalMemory, CanonicalMemoryError, CanonicalValue, VendorProfile,
+};
 use crate::project::PlcSettings;
 use crate::sim::tag_registry::SharedTagRegistry;
 
@@ -15,8 +17,6 @@ use super::address_space::OpcUaAccessLevel;
 use super::address_space::{build_address_space_spec, AddressSpaceSpec};
 use super::memory::{OpcUaMemory, OpcUaNodeId};
 use super::types::{OpcUaConfig, OpcUaError, OpcUaStatus};
-#[cfg(feature = "opcua-server")]
-use crate::plc_runtime::CanonicalValue;
 #[cfg(feature = "opcua-server")]
 use sha2::{Digest, Sha256};
 
@@ -114,7 +114,7 @@ impl OpcUaServer {
 
     pub fn start(
         &self,
-        canonical_memory: &parking_lot::RwLock<CanonicalMemory>,
+        canonical_memory: &Arc<parking_lot::RwLock<CanonicalMemory>>,
         vendor_profile: &dyn VendorProfile,
         plc_settings: &PlcSettings,
         tag_registry: &SharedTagRegistry,
@@ -139,7 +139,7 @@ impl OpcUaServer {
             .register_nodes(spec.primary_node_map.clone(), spec.publish_map.clone());
 
         #[cfg(feature = "opcua-server")]
-        self.start_opcua_server(&spec)?;
+        self.start_opcua_server(&spec, Arc::clone(canonical_memory))?;
 
         *self.address_spec.lock() = Some(spec);
         self.running.store(true, Ordering::Relaxed);
@@ -201,7 +201,11 @@ impl OpcUaServer {
     }
 
     #[cfg(feature = "opcua-server")]
-    fn start_opcua_server(&self, spec: &AddressSpaceSpec) -> Result<(), OpcUaError> {
+    fn start_opcua_server(
+        &self,
+        spec: &AddressSpaceSpec,
+        canonical_memory: Arc<parking_lot::RwLock<CanonicalMemory>>,
+    ) -> Result<(), OpcUaError> {
         use opcua::server::prelude::*;
 
         let username = self
@@ -287,6 +291,28 @@ impl OpcUaServer {
                     vb.data_type(DataTypeId::Boolean).value(false)
                 } else {
                     vb.data_type(DataTypeId::UInt16).value(0u16)
+                };
+                let vb = if node_spec.requires_live_value_getter() {
+                    let canonical_memory = Arc::clone(&canonical_memory);
+                    let canonical_address = node_spec.canonical_address;
+                    let getter = AttrFnGetter::new_boxed(
+                        move |_node_id,
+                              timestamps_to_return,
+                              attribute_id,
+                              _index_range,
+                              _data_encoding,
+                              _max_age| {
+                            if attribute_id != AttributeId::Value {
+                                return Ok(None);
+                            }
+
+                            let value = canonical_memory.read().read(canonical_address);
+                            Ok(Some(canonical_data_value(value, timestamps_to_return)))
+                        },
+                    );
+                    vb.value_getter(getter)
+                } else {
+                    vb
                 };
                 let vb = if node_spec.access_level == OpcUaAccessLevel::ReadWrite {
                     vb.writable()
@@ -478,6 +504,57 @@ fn variant_to_canonical_value(
         }
         Variant::UInt32(_) => Err(StatusCode::BadOutOfRange),
         _ => Err(StatusCode::BadTypeMismatch),
+    }
+}
+
+#[cfg(feature = "opcua-server")]
+fn canonical_data_value(
+    value: Result<CanonicalValue, CanonicalMemoryError>,
+    timestamps_to_return: opcua::server::prelude::TimestampsToReturn,
+) -> opcua::server::prelude::DataValue {
+    use opcua::server::prelude::{DataValue, DateTime, StatusCode, Variant};
+
+    match value {
+        Ok(CanonicalValue::Bool(value)) => {
+            let now = DateTime::now();
+            let mut data_value = DataValue::from((Variant::Boolean(value), StatusCode::Good));
+            data_value.set_timestamps(timestamps_to_return, now, now);
+            data_value
+        }
+        Ok(CanonicalValue::U16(value)) => {
+            let now = DateTime::now();
+            let mut data_value = DataValue::from((Variant::UInt16(value), StatusCode::Good));
+            data_value.set_timestamps(timestamps_to_return, now, now);
+            data_value
+        }
+        Err(error) => {
+            let status = canonical_read_error_status(&error);
+            let now = DateTime::now();
+            let mut data_value = DataValue {
+                value: None,
+                status: Some(status),
+                source_timestamp: None,
+                source_picoseconds: None,
+                server_timestamp: None,
+                server_picoseconds: None,
+            };
+            data_value.set_timestamps(timestamps_to_return, now, now);
+            data_value
+        }
+    }
+}
+
+#[cfg(feature = "opcua-server")]
+fn canonical_read_error_status(error: &CanonicalMemoryError) -> opcua::server::prelude::StatusCode {
+    use opcua::server::prelude::StatusCode;
+
+    match error {
+        CanonicalMemoryError::AddressOutOfRange { .. }
+        | CanonicalMemoryError::BitIndexOutOfRange { .. }
+        | CanonicalMemoryError::BitIndexOnBitArea { .. } => StatusCode::BadNodeIdUnknown,
+        CanonicalMemoryError::TypeMismatch { .. }
+        | CanonicalMemoryError::WriteNotAllowed { .. }
+        | CanonicalMemoryError::SnapshotSizeMismatch { .. } => StatusCode::BadUnexpectedError,
     }
 }
 

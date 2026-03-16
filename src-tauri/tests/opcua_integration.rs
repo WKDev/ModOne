@@ -234,6 +234,21 @@ fn secure_server_supports_browse_read_write_subscription_and_security_child() {
             .unwrap(),
         CanonicalValue::Bool(true)
     );
+    {
+        let session_guard = session.read();
+        let values = session_guard
+            .read(
+                &[ReadValueId::from(writable_tag_node.clone())],
+                TimestampsToReturn::Both,
+                0.0,
+            )
+            .unwrap();
+        assert!(bool_value(&values[0]));
+    }
+    trace_to(
+        trace_path,
+        "live getter readback confirmed after external write",
+    );
 
     trace_to(trace_path, "readonly semantic write request:start");
     {
@@ -275,6 +290,35 @@ fn secure_server_supports_browse_read_write_subscription_and_security_child() {
     trace_to(trace_path, "invalid-type write request:ok");
     trace_to(trace_path, "write policy assertions complete");
 
+    trace_to(trace_path, "starting live readback assertions");
+    trace_to(trace_path, "simulation write:start");
+    {
+        let mut memory = fixture.canonical_memory.write();
+        memory
+            .write(
+                CanonicalAddress::new(CanonicalAreaKind::OutputBit, 3),
+                CanonicalValue::Bool(false),
+                CanonicalWriteSource::Simulation,
+            )
+            .unwrap();
+    }
+    trace_to(trace_path, "simulation write:ok");
+    {
+        let session_guard = session.read();
+        let values = session_guard
+            .read(
+                &[ReadValueId::from(writable_tag_node.clone())],
+                TimestampsToReturn::Both,
+                0.0,
+            )
+            .unwrap();
+        assert!(!bool_value(&values[0]));
+    }
+    trace_to(
+        trace_path,
+        "live getter readback confirmed after simulation write",
+    );
+
     trace_to(trace_path, "starting subscription assertions");
     {
         let session_guard = session.read();
@@ -299,62 +343,6 @@ fn secure_server_supports_browse_read_write_subscription_and_security_child() {
         assert_eq!(monitored.len(), 1);
     }
     trace_to(trace_path, "subscription created");
-
-    trace_to(
-        trace_path,
-        "starting publish and subscription delivery assertions",
-    );
-    trace_to(trace_path, "simulation write:start");
-    {
-        let mut memory = fixture.canonical_memory.write();
-        memory
-            .write(
-                CanonicalAddress::new(CanonicalAreaKind::OutputBit, 3),
-                CanonicalValue::Bool(false),
-                CanonicalWriteSource::Simulation,
-            )
-            .unwrap();
-    }
-    trace_to(trace_path, "simulation write:ok");
-
-    let mut observed_false = false;
-    for _ in 0..10 {
-        {
-            let session_guard = session.read();
-            let values = session_guard
-                .read(
-                    &[ReadValueId::from(writable_tag_node.clone())],
-                    TimestampsToReturn::Both,
-                    0.0,
-                )
-                .unwrap();
-            if !bool_value(&values[0]) {
-                observed_false = true;
-                break;
-            }
-        }
-        std::thread::sleep(Duration::from_millis(300));
-    }
-    trace_to(
-        trace_path,
-        &format!("state propagation complete: observed_false={observed_false}"),
-    );
-    assert!(
-        observed_false,
-        "expected writable tag to read back false after simulation update"
-    );
-    trace_to(trace_path, "state propagation readback confirmed");
-
-    let session_guard = session.read();
-    let values = session_guard
-        .read(
-            &[ReadValueId::from(writable_tag_node.clone())],
-            TimestampsToReturn::Both,
-            0.0,
-        )
-        .unwrap();
-    assert!(!bool_value(&values[0]));
-    drop(session_guard);
 
     let session_guard = session.write();
     session_guard.disconnect();

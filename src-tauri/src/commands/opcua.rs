@@ -78,7 +78,7 @@ pub async fn opcua_stop_server(app: AppHandle, state: State<'_, OpcUaState>) -> 
 pub fn opcua_start_project_simulation(
     app: &AppHandle,
     opcua_state: &OpcUaState,
-    canonical_memory: &parking_lot::RwLock<CanonicalMemory>,
+    canonical_memory: &Arc<parking_lot::RwLock<CanonicalMemory>>,
     vendor_profile: &dyn VendorProfile,
     project_config: &ProjectConfig,
     tag_registry: &SharedTagRegistry,
@@ -198,7 +198,7 @@ fn start_server_common(
     app: &AppHandle,
     opcua_state: &OpcUaState,
     config: OpcUaConfig,
-    canonical_memory: &parking_lot::RwLock<CanonicalMemory>,
+    canonical_memory: &Arc<parking_lot::RwLock<CanonicalMemory>>,
     vendor_profile: &dyn VendorProfile,
     plc_settings: &crate::project::PlcSettings,
     tag_registry: &SharedTagRegistry,
