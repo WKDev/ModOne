@@ -5,17 +5,19 @@
  * for project lifecycle management (create, open, save, close).
  */
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { useProjectStore } from '../stores/projectStore';
 import { useExplorerStore } from '../stores/explorerStore';
 import { useSidebarStore } from '../stores/sidebarStore';
+import { useTagStore } from '../stores/tagStore';
 import { projectService } from '../services/projectService';
 import { explorerService } from '../services/explorerService';
 import type {
   PlcManufacturer,
   ProjectData,
   ProjectInfo,
+  ProjectConfigPatch,
   RecentProject,
 } from '../types/project';
 
@@ -50,7 +52,7 @@ export function useProject() {
     setProject,
     setCurrentProjectPath,
     setModified,
-    updateConfig,
+    updateConfig: updateConfigLocal,
     setRecentProjects,
     addRecentProject,
     removeRecentProject,
@@ -59,6 +61,7 @@ export function useProject() {
     clearError,
     reset,
   } = useProjectStore();
+  const updateConfigRequestId = useRef(0);
 
   // Get explorer store actions
   const {
@@ -213,6 +216,12 @@ export function useProject() {
         const data = await projectService.openProject(path);
         setProject(data, path);
 
+        // Restore watched tags from project config
+        const savedWatchedTags = data.config.watched_tag_ids;
+        if (savedWatchedTags && savedWatchedTags.length > 0) {
+          useTagStore.getState().initWatchedTags(savedWatchedTags);
+        }
+
         // Load file tree into explorer
         await loadFileTree(path);
 
@@ -304,6 +313,9 @@ export function useProject() {
         // Clear explorer file tree
         clearExplorerTree();
 
+        // Clear tag watch list
+        useTagStore.getState().reset();
+
         reset();
         return true;
       } catch (err) {
@@ -337,6 +349,43 @@ export function useProject() {
   const hasUnsavedChanges = useCallback((): boolean => {
     return isModified;
   }, [isModified]);
+
+  const updateConfig = useCallback(
+    async (patch: ProjectConfigPatch): Promise<void> => {
+      if (!currentProject) return;
+
+      updateConfigRequestId.current += 1;
+      const requestId = updateConfigRequestId.current;
+
+      updateConfigLocal(patch);
+      setModified(true);
+
+      try {
+        const data = await projectService.updateProjectConfig(patch);
+        if (requestId === updateConfigRequestId.current) {
+          setProject(data, currentProjectPath);
+        }
+      } catch (err) {
+        if (requestId !== updateConfigRequestId.current) {
+          return;
+        }
+
+        if (currentProjectPath) {
+          try {
+            const restored = await projectService.openProject(currentProjectPath, {
+              suppressErrorToast: true,
+            });
+            setProject(restored, currentProjectPath);
+          } catch {
+            // Leave the optimistic state in place if recovery fails; the toast already fired.
+          }
+        }
+
+        throw err;
+      }
+    },
+    [currentProject, currentProjectPath, setModified, setProject, updateConfigLocal]
+  );
 
   // ============================================================================
   // Return Hook Interface

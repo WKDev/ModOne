@@ -37,6 +37,8 @@ interface OpcUaActions {
     server_name?: string;
     username?: string | null;
     password?: string | null;
+    security_policies?: OpcUaStatus['activeSecurityPolicies'];
+    allow_anonymous?: boolean;
   }) => Promise<void>;
   /** Stop the OPC UA server */
   stopServer: () => Promise<void>;
@@ -120,6 +122,8 @@ export const useOpcUaStore = create<OpcUaStore>()(
             server_name: config?.server_name ?? 'ModOne PLC Simulator',
             username: config?.username,
             password: config?.password,
+            security_policies: config?.security_policies,
+            allow_anonymous: config?.allow_anonymous,
           });
           set((state) => {
             state.status = status;

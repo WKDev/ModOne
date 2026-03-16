@@ -162,6 +162,8 @@ export interface ProjectConfig {
   canvas?: CanvasSettings;
   network?: NetworkSettings;
   opcua?: OpcUaSettings;
+  /** IDs of tags pinned to the watch list in the Tag Browser */
+  watched_tag_ids?: string[];
 }
 
 export interface NetworkSettings {
@@ -173,7 +175,23 @@ export interface NetworkSettings {
   subnet_mask: string | null;
 }
 
-export type OpcUaSecurityPolicy = 'Basic256Sha256';
+export type OpcUaSecurityPolicy =
+  | 'None'
+  | 'Basic128Rsa15'
+  | 'Basic256'
+  | 'Basic256Sha256'
+  | 'Aes128Sha256RsaOaep'
+  | 'Aes256Sha256RsPss';
+
+/** Info about a single security policy, returned by the backend */
+export interface SecurityPolicyInfo {
+  id: OpcUaSecurityPolicy;
+  displayName: string;
+  policyUri: string;
+  requiresEncryption: boolean;
+  messageSecurityMode: string;
+  enabled: boolean;
+}
 
 export interface OpcUaSettings {
   /** Whether the OPC UA server is enabled during simulation */
@@ -186,6 +204,10 @@ export interface OpcUaSettings {
   username?: string | null;
   /** Optional password for user/password authentication */
   password?: string | null;
+  /** Enabled security policies */
+  security_policies?: OpcUaSecurityPolicy[];
+  /** Whether anonymous (unauthenticated) client connections are allowed */
+  allow_anonymous?: boolean;
 }
 
 export interface OpcUaStatus {
@@ -198,6 +220,28 @@ export interface OpcUaStatus {
   certificateFingerprint?: string | null;
   certificateValidTo?: string | null;
   featureEnabled: boolean;
+  /** Security policies currently advertised by the running server */
+  activeSecurityPolicies?: OpcUaSecurityPolicy[];
+  /** Whether the running server allows anonymous connections */
+  allowAnonymous?: boolean;
+}
+
+/** Detailed information about an active OPC UA client session. */
+export interface OpcUaSessionInfo {
+  /** Unique identifier for this session (opaque string) */
+  sessionId: string;
+  /** Client application name as reported during session creation */
+  clientName: string;
+  /** Remote IP address of the connected client */
+  clientIp: string;
+  /** Security policy URI active on this session's channel */
+  securityPolicy: string;
+  /** Message security mode ("None", "Sign", "SignAndEncrypt") */
+  securityMode: string;
+  /** ISO 8601 timestamp when the session was created */
+  connectedAt: string;
+  /** Number of active subscriptions on this session */
+  subscriptionCount: number;
 }
 
 // Placeholder types (to be fully implemented in later units)
@@ -212,6 +256,16 @@ export interface ScenarioData {
 export interface MemorySnapshot {
   data?: unknown;
 }
+
+type DeepPartial<T> = {
+  [K in keyof T]?: NonNullable<T[K]> extends Array<infer U>
+    ? U[]
+    : NonNullable<T[K]> extends object
+      ? DeepPartial<NonNullable<T[K]>>
+      : T[K];
+};
+
+export type ProjectConfigPatch = DeepPartial<ProjectConfig>;
 
 // Project data returned from Tauri backend (matches Rust ProjectData)
 export interface ProjectData {
@@ -327,5 +381,7 @@ export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
     server_name: 'ModOne PLC Simulator',
     username: '',
     password: '',
+    security_policies: ['Basic256Sha256'],
+    allow_anonymous: false,
   },
 };

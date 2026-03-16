@@ -40,11 +40,13 @@ pub use project::{
     recover_project_from_backup,
     remove_from_recent,
     save_project,
+    set_project_watched_tags,
     set_auto_save_enabled,
     set_auto_save_interval,
     set_backup_count,
     start_auto_save,
     stop_auto_save,
+    update_project_config,
     validate_project_integrity,
 };
 
@@ -173,10 +175,17 @@ pub use schematic::{
 pub use symbols::{symbol_delete, symbol_list, symbol_list_all, symbol_load, symbol_save};
 
 // Re-export OPC UA commands and state
-pub use opcua::{opcua_get_status, opcua_start_server, opcua_stop_server, OpcUaState};
+pub use opcua::{
+    opcua_add_user_account, opcua_clear_audit_log, opcua_enforce_audit_retention,
+    opcua_get_anonymous_access, opcua_get_audit_log_count, opcua_get_security_policies,
+    opcua_get_sessions, opcua_get_status, opcua_list_user_accounts, opcua_query_audit_log,
+    opcua_remove_user_account, opcua_set_anonymous_access, opcua_set_security_policies,
+    opcua_restart_server, opcua_start_server, opcua_stop_server, opcua_update_user_account, CredentialCacheState,
+    OpcUaState, UserAccountStoreState,
+};
 
 // Re-export tag commands and state
-pub use tags::{list_tags, read_tags, set_watched_tags, write_tag, TagEventBridgeState};
+pub use tags::{check_canonical_address_duplicate, create_tag, delete_tag, delete_tags, list_tags, read_tags, set_watched_tags, update_tag_definition, write_tag, TagEventBridgeState};
 
 // Re-export network commands
 pub use network::{

@@ -38,6 +38,7 @@ fn get_cli_project_path(state: tauri::State<'_, CliProjectPath>) -> Option<Strin
 
 // Re-export commands for registration
 use commands::window::close_all_floating_windows;
+use opcua::AuditLoggerState;
 use commands::{
     attempt_project_recovery,
     // Canvas commands
@@ -93,6 +94,8 @@ use commands::{
     list_project_files,
     load_layout,
     mark_project_modified,
+    set_project_watched_tags,
+    update_project_config,
     // Modbus commands
     modbus_bulk_write,
     modbus_get_status,
@@ -122,11 +125,32 @@ use commands::{
     network_remove_alias,
     // OPC UA commands
     opcua_get_status,
+    opcua_get_sessions,
+    opcua_get_security_policies,
+    opcua_set_security_policies,
+    opcua_get_anonymous_access,
+    opcua_set_anonymous_access,
     opcua_start_server,
     opcua_stop_server,
+    opcua_restart_server,
+    // OPC UA user account CRUD commands
+    opcua_list_user_accounts,
+    opcua_add_user_account,
+    opcua_update_user_account,
+    opcua_remove_user_account,
+    // OPC UA audit log commands
+    opcua_query_audit_log,
+    opcua_clear_audit_log,
+    opcua_enforce_audit_retention,
+    opcua_get_audit_log_count,
     // Tag commands
+    check_canonical_address_duplicate,
+    create_tag,
+    delete_tag,
+    delete_tags,
     list_tags,
     read_tags,
+    update_tag_definition,
     write_tag,
     set_watched_tags,
     TagEventBridgeState,
@@ -253,6 +277,8 @@ use commands::{
     ModbusState,
     NetworkState,
     OpcUaState,
+    CredentialCacheState,
+    UserAccountStoreState,
     ScenarioExecutorState,
     ScopeState,
     SimState,
@@ -352,9 +378,43 @@ pub fn run() {
         .manage(scope_state)
         .manage(NetworkState::default())
         .manage(OpcUaState::default())
+        .manage(commands::tags::MappingStoreState::default())
         .manage(tag_bridge_state)
         .setup(|app| {
             log::info!("ModOne application starting...");
+
+            // Initialize persistent OPC UA user account store
+            {
+                use tauri::Manager;
+                let app_data_dir = app
+                    .path()
+                    .app_data_dir()
+                    .map_err(|e| format!("Failed to resolve app data dir: {e}"))?;
+                let store = opcua::UserAccountStore::load(&app_data_dir)
+                    .map_err(|e| format!("Failed to load OPC UA user accounts: {e}"))?;
+                app.manage(UserAccountStoreState(parking_lot::Mutex::new(store)));
+                app.manage(CredentialCacheState::default());
+                log::info!("OPC UA user account store loaded from {:?}", app_data_dir);
+
+                // Initialize OPC UA audit logger (SQLite)
+                match opcua::AuditLogger::open(&app_data_dir) {
+                    Ok(audit_logger) => {
+                        let state = AuditLoggerState::new(audit_logger);
+                        // Enforce retention on startup
+                        state.0.lock().as_ref().map(|l| {
+                            if let Err(e) = l.enforce_retention() {
+                                log::warn!("Audit log retention enforcement failed: {e}");
+                            }
+                        });
+                        app.manage(state);
+                        log::info!("OPC UA audit logger initialized");
+                    }
+                    Err(e) => {
+                        log::error!("Failed to initialize OPC UA audit logger: {e}");
+                        app.manage(AuditLoggerState::default());
+                    }
+                }
+            }
 
             // Wire tag event bridge with app handle and start subscriber
             {
@@ -470,6 +530,8 @@ pub fn run() {
             get_recent_projects,
             get_project_status,
             mark_project_modified,
+            update_project_config,
+            set_project_watched_tags,
             remove_from_recent,
             clear_recent_projects,
             // Auto-save commands
@@ -664,11 +726,30 @@ pub fn run() {
             network_cleanup_aliases,
             // OPC UA commands
             opcua_get_status,
+            opcua_get_sessions,
+            opcua_get_security_policies,
+            opcua_set_security_policies,
+            opcua_get_anonymous_access,
+            opcua_set_anonymous_access,
             opcua_start_server,
             opcua_stop_server,
+            opcua_list_user_accounts,
+            opcua_add_user_account,
+            opcua_update_user_account,
+            opcua_remove_user_account,
+            // OPC UA audit log commands
+            opcua_query_audit_log,
+            opcua_clear_audit_log,
+            opcua_enforce_audit_retention,
+            opcua_get_audit_log_count,
             // Tag commands
+            check_canonical_address_duplicate,
+            create_tag,
+            delete_tag,
+            delete_tags,
             list_tags,
             read_tags,
+            update_tag_definition,
             write_tag,
             set_watched_tags,
         ])

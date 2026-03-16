@@ -3,6 +3,7 @@ export { useAutoSave } from './useAutoSave';
 export { useErrorHandler, default as UseErrorHandler } from './useErrorHandler';
 export { useKeyboardShortcuts, default as UseKeyboardShortcuts } from './useKeyboardShortcuts';
 export { useModbus, default as UseModbus } from './useModbus';
+export { useModbusInit, default as UseModbusInit } from './useModbusInit';
 export {
   useModbusMemory,
   useModbusCoils,
@@ -64,3 +65,14 @@ export {
   type UseWindowCloseResult,
 } from './useWindowClose';
 export { useUndoRedoKeyboard, default as UseUndoRedoKeyboard } from './useUndoRedoKeyboard';
+export { useDebouncedValue } from './useDebouncedValue';
+export {
+  useCanonicalAddressValidation,
+  type CanonicalAddressInput,
+  type CanonicalAddressValidationResult,
+} from './useCanonicalAddressValidation';
+export {
+  useTagSearch,
+  default as UseTagSearch,
+  type UseTagSearchResult,
+} from './useTagSearch';

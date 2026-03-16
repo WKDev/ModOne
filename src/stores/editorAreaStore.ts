@@ -53,6 +53,10 @@ interface EditorAreaActions {
   setTabs: (tabs: TabState[], activeTabId: string | null) => void;
   /** Open settings tab (creates if not exists, focuses if exists) */
   openSettingsTab: () => void;
+  /** Open project settings tab (creates if not exists, focuses if exists) */
+  openProjectSettingsTab: () => void;
+  /** Open tag browser tab (creates if not exists, focuses if exists) */
+  openTagBrowserTab: () => void;
   /** Open welcome tab (creates if not exists, focuses if exists) */
   openWelcomeTab: () => void;
 }
@@ -264,6 +268,30 @@ export const useEditorAreaStore = create<EditorAreaStore>()(
 
         // Create new settings tab
         addTab('settings', 'Settings');
+      },
+
+      openProjectSettingsTab: () => {
+        const { tabs, addTab, setActiveTab } = get();
+
+        const existingTab = tabs.find((t) => t.panelType === 'project-settings');
+        if (existingTab) {
+          setActiveTab(existingTab.id);
+          return;
+        }
+
+        addTab('project-settings', 'Project Settings');
+      },
+
+      openTagBrowserTab: () => {
+        const { tabs, addTab, setActiveTab } = get();
+
+        const existingTab = tabs.find((t) => t.panelType === 'tag-browser');
+        if (existingTab) {
+          setActiveTab(existingTab.id);
+          return;
+        }
+
+        addTab('tag-browser', 'Tag Browser');
       },
 
       openWelcomeTab: () => {

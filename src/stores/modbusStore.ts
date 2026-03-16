@@ -9,7 +9,13 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { modbusService } from '../services/modbusService';
-import type { ModbusStatus, ConnectionEvent } from '../types/modbus';
+import { useLayoutStore } from './layoutStore';
+import type {
+  ModbusStatus,
+  ConnectionEvent,
+  RtuConfig,
+  TcpServerConfig,
+} from '../types/modbus';
 
 // ============================================================================
 // Types
@@ -49,6 +55,14 @@ interface ModbusActions {
   fetchStatus: () => Promise<void>;
   /** Directly set status (for event-based updates) */
   setStatus: (status: ModbusStatus) => void;
+  /** Start the Modbus TCP server */
+  startTcp: (config?: TcpServerConfig) => Promise<void>;
+  /** Stop the Modbus TCP server */
+  stopTcp: () => Promise<void>;
+  /** Start the Modbus RTU server */
+  startRtu: (config: RtuConfig) => Promise<void>;
+  /** Stop the Modbus RTU server */
+  stopRtu: () => Promise<void>;
   /** Set error message */
   setError: (error: string | null) => void;
   /** Set connecting state */
@@ -96,6 +110,12 @@ const initialState: ModbusState = {
   connections: [],
 };
 
+function syncLayoutStore(status: ModbusStatus | null) {
+  const { setModbusConnected, setModbusPort } = useLayoutStore.getState();
+  setModbusConnected(status?.tcp_running ?? false);
+  setModbusPort(status?.tcp_port ?? 502);
+}
+
 // ============================================================================
 // Store
 // ============================================================================
@@ -117,6 +137,7 @@ export const useModbusStore = create<ModbusStore>()(
           set((state) => {
             state.status = status;
           }, false, 'fetchStatus/success');
+          syncLayoutStore(status);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
           console.error('Failed to fetch Modbus status:', errorMessage);
@@ -130,6 +151,109 @@ export const useModbusStore = create<ModbusStore>()(
         set((state) => {
           state.status = status;
         }, false, 'setStatus');
+        syncLayoutStore(status);
+      },
+
+      startTcp: async (config) => {
+        set((state) => {
+          state.isConnecting = true;
+          state.error = null;
+        }, false, 'startTcp/start');
+
+        try {
+          await modbusService.startTcp(config);
+          const status = await modbusService.getStatus();
+          set((state) => {
+            state.status = status;
+            state.isConnecting = false;
+          }, false, 'startTcp/success');
+          syncLayoutStore(status);
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          set((state) => {
+            state.isConnecting = false;
+            state.error = errorMessage;
+          }, false, 'startTcp/error');
+          throw error;
+        }
+      },
+
+      stopTcp: async () => {
+        set((state) => {
+          state.isConnecting = true;
+          state.error = null;
+        }, false, 'stopTcp/start');
+
+        try {
+          await modbusService.stopTcp();
+          const status = await modbusService.getStatus();
+          set((state) => {
+            state.status = status;
+            state.isConnecting = false;
+            if (!status.tcp_running) {
+              state.connections = state.connections.filter((conn) => conn.protocol !== 'tcp');
+            }
+          }, false, 'stopTcp/success');
+          syncLayoutStore(status);
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          set((state) => {
+            state.isConnecting = false;
+            state.error = errorMessage;
+          }, false, 'stopTcp/error');
+          throw error;
+        }
+      },
+
+      startRtu: async (config) => {
+        set((state) => {
+          state.isConnecting = true;
+          state.error = null;
+        }, false, 'startRtu/start');
+
+        try {
+          await modbusService.startRtu(config);
+          const status = await modbusService.getStatus();
+          set((state) => {
+            state.status = status;
+            state.isConnecting = false;
+          }, false, 'startRtu/success');
+          syncLayoutStore(status);
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          set((state) => {
+            state.isConnecting = false;
+            state.error = errorMessage;
+          }, false, 'startRtu/error');
+          throw error;
+        }
+      },
+
+      stopRtu: async () => {
+        set((state) => {
+          state.isConnecting = true;
+          state.error = null;
+        }, false, 'stopRtu/start');
+
+        try {
+          await modbusService.stopRtu();
+          const status = await modbusService.getStatus();
+          set((state) => {
+            state.status = status;
+            state.isConnecting = false;
+            if (!status.rtu_running) {
+              state.connections = state.connections.filter((conn) => conn.protocol !== 'rtu');
+            }
+          }, false, 'stopRtu/success');
+          syncLayoutStore(status);
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          set((state) => {
+            state.isConnecting = false;
+            state.error = errorMessage;
+          }, false, 'stopRtu/error');
+          throw error;
+        }
       },
 
       setError: (error) => {
@@ -240,6 +364,7 @@ export const useModbusStore = create<ModbusStore>()(
           inputRegisterCache: new Map(),
           connections: [],
         }), false, 'reset');
+        syncLayoutStore(null);
       },
     })),
     { name: 'modbus-store' }

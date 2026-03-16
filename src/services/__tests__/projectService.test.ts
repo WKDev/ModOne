@@ -203,6 +203,34 @@ describe('projectService', () => {
     });
   });
 
+  describe('updateProjectConfig', () => {
+    it('calls invoke with update_project_config and patch payload', async () => {
+      mockInvoke.mockResolvedValueOnce({ config: { project: { name: 'Updated' } } });
+
+      await projectService.updateProjectConfig({
+        project: { name: 'Updated' },
+        opcua: { enabled: true },
+      });
+
+      expect(mockInvoke).toHaveBeenCalledWith('update_project_config', {
+        patch: {
+          project: { name: 'Updated' },
+          opcua: { enabled: true },
+        },
+      });
+    });
+
+    it('calls toast.error and re-throws on failure', async () => {
+      const error = new Error('Patch failed');
+      mockInvoke.mockRejectedValueOnce(error);
+
+      await expect(
+        projectService.updateProjectConfig({ project: { name: 'Broken' } })
+      ).rejects.toThrow('Patch failed');
+      expect(mockToastError).toHaveBeenCalled();
+    });
+  });
+
   describe('setAutoSaveEnabled', () => {
     it('calls invoke with set_auto_save_enabled and enabled arg', async () => {
       mockInvoke.mockResolvedValueOnce(undefined);

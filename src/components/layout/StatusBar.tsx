@@ -1,6 +1,7 @@
 import { Activity, Wifi, WifiOff, Cpu, Sun, Moon, Radio } from 'lucide-react';
 import { useLayoutStore, SimulationStatus } from '../../stores/layoutStore';
 import { useOpcUaStore } from '../../stores/opcuaStore';
+import { useModbusStore } from '../../stores/modbusStore';
 import { useSidebarStore } from '../../stores/sidebarStore';
 import { useTheme } from '../../providers/ThemeProvider';
 
@@ -33,12 +34,13 @@ export function StatusBar() {
   const {
     simulationStatus,
     scanTime,
-    modbusConnected,
-    modbusPort,
-    opcuaRunning,
-    opcuaPort,
     memoryUsageMb,
   } = useLayoutStore();
+  const modbusStatus = useModbusStore((s) => s.status);
+  const modbusConnected = modbusStatus?.tcp_running ?? false;
+  const modbusPort = modbusStatus?.tcp_port ?? 502;
+  const opcuaRunning = useOpcUaStore((s) => s.status?.running ?? false);
+  const opcuaPort = useOpcUaStore((s) => s.status?.port ?? 4840);
 
   const sessionCount = useOpcUaStore((s) => s.status?.sessionCount ?? 0);
   const sessionCountSupported = useOpcUaStore((s) => s.status?.sessionCountSupported ?? false);
@@ -47,6 +49,10 @@ export function StatusBar() {
 
   const handleOpcUaClick = () => {
     useSidebarStore.getState().showPanel('opcua');
+  };
+
+  const handleModbusClick = () => {
+    useSidebarStore.getState().showPanel('modbus');
   };
 
   const toggleTheme = () => {
@@ -72,9 +78,10 @@ export function StatusBar() {
       {/* Right Section: Modbus + Memory */}
       <div className="flex items-center gap-4">
         {/* Modbus Status */}
-        <div
+        <button
           className="flex items-center gap-1.5"
           title={modbusConnected ? 'Modbus Connected' : 'Modbus Disconnected'}
+          onClick={handleModbusClick}
         >
           {modbusConnected ? (
             <Wifi size={12} className="text-[var(--color-success)]" />
@@ -84,7 +91,7 @@ export function StatusBar() {
           <span className={modbusConnected ? 'text-[var(--color-text-secondary)]' : 'text-[var(--color-text-muted)]'}>
             TCP:{modbusPort}
           </span>
-        </div>
+        </button>
 
         {/* OPC UA Status */}
         <button

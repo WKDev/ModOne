@@ -18,6 +18,7 @@ import { Toaster, toast } from 'sonner';
 import { useMacosNativeMenu } from "./hooks/useMacosNativeMenu";
 import { useStartupProject } from "./hooks/useStartupProject";
 import { useOpcUaInit } from "./hooks/useOpcUaInit";
+import { useModbusInit } from "./hooks/useModbusInit";
 import { useTagInit } from "./hooks/useTagInit";
 
 /**
@@ -71,6 +72,9 @@ function MainWindowContent() {
 
   // Centralized OPC UA event subscription
   useOpcUaInit();
+
+  // Centralized Modbus event subscription
+  useModbusInit();
 
   // Centralized tag event subscription
   useTagInit();

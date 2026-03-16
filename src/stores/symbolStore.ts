@@ -8,6 +8,16 @@ interface SymbolStoreState {
   currentSymbol: SymbolDefinition | null;
   isLoading: boolean;
   error: string | null;
+  loadLibrary: (projectDir: string) => Promise<void>;
+  loadSymbol: (projectDir: string, id: string, scope: LibraryScope) => Promise<void>;
+  saveSymbol: (
+    projectDir: string,
+    symbol: SymbolDefinition,
+    scope: LibraryScope
+  ) => Promise<void>;
+  deleteSymbol: (projectDir: string, id: string, scope: LibraryScope) => Promise<void>;
+  setCurrentSymbol: (symbol: SymbolDefinition | null) => void;
+  clearError: () => void;
 
   /** Open the Symbol Editor in a new floating window */
   openEditor: (symbol?: SymbolDefinition | null) => void;

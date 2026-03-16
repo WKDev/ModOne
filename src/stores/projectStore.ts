@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { ProjectConfig, ProjectData, RecentProject } from '../types/project';
+import type { ProjectConfigPatch, ProjectData, RecentProject } from '../types/project';
 
 // Loading operation types for granular loading state
 export type LoadingOperation =
@@ -36,7 +36,7 @@ interface ProjectStoreActions {
   /** Set the modified state */
   setModified: (modified: boolean) => void;
   /** Update the project config (partial merge) and mark as modified */
-  updateConfig: (config: Partial<ProjectConfig>) => void;
+  updateConfig: (config: ProjectConfigPatch) => void;
   /** Set the recent projects list */
   setRecentProjects: (projects: RecentProject[]) => void;
   /** Add a project to the recent list */
@@ -64,6 +64,33 @@ const initialState: ProjectStoreState = {
   loadingOperation: null,
   error: null,
 };
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function mergeProjectConfig<T>(target: T, patch: unknown): T {
+  if (Array.isArray(patch)) {
+    return [...patch] as T;
+  }
+
+  if (!isPlainObject(target) || !isPlainObject(patch)) {
+    return patch as T;
+  }
+
+  const merged: Record<string, unknown> = { ...target };
+  for (const [key, value] of Object.entries(patch)) {
+    const currentValue = merged[key];
+    merged[key] =
+      isPlainObject(currentValue) && isPlainObject(value)
+        ? mergeProjectConfig(currentValue, value)
+        : Array.isArray(value)
+          ? [...value]
+          : value;
+  }
+
+  return merged as T;
+}
 
 export const useProjectStore = create<ProjectStore>()(
   devtools(
@@ -95,10 +122,7 @@ export const useProjectStore = create<ProjectStore>()(
             return {
               currentProject: {
                 ...state.currentProject,
-                config: {
-                  ...state.currentProject.config,
-                  ...configUpdate,
-                },
+                config: mergeProjectConfig(state.currentProject.config, configUpdate),
               },
               isModified: true,
             };

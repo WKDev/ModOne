@@ -6,8 +6,10 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { toast } from 'sonner';
 import type {
+  ConnectionEvent,
   ModbusStatus,
   RtuConfig,
   PortInfo,
@@ -395,6 +397,15 @@ export const modbusService = {
       });
       throw error;
     }
+  },
+
+  /**
+   * Listen for Modbus connection lifecycle events.
+   */
+  async onConnectionEvent(callback: (event: ConnectionEvent) => void): Promise<UnlistenFn> {
+    return listen<ConnectionEvent>('modbus:connection', (event) => {
+      callback(event.payload);
+    });
   },
 };
 

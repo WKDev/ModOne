@@ -6,6 +6,7 @@
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tauri::State;
 
 use crate::project::{
@@ -267,6 +268,44 @@ pub async fn mark_project_modified(state: State<'_, SharedProjectManager>) -> Re
         .map_err(|e| format!("Internal error: failed to acquire lock: {}", e))?;
 
     manager.mark_modified();
+    Ok(())
+}
+
+/// Apply a partial project-config patch to the current open project.
+#[tauri::command]
+pub async fn update_project_config(
+    state: State<'_, SharedProjectManager>,
+    patch: Value,
+) -> Result<ProjectData, String> {
+    let mut manager = state
+        .lock()
+        .map_err(|e| format!("Internal error: failed to acquire lock: {}", e))?;
+
+    let data = manager.update_project_config(patch).map_err(format_error)?;
+
+    Ok(ProjectData {
+        config: data.config,
+        canvas_data: data.canvas_data,
+        scenario_data: data.scenario_data,
+        memory_snapshot: data.memory_snapshot,
+        is_modified: true,
+    })
+}
+
+/// Update the watched tag IDs on the current project.
+///
+/// Called by the frontend whenever the watch list changes so that the
+/// backend's in-memory config stays in sync and will be persisted on save.
+#[tauri::command]
+pub async fn set_project_watched_tags(
+    state: State<'_, SharedProjectManager>,
+    tag_ids: Vec<String>,
+) -> Result<(), String> {
+    let mut manager = state
+        .lock()
+        .map_err(|e| format!("Internal error: failed to acquire lock: {}", e))?;
+
+    manager.set_watched_tag_ids(tag_ids);
     Ok(())
 }
 

@@ -81,6 +81,7 @@ use std::sync::{Arc, Mutex};
 use chrono::{DateTime, Utc};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use thiserror::Error;
 
 /// Type alias for thread-safe ProjectManager wrapped in Arc<Mutex>
@@ -328,6 +329,36 @@ impl ProjectManager {
         }
     }
 
+    /// Update the watched tag IDs on the current project and mark it modified.
+    pub fn set_watched_tag_ids(&mut self, tag_ids: Vec<String>) {
+        if let Some(project) = &mut self.current {
+            project.config.watched_tag_ids = tag_ids;
+            project.is_modified = true;
+        }
+    }
+
+    /// Apply a partial JSON patch to the current project configuration.
+    pub fn update_project_config(&mut self, patch: Value) -> Result<ProjectData, ProjectError> {
+        let project = self.current.as_mut().ok_or(ProjectError::NoProjectOpen)?;
+
+        let mut current_value = serde_json::to_value(&project.config)?;
+        merge_json_value(&mut current_value, patch);
+
+        let mut updated_config: ProjectConfig = serde_json::from_value(current_value)?;
+        updated_config.project.updated_at = Utc::now();
+        validate_project_config(&updated_config)?;
+
+        project.config = updated_config.clone();
+        project.is_modified = true;
+
+        Ok(ProjectData {
+            config: updated_config,
+            canvas_data: project.canvas_data.clone(),
+            scenario_data: project.scenario_data.clone(),
+            memory_snapshot: project.memory_snapshot.clone(),
+        })
+    }
+
     // ========================================================================
     // Project Lifecycle Methods
     // ========================================================================
@@ -533,6 +564,8 @@ impl ProjectManager {
                 manifest.canvas = project.config.canvas.clone();
                 manifest.network = project.config.network.clone();
                 manifest.opcua = project.config.opcua.clone();
+                manifest.watched_tag_ids = project.config.watched_tag_ids.clone();
+                manifest.opcua_mappings = project.config.opcua_mappings.clone();
 
                 if let Some(new_dir) = path {
                     // Save As - to new directory
@@ -651,6 +684,24 @@ fn take_project_config_migration_warnings(config: &mut ProjectConfig) -> Vec<Str
         config.opcua.legacy_anonymous_access_seen = false;
     }
     warnings
+}
+
+fn merge_json_value(target: &mut Value, patch: Value) {
+    match (target, patch) {
+        (Value::Object(target_map), Value::Object(patch_map)) => {
+            for (key, patch_value) in patch_map {
+                match target_map.get_mut(&key) {
+                    Some(existing) => merge_json_value(existing, patch_value),
+                    None => {
+                        target_map.insert(key, patch_value);
+                    }
+                }
+            }
+        }
+        (slot, patch_value) => {
+            *slot = patch_value;
+        }
+    }
 }
 
 // ============================================================================
@@ -911,6 +962,69 @@ mod tests {
         // Verify the new directory and manifest exist
         assert!(save_as_dir.exists());
         assert!(save_as_dir.join("Save As Test.mop").exists());
+    }
+
+    #[test]
+    fn test_update_project_config_persists_partial_patch() {
+        let mut manager = ProjectManager::new();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let project_dir = temp_dir.path().join("PatchedProject");
+
+        let info = manager
+            .create_project(
+                "Patched Project".to_string(),
+                project_dir,
+                PlcSettings::default(),
+            )
+            .unwrap();
+
+        let updated = manager
+            .update_project_config(serde_json::json!({
+                "network": {
+                    "plc_ip": "127.0.0.20",
+                    "interface_name": "Loopback",
+                    "subnet_mask": "255.255.255.0"
+                },
+                "modbus": {
+                    "simulation": {
+                        "enabled": true,
+                        "transport": "Tcp",
+                        "address": "127.0.0.20:1502"
+                    },
+                    "exposure": {
+                        "mode": "Custom",
+                        "rules": [
+                            {
+                                "family": "D",
+                                "address_space": "HoldingRegister",
+                                "offset": 100,
+                                "count": 16
+                            }
+                        ]
+                    }
+                },
+                "opcua": {
+                    "enabled": true,
+                    "port": 4841,
+                    "server_name": "Patched OPC UA",
+                    "allow_anonymous": true
+                }
+            }))
+            .unwrap();
+
+        assert_eq!(updated.config.network.plc_ip.as_deref(), Some("127.0.0.20"));
+        assert!(updated.config.modbus.simulation.enabled);
+        assert_eq!(updated.config.modbus.exposure.mode, ModbusExposureMode::Custom);
+        assert_eq!(updated.config.opcua.port, 4841);
+        assert!(manager.is_modified());
+
+        manager.save_project(None).unwrap();
+        manager.close_project().unwrap();
+
+        let reopened = manager.open_project(info.path).unwrap();
+        assert_eq!(reopened.config.network.interface_name.as_deref(), Some("Loopback"));
+        assert_eq!(reopened.config.modbus.exposure.rules.len(), 1);
+        assert!(reopened.config.opcua.allow_anonymous);
     }
 
     #[test]

@@ -14,6 +14,7 @@ import type {
   RecentProject,
   PlcManufacturer,
   AutoSaveSettings,
+  ProjectConfigPatch,
 } from '../types/project';
 
 interface ProjectServiceOptions {
@@ -170,6 +171,20 @@ export const projectService = {
       await invoke('mark_project_modified');
     } catch (error) {
       toast.error('Failed to mark project as modified', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  },
+
+  /**
+   * Apply a partial update to the open project's configuration.
+   */
+  async updateProjectConfig(patch: ProjectConfigPatch): Promise<ProjectData> {
+    try {
+      return await invoke('update_project_config', { patch });
+    } catch (error) {
+      toast.error('Failed to update project settings', {
         description: error instanceof Error ? error.message : String(error),
       });
       throw error;
