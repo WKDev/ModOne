@@ -21,6 +21,8 @@ export interface Modifiers {
   space: boolean;
 }
 
+export type CanvasInteractionMode = 'edit' | 'operate';
+
 export type InteractionState =
   | 'idle'
   | 'panning'
@@ -30,6 +32,7 @@ export type InteractionState =
   | 'box_selecting'
   | 'wire_drawing'
   | 'wire_segment_dragging'
+  | 'operating_pressing'
   | 'placing'
   | 'wire_mode';
 
@@ -68,12 +71,17 @@ export interface InteractionControllerConfig {
   hitTester: HitTester;
   spatialIndex: SpatialIndex;
   visuals: InteractionVisuals;
+  mode?: CanvasInteractionMode;
   onPlaceBlock?: (
     blockType: string,
     position: Position,
     rotation: number,
     flipH: boolean,
     flipV: boolean
+  ) => void;
+  onOperateBlockInteraction?: (
+    blockId: string,
+    phase: 'press' | 'release' | 'click'
   ) => void;
   onStateChange?: (state: InteractionState) => void;
 }
@@ -98,10 +106,12 @@ const PORT_DIRECTIONS: readonly PortPosition[] = [
 
 export class InteractionController {
   private _state: InteractionState = 'idle';
+  private _mode: CanvasInteractionMode;
   private _hitTester: HitTester;
   private _spatialIndex: SpatialIndex;
   private _visuals: InteractionVisuals;
   private _onPlaceBlock: InteractionControllerConfig['onPlaceBlock'];
+  private _onOperateBlockInteraction: InteractionControllerConfig['onOperateBlockInteraction'];
   private _onStateChange: InteractionControllerConfig['onStateChange'];
   private _destroyed = false;
 
@@ -118,6 +128,8 @@ export class InteractionController {
   private _dragPrimaryId: string | null = null;
   private _dragGroup: Map<string, DragGroupItem> | null = null;
   private _dragThresholdPassed = false;
+  private _operateBlockId: string | null = null;
+  private _operatePointerMoved = false;
 
   // Box select state
   private _boxSelectStart: Position | null = null;
@@ -156,10 +168,12 @@ export class InteractionController {
   private _isMouseOverCanvas = false;
 
   constructor(config: InteractionControllerConfig) {
+    this._mode = config.mode ?? 'edit';
     this._hitTester = config.hitTester;
     this._spatialIndex = config.spatialIndex;
     this._visuals = config.visuals;
     this._onPlaceBlock = config.onPlaceBlock;
+    this._onOperateBlockInteraction = config.onOperateBlockInteraction;
     this._onStateChange = config.onStateChange;
   }
 
@@ -175,6 +189,10 @@ export class InteractionController {
     return this._state === 'wire_mode' || this._state === 'wire_drawing';
   }
 
+  get mode(): CanvasInteractionMode {
+    return this._mode;
+  }
+
   setFacade(facade: CanvasFacadeReturn | null): void {
     this._facade = facade;
   }
@@ -183,8 +201,22 @@ export class InteractionController {
     this._onPlaceBlock = cb;
   }
 
+  setOnOperateBlockInteraction(
+    cb: InteractionControllerConfig['onOperateBlockInteraction']
+  ): void {
+    this._onOperateBlockInteraction = cb;
+  }
+
   setOnStateChange(cb: InteractionControllerConfig['onStateChange']): void {
     this._onStateChange = cb;
+  }
+
+  setMode(mode: CanvasInteractionMode): void {
+    if (this._mode === mode) return;
+    this.cancel();
+    this._mode = mode;
+    this._operateBlockId = null;
+    this._operatePointerMoved = false;
   }
 
   // ==========================================================================
@@ -192,6 +224,7 @@ export class InteractionController {
   // ==========================================================================
 
   startPlacing(blockType: string): void {
+    if (this._mode !== 'edit') return;
     this._resetTransient();
     this._state = 'placing';
     this._placingBlockType = blockType;
@@ -204,6 +237,7 @@ export class InteractionController {
   }
 
   startWireMode(): void {
+    if (this._mode !== 'edit') return;
     this._resetTransient();
     this._state = 'wire_mode';
     this._visuals.setPortsVisible(true);
@@ -263,6 +297,11 @@ export class InteractionController {
 
     this._downModifiers = modifiers;
 
+    if (this._mode === 'operate') {
+      this._handleOperatePointerDown(worldPos, screenPos, button);
+      return;
+    }
+
     switch (this._state) {
       case 'idle':
         this._handleIdlePointerDown(worldPos, screenPos, button, modifiers);
@@ -290,6 +329,15 @@ export class InteractionController {
 
     switch (this._state) {
       case 'panning':
+        break;
+
+      case 'operating_pressing':
+        if (
+          this._pointerStartScreen
+          && getDistance(this._pointerStartScreen, screenPos) > DRAG_THRESHOLD_PX
+        ) {
+          this._operatePointerMoved = true;
+        }
         break;
 
       case 'item_pending':
@@ -343,6 +391,10 @@ export class InteractionController {
         this._clearPointerTracking();
         break;
 
+      case 'operating_pressing':
+        this._handleOperatePointerUp(worldPos, button);
+        break;
+
       case 'item_pending':
         this._handleItemPendingUp(modifiers);
         break;
@@ -384,6 +436,10 @@ export class InteractionController {
     }
 
     if (key === 'Escape') {
+      if (this._state === 'operating_pressing') {
+        this._handleOperateCancel();
+        return;
+      }
       if (this._state === 'wire_drawing') {
         if (this._wireBendPoints.length > 0) {
           // Last bend becomes the endpoint; remove it from handles to avoid duplication
@@ -423,6 +479,54 @@ export class InteractionController {
   // ==========================================================================
   // Idle State Handlers
   // ==========================================================================
+
+  private _handleOperatePointerDown(
+    worldPos: Position,
+    screenPos: Position,
+    button: number
+  ): void {
+    if (button === 1 || (button === 0 && this._isSpaceHeld)) {
+      this._state = 'panning';
+      this._pointerStartWorld = worldPos;
+      this._pointerStartScreen = screenPos;
+      return;
+    }
+
+    if (button !== 0) return;
+
+    const target = this._hitTester.hitTest(worldPos);
+    if (target.type !== 'block' || !target.id) return;
+
+    this._pointerStartWorld = worldPos;
+    this._pointerStartScreen = screenPos;
+    this._operateBlockId = target.id;
+    this._operatePointerMoved = false;
+    this._state = 'operating_pressing';
+    this._onOperateBlockInteraction?.(target.id, 'press');
+  }
+
+  private _handleOperatePointerUp(worldPos: Position, button: number): void {
+    if (button !== 0) return;
+
+    const blockId = this._operateBlockId;
+    if (blockId) {
+      this._onOperateBlockInteraction?.(blockId, 'release');
+
+      const target = this._hitTester.hitTest(worldPos);
+      if (!this._operatePointerMoved && target.type === 'block' && target.id === blockId) {
+        this._onOperateBlockInteraction?.(blockId, 'click');
+      }
+    }
+
+    this._handleOperateCancel();
+  }
+
+  private _handleOperateCancel(): void {
+    this._operateBlockId = null;
+    this._operatePointerMoved = false;
+    this._state = 'idle';
+    this._clearPointerTracking();
+  }
 
   private _handleIdlePointerDown(
     worldPos: Position,
@@ -1047,6 +1151,8 @@ export class InteractionController {
     this._dragPrimaryId = null;
     this._dragGroup = null;
     this._dragThresholdPassed = false;
+    this._operateBlockId = null;
+    this._operatePointerMoved = false;
     this._boxSelectStart = null;
     this._boxSelectCurrent = null;
     this._wireFrom = null;
@@ -1125,3 +1231,4 @@ function rectFromTwoPoints(a: Position, b: Position) {
     height: Math.abs(a.y - b.y),
   };
 }
+

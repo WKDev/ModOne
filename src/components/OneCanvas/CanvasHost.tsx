@@ -63,7 +63,7 @@ import { EventBridge } from './interaction/EventBridge';
 import { KeyboardShortcuts } from './interaction/KeyboardShortcuts';
 import { InteractionController } from './interaction/InteractionController';
 import type { InteractionVisuals } from './interaction/InteractionController';
-import type { ShortcutCallbacks } from './interaction';
+import type { CanvasInteractionMode, ShortcutCallbacks } from './interaction';
 import { SyncEngine, ViewportSync } from './sync';
 import { useDocumentRegistry } from '@stores/documentRegistry';
 import { isCanvasDocument, isSchematicDocument } from '@/types/document';
@@ -185,11 +185,13 @@ export interface CanvasHostProps {
   documentId?: string | null;
   config?: CanvasConfig;
   facade: CanvasFacadeReturn;
+  interactionMode?: CanvasInteractionMode;
   onViewportChange?: (state: ViewportState) => void;
   shortcutCallbacks?: ShortcutCallbacks;
   style?: CSSProperties;
   className?: string;
   onPlaceBlock?: (blockType: string, position: Position, rotation: number, flipH: boolean, flipV: boolean) => void;
+  onOperateBlockInteraction?: (blockId: string, phase: 'press' | 'release' | 'click') => void;
   onInteractionStateChange?: (state: string) => void;
 }
 
@@ -212,7 +214,19 @@ const DEFAULT_PDF_OUTPUT_GUIDE = getDefaultPdfOutputGuideBounds();
  * It exposes an imperative handle for the parent to drive rendering.
  */
 export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
-  function CanvasHost({ documentId, config, facade, onViewportChange, shortcutCallbacks, onPlaceBlock, onInteractionStateChange, style, className }, ref) {
+  function CanvasHost({
+    documentId,
+    config,
+    facade,
+    interactionMode = 'edit',
+    onViewportChange,
+    shortcutCallbacks,
+    onPlaceBlock,
+    onOperateBlockInteraction,
+    onInteractionStateChange,
+    style,
+    className,
+  }, ref) {
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasConfig = config ?? DEFAULT_CANVAS_CONFIG;
     const effectiveGridConfig = useMemo(
@@ -263,6 +277,8 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
     onViewportChangeRef.current = onViewportChange;
     const onPlaceBlockRef = useRef(onPlaceBlock);
     onPlaceBlockRef.current = onPlaceBlock;
+    const onOperateBlockInteractionRef = useRef(onOperateBlockInteraction);
+    onOperateBlockInteractionRef.current = onOperateBlockInteraction;
     const onInteractionStateChangeRef = useRef(onInteractionStateChange);
     onInteractionStateChangeRef.current = onInteractionStateChange;
     const documentIdRef = useRef<string | null>(documentId ?? null);
@@ -454,7 +470,10 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
           hitTester,
           spatialIndex: spatial,
           visuals,
+          mode: interactionMode,
           onPlaceBlock: (...args) => onPlaceBlockRef.current?.(...args),
+          onOperateBlockInteraction: (...args) =>
+            onOperateBlockInteractionRef.current?.(...args),
           onStateChange: (state) => onInteractionStateChangeRef.current?.(state),
         });
         controller.setFacade(facadeRef.current);
@@ -712,6 +731,10 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
       }
       controllerRef.current?.setFacade(facade);
     }, [facade]);
+
+    useEffect(() => {
+      controllerRef.current?.setMode(interactionMode);
+    }, [interactionMode]);
 
     // ========================================================================
     // Imperative Handle

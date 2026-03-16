@@ -20,6 +20,7 @@ import {
 } from '../../OneCanvas';
 import { useSymbolStore } from '../../../stores/symbolStore';
 import { CanvasHost, type CanvasHostHandle } from '../../OneCanvas/CanvasHost';
+import type { CanvasInteractionMode } from '../../OneCanvas/interaction';
 
 
 import type { Block, Junction, Wire } from '../../OneCanvas/types';
@@ -36,6 +37,10 @@ import type { CanvasFacadeReturn } from '../../../types/canvasFacade';
 import { PropertiesPanel } from './PropertiesPanel';
 import { CanvasDialogs } from './canvas/CanvasDialogs';
 import { useCanvasFacade } from '../../../hooks/useCanvasFacade';
+import {
+  evaluateBehaviorSwitch,
+  resolveBehaviorBinding,
+} from '../../OneCanvas/runtime/behaviorTemplates';
 import '../../OneCanvas/styles/simulation.css';
 
 interface OneCanvasPanelProps {
@@ -104,6 +109,7 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
   const [debugMode, setDebugMode] = useState(false);
   const [wireContextMenu, setWireContextMenu] = useState<WireContextMenuState | null>(null);
   const [isWireMode, setIsWireMode] = useState(false);
+  const [interactionMode, setInteractionMode] = useState<CanvasInteractionMode>('edit');
 
 
   useEffect(() => {
@@ -170,8 +176,17 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
   const componentsArray = useMemo(() => Array.from(components.values()), [components]);
   const junctionsArray = useMemo(() => Array.from(junctions.values()), [junctions]);
   const simulation = useSimulation(componentsArray, wires, junctionsArray);
+  const {
+    result: simulationResult,
+    running: isSimulationRunning,
+    runtimeState,
+    step: stepSimulation,
+    setButtonState,
+    setManualOverride,
+  } = simulation;
 
   useCanvasKeyboardShortcuts({
+    enabled: interactionMode === 'edit',
     components: components as Map<string, Block>,
     wires,
     selectedIds,
@@ -205,8 +220,9 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
   );
 
   const handleStartWireMode = useCallback(() => {
+    if (interactionMode !== 'edit') return;
     canvasRef.current?.startWireMode();
-  }, []);
+  }, [interactionMode]);
 
   const handleInteractionStateChange = useCallback((state: string) => {
     setIsWireMode(state === 'wire_mode' || state === 'wire_drawing');
@@ -214,9 +230,10 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
 
   const handleSelectSymbol = useCallback(
     (blockType: string) => {
+      if (interactionMode !== 'edit') return;
       canvasRef.current?.startPlacing(blockType);
     },
-    []
+    [interactionMode]
   );
 
   const handlePlaceBlock = useCallback(
@@ -245,6 +262,12 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
     [updateComponent]
   );
 
+  useEffect(() => {
+    if (interactionMode === 'operate') {
+      clearSelection();
+    }
+  }, [clearSelection, interactionMode]);
+
   const portVoltages = useMemo(() => {
     const result = simulation.result as unknown;
     if (!result || typeof result !== 'object' || !('nodeVoltages' in result)) {
@@ -271,16 +294,79 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
 
   const handleButtonPress = useCallback(
     (blockId: string) => {
-      simulation.setButtonState(blockId, true);
+      setButtonState(blockId, true);
     },
-    [simulation]
+    [setButtonState]
   );
 
   const handleButtonRelease = useCallback(
     (blockId: string) => {
-      simulation.setButtonState(blockId, false);
+      setButtonState(blockId, false);
     },
-    [simulation]
+    [setButtonState]
+  );
+
+  const resolveOperateInteractionMode = useCallback((block: Block): 'momentary' | 'maintained' | 'none' => {
+    const binding = resolveBehaviorBinding(block);
+    if (!binding || binding.archetype !== 'switch') {
+      return 'none';
+    }
+
+    if (block.type === 'button') {
+      return block.mode === 'momentary' ? 'momentary' : 'maintained';
+    }
+
+    if (
+      block.type === 'selector_switch'
+      || block.type === 'emergency_stop'
+      || block.type === 'plc_out'
+      || block.type === 'disconnect_switch'
+    ) {
+      return 'maintained';
+    }
+
+    return binding.interactionMode === 'momentary'
+      ? 'momentary'
+      : binding.interactionMode === 'maintained'
+        ? 'maintained'
+        : 'none';
+  }, []);
+
+  const handleOperateBlockInteraction = useCallback(
+    (blockId: string, phase: 'press' | 'release' | 'click') => {
+      if (interactionMode !== 'operate') return;
+
+      const block = components.get(blockId);
+      if (!block) return;
+
+      const blockMode = resolveOperateInteractionMode(block as Block);
+      if (blockMode === 'none') return;
+
+      if (phase === 'press' && blockMode === 'momentary') {
+        handleButtonPress(blockId);
+        return;
+      }
+
+      if (phase === 'release' && blockMode === 'momentary') {
+        handleButtonRelease(blockId);
+        return;
+      }
+
+      if (phase !== 'click' || blockMode !== 'maintained') return;
+
+      const currentState = evaluateBehaviorSwitch(block as Block, runtimeState);
+      const nextValue = !(currentState?.energized ?? currentState?.conducting ?? false);
+      setManualOverride(blockId, nextValue);
+    },
+    [
+      components,
+      handleButtonPress,
+      handleButtonRelease,
+      interactionMode,
+      resolveOperateInteractionMode,
+      runtimeState,
+      setManualOverride,
+    ]
   );
 
   const handleApplyWireNumbering = useCallback(
@@ -334,11 +420,33 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
     handleButtonRelease,
   ];
 
+  useEffect(() => {
+    if (isSimulationRunning) return;
+    stepSimulation();
+  }, [componentsArray, isSimulationRunning, junctionsArray, stepSimulation, wires]);
+
+  useEffect(() => {
+    const renderer = canvasRef.current?.getSimulationRenderer();
+    if (!renderer) return;
+
+    if (interactionMode !== 'operate' || !simulationResult) {
+      renderer.resetAllVisualState();
+      return;
+    }
+
+    renderer.applySimulationSnapshot(
+      simulationResult.behaviorStates,
+      simulationResult.poweredWires,
+    );
+  }, [interactionMode, simulationResult]);
+
   return (
     <PanelErrorBoundary panelName="Canvas">
       <div className="h-full flex flex-col bg-neutral-950">
         <div className="flex items-center justify-center px-2 py-1 bg-neutral-900 border-b border-neutral-800">
           <CanvasToolbar
+            interactionMode={interactionMode}
+            onInteractionModeChange={setInteractionMode}
             onAlignSelected={alignSelected}
             onDistributeSelected={distributeSelected}
             onFlipSelected={flipSelected}
@@ -351,6 +459,7 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
 
         <div className="flex-1 flex overflow-hidden">
           <Toolbox
+            editingEnabled={interactionMode === 'edit'}
             onOpenLibrary={() => setLibraryOpen(true)}
             onOpenSymbolEditor={() => useSymbolStore.getState().openEditor()}
             onSelectSymbol={handleSelectSymbol}
@@ -368,7 +477,9 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
                 className={`w-full h-full ${isWireMode ? 'cursor-crosshair' : ''}`}
                 documentId={documentId}
                 facade={facade}
+                interactionMode={interactionMode}
                 onPlaceBlock={handlePlaceBlock}
+                onOperateBlockInteraction={handleOperateBlockInteraction}
                 onInteractionStateChange={handleInteractionStateChange}
               />
 

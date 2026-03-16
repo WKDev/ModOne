@@ -20,12 +20,17 @@ import {
   Hash,
   Printer,
 } from 'lucide-react';
+import type { CanvasInteractionMode } from './interaction';
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface CanvasToolbarProps {
+  /** Current canvas interaction mode */
+  interactionMode: CanvasInteractionMode;
+  /** Switch canvas interaction mode */
+  onInteractionModeChange: (mode: CanvasInteractionMode) => void;
   /** Align selected blocks */
   onAlignSelected: (direction: 'left' | 'right' | 'top' | 'bottom' | 'centerH' | 'centerV') => void;
   /** Distribute selected blocks */
@@ -84,6 +89,8 @@ const Divider = () => <div className="w-px h-6 bg-neutral-600 mx-1" />;
 // ============================================================================
 
 export const CanvasToolbar = memo(function CanvasToolbar({
+  interactionMode,
+  onInteractionModeChange,
   onAlignSelected,
   onDistributeSelected,
   onFlipSelected,
@@ -92,12 +99,46 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   hasSelection = false,
   selectionCount = 0,
 }: CanvasToolbarProps) {
-  const canAlign = hasSelection && selectionCount >= 2;
-  const canDistribute = hasSelection && selectionCount >= 3;
-  const canFlip = hasSelection && selectionCount >= 1;
+  const isEditMode = interactionMode === 'edit';
+  const canAlign = isEditMode && hasSelection && selectionCount >= 2;
+  const canDistribute = isEditMode && hasSelection && selectionCount >= 3;
+  const canFlip = isEditMode && hasSelection && selectionCount >= 1;
 
   return (
     <div className="flex items-center gap-1 px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg">
+      <div className="flex items-center gap-1 rounded-md bg-neutral-900/80 p-1">
+        <button
+          type="button"
+          onClick={() => onInteractionModeChange('edit')}
+          className={`
+            px-2.5 py-1 rounded text-xs font-medium transition-colors
+            ${isEditMode
+              ? 'bg-blue-600 text-white'
+              : 'text-neutral-300 hover:bg-neutral-700'
+            }
+          `}
+          title="편집 모드"
+        >
+          편집 모드
+        </button>
+        <button
+          type="button"
+          onClick={() => onInteractionModeChange('operate')}
+          className={`
+            px-2.5 py-1 rounded text-xs font-medium transition-colors
+            ${!isEditMode
+              ? 'bg-emerald-600 text-white'
+              : 'text-neutral-300 hover:bg-neutral-700'
+            }
+          `}
+          title="운영 모드"
+        >
+          운영 모드
+        </button>
+      </div>
+
+      <Divider />
+
       {/* Alignment Group */}
       <div className="flex items-center gap-0.5" title="Alignment">
         <ToolButton
@@ -191,6 +232,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
         <ToolButton
           onClick={onOpenWireNumbering}
           title="Wire Numbering (IEC 81346)"
+          disabled={!isEditMode}
         >
           <Hash size={16} />
         </ToolButton>

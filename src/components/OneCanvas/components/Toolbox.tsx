@@ -31,17 +31,31 @@ const THUMBNAIL_SIZE = 36;
 // ---------------------------------------------------------------------------
 
 /** A single clickable symbol item inside a category. */
-function ClickableSymbolItem({ type, onSelect }: { type: BlockType; onSelect?: (type: BlockType) => void }) {
+function ClickableSymbolItem({
+  type,
+  onSelect,
+  disabled = false,
+}: {
+  type: BlockType;
+  onSelect?: (type: BlockType) => void;
+  disabled?: boolean;
+}) {
   const label = SYMBOL_LABELS[type] ?? type;
 
   return (
     <div
       className={cn(
-        'flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer select-none',
-        'hover:bg-neutral-700/60 active:bg-neutral-600/60 transition-colors',
+        'flex items-center gap-2 px-2 py-1.5 rounded select-none transition-colors',
+        disabled
+          ? 'cursor-not-allowed opacity-45'
+          : 'cursor-pointer hover:bg-neutral-700/60 active:bg-neutral-600/60',
       )}
       title={label}
-      onClick={() => onSelect?.(type)}
+      onClick={() => {
+        if (!disabled) {
+          onSelect?.(type);
+        }
+      }}
     >
       <SymbolRenderer
         symbolId={type}
@@ -62,12 +76,14 @@ const CategorySection = memo(function CategorySection({
   onToggle,
   filter,
   onSelect,
+  disabled = false,
 }: {
   category: SymbolCategory;
   expanded: boolean;
   onToggle: () => void;
   filter: string;
   onSelect?: (type: BlockType) => void;
+  disabled?: boolean;
 }) {
   const visibleItems = useMemo(() => {
     if (!filter) return category.items;
@@ -99,7 +115,12 @@ const CategorySection = memo(function CategorySection({
       {expanded && (
         <div className="ml-1 mt-0.5 flex flex-col gap-0.5">
           {visibleItems.map((type) => (
-            <ClickableSymbolItem key={type} type={type} onSelect={onSelect} />
+            <ClickableSymbolItem
+              key={type}
+              type={type}
+              onSelect={onSelect}
+              disabled={disabled}
+            />
           ))}
         </div>
       )}
@@ -113,6 +134,7 @@ const CategorySection = memo(function CategorySection({
 
 export interface ToolboxProps {
   className?: string;
+  editingEnabled?: boolean;
   onOpenLibrary?: () => void;
   onOpenSymbolEditor?: () => void;
   onSelectSymbol?: (blockType: BlockType) => void;
@@ -126,6 +148,7 @@ export interface ToolboxProps {
 
 export const Toolbox = memo(function Toolbox({
   className,
+  editingEnabled = true,
   onOpenLibrary,
   onOpenSymbolEditor,
   onSelectSymbol,
@@ -211,18 +234,29 @@ export const Toolbox = memo(function Toolbox({
       <div className="px-2 py-1.5 border-b border-neutral-800">
         <button
           type="button"
-          onClick={() => onStartWireMode?.()}
+          onClick={() => {
+            if (editingEnabled) {
+              onStartWireMode?.();
+            }
+          }}
+          disabled={!editingEnabled}
           className={cn(
             'flex items-center gap-2 w-full px-2 py-1.5 rounded text-xs transition-colors',
             isWireMode
               ? 'bg-blue-600/30 text-blue-300 border border-blue-500/40'
               : 'text-neutral-300 hover:bg-neutral-700/60',
+            !editingEnabled && 'cursor-not-allowed opacity-45 hover:bg-transparent',
           )}
         >
           <Spline size={16} />
           <span>Wire Tool</span>
           <span className="ml-auto text-[10px] text-neutral-500">W</span>
         </button>
+        {!editingEnabled && (
+          <p className="mt-2 text-[11px] leading-4 text-neutral-500">
+            운영 모드에서는 심볼 조작만 가능합니다.
+          </p>
+        )}
       </div>
 
       {/* Search */}
@@ -266,6 +300,7 @@ export const Toolbox = memo(function Toolbox({
             onToggle={() => toggleCategory(cat.id)}
             filter={search}
             onSelect={onSelectSymbol}
+            disabled={!editingEnabled}
           />
         ))}
 
