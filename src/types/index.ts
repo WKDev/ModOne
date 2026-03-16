@@ -85,6 +85,16 @@ export {
   FLOATING_WINDOW_CASCADE_OFFSET,
 } from './window';
 
+// Tag types (imported directly from './tags' to avoid naming conflicts with onesim)
+export type {
+  TagTypedValue,
+  TagValueChangedEvent,
+  TagValue,
+} from './tags';
+export { TAG_EVENTS } from './tags';
+// TagDefinition from tags.ts is the DTO variant; use as TagDefinitionDto if needed
+export type { TagDefinition as TagDefinitionDto } from './tags';
+
 // Document types (Multi-Document Editing)
 export type {
   DocumentType,

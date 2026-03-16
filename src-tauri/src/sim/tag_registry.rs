@@ -30,6 +30,7 @@ pub type TagRegistryResult<T> = Result<T, TagRegistryError>;
 pub struct TagRegistry {
     raw_tags: RwLock<HashMap<String, TagDefinition>>,
     semantic_tags: RwLock<HashMap<String, TagDefinition>>,
+    reverse_index: RwLock<HashMap<CanonicalAddress, Vec<String>>>,
 }
 
 impl TagRegistry {
@@ -81,13 +82,18 @@ impl TagRegistry {
         }
     }
 
-    pub fn register_semantic(&self, request: RegisterTagRequest) -> TagRegistryResult<TagDefinition> {
+    pub fn register_semantic(
+        &self,
+        request: RegisterTagRequest,
+    ) -> TagRegistryResult<TagDefinition> {
         let canonical_address = request
             .canonical_address
-            .or_else(|| request.binding.as_ref().and_then(|binding| match binding {
-                RuntimeBinding::Canonical { address } => Some(*address),
-                RuntimeBinding::Tag { .. } => None,
-            }))
+            .or_else(|| {
+                request.binding.as_ref().and_then(|binding| match binding {
+                    RuntimeBinding::Canonical { address } => Some(*address),
+                    RuntimeBinding::Tag { .. } => None,
+                })
+            })
             .ok_or(TagRegistryError::MissingCanonicalBinding)?;
 
         let tag_id = request
@@ -100,7 +106,9 @@ impl TagRegistry {
         let default_access = access_from_canonical(canonical_address.area.default_access());
         if request
             .access
-            .map(|access| access == TagAccessLevel::ReadWrite && default_access == TagAccessLevel::ReadOnly)
+            .map(|access| {
+                access == TagAccessLevel::ReadWrite && default_access == TagAccessLevel::ReadOnly
+            })
             .unwrap_or(false)
         {
             return Err(TagRegistryError::AccessEscalation);
@@ -110,7 +118,9 @@ impl TagRegistry {
             tag_id: tag_id.clone(),
             class: TagClass::Semantic,
             display_name: request.display_name,
-            binding: RuntimeBinding::Tag { tag_id: tag_id.clone() },
+            binding: RuntimeBinding::Tag {
+                tag_id: tag_id.clone(),
+            },
             canonical_address,
             access: request.access.unwrap_or(default_access),
             vendor_aliases: request.vendor_aliases,
@@ -122,7 +132,12 @@ impl TagRegistry {
         if semantic_tags.contains_key(&tag_id) {
             return Err(TagRegistryError::DuplicateTag(tag_id));
         }
-        semantic_tags.insert(tag_id, definition.clone());
+        semantic_tags.insert(tag_id.clone(), definition.clone());
+        self.reverse_index
+            .write()
+            .entry(canonical_address)
+            .or_default()
+            .push(tag_id);
         Ok(definition)
     }
 
@@ -136,6 +151,11 @@ impl TagRegistry {
         self.raw_tags
             .write()
             .insert(definition.tag_id.clone(), definition.clone());
+        self.reverse_index
+            .write()
+            .entry(address)
+            .or_default()
+            .push(definition.tag_id.clone());
         definition
     }
 
@@ -144,11 +164,32 @@ impl TagRegistry {
             return Err(TagRegistryError::TagNotFound(tag_id.to_string()));
         }
 
-        self.semantic_tags
+        let removed = self
+            .semantic_tags
             .write()
-            .remove(tag_id)
-            .map(|_| ())
-            .ok_or_else(|| TagRegistryError::TagNotFound(tag_id.to_string()))
+            .remove(tag_id);
+
+        match removed {
+            Some(definition) => {
+                let mut reverse = self.reverse_index.write();
+                if let Some(ids) = reverse.get_mut(&definition.canonical_address) {
+                    ids.retain(|id| id != tag_id);
+                    if ids.is_empty() {
+                        reverse.remove(&definition.canonical_address);
+                    }
+                }
+                Ok(())
+            }
+            None => Err(TagRegistryError::TagNotFound(tag_id.to_string())),
+        }
+    }
+
+    pub fn tags_for_address(&self, addr: &CanonicalAddress) -> Vec<String> {
+        self.reverse_index
+            .read()
+            .get(addr)
+            .cloned()
+            .unwrap_or_default()
     }
 
     pub fn list(&self, include_raw: bool) -> Vec<TagDefinition> {
@@ -171,7 +212,10 @@ pub type SharedTagRegistry = Arc<TagRegistry>;
 
 fn raw_tag_id(address: CanonicalAddress) -> String {
     match address.bit_index {
-        Some(bit_index) => format!("{RAW_TAG_PREFIX}{:?}:{}:bit:{}", address.area, address.index, bit_index),
+        Some(bit_index) => format!(
+            "{RAW_TAG_PREFIX}{:?}:{}:bit:{}",
+            address.area, address.index, bit_index
+        ),
         None => format!("{RAW_TAG_PREFIX}{:?}:{}", address.area, address.index),
     }
 }
@@ -180,7 +224,10 @@ fn parse_raw_tag_id(tag_id: &str) -> Option<CanonicalAddress> {
     let remainder = tag_id.strip_prefix(RAW_TAG_PREFIX)?;
     let parts: Vec<_> = remainder.split(':').collect();
     match parts.as_slice() {
-        [area, index] => Some(CanonicalAddress::new(parse_area(area)?, index.parse().ok()?)),
+        [area, index] => Some(CanonicalAddress::new(
+            parse_area(area)?,
+            index.parse().ok()?,
+        )),
         [area, index, "bit", bit_index] => Some(CanonicalAddress::with_bit_index(
             parse_area(area)?,
             index.parse().ok()?,
@@ -250,7 +297,10 @@ mod tests {
     fn resolves_deterministic_raw_tags() {
         let registry = TagRegistry::new();
         let tag = registry.resolve("raw:InputBit:12").expect("raw");
-        assert_eq!(tag.canonical_address, CanonicalAddress::new(CanonicalAreaKind::InputBit, 12));
+        assert_eq!(
+            tag.canonical_address,
+            CanonicalAddress::new(CanonicalAreaKind::InputBit, 12)
+        );
         assert_eq!(tag.class, TagClass::RawBacked);
     }
 
@@ -274,7 +324,10 @@ mod tests {
             .expect("semantic");
 
         assert_eq!(tag.tag_id, "motor-run");
-        assert_eq!(registry.resolve("motor-run").unwrap().canonical_address, tag.canonical_address);
+        assert_eq!(
+            registry.resolve("motor-run").unwrap().canonical_address,
+            tag.canonical_address
+        );
     }
 
     #[test]
@@ -288,6 +341,9 @@ mod tests {
 
         let listed = registry.list(true);
         assert!(listed.iter().any(|item| item.tag_id == tag.tag_id));
-        assert_eq!(registry.resolve(&tag.tag_id).unwrap().display_name, "D5 Raw");
+        assert_eq!(
+            registry.resolve(&tag.tag_id).unwrap().display_name,
+            "D5 Raw"
+        );
     }
 }

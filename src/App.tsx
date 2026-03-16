@@ -18,6 +18,7 @@ import { Toaster, toast } from 'sonner';
 import { useMacosNativeMenu } from "./hooks/useMacosNativeMenu";
 import { useStartupProject } from "./hooks/useStartupProject";
 import { useOpcUaInit } from "./hooks/useOpcUaInit";
+import { useTagInit } from "./hooks/useTagInit";
 
 /**
  * Parse URL parameters to detect floating window mode
@@ -70,6 +71,9 @@ function MainWindowContent() {
 
   // Centralized OPC UA event subscription
   useOpcUaInit();
+
+  // Centralized tag event subscription
+  useTagInit();
 
   const isStartupProjectResolved = useStartupProject(isInitialized);
 

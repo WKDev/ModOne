@@ -20,7 +20,7 @@ pub mod symbols;
 pub use error::{ModOneError, ModOneResult};
 
 // Re-export logging types
-pub use logging::{ErrorLogger, SharedErrorLogger, LogEntry};
+pub use logging::{ErrorLogger, LogEntry, SharedErrorLogger};
 
 use project::{AutoSaveManager, ProjectManager};
 use sim::CanonicalRuntimeFacade;
@@ -37,84 +37,226 @@ fn get_cli_project_path(state: tauri::State<'_, CliProjectPath>) -> Option<Strin
 }
 
 // Re-export commands for registration
-use commands::{
-    clear_recent_projects, close_project, close_project_force, create_project,
-    get_app_settings, get_auto_save_settings, get_project_status, get_recent_projects,
-    mark_project_modified, open_project, remove_from_recent, save_app_settings, save_project,
-    set_auto_save_enabled, set_auto_save_interval, set_backup_count, start_auto_save,
-    stop_auto_save,
-    // Recovery commands
-    get_available_backups, validate_project_integrity, recover_project_from_backup,
-    attempt_project_recovery,
-    // Layout commands
-    delete_layout, get_last_active_layout, get_restore_last_session, list_layouts, load_layout,
-    save_layout, set_last_active_layout, set_restore_last_session,
-    // Logging commands
-    clear_error_logs, get_log_path, get_recent_errors, open_logs_directory,
-    // Modbus commands
-    modbus_bulk_write, modbus_get_status, modbus_list_serial_ports, modbus_load_memory_csv,
-    modbus_read_coils, modbus_read_discrete_inputs, modbus_read_holding_registers,
-    modbus_read_input_registers, modbus_save_memory_csv, modbus_start_rtu, modbus_start_tcp,
-    modbus_stop_rtu, modbus_stop_tcp, modbus_write_coil, modbus_write_coils,
-    modbus_write_discrete_input, modbus_write_holding_register, modbus_write_holding_registers,
-    modbus_write_input_register, ModbusState,
-    // Canvas commands
-    canvas_circuit_exists, canvas_create_circuit, canvas_delete_circuit, canvas_list_circuits,
-    canvas_load_circuit, canvas_save_circuit,
-    // Scope commands
-    scope_create, scope_get_data, scope_update_settings, scope_add_sample, scope_add_samples,
-    scope_run_stop, scope_reset, scope_arm_trigger, scope_delete, scope_list, scope_exists,
-    // Scope mapping commands
-    scope_register_mapping, scope_register_mappings, scope_remove_mapping,
-    scope_clear_mappings, scope_get_mappings,
-    // Scope-simulation integration commands
-    scope_tick, scope_read_device_voltage,
-    ScopeState,
-    // Canvas sync commands
-    canvas_sync_clear_mappings, canvas_sync_force_update_outputs, canvas_sync_get_changed_blocks,
-    canvas_sync_get_mappings, canvas_sync_get_status, canvas_sync_handle_input,
-    canvas_sync_handle_inputs, canvas_sync_has_changes, canvas_sync_init,
-    canvas_sync_register_mapping, canvas_sync_register_mappings, canvas_sync_remove_mapping,
-    canvas_sync_reset_stats, canvas_sync_shutdown, canvas_sync_update_outputs,
-    CanvasSyncState,
-    // Schematic commands
-    schematic_save, schematic_load, schematic_list, schematic_exists, schematic_delete,
-    // Symbol commands
-    symbol_save, symbol_load, symbol_delete, symbol_list, symbol_list_all,
-    // Scenario commands
-    scenario_create, scenario_delete, scenario_exists, scenario_export_csv, scenario_import_csv,
-    scenario_list, scenario_load, scenario_save,
-    // Scenario execution commands
-    scenario_run, scenario_pause, scenario_resume, scenario_stop, scenario_get_status,
-    scenario_get_state, scenario_seek, ScenarioExecutorState,
-    // Parser commands
-    parser_format_modbus_address, parser_is_read_only, parser_load_program,
-    parser_map_address_to_modbus, parser_map_modbus_to_address, parser_parse_csv_content,
-    parser_parse_csv_file, parser_parse_csv_grouped, parser_parse_modbus_address,
-    parser_program_exists, parser_save_program,
-    // Simulation commands
-    ladder_force_device, ladder_release_force, ladder_start_monitoring, ladder_stop_monitoring,
-    sim_add_breakpoint, sim_add_watch, sim_continue, sim_get_breakpoints,
-    sim_create_raw_tag, sim_get_debugger_state, sim_get_memory_snapshot, sim_get_scan_info, sim_get_status,
-    sim_get_tag, sim_list_tags, sim_load_program, sim_get_watches, sim_pause, sim_read_binding,
-    sim_resolve_binding, sim_resolve_binding_parts,
-    sim_register_tag, sim_remove_breakpoint, sim_remove_tag, sim_set_breakpoint_enabled,
-    sim_remove_watch, sim_reset, sim_resume, sim_run, sim_step, sim_stop, sim_write_binding,
-    SimState,
-    // Explorer commands
-    list_project_files, read_file_contents, path_exists, get_file_info, create_project_file,
-    // Window commands
-    window_create_floating, window_close_floating, window_update_bounds,
-    window_focus_floating, window_list_floating, window_get_floating_info,
-    window_minimize_floating, window_maximize_floating, window_floating_exists,
-    FloatingWindowState, FloatingWindowRegistry,
-    // Network commands
-    network_add_alias, network_check_ip, network_cleanup_aliases, network_get_active_aliases,
-    network_list_interfaces, network_remove_alias, NetworkState,
-    // OPC UA commands
-    opcua_get_status, opcua_start_server, opcua_stop_server, OpcUaState,
-};
 use commands::window::close_all_floating_windows;
+use commands::{
+    attempt_project_recovery,
+    // Canvas commands
+    canvas_circuit_exists,
+    canvas_create_circuit,
+    canvas_delete_circuit,
+    canvas_list_circuits,
+    canvas_load_circuit,
+    canvas_save_circuit,
+    // Canvas sync commands
+    canvas_sync_clear_mappings,
+    canvas_sync_force_update_outputs,
+    canvas_sync_get_changed_blocks,
+    canvas_sync_get_mappings,
+    canvas_sync_get_status,
+    canvas_sync_handle_input,
+    canvas_sync_handle_inputs,
+    canvas_sync_has_changes,
+    canvas_sync_init,
+    canvas_sync_register_mapping,
+    canvas_sync_register_mappings,
+    canvas_sync_remove_mapping,
+    canvas_sync_reset_stats,
+    canvas_sync_shutdown,
+    canvas_sync_update_outputs,
+    // Logging commands
+    clear_error_logs,
+    clear_recent_projects,
+    close_project,
+    close_project_force,
+    create_project,
+    create_project_file,
+    // Layout commands
+    delete_layout,
+    get_app_settings,
+    get_auto_save_settings,
+    // Recovery commands
+    get_available_backups,
+    get_file_info,
+    get_last_active_layout,
+    get_log_path,
+    get_project_status,
+    get_recent_errors,
+    get_recent_projects,
+    get_restore_last_session,
+    // Simulation commands
+    ladder_force_device,
+    ladder_release_force,
+    ladder_start_monitoring,
+    ladder_stop_monitoring,
+    list_layouts,
+    // Explorer commands
+    list_project_files,
+    load_layout,
+    mark_project_modified,
+    // Modbus commands
+    modbus_bulk_write,
+    modbus_get_status,
+    modbus_list_serial_ports,
+    modbus_load_memory_csv,
+    modbus_read_coils,
+    modbus_read_discrete_inputs,
+    modbus_read_holding_registers,
+    modbus_read_input_registers,
+    modbus_save_memory_csv,
+    modbus_start_rtu,
+    modbus_start_tcp,
+    modbus_stop_rtu,
+    modbus_stop_tcp,
+    modbus_write_coil,
+    modbus_write_coils,
+    modbus_write_discrete_input,
+    modbus_write_holding_register,
+    modbus_write_holding_registers,
+    modbus_write_input_register,
+    // Network commands
+    network_add_alias,
+    network_check_ip,
+    network_cleanup_aliases,
+    network_get_active_aliases,
+    network_list_interfaces,
+    network_remove_alias,
+    // OPC UA commands
+    opcua_get_status,
+    opcua_start_server,
+    opcua_stop_server,
+    // Tag commands
+    list_tags,
+    read_tags,
+    write_tag,
+    set_watched_tags,
+    TagEventBridgeState,
+    open_logs_directory,
+    open_project,
+    // Parser commands
+    parser_format_modbus_address,
+    parser_is_read_only,
+    parser_load_program,
+    parser_map_address_to_modbus,
+    parser_map_modbus_to_address,
+    parser_parse_csv_content,
+    parser_parse_csv_file,
+    parser_parse_csv_grouped,
+    parser_parse_modbus_address,
+    parser_program_exists,
+    parser_save_program,
+    path_exists,
+    read_file_contents,
+    recover_project_from_backup,
+    remove_from_recent,
+    save_app_settings,
+    save_layout,
+    save_project,
+    // Scenario commands
+    scenario_create,
+    scenario_delete,
+    scenario_exists,
+    scenario_export_csv,
+    scenario_get_state,
+    scenario_get_status,
+    scenario_import_csv,
+    scenario_list,
+    scenario_load,
+    scenario_pause,
+    scenario_resume,
+    // Scenario execution commands
+    scenario_run,
+    scenario_save,
+    scenario_seek,
+    scenario_stop,
+    schematic_delete,
+    schematic_exists,
+    schematic_list,
+    schematic_load,
+    // Schematic commands
+    schematic_save,
+    scope_add_sample,
+    scope_add_samples,
+    scope_arm_trigger,
+    scope_clear_mappings,
+    // Scope commands
+    scope_create,
+    scope_delete,
+    scope_exists,
+    scope_get_data,
+    scope_get_mappings,
+    scope_list,
+    scope_read_device_voltage,
+    // Scope mapping commands
+    scope_register_mapping,
+    scope_register_mappings,
+    scope_remove_mapping,
+    scope_reset,
+    scope_run_stop,
+    // Scope-simulation integration commands
+    scope_tick,
+    scope_update_settings,
+    set_auto_save_enabled,
+    set_auto_save_interval,
+    set_backup_count,
+    set_last_active_layout,
+    set_restore_last_session,
+    sim_add_breakpoint,
+    sim_add_watch,
+    sim_continue,
+    sim_create_raw_tag,
+    sim_get_breakpoints,
+    sim_get_debugger_state,
+    sim_get_memory_snapshot,
+    sim_get_scan_info,
+    sim_get_status,
+    sim_get_tag,
+    sim_get_watches,
+    sim_list_tags,
+    sim_load_program,
+    sim_pause,
+    sim_read_binding,
+    sim_register_tag,
+    sim_remove_breakpoint,
+    sim_remove_tag,
+    sim_remove_watch,
+    sim_reset,
+    sim_resolve_binding,
+    sim_resolve_binding_parts,
+    sim_resume,
+    sim_run,
+    sim_set_breakpoint_enabled,
+    sim_step,
+    sim_stop,
+    sim_write_binding,
+    start_auto_save,
+    stop_auto_save,
+    symbol_delete,
+    symbol_list,
+    symbol_list_all,
+    symbol_load,
+    // Symbol commands
+    symbol_save,
+    validate_project_integrity,
+    window_close_floating,
+    // Window commands
+    window_create_floating,
+    window_floating_exists,
+    window_focus_floating,
+    window_get_floating_info,
+    window_list_floating,
+    window_maximize_floating,
+    window_minimize_floating,
+    window_update_bounds,
+    CanvasSyncState,
+    FloatingWindowRegistry,
+    FloatingWindowState,
+    ModbusState,
+    NetworkState,
+    OpcUaState,
+    ScenarioExecutorState,
+    ScopeState,
+    SimState,
+};
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -160,15 +302,25 @@ pub fn run() {
         Arc::clone(&shared_tag_registry),
     );
 
+    // Initialize tag event bridge
+    let tag_event_bridge = crate::sim::tag_events::TagEventBridge::new(
+        Arc::clone(&shared_tag_registry),
+    );
+    // Start the bridge subscriber on the canonical memory bus
+    tag_event_bridge.start(shared_runtime.handle().read().bus());
+    let tag_bridge_state = TagEventBridgeState {
+        bridge: tag_event_bridge,
+    };
+
     // Initialize error logger
-    let error_logger = ErrorLogger::new_shared()
-        .unwrap_or_else(|e| {
-            log::warn!("Failed to initialize error logger: {}. Using default.", e);
-            std::sync::Arc::new(std::sync::Mutex::new(ErrorLogger::default()))
-        });
+    let error_logger = ErrorLogger::new_shared().unwrap_or_else(|e| {
+        log::warn!("Failed to initialize error logger: {}. Using default.", e);
+        std::sync::Arc::new(std::sync::Mutex::new(ErrorLogger::default()))
+    });
 
     // Initialize floating window state
-    let floating_window_state: FloatingWindowState = std::sync::Mutex::new(FloatingWindowRegistry::new());
+    let floating_window_state: FloatingWindowState =
+        std::sync::Mutex::new(FloatingWindowRegistry::new());
 
     // Initialize scope state
     let scope_state = ScopeState::default();
@@ -179,9 +331,11 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         // Exclude floating windows ("floating-" prefix) from state persistence --
         // they are ephemeral and managed by FloatingWindowRegistry, not the plugin.
-        .plugin(tauri_plugin_window_state::Builder::default()
-            .with_filter(|label| !label.starts_with("floating-"))
-            .build());
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_filter(|label| !label.starts_with("floating-"))
+                .build(),
+        );
 
     #[cfg(feature = "webdriver")]
     let builder = builder.plugin(tauri_plugin_webdriver::init());
@@ -199,8 +353,18 @@ pub fn run() {
         .manage(scope_state)
         .manage(NetworkState::default())
         .manage(OpcUaState::default())
+        .manage(tag_bridge_state)
         .setup(|app| {
             log::info!("ModOne application starting...");
+
+            // Wire tag event bridge with app handle
+            {
+                use tauri::Manager;
+                if let Some(tag_state) = app.try_state::<TagEventBridgeState>() {
+                    tag_state.bridge.set_app_handle(app.handle().clone());
+                }
+            }
+
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
@@ -245,7 +409,11 @@ pub fn run() {
                             "floating-window-closed",
                             &serde_json::json!({ "windowId": label }),
                         ) {
-                            log::warn!("Failed to emit floating-window-closed for {}: {}", label, e);
+                            log::warn!(
+                                "Failed to emit floating-window-closed for {}: {}",
+                                label,
+                                e
+                            );
                         }
                     }
 
@@ -498,6 +666,11 @@ pub fn run() {
             opcua_get_status,
             opcua_start_server,
             opcua_stop_server,
+            // Tag commands
+            list_tags,
+            read_tags,
+            write_tag,
+            set_watched_tags,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

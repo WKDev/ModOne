@@ -11,13 +11,14 @@ pub mod memory;
 pub mod monitoring;
 pub mod protocol_runtime;
 pub mod runtime_host;
+pub mod tag_events;
 pub mod tag_registry;
 pub mod timer;
 pub mod types;
 
 pub use canvas_sync::{
-    CanvasSync, CanvasSyncError, CanvasSyncResult, PlcBlockMapping, PlcBlockType,
-    PlcInputChange, PlcOutputUpdate, PlcOutputsEvent,
+    CanvasSync, CanvasSyncError, CanvasSyncResult, PlcBlockMapping, PlcBlockType, PlcInputChange,
+    PlcOutputUpdate, PlcOutputsEvent,
 };
 pub use counter::CounterManager;
 pub use engine::{
