@@ -29,4 +29,7 @@ export type { SimulationOverlayConfig } from './SimulationOverlay';
 export { GhostPreviewRenderer } from './GhostPreviewRenderer';
 export type { GhostPreviewConfig, GhostState } from './GhostPreviewRenderer';
 
+export { PageGuideRenderer } from './PageGuideRenderer';
+export type { PageGuideRendererConfig } from './PageGuideRenderer';
+
 export { getSymbolContext, getSymbolSize } from './symbols';

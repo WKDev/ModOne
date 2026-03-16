@@ -288,7 +288,7 @@ export function createDefaultPrintLayout(
   titleBlock: Partial<TitleBlockInfo> = {}
 ): PrintLayoutConfig {
   return {
-    paperSize: 'A4',
+    paperSize: 'A3',
     orientation: 'landscape',
     margins: { ...DEFAULT_MARGINS },
     titleBlockPosition: 'bottom-right',

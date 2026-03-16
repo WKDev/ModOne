@@ -10,6 +10,7 @@
 
 import { memo, useMemo, useCallback, useRef, useEffect, useState } from 'react';
 import type { Block, Wire, Position } from '../types';
+import { getDefaultCanvasSheetBounds } from '../utils/canvasSheetGuides';
 
 // ============================================================================
 // Types
@@ -51,6 +52,7 @@ interface Bounds {
 const MINIMAP_WIDTH = 180;
 const MINIMAP_HEIGHT = 120;
 const MINIMAP_PADDING = 10;
+const DEFAULT_CANVAS_SHEET = getDefaultCanvasSheetBounds();
 
 // Component colors for minimap
 const COMPONENT_COLORS: Record<string, string> = {
@@ -81,13 +83,20 @@ const COMPONENT_COLORS: Record<string, string> = {
  */
 function calculateBounds(components: Map<string, Block>): Bounds {
   if (components.size === 0) {
-    return { minX: 0, minY: 0, maxX: 500, maxY: 500, width: 500, height: 500 };
+    return {
+      minX: DEFAULT_CANVAS_SHEET.x,
+      minY: DEFAULT_CANVAS_SHEET.y,
+      maxX: DEFAULT_CANVAS_SHEET.x + DEFAULT_CANVAS_SHEET.width,
+      maxY: DEFAULT_CANVAS_SHEET.y + DEFAULT_CANVAS_SHEET.height,
+      width: DEFAULT_CANVAS_SHEET.width,
+      height: DEFAULT_CANVAS_SHEET.height,
+    };
   }
 
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
+  let minX = DEFAULT_CANVAS_SHEET.x;
+  let minY = DEFAULT_CANVAS_SHEET.y;
+  let maxX = DEFAULT_CANVAS_SHEET.x + DEFAULT_CANVAS_SHEET.width;
+  let maxY = DEFAULT_CANVAS_SHEET.y + DEFAULT_CANVAS_SHEET.height;
 
   for (const block of components.values()) {
     minX = Math.min(minX, block.position.x);

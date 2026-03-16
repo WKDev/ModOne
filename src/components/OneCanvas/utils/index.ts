@@ -43,3 +43,4 @@ export {
   type AlignmentResult,
 } from './alignmentTools';
 export * from './printSupport';
+export * from './canvasSheetGuides';

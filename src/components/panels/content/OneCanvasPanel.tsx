@@ -10,7 +10,6 @@
  */
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Layout } from 'lucide-react';
 import { useDocumentContext } from '../../../contexts/DocumentContext';
 
 import { PanelErrorBoundary } from '../../error/PanelErrorBoundary';
@@ -21,7 +20,6 @@ import {
 } from '../../OneCanvas';
 import { useSymbolStore } from '../../../stores/symbolStore';
 import { CanvasHost, type CanvasHostHandle } from '../../OneCanvas/CanvasHost';
-import { ViewTabs, type ViewType } from '../../OneCanvas/components/ViewTabs';
 
 
 import type { Block, Junction, Wire } from '../../OneCanvas/types';
@@ -106,7 +104,6 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
   const [debugMode, setDebugMode] = useState(false);
   const [wireContextMenu, setWireContextMenu] = useState<WireContextMenuState | null>(null);
   const [isWireMode, setIsWireMode] = useState(false);
-  const [activeView, setActiveView] = useState<ViewType>('model');
 
 
   useEffect(() => {
@@ -388,7 +385,7 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
               />
             </div>
 
-            {activeView === 'model' && schematicDoc && (
+            {schematicDoc && (
               <SchematicPageBar
                 pages={schematicDoc.schematic.pages}
                 activePageId={schematicDoc.schematic.activePageId}
@@ -404,35 +401,6 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
                 className="left-[186px]"
               />
             )}
-
-
-            {activeView === 'layout' && (
-              <div className="absolute inset-0 bg-neutral-900 flex flex-col items-center justify-center z-20">
-                <div className="p-8 border border-dashed border-neutral-700 rounded-xl bg-neutral-800/50 flex flex-col items-center gap-4 text-neutral-400">
-                  <div className="p-4 bg-neutral-700/30 rounded-full">
-                    <Layout size={48} className="text-blue-500/50" />
-                  </div>
-                  <div className="text-center">
-                    <h3 className="text-lg font-medium text-neutral-200">Layout View</h3>
-                    <p className="text-sm max-w-xs mt-1">
-                      The Layout view is currently under development. Here you will be able to perform physical component placement and PCB routing.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setActiveView('model')}
-                    className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md text-sm font-medium transition-colors"
-                  >
-                    Back to Model View
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="absolute bottom-0 left-0 z-40 h-9">
-              <ViewTabs activeView={activeView} onChangeView={setActiveView} />
-            </div>
-
 
           </div>
 

@@ -40,7 +40,7 @@ export const PrintDialog = memo(function PrintDialog({
   defaultProjectTitle = 'Project',
 }: PrintDialogProps) {
   // Page setup state
-  const [paperSize, setPaperSize] = useState<PaperSize>('A4');
+  const [paperSize, setPaperSize] = useState<PaperSize>('A3');
   const [orientation, setOrientation] = useState<PaperOrientation>('landscape');
   const [showGrid, setShowGrid] = useState(false);
   const [showWireLabels, setShowWireLabels] = useState(true);

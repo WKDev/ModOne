@@ -55,6 +55,7 @@ import { PortRenderer } from './renderers/PortRenderer';
 import { JunctionRenderer } from './renderers/JunctionRenderer';
 import { SelectionRenderer } from './renderers/SelectionRenderer';
 import { GhostPreviewRenderer } from './renderers/GhostPreviewRenderer';
+import { PageGuideRenderer } from './renderers/PageGuideRenderer';
 import { SimulationRenderer } from './renderers/SimulationRenderer';
 import { SimulationOverlay } from './renderers/SimulationOverlay';
 
@@ -66,6 +67,10 @@ import type { ShortcutCallbacks } from './interaction';
 import { SyncEngine, ViewportSync } from './sync';
 import { useDocumentRegistry } from '@stores/documentRegistry';
 import { isCanvasDocument, isSchematicDocument } from '@/types/document';
+import {
+  getDefaultCanvasSheetBounds,
+  getDefaultPdfOutputGuideBounds,
+} from './utils/canvasSheetGuides';
 // ============================================================================
 // Public API (imperative handle)
 // ============================================================================
@@ -199,6 +204,9 @@ const CONTAINER_STYLE: CSSProperties = {
   position: 'relative',
 };
 
+const DEFAULT_CANVAS_SHEET = getDefaultCanvasSheetBounds();
+const DEFAULT_PDF_OUTPUT_GUIDE = getDefaultPdfOutputGuideBounds();
+
 /**
  * CanvasHost mounts the Pixi.js application and all rendering subsystems.
  * It exposes an imperative handle for the parent to drive rendering.
@@ -233,6 +241,7 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
     const portRendererRef = useRef<PortRenderer | null>(null);
     const junctionRendererRef = useRef<JunctionRenderer | null>(null);
     const selectionRendererRef = useRef<SelectionRenderer | null>(null);
+    const pageGuideRendererRef = useRef<PageGuideRenderer | null>(null);
     const simulationRendererRef = useRef<SimulationRenderer | null>(null);
     const simulationOverlayRef = useRef<SimulationOverlay | null>(null);
     const ghostPreviewRef = useRef<GhostPreviewRenderer | null>(null);
@@ -331,6 +340,8 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
         const vpContainer = viewport.init({
           app: pixiApp.app,
           config: canvasConfig,
+          worldWidth: DEFAULT_CANVAS_SHEET.width,
+          worldHeight: DEFAULT_CANVAS_SHEET.height,
           onViewportChange: (state) => {
             onViewportChangeRef.current?.(state);
             // Re-render grid on viewport change
@@ -368,6 +379,14 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
           layer: layerMgr.getLayer('grid'),
           config: effectiveGridConfig,
         });
+
+        const pageGuideRenderer = new PageGuideRenderer();
+        pageGuideRenderer.init({
+          layer: layerMgr.getLayer('grid'),
+          canvasBounds: DEFAULT_CANVAS_SHEET,
+          pdfOutputBounds: DEFAULT_PDF_OUTPUT_GUIDE,
+        });
+        pageGuideRendererRef.current = pageGuideRenderer;
 
         blockRendererRef.current = new BlockRenderer({
           layer: layerMgr.getLayer('blocks'),
@@ -594,6 +613,7 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
         simulationOverlayRef.current?.destroy();
         ghostPreviewRef.current?.destroy();
         simulationRendererRef.current?.destroy();
+        pageGuideRendererRef.current?.destroy();
         viewportSyncRef.current?.destroy();
         syncEngineRef.current?.destroy();
         keyboardShortcutsRef.current?.destroy();
@@ -617,6 +637,7 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
         eventBridgeRef.current = null;
         controllerRef.current = null;
         selectionRendererRef.current = null;
+        pageGuideRendererRef.current = null;
         junctionRendererRef.current = null;
         portRendererRef.current = null;
         wireRendererRef.current = null;
