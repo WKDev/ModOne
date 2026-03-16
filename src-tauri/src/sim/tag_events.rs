@@ -84,14 +84,16 @@ pub struct TagEventBridge {
     tag_registry: SharedTagRegistry,
     watched_tags: Arc<RwLock<HashSet<String>>>,
     app_handle: Arc<RwLock<Option<AppHandle>>>,
+    bus: CanonicalMemoryBus,
 }
 
 impl TagEventBridge {
-    pub fn new(tag_registry: SharedTagRegistry) -> Self {
+    pub fn new(tag_registry: SharedTagRegistry, bus: CanonicalMemoryBus) -> Self {
         Self {
             tag_registry,
             watched_tags: Arc::new(RwLock::new(HashSet::new())),
             app_handle: Arc::new(RwLock::new(None)),
+            bus,
         }
     }
 
@@ -103,8 +105,8 @@ impl TagEventBridge {
         *self.watched_tags.write() = tags.into_iter().collect();
     }
 
-    pub fn start(&self, bus: &CanonicalMemoryBus) {
-        let rx = bus.subscribe();
+    pub fn start(&self) {
+        let rx = self.bus.subscribe();
         let tag_registry = Arc::clone(&self.tag_registry);
         let watched_tags = Arc::clone(&self.watched_tags);
         let app_handle = Arc::clone(&self.app_handle);

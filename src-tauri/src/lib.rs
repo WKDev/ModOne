@@ -302,12 +302,11 @@ pub fn run() {
         Arc::clone(&shared_tag_registry),
     );
 
-    // Initialize tag event bridge
+    // Initialize tag event bridge (start() is deferred to setup() where Tokio is available)
     let tag_event_bridge = crate::sim::tag_events::TagEventBridge::new(
         Arc::clone(&shared_tag_registry),
+        shared_runtime.handle().read().bus().clone(),
     );
-    // Start the bridge subscriber on the canonical memory bus
-    tag_event_bridge.start(shared_runtime.handle().read().bus());
     let tag_bridge_state = TagEventBridgeState {
         bridge: tag_event_bridge,
     };
@@ -357,11 +356,12 @@ pub fn run() {
         .setup(|app| {
             log::info!("ModOne application starting...");
 
-            // Wire tag event bridge with app handle
+            // Wire tag event bridge with app handle and start subscriber
             {
                 use tauri::Manager;
                 if let Some(tag_state) = app.try_state::<TagEventBridgeState>() {
                     tag_state.bridge.set_app_handle(app.handle().clone());
+                    tag_state.bridge.start();
                 }
             }
 
