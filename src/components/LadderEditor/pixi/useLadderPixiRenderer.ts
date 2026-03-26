@@ -182,11 +182,8 @@ export function useLadderPixiRenderer({
     const doc = ladderDocRef.current;
     if (!doc || readonlyRef.current) return;
     if (!activeToolRef.current) {
-      // Try element drag first; if no element hit, try drag-select
-      const claimed = dragHandlerRef.current?.onPointerDown(event, doc, doc.gridConfig);
-      if (!claimed) {
-        dragSelectHandlerRef.current?.onPointerDown(event, doc, doc.gridConfig);
-      }
+      // Drag-select takes priority (Excel-style: drag = range selection)
+      dragSelectHandlerRef.current?.onPointerDown(event, doc, doc.gridConfig);
     }
   }, []);
 

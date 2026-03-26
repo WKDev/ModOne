@@ -12,7 +12,6 @@ import type { LadderSyncEngine } from '../LadderSyncEngine';
 import type { UseLadderDocumentReturn } from '../../../../stores/hooks/useLadderDocument';
 import type { LadderGridConfig } from '../../../../types/ladder';
 import { useLadderUIStore } from '../../../../stores/ladderUIStore';
-import { resolveVerticalWireHitTarget } from '../verticalWireInteraction';
 
 const DRAG_ACTIVATION_DISTANCE = 8; // pixels before drag activates
 
@@ -34,29 +33,10 @@ export class LadderDragSelectHandler {
    */
   onPointerDown(
     event: LadderPointerEvent,
-    doc: UseLadderDocumentReturn,
-    config: LadderGridConfig,
+    _doc: UseLadderDocumentReturn,
+    _config: LadderGridConfig,
   ): boolean {
     if (event.button !== 0) return false;
-
-    // Check if there's an element or vertical wire at the click position
-    const verticalHit = resolveVerticalWireHitTarget(
-      event.worldX,
-      event.worldY,
-      event.gridCol,
-      event.gridRow,
-      config.cellWidth,
-      config.cellHeight,
-    );
-    const verticalLink = verticalHit.isEdgeClick
-      ? doc.getVerticalLinkAt(verticalHit.targetRow, verticalHit.targetCol)
-      : undefined;
-    const element = verticalLink
-      ? undefined
-      : doc.getElementAt(event.gridRow, event.gridCol);
-
-    // Only start drag-select on empty cells
-    if (element || verticalLink) return false;
 
     this.anchorWorldX = event.worldX;
     this.anchorWorldY = event.worldY;
