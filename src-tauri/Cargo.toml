@@ -71,9 +71,24 @@ directories = "5"
 # CSV parsing
 csv = "1.3"
 
+# XML generation (NodeSet2 export)
+quick-xml = "0.38"
+
 # UUID generation
 uuid = { version = "1", features = ["v4"] }
 
 # Certificate metadata parsing
 sha2 = "0.10"
 x509-parser = "0.16"
+
+# Password hashing for OPC UA user accounts
+bcrypt = "0.16"
+
+# SQLite for audit log and future HDA
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+# Licensing
+machine-uid = "0.5"
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+ed25519-dalek = "2"
+reqwest = { version = "0.12", features = ["json"] }

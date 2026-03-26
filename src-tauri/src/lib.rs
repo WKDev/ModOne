@@ -14,6 +14,7 @@ pub mod plc_runtime;
 pub mod project;
 pub mod scenario;
 pub mod sim;
+pub mod licensing;
 pub mod symbols;
 
 // Re-export error types for convenience
@@ -40,6 +41,11 @@ fn get_cli_project_path(state: tauri::State<'_, CliProjectPath>) -> Option<Strin
 use commands::window::close_all_floating_windows;
 use opcua::AuditLoggerState;
 use commands::{
+    // Licensing commands
+    activate_license,
+    checkout_license,
+    deactivate_license,
+    get_license_info,
     attempt_project_recovery,
     // Canvas commands
     canvas_circuit_exists,
@@ -143,6 +149,8 @@ use commands::{
     opcua_clear_audit_log,
     opcua_enforce_audit_retention,
     opcua_get_audit_log_count,
+    opcua_get_audit_retention_days,
+    opcua_set_audit_retention_days,
     // Tag commands
     check_canonical_address_duplicate,
     create_tag,
@@ -154,6 +162,14 @@ use commands::{
     write_tag,
     set_watched_tags,
     TagEventBridgeState,
+    // Tag import/export commands
+    import_tags_csv,
+    import_tags_json,
+    validate_csv_import,
+    validate_json_import,
+    export_tags_csv,
+    export_tags_json,
+    export_tags_nodeset2,
     open_logs_directory,
     open_project,
     // Parser commands
@@ -401,13 +417,13 @@ pub fn run() {
                     Ok(audit_logger) => {
                         let state = AuditLoggerState::new(audit_logger);
                         // Enforce retention on startup
-                        state.0.lock().as_ref().map(|l| {
-                            if let Err(e) = l.enforce_retention() {
-                                log::warn!("Audit log retention enforcement failed: {e}");
-                            }
-                        });
+                        if let Err(e) = state.enforce_retention() {
+                            log::warn!("Audit log retention enforcement failed: {e}");
+                        }
+                        // Start periodic retention scheduler (shares inner Arc with the task)
+                        state.start_retention_scheduler();
                         app.manage(state);
-                        log::info!("OPC UA audit logger initialized");
+                        log::info!("OPC UA audit logger initialized with retention scheduler");
                     }
                     Err(e) => {
                         log::error!("Failed to initialize OPC UA audit logger: {e}");
@@ -481,6 +497,17 @@ pub fn run() {
                         log::info!("Main window closing - cleaning up floating windows");
                         if let Some(state) = window.try_state::<FloatingWindowState>() {
                             close_all_floating_windows(window.app_handle(), &state);
+                        }
+                        // Gracefully stop OPC UA server on app shutdown, recording
+                        // the reason in the audit log.
+                        if let Some(opcua_state) = window.try_state::<OpcUaState>() {
+                            let audit_state = window.try_state::<AuditLoggerState>();
+                            if let Some(server) = opcua_state.server.lock().take() {
+                                let _ = server.stop_with_reason(
+                                    audit_state.as_deref(),
+                                    "app_shutdown",
+                                );
+                            }
                         }
                         // Clean up IP aliases synchronously — we cannot rely on
                         // tokio::spawn completing before the process exits.
@@ -733,6 +760,7 @@ pub fn run() {
             opcua_set_anonymous_access,
             opcua_start_server,
             opcua_stop_server,
+            opcua_restart_server,
             opcua_list_user_accounts,
             opcua_add_user_account,
             opcua_update_user_account,
@@ -742,6 +770,8 @@ pub fn run() {
             opcua_clear_audit_log,
             opcua_enforce_audit_retention,
             opcua_get_audit_log_count,
+            opcua_get_audit_retention_days,
+            opcua_set_audit_retention_days,
             // Tag commands
             check_canonical_address_duplicate,
             create_tag,
@@ -752,6 +782,19 @@ pub fn run() {
             update_tag_definition,
             write_tag,
             set_watched_tags,
+            // Tag import/export commands
+            import_tags_csv,
+            import_tags_json,
+            validate_csv_import,
+            validate_json_import,
+            export_tags_csv,
+            export_tags_json,
+            export_tags_nodeset2,
+            // Licensing commands
+            activate_license,
+            checkout_license,
+            deactivate_license,
+            get_license_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

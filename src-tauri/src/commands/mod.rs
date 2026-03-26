@@ -7,6 +7,7 @@ pub mod canvas;
 pub mod canvas_sync;
 pub mod explorer;
 pub mod layout;
+pub mod licensing;
 pub mod logging;
 pub mod menu;
 pub mod modbus;
@@ -20,6 +21,8 @@ pub mod scope_sim;
 pub mod settings;
 pub mod sim;
 pub mod symbols;
+pub mod nodeset2_export;
+pub mod tag_import_export;
 pub mod tags;
 pub mod window;
 
@@ -49,6 +52,9 @@ pub use project::{
     update_project_config,
     validate_project_integrity,
 };
+
+// Re-export licensing commands
+pub use licensing::{activate_license, checkout_license, deactivate_license, get_license_info};
 
 // Re-export settings commands
 pub use settings::{get_app_settings, save_app_settings};
@@ -177,15 +183,20 @@ pub use symbols::{symbol_delete, symbol_list, symbol_list_all, symbol_load, symb
 // Re-export OPC UA commands and state
 pub use opcua::{
     opcua_add_user_account, opcua_clear_audit_log, opcua_enforce_audit_retention,
-    opcua_get_anonymous_access, opcua_get_audit_log_count, opcua_get_security_policies,
+    opcua_get_anonymous_access, opcua_get_audit_log_count, opcua_get_audit_retention_days,
+    opcua_get_security_policies,
     opcua_get_sessions, opcua_get_status, opcua_list_user_accounts, opcua_query_audit_log,
-    opcua_remove_user_account, opcua_set_anonymous_access, opcua_set_security_policies,
+    opcua_remove_user_account, opcua_set_anonymous_access, opcua_set_audit_retention_days,
+    opcua_set_security_policies,
     opcua_restart_server, opcua_start_server, opcua_stop_server, opcua_update_user_account, CredentialCacheState,
     OpcUaState, UserAccountStoreState,
 };
 
 // Re-export tag commands and state
 pub use tags::{check_canonical_address_duplicate, create_tag, delete_tag, delete_tags, list_tags, read_tags, set_watched_tags, update_tag_definition, write_tag, TagEventBridgeState};
+
+// Re-export tag import/export commands
+pub use tag_import_export::{export_tags_csv, export_tags_json, export_tags_nodeset2, import_tags_csv, import_tags_json, validate_csv_import, validate_json_import};
 
 // Re-export network commands
 pub use network::{

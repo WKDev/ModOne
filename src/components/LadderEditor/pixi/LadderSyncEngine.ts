@@ -162,6 +162,11 @@ export class LadderSyncEngine {
     return this.layers.overlayLayer;
   }
 
+  /** Public access to selection renderer for rubber-band drag-select */
+  get selection(): LadderSelectionRenderer {
+    return this.selectionRenderer;
+  }
+
   getElementContainers(): Map<string, Container> {
     return this.elementContainers;
   }

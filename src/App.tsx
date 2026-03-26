@@ -14,6 +14,8 @@ import { FloatingWindowRenderer } from './components/floating/FloatingWindowRend
 import { CommandPalette, useCommandPalette, registerAllCommands, registerLadderCommands } from './components/CommandPalette';
 import { ProjectDialogProvider } from './contexts/ProjectDialogContext';
 import { UnsavedChangesDialog } from './components/project/UnsavedChangesDialog';
+import { LicenseManagerDialog } from './components/dialogs/LicenseManagerDialog';
+import { useLicenseStore } from './stores/licenseStore';
 import { Toaster, toast } from 'sonner';
 import { useMacosNativeMenu } from "./hooks/useMacosNativeMenu";
 import { useStartupProject } from "./hooks/useStartupProject";
@@ -109,6 +111,8 @@ function MainWindowContent() {
     const initApp = async () => {
       await initialize();
       setIsInitialized(true);
+      // Fetch license info after initialization
+      useLicenseStore.getState().fetchLicenseInfo();
     };
     initApp();
   }, [initialize]);
@@ -148,6 +152,7 @@ function MainWindowContent() {
         onDontSave={handleWindowCloseDontSave}
         onCancel={handleWindowCloseCancel}
       />
+      <LicenseManagerDialog />
     </ProjectDialogProvider>
   );
 }

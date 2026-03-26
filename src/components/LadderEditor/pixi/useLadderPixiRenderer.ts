@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import type { LadderPixiCanvasHostRef } from './LadderPixiCanvasHost';
 import { LadderSyncEngine } from './LadderSyncEngine';
 import { LadderDragHandler } from './interactions/LadderDragHandler';
+import { LadderDragSelectHandler } from './interactions/LadderDragSelectHandler';
 import type { LadderPointerEvent } from './LadderEventBridge';
 import type { UseLadderDocumentReturn } from '../../../stores/hooks/useLadderDocument';
 import { useLadderUIStore } from '../../../stores/ladderUIStore';
@@ -26,6 +27,7 @@ export function useLadderPixiRenderer({
 }: UseLadderPixiRendererOptions): void {
   const syncEngineRef = useRef<LadderSyncEngine | null>(null);
   const dragHandlerRef = useRef<LadderDragHandler | null>(null);
+  const dragSelectHandlerRef = useRef<LadderDragSelectHandler | null>(null);
 
   const { selectedElementIds, activeTool, monitoringState, mode, cursorCell } = useLadderUIStore(
     useShallow((state) => ({
@@ -58,10 +60,14 @@ export function useLadderPixiRenderer({
 
     const engine = new LadderSyncEngine(hostRef.layers);
     const dragHandler = new LadderDragHandler(engine, engine.overlayLayer);
+    const dragSelectHandler = new LadderDragSelectHandler(engine);
     syncEngineRef.current = engine;
     dragHandlerRef.current = dragHandler;
+    dragSelectHandlerRef.current = dragSelectHandler;
 
     return () => {
+      dragSelectHandler.destroy();
+      dragSelectHandlerRef.current = null;
       dragHandler.destroy();
       dragHandlerRef.current = null;
       engine.destroy();
@@ -176,13 +182,22 @@ export function useLadderPixiRenderer({
     const doc = ladderDocRef.current;
     if (!doc || readonlyRef.current) return;
     if (!activeToolRef.current) {
-      dragHandlerRef.current?.onPointerDown(event, doc, doc.gridConfig);
+      // Try element drag first; if no element hit, try drag-select
+      const claimed = dragHandlerRef.current?.onPointerDown(event, doc, doc.gridConfig);
+      if (!claimed) {
+        dragSelectHandlerRef.current?.onPointerDown(event, doc, doc.gridConfig);
+      }
     }
   }, []);
 
   const handlePointerMove = useCallback((event: LadderPointerEvent) => {
     const doc = ladderDocRef.current;
     if (!doc || readonlyRef.current) return;
+
+    // Drag-select takes priority when active
+    if (dragSelectHandlerRef.current?.onPointerMove(event, doc, doc.gridConfig)) {
+      return;
+    }
 
     dragHandlerRef.current?.onPointerMove(event, doc, doc.gridConfig);
 
@@ -215,6 +230,10 @@ export function useLadderPixiRenderer({
   const handlePointerUp = useCallback((event: LadderPointerEvent) => {
     const doc = ladderDocRef.current;
     if (!doc || readonlyRef.current) return;
+    if (dragSelectHandlerRef.current?.isActive) {
+      dragSelectHandlerRef.current.onPointerUp();
+      return;
+    }
     if (dragHandlerRef.current?.isActive) {
       dragHandlerRef.current.onPointerUp(event, doc, doc.gridConfig);
       return;
@@ -226,6 +245,7 @@ export function useLadderPixiRenderer({
     const doc = ladderDocRef.current;
     if (!doc || readonlyRef.current) return;
     if (dragHandlerRef.current?.isActive) return;
+    if (dragSelectHandlerRef.current?.isActive) return;
 
     const uiStore = useLadderUIStore.getState();
     const tool = activeToolRef.current;
