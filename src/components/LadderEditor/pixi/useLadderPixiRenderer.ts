@@ -230,8 +230,8 @@ export function useLadderPixiRenderer({
   const handlePointerUp = useCallback((event: LadderPointerEvent) => {
     const doc = ladderDocRef.current;
     if (!doc || readonlyRef.current) return;
-    if (dragSelectHandlerRef.current?.isActive) {
-      dragSelectHandlerRef.current.onPointerUp();
+    // Always let drag-select handler clean up (pending or active)
+    if (dragSelectHandlerRef.current?.onPointerUp()) {
       return;
     }
     if (dragHandlerRef.current?.isActive) {

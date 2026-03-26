@@ -144,7 +144,12 @@ export class LadderDragSelectHandler {
    * Handle pointer up — commit selection, hide rubber band.
    */
   onPointerUp(): boolean {
+    if (!this.isPending && !this.isDragActive) {
+      return false;
+    }
+
     if (!this.isDragActive) {
+      // Click without drag — just clean up pending state
       this.cleanup();
       return false;
     }
