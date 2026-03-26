@@ -124,6 +124,9 @@ export class LadderEventBridge {
       return;
     }
 
+    // Prevent browser native drag so pointermove keeps firing during drag
+    event.preventDefault();
+
     const worldPos = this.viewport.toWorld(event.global.x, event.global.y);
     const gridPos = this.worldToGrid(worldPos.x, worldPos.y);
 
