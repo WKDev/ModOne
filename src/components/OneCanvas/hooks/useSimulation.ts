@@ -5,7 +5,7 @@
  * using requestAnimationFrame for smooth updates.
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Block, Wire, Junction } from '../types';
 import {
   simulateCircuit,
@@ -103,12 +103,6 @@ export function useSimulation(
     syncWithModbus = true,
   } = options;
 
-  // Stabilize simulationOptions reference to prevent infinite re-render loop
-  const simulationOptions = useMemo(() => {
-    const { updateRate: _, syncWithModbus: __, autoStart: _a, ...rest } = options;
-    return rest;
-  }, [options]);
-
   // Global State
   const simulationStatus = useLayoutStore((state) => state.simulationStatus);
   const resetCounter = useLayoutStore((state) => state.resetCounter);
@@ -117,10 +111,6 @@ export function useSimulation(
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [runtimeState, setRuntimeState] = useState<RuntimeState>(createEmptyRuntimeState);
   const [measuredRate, setMeasuredRate] = useState(0);
-
-  // Use ref for runtimeState to avoid destabilizing runSimulation on every state change
-  const runtimeStateRef = useRef(runtimeState);
-  runtimeStateRef.current = runtimeState;
 
   // Sync with global reset
   useEffect(() => {
@@ -150,28 +140,57 @@ export function useSimulation(
     }
   }, [coilCache, syncWithModbus]);
 
-  // Run simulation step — uses ref for runtimeState to keep stable reference
-  const runSimulation = useCallback(() => {
+  // Use refs for all simulation inputs so the animation loop never needs to restart
+  const componentsRef = useRef(components);
+  componentsRef.current = components;
+  const wiresRef = useRef(wires);
+  wiresRef.current = wires;
+  const junctionsRef = useRef(junctions);
+  junctionsRef.current = junctions;
+  const runtimeStateRef = useRef(runtimeState);
+  runtimeStateRef.current = runtimeState;
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+
+  // Stable simulation step function — never changes reference
+  const runSimulationRef = useRef(() => {
+    const { updateRate: _, syncWithModbus: __, autoStart: _a, ...simOpts } = optionsRef.current;
     const newResult = simulateCircuit(
-      components,
-      wires,
-      junctions,
+      componentsRef.current,
+      wiresRef.current,
+      junctionsRef.current,
       runtimeStateRef.current,
-      simulationOptions
+      simOpts
     );
     setResult(newResult);
-  }, [components, wires, junctions, simulationOptions]);
+  });
+  runSimulationRef.current = () => {
+    const { updateRate: _, syncWithModbus: __, autoStart: _a, ...simOpts } = optionsRef.current;
+    const newResult = simulateCircuit(
+      componentsRef.current,
+      wiresRef.current,
+      junctionsRef.current,
+      runtimeStateRef.current,
+      simOpts
+    );
+    setResult(newResult);
+  };
 
-  // Animation loop
+  const runSimulation = useCallback(() => {
+    runSimulationRef.current();
+  }, []);
+
+  // Animation loop — stable deps, never restarts unnecessarily
   useEffect(() => {
     if (!running) {
       return;
     }
 
+    const interval = updateInterval;
+
     const tick = (timestamp: number) => {
-      // Check if enough time has passed
-      if (timestamp - lastUpdateRef.current >= updateInterval) {
-        runSimulation();
+      if (timestamp - lastUpdateRef.current >= interval) {
+        runSimulationRef.current();
         lastUpdateRef.current = timestamp;
         frameCountRef.current++;
 
@@ -199,7 +218,7 @@ export function useSimulation(
         frameIdRef.current = null;
       }
     };
-  }, [running, runSimulation, updateInterval]);
+  }, [running, updateInterval]);
 
   // Control functions
   const start = useCallback(() => {
