@@ -39,10 +39,16 @@ pub struct SimulationRuntimeHost {
 }
 
 impl SimulationRuntimeHost {
-    pub fn with_runtime(runtime: Arc<CanonicalRuntimeFacade>, tag_registry: SharedTagRegistry) -> Self {
+    pub fn with_runtime(
+        runtime: Arc<CanonicalRuntimeFacade>,
+        tag_registry: SharedTagRegistry,
+    ) -> Self {
         Self {
             engine: Arc::new(Mutex::new(None)),
-            debugger: Arc::new(SimDebugger::with_tag_registry(100, Arc::clone(&tag_registry))),
+            debugger: Arc::new(SimDebugger::with_tag_registry(
+                100,
+                Arc::clone(&tag_registry),
+            )),
             runtime,
             modbus_memory: None,
             program: Arc::new(Mutex::new(None)),
@@ -139,10 +145,14 @@ impl SimulationRuntimeHost {
         self.attach_modbus(project_config.as_ref(), &plc_settings)?;
         self.spawn_event_forwarder(app.clone(), Arc::clone(&engine));
 
-        let program = self.program.lock().clone().unwrap_or_else(|| CompiledProgram {
-            name: "Default Program".to_string(),
-            networks: vec![],
-        });
+        let program = self
+            .program
+            .lock()
+            .clone()
+            .unwrap_or_else(|| CompiledProgram {
+                name: "Default Program".to_string(),
+                networks: vec![],
+            });
         engine.start(program).map_err(|e| e.to_string())?;
 
         drop(engine_guard);
@@ -239,13 +249,17 @@ impl SimulationRuntimeHost {
     }
 
     pub fn scan_info(&self) -> ScanCycleInfo {
-        self.engine.lock().as_ref().map(|engine| engine.get_scan_info()).unwrap_or(ScanCycleInfo {
-            cycle_count: 0,
-            last_scan_time: 0,
-            average_scan_time: 0,
-            max_scan_time: 0,
-            timestamp: 0,
-        })
+        self.engine
+            .lock()
+            .as_ref()
+            .map(|engine| engine.get_scan_info())
+            .unwrap_or(ScanCycleInfo {
+                cycle_count: 0,
+                last_scan_time: 0,
+                average_scan_time: 0,
+                max_scan_time: 0,
+                timestamp: 0,
+            })
     }
 
     fn attach_modbus(
@@ -259,8 +273,11 @@ impl SimulationRuntimeHost {
         };
 
         let policy = if let Some(project_config) = project_config {
-            resolve_modbus_mapping_policy(&project_config.plc, Some(&project_config.modbus.exposure))
-                .map_err(|e| e.to_string())?
+            resolve_modbus_mapping_policy(
+                &project_config.plc,
+                Some(&project_config.modbus.exposure),
+            )
+            .map_err(|e| e.to_string())?
         } else {
             resolve_modbus_mapping_policy(plc_settings, None).map_err(|e| e.to_string())?
         };
@@ -302,8 +319,10 @@ impl SimulationRuntimeHost {
                                 }),
                             );
                         }
-                        if let Some(sync) = canvas_sync.read().as_ref() {
-                            let _ = sync.update_plc_outputs();
+                        if event.scan_count % 5 == 0 {
+                            if let Some(sync) = canvas_sync.read().as_ref() {
+                                let _ = sync.update_plc_outputs();
+                            }
                         }
                         protocol_runtime.flush_now();
                         if event.scan_count % 10 == 0 {

@@ -5,7 +5,7 @@
  * using requestAnimationFrame for smooth updates.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { Block, Wire, Junction } from '../types';
 import {
   simulateCircuit,
@@ -101,9 +101,13 @@ export function useSimulation(
   const {
     updateRate = DEFAULT_UPDATE_RATE,
     syncWithModbus = true,
-    autoStart = false,
-    ...simulationOptions
   } = options;
+
+  // Stabilize simulationOptions reference to prevent infinite re-render loop
+  const simulationOptions = useMemo(() => {
+    const { updateRate: _, syncWithModbus: __, autoStart: _a, ...rest } = options;
+    return rest;
+  }, [options]);
 
   // Global State
   const simulationStatus = useLayoutStore((state) => state.simulationStatus);
@@ -113,6 +117,10 @@ export function useSimulation(
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [runtimeState, setRuntimeState] = useState<RuntimeState>(createEmptyRuntimeState);
   const [measuredRate, setMeasuredRate] = useState(0);
+
+  // Use ref for runtimeState to avoid destabilizing runSimulation on every state change
+  const runtimeStateRef = useRef(runtimeState);
+  runtimeStateRef.current = runtimeState;
 
   // Sync with global reset
   useEffect(() => {
@@ -142,17 +150,17 @@ export function useSimulation(
     }
   }, [coilCache, syncWithModbus]);
 
-  // Run simulation step
+  // Run simulation step — uses ref for runtimeState to keep stable reference
   const runSimulation = useCallback(() => {
     const newResult = simulateCircuit(
       components,
       wires,
       junctions,
-      runtimeState,
+      runtimeStateRef.current,
       simulationOptions
     );
     setResult(newResult);
-  }, [components, wires, junctions, runtimeState, simulationOptions]);
+  }, [components, wires, junctions, simulationOptions]);
 
   // Animation loop
   useEffect(() => {

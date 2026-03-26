@@ -1,23 +1,26 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 use parking_lot::{Mutex, RwLock};
 use tauri::{AppHandle, Emitter};
 
-use crate::plc_runtime::{CanonicalAddress, CanonicalMemoryEvent, CanonicalValue, CanonicalWriteSource};
+use crate::plc_runtime::{
+    CanonicalAddress, CanonicalMemoryEvent, CanonicalValue, CanonicalWriteSource,
+};
 
+use super::counter::CounterManager;
 use super::debugger::SimDebugger;
 use super::memory::CanonicalRuntimeFacade;
 use super::tag_registry::SharedTagRegistry;
 use super::timer::TimerManager;
-use super::counter::CounterManager;
 use super::types::{ForcedDeviceValue, RuntimeBinding};
 
 const MONITORING_EVENT_NAME: &str = "ladder:monitoring-update";
 const MONITORING_ERROR_EVENT: &str = "ladder:monitoring-error";
-const MONITORING_COALESCE_WINDOW: Duration = Duration::from_millis(5);
+const MONITORING_COALESCE_WINDOW: Duration = Duration::from_millis(100);
+const MAX_TRACKED_VALUES: usize = 1024;
 
 pub struct MonitoringService {
     active: Arc<AtomicBool>,
@@ -188,7 +191,9 @@ impl MonitoringService {
     }
 
     pub fn register_binding(&self, binding: RuntimeBinding, display_address: String) {
-        self.tracked_bindings.write().insert(binding, display_address);
+        self.tracked_bindings
+            .write()
+            .insert(binding, display_address);
         self.refresh_requested.store(true, Ordering::SeqCst);
     }
 
@@ -204,11 +209,19 @@ fn track_event(
 ) {
     match event {
         CanonicalMemoryEvent::Single(change) => {
-            tracked_values.insert(change.address, change.new_value);
+            if tracked_values.len() < MAX_TRACKED_VALUES
+                || tracked_values.contains_key(&change.address)
+            {
+                tracked_values.insert(change.address, change.new_value);
+            }
         }
         CanonicalMemoryEvent::Batch(batch) => {
             for change in batch.changes {
-                tracked_values.insert(change.address, change.new_value);
+                if tracked_values.len() < MAX_TRACKED_VALUES
+                    || tracked_values.contains_key(&change.address)
+                {
+                    tracked_values.insert(change.address, change.new_value);
+                }
             }
         }
     }
@@ -242,7 +255,10 @@ fn emit_snapshot(
         let Ok(address) = tag_registry.resolve_binding(binding) else {
             continue;
         };
-        if devices.iter().any(|entry| entry["binding"] == serde_json::to_value(binding).unwrap_or_default()) {
+        if devices
+            .iter()
+            .any(|entry| entry["binding"] == serde_json::to_value(binding).unwrap_or_default())
+        {
             continue;
         }
         let value = runtime.read(address).map_err(|e| e.to_string())?;
@@ -255,7 +271,10 @@ fn emit_snapshot(
 
     for (address, value) in tracked_values {
         let binding = RuntimeBinding::canonical(*address);
-        if devices.iter().any(|entry| entry["binding"] == serde_json::to_value(&binding).unwrap_or_default()) {
+        if devices
+            .iter()
+            .any(|entry| entry["binding"] == serde_json::to_value(&binding).unwrap_or_default())
+        {
             continue;
         }
         devices.push(serde_json::json!({
