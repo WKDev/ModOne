@@ -12,34 +12,7 @@ import { usePanelStore } from '../../stores/panelStore';
 import { windowService } from '../../services/windowService';
 import { FloatingWindowHeader } from './FloatingWindowHeader';
 import { TabContent } from '../panels/TabContent';
-
-// Panel content components
-import { LadderEditorPanel } from '../panels/content/LadderEditorPanel';
-import { MemoryVisualizerPanel } from '../panels/content/MemoryVisualizerPanel';
-import { OneCanvasPanel } from '../panels/content/OneCanvasPanel';
-import { ScenarioEditorPanel } from '../panels/content/ScenarioEditorPanel';
-import { ConsolePanel } from '../panels/content/ConsolePanel';
-import { PropertiesPanel } from '../panels/content/PropertiesPanel';
-import { CsvViewerPanel } from '../panels/content/CsvViewerPanel';
-import { SettingsPanel } from '../panels/content/SettingsPanel';
-import { SymbolEditorPanel } from '../panels/content/SymbolEditorPanel';
-import { WelcomePanel } from '../panels/content/WelcomePanel';
-import { ProjectSettingsPanel } from '../panels/content/ProjectSettingsPanel';
-import type { PanelType } from '../../types/panel';
-
-const panelContentMap: Record<PanelType, React.ComponentType> = {
-  'ladder-editor': LadderEditorPanel,
-  'memory-visualizer': MemoryVisualizerPanel,
-  'one-canvas': OneCanvasPanel,
-  'scenario-editor': ScenarioEditorPanel,
-  'console': ConsolePanel,
-  'properties': PropertiesPanel,
-  'csv-viewer': CsvViewerPanel,
-  'settings': SettingsPanel,
-  'symbol-editor': SymbolEditorPanel,
-  'welcome': WelcomePanel,
-  'project-settings': ProjectSettingsPanel,
-};
+import { getComponent } from '../../registries/panelRegistry';
 
 interface FloatingWindowContentProps {
   /** ID of the Tauri window */
@@ -139,7 +112,7 @@ export function FloatingWindowContent({
     );
   }
 
-  const ContentComponent = panelContentMap[panel.type];
+  const ContentComponent = getComponent(panel.type);
   const hasTabs = panel.tabs && panel.tabs.length > 0;
 
   return (

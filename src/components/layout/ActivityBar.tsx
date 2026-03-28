@@ -1,5 +1,6 @@
-import { FolderTree, Search, Server, Radio } from 'lucide-react';
+import { FolderTree, Search, Server, Radio, Tags } from 'lucide-react';
 import { useSidebarStore, SidebarPanel } from '../../stores/sidebarStore';
+import { useEditorAreaStore } from '../../stores/editorAreaStore';
 
 interface ActivityBarItemProps {
   icon: React.ReactNode;
@@ -29,6 +30,13 @@ function ActivityBarItem({ icon, panel, tooltip, isActive, onClick }: ActivityBa
   );
 }
 
+const ACTIVITY_BAR_ITEMS: { panel: SidebarPanel; icon: React.ReactNode; tooltip: string }[] = [
+  { panel: 'explorer', icon: <FolderTree size={24} />, tooltip: 'Explorer' },
+  { panel: 'search', icon: <Search size={24} />, tooltip: 'Search' },
+  { panel: 'modbus', icon: <Server size={24} />, tooltip: 'Modbus' },
+  { panel: 'opcua', icon: <Radio size={24} />, tooltip: 'OPC UA' },
+];
+
 export function ActivityBar() {
   const { activePanel, setActivePanel, toggleVisibility, isVisible } = useSidebarStore();
 
@@ -43,16 +51,13 @@ export function ActivityBar() {
     }
   };
 
-  const items: { panel: SidebarPanel; icon: React.ReactNode; tooltip: string }[] = [
-    { panel: 'explorer', icon: <FolderTree size={24} />, tooltip: 'Explorer' },
-    { panel: 'search', icon: <Search size={24} />, tooltip: 'Search' },
-    { panel: 'modbus', icon: <Server size={24} />, tooltip: 'Modbus' },
-    { panel: 'opcua', icon: <Radio size={24} />, tooltip: 'OPC UA' },
-  ];
+  const handleOpenTagBrowser = () => {
+    useEditorAreaStore.getState().openTagBrowserTab();
+  };
 
   return (
     <div data-testid="activity-bar" className="w-12 bg-[var(--color-bg-primary)] border-r border-[var(--color-border)] flex flex-col">
-      {items.map((item) => (
+      {ACTIVITY_BAR_ITEMS.map((item) => (
         <ActivityBarItem
           key={item.panel}
           panel={item.panel}
@@ -62,6 +67,19 @@ export function ActivityBar() {
           onClick={() => handleItemClick(item.panel)}
         />
       ))}
+
+      {/* Separator */}
+      <div className="mx-3 my-1 border-t border-[var(--color-border)]" />
+
+      {/* Tag Browser - opens as singleton editor tab */}
+      <button
+        data-testid="activity-tag-browser"
+        className="w-12 h-12 flex items-center justify-center relative text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
+        onClick={handleOpenTagBrowser}
+        title="Tag Browser"
+      >
+        <Tags size={24} />
+      </button>
     </div>
   );
 }

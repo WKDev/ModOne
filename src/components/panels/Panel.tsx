@@ -1,37 +1,13 @@
 import { useState, useCallback } from 'react';
 import { ExternalLink, Minus, Square, X } from 'lucide-react';
-import { PanelProps, PanelType } from '../../types/panel';
+import { PanelProps } from '../../types/panel';
 import { TabState } from '../../types/tab';
 import { usePanelStore } from '../../stores/panelStore';
 import { DEFAULT_FLOATING_WINDOW_SIZE } from '../../types/window';
-import { LadderEditorPanel } from './content/LadderEditorPanel';
-import { MemoryVisualizerPanel } from './content/MemoryVisualizerPanel';
-import { OneCanvasPanel } from './content/OneCanvasPanel';
-import { ScenarioEditorPanel } from './content/ScenarioEditorPanel';
-import { ConsolePanel } from './content/ConsolePanel';
-import { PropertiesPanel } from './content/PropertiesPanel';
-import { CsvViewerPanel } from './content/CsvViewerPanel';
-import { SettingsPanel } from './content/SettingsPanel';
-import { SymbolEditorPanel } from './content/SymbolEditorPanel';
-import { WelcomePanel } from './content/WelcomePanel';
-import { ProjectSettingsPanel } from './content/ProjectSettingsPanel';
+import { getComponent } from '../../registries/panelRegistry';
 import { TabBar } from './TabBar';
 import { TabContent } from './TabContent';
 import { TabContextMenu } from './TabContextMenu';
-
-const panelContentMap: Record<PanelType, React.ComponentType> = {
-  'ladder-editor': LadderEditorPanel,
-  'memory-visualizer': MemoryVisualizerPanel,
-  'one-canvas': OneCanvasPanel,
-  'scenario-editor': ScenarioEditorPanel,
-  'console': ConsolePanel,
-  'properties': PropertiesPanel,
-  'csv-viewer': CsvViewerPanel,
-  'settings': SettingsPanel,
-  'symbol-editor': SymbolEditorPanel,
-  'welcome': WelcomePanel,
-  'project-settings': ProjectSettingsPanel,
-};
 
 export interface ExtendedPanelProps extends PanelProps {
   tabs?: TabState[];
@@ -65,7 +41,7 @@ export function Panel({
   const undockPanel = usePanelStore((state) => state.undockPanel);
 
   const hasTabs = tabs && tabs.length > 0;
-  const ContentComponent = panelContentMap[type];
+  const ContentComponent = getComponent(type);
 
   const handleUndock = useCallback(async () => {
     // Calculate position relative to screen

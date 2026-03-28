@@ -1,43 +1,7 @@
 import { memo } from 'react';
-import { PanelType } from '../../types/panel';
 import { TabState } from '../../types/tab';
-import { DocumentType } from '../../types/document';
 import { DocumentProvider } from '../../contexts/DocumentContext';
-import { LadderEditorPanel } from './content/LadderEditorPanel';
-import { MemoryVisualizerPanel } from './content/MemoryVisualizerPanel';
-import { OneCanvasPanel } from './content/OneCanvasPanel';
-import { ScenarioEditorPanel } from './content/ScenarioEditorPanel';
-import { ConsolePanel } from './content/ConsolePanel';
-import { PropertiesPanel } from './content/PropertiesPanel';
-import { CsvViewerPanel } from './content/CsvViewerPanel';
-import { SettingsPanel } from './content/SettingsPanel';
-import { SymbolEditorPanel } from './content/SymbolEditorPanel';
-import { WelcomePanel } from './content/WelcomePanel';
-import { ProjectSettingsPanel } from './content/ProjectSettingsPanel';
-
-const panelContentMap: Record<PanelType, React.ComponentType<{ data?: unknown }>> = {
-  'ladder-editor': LadderEditorPanel,
-  'memory-visualizer': MemoryVisualizerPanel,
-  'one-canvas': OneCanvasPanel,
-  'scenario-editor': ScenarioEditorPanel,
-  'console': ConsolePanel,
-  'properties': PropertiesPanel,
-  'csv-viewer': CsvViewerPanel,
-  'settings': SettingsPanel,
-  'symbol-editor': SymbolEditorPanel,
-  'welcome': WelcomePanel,
-  'project-settings': ProjectSettingsPanel,
-};
-
-/**
- * Mapping from panel type to document type.
- * Only panels that support document-based editing have mappings.
- */
-const panelTypeToDocumentType: Partial<Record<PanelType, DocumentType>> = {
-  'one-canvas': 'canvas',
-  'ladder-editor': 'ladder',
-  'scenario-editor': 'scenario',
-};
+import { getComponent, getDocumentType } from '../../registries/panelRegistry';
 
 export interface TabContentProps {
   tabs: TabState[];
@@ -63,7 +27,7 @@ export const TabContent = memo(function TabContent({ tabs, activeTabId }: TabCon
     );
   }
 
-  const ContentComponent = panelContentMap[activeTab.panelType];
+  const ContentComponent = getComponent(activeTab.panelType);
 
   if (!ContentComponent) {
     return (
@@ -75,7 +39,7 @@ export const TabContent = memo(function TabContent({ tabs, activeTabId }: TabCon
 
   // Check if this tab has a document associated with it
   const documentId = activeTab.data?.documentId as string | undefined;
-  const documentType = panelTypeToDocumentType[activeTab.panelType];
+  const documentType = getDocumentType(activeTab.panelType);
 
   // Wrap with DocumentProvider if we have a document
   if (documentId && documentType) {

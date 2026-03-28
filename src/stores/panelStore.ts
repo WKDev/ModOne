@@ -3,6 +3,7 @@ import { devtools } from 'zustand/middleware';
 import { PanelState, PanelType, GridConfig, PANEL_TYPE_LABELS } from '../types/panel';
 import { TabState, TabData } from '../types/tab';
 import { DropPosition } from '../types/dnd';
+import { getNextActiveTabId } from '../utils/tabUtils';
 import { Bounds, DEFAULT_FLOATING_WINDOW_SIZE } from '../types/window';
 import {
   splitGrid,
@@ -41,8 +42,6 @@ interface PanelStoreActions {
   duplicateTab: (panelId: string, tabId: string) => string | null;
   moveTabToNewPanel: (panelId: string, tabId: string) => string | null;
   moveTabBetweenPanels: (sourcePanelId: string, tabId: string, targetPanelId: string, insertIndex?: number) => boolean;
-  // Settings tab action
-  openSettingsTab: () => void;
   // Panel drag-and-drop actions
   splitPanel: (
     targetPanelId: string,
@@ -240,22 +239,10 @@ export const usePanelStore = create<PanelStore>()(
               const tabIndex = tabs.findIndex((t) => t.id === tabId);
               const newTabs = tabs.filter((t) => t.id !== tabId);
 
-              // Determine new active tab
-              let newActiveTabId = p.activeTabId;
-              if (p.activeTabId === tabId) {
-                if (newTabs.length === 0) {
-                  newActiveTabId = null;
-                } else if (tabIndex >= newTabs.length) {
-                  newActiveTabId = newTabs[newTabs.length - 1].id;
-                } else {
-                  newActiveTabId = newTabs[tabIndex].id;
-                }
-              }
-
               return {
                 ...p,
                 tabs: newTabs,
-                activeTabId: newActiveTabId,
+                activeTabId: getNextActiveTabId(newTabs, tabIndex, p.activeTabId, tabId),
               };
             }),
           }),
@@ -797,6 +784,7 @@ export const usePanelStore = create<PanelStore>()(
           'one-canvas',
           'scenario-editor',
           'csv-viewer',
+          'sheet-editor',
         ];
 
         // If a preferred type is given, try to find that first
@@ -816,39 +804,6 @@ export const usePanelStore = create<PanelStore>()(
         // Create a new panel with the preferred type or default to ladder-editor
         const type = preferredType || 'ladder-editor';
         return addPanel(type, '1 / 1 / 2 / 2');
-      },
-
-      openSettingsTab: () => {
-        const { panels, addTab, setActiveTab } = get();
-
-        // Check if settings tab already exists
-        for (const panel of panels) {
-          if (panel.tabs) {
-            const existingTab = panel.tabs.find((t) => t.panelType === 'settings');
-            if (existingTab) {
-              // Focus existing settings tab
-              setActiveTab(panel.id, existingTab.id);
-              return;
-            }
-          }
-        }
-
-        // Find an editor panel to add the settings tab to
-        const editorTypes: PanelType[] = [
-          'ladder-editor',
-          'one-canvas',
-          'scenario-editor',
-          'csv-viewer',
-        ];
-        const editorPanel = panels.find((p) => editorTypes.includes(p.type));
-
-        if (editorPanel) {
-          // Add settings tab to existing editor panel
-          addTab(editorPanel.id, 'settings', 'Settings');
-        } else if (panels.length > 0) {
-          // Add to first available panel
-          addTab(panels[0].id, 'settings', 'Settings');
-        }
       },
 
       // Floating window actions

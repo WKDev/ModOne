@@ -17,10 +17,13 @@ export type PanelType =
   | 'console'
   | 'properties'
   | 'csv-viewer'
+  | 'sheet-editor'
   | 'settings'
   | 'project-settings'
   | 'symbol-editor'
-  | 'welcome';
+  | 'tag-browser'
+  | 'welcome'
+  | 'opcua-server';
 
 /**
  * Runtime state of a panel instance.
@@ -91,24 +94,6 @@ export interface PanelProps {
 }
 
 /**
- * Human-readable labels for each panel type.
- * Used for display in menus, headers, and tooltips.
- */
-export const PANEL_TYPE_LABELS: Record<PanelType, string> = {
-  'ladder-editor': 'Ladder Editor',
-  'memory-visualizer': 'Memory Visualizer',
-  'one-canvas': 'One Canvas',
-  'scenario-editor': 'Scenario Editor',
-  'console': 'Console',
-  'properties': 'Properties',
-  'csv-viewer': 'CSV Viewer',
-  'settings': 'Settings',
-  'project-settings': 'Project Settings',
-  'symbol-editor': 'Symbol Editor',
-  'welcome': 'Welcome',
-};
-
-/**
  * Minimum panel size in pixels.
  * Prevents panels from being resized below this threshold.
  */
@@ -121,21 +106,16 @@ export const MIN_PANEL_SIZE = 150;
  */
 export type PanelZone = 'editor' | 'tool';
 
-/**
- * Panel types that belong to the tool zone (bottom panel).
- */
-export const TOOL_PANEL_TYPES: PanelType[] = ['console', 'memory-visualizer', 'properties'];
+// Re-export from the canonical panel registry for backward compatibility.
+// New code should import directly from '@/registries/panelRegistry'.
+export {
+  PANEL_TYPE_LABELS,
+  getToolPanelTypes,
+  getEditorPanelTypes,
+  getPanelZone,
+} from '../registries/panelRegistry';
 
-/**
- * Panel types that belong to the editor zone (main area).
- */
-export const EDITOR_PANEL_TYPES: PanelType[] = ['ladder-editor', 'one-canvas', 'scenario-editor', 'csv-viewer', 'settings', 'project-settings', 'symbol-editor', 'welcome'];
-
-/**
- * Determines which zone a panel type belongs to.
- * @param type - The panel type to classify
- * @returns 'editor' for editor panels, 'tool' for tool panels
- */
-export function getPanelZone(type: PanelType): PanelZone {
-  return TOOL_PANEL_TYPES.includes(type) ? 'tool' : 'editor';
-}
+/** @deprecated Import getToolPanelTypes() from panelRegistry instead. */
+import { getToolPanelTypes, getEditorPanelTypes } from '../registries/panelRegistry';
+export const TOOL_PANEL_TYPES: PanelType[] = getToolPanelTypes();
+export const EDITOR_PANEL_TYPES: PanelType[] = getEditorPanelTypes();

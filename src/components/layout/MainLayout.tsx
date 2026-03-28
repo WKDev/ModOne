@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { MenuBar } from './MenuBar';
 import { Toolbar } from './Toolbar';
 import { StatusBar } from './StatusBar';
+import { PanelErrorBoundary } from './PanelErrorBoundary';
 import { Sidebar } from './Sidebar';
 import { EditorArea } from './EditorArea';
 import { ToolPanel } from './ToolPanel';
@@ -37,7 +38,9 @@ export function MainLayout() {
       {/* Header: Menu Bar + Toolbar */}
       <header className="flex-shrink-0">
         {!IS_MAC && <MenuBar />}
-        <Toolbar />
+        <PanelErrorBoundary panelName="Ribbon">
+          <Toolbar />
+        </PanelErrorBoundary>
       </header>
 
       {/* Main Content Area */}

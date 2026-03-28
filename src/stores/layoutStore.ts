@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 
 export type SimulationStatus = 'running' | 'stopped' | 'paused';
-export type PanelType = 'output' | 'problems' | 'terminal';
+export type BottomPanelTab = 'output' | 'problems' | 'terminal';
 
 interface LayoutState {
   // Menu state
@@ -26,7 +26,7 @@ interface LayoutState {
   // Layout visibility
   sidebarVisible: boolean;
   panelVisible: boolean;
-  panelType: PanelType;
+  panelType: BottomPanelTab;
   resetCounter: number;
 }
 
@@ -53,7 +53,7 @@ interface LayoutActions {
   // Layout actions
   toggleSidebar: () => void;
   togglePanel: () => void;
-  setPanelType: (type: PanelType) => void;
+  setPanelType: (type: BottomPanelTab) => void;
 
   // Reset
   resetLayout: () => void;

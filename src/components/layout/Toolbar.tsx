@@ -1,143 +1,149 @@
-import {
-  FilePlus,
-  FolderOpen,
-  Save,
-  Play,
-  Pause,
-  Square,
-  RotateCcw,
-  StepForward,
-  PanelLeft,
-  PanelBottom,
-  Shapes,
-} from 'lucide-react';
-import { useLayoutStore } from '../../stores/layoutStore';
+import { useEffect, useMemo, useState } from 'react';
+import { PanelBottom, PanelLeft } from 'lucide-react';
 import { commandRegistry } from '../CommandPalette/commandRegistry';
+import { useLayoutStore } from '../../stores/layoutStore';
+import { useScenarioStore } from '../../stores/scenarioStore';
+import { useModbusStore } from '../../stores/modbusStore';
+import {
+  renderRibbonIcon,
+  resolveRibbonTabs,
+  useRibbonTabsConfig,
+  type RibbonResolvedAction,
+  type RibbonResolvedGroup,
+  type RibbonTabId,
+} from './ribbon';
 
-interface ToolbarButtonProps {
-  icon: React.ReactNode;
-  tooltip: string;
-  onClick?: () => void;
-  disabled?: boolean;
-  active?: boolean;
-  dataTestId?: string;
-}
-
-function ToolbarButton({ icon, tooltip, onClick, disabled, active, dataTestId }: ToolbarButtonProps) {
+function RibbonActionButton({ label, commandId, icon, disabled, active, dataTestId }: RibbonResolvedAction) {
   return (
     <button
+      type="button"
       data-testid={dataTestId}
-      className={`w-8 h-8 flex items-center justify-center rounded ${disabled
-        ? 'opacity-50 cursor-not-allowed text-[var(--color-text-muted)]'
-        : active
-          ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)]'
-          : 'hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-        }`}
-      onClick={onClick}
       disabled={disabled}
-      title={tooltip}
+      title={label}
+      onClick={() => { commandRegistry.execute(commandId).catch((err) => console.error(`Ribbon command failed: ${commandId}`, err)); }}
+      className={`group min-w-[82px] h-[74px] px-2 py-1.5 rounded-md border text-xs flex flex-col items-center justify-center gap-1 transition-colors ${
+        disabled
+          ? 'cursor-not-allowed opacity-45 border-[var(--color-border)] text-[var(--color-text-muted)]'
+          : active
+            ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-text-primary)]'
+            : 'border-transparent text-[var(--color-text-secondary)] hover:border-[var(--color-border)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]'
+      }`}
     >
-      {icon}
+      <span className="flex items-center justify-center">{renderRibbonIcon(icon)}</span>
+      <span className="leading-tight text-center">{label}</span>
     </button>
   );
 }
 
-function ToolbarSeparator() {
-  return <div className="h-6 w-px bg-[var(--color-bg-tertiary)] mx-1" />;
+function RibbonGroupView({ title, actions }: RibbonResolvedGroup) {
+  return (
+    <div className="flex h-[86px] shrink-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
+      <div className="flex items-start gap-1 px-2 py-1.5">{actions.map((action) => <RibbonActionButton key={action.id} {...action} />)}</div>
+      <div className="w-7 border-l border-[var(--color-border)] flex items-end justify-center pb-1">
+        <span className="text-[10px] tracking-wide [writing-mode:vertical-rl] rotate-180 text-[var(--color-text-muted)]">{title}</span>
+      </div>
+    </div>
+  );
 }
 
 export function Toolbar() {
-  const {
-    simulationStatus,
-    sidebarVisible,
-    toggleSidebar,
-    panelVisible,
-    togglePanel,
-  } = useLayoutStore();
+  const [activeTab, setActiveTab] = useState<RibbonTabId>('canvas');
+  const { simulationStatus, sidebarVisible, panelVisible, toggleSidebar, togglePanel, opcuaRunning } = useLayoutStore();
+  const scenarioStatus = useScenarioStore((state) => state.executionState.status);
+  const modbusStatus = useModbusStore((state) => state.status);
+  const ribbonTabsConfig = useRibbonTabsConfig();
 
   const isRunning = simulationStatus === 'running';
-  const isStopped = simulationStatus === 'stopped';
   const isPaused = simulationStatus === 'paused';
 
+  const ribbonTabs = useMemo(
+    () =>
+      resolveRibbonTabs(ribbonTabsConfig, {
+        simulationStatus,
+        scenarioStatus,
+        modbusTcpRunning: Boolean(modbusStatus?.tcp_running),
+        opcuaRunning,
+      }),
+    [ribbonTabsConfig, modbusStatus?.tcp_running, opcuaRunning, scenarioStatus, simulationStatus]
+  );
+
+  useEffect(() => {
+    if (!ribbonTabs.some((tab) => tab.id === activeTab) && ribbonTabs.length > 0) {
+      setActiveTab(ribbonTabs[0].id);
+    }
+  }, [activeTab, ribbonTabs]);
+
+  const activeGroups = useMemo(
+    () => ribbonTabs.find((tab) => tab.id === activeTab)?.groups ?? [],
+    [activeTab, ribbonTabs]
+  );
+
   return (
-    <div className="h-10 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)] flex items-center px-2 gap-0.5">
-      {/* Project Group */}
-      <ToolbarButton
-        icon={<FilePlus size={18} />}
-        tooltip="New Project (Ctrl+N)"
-        onClick={() => commandRegistry.execute('file.new')}
-      />
-      <ToolbarButton
-        icon={<FolderOpen size={18} />}
-        tooltip="Open Project (Ctrl+O)"
-        onClick={() => commandRegistry.execute('file.open')}
-      />
-      <ToolbarButton
-        icon={<Save size={18} />}
-        tooltip="Save (Ctrl+S)"
-        onClick={() => commandRegistry.execute('file.save')}
-      />
-      <ToolbarButton
-        icon={<Shapes size={18} />}
-        tooltip="Open Symbol Editor"
-        dataTestId="open-symbol-editor"
-        onClick={() => commandRegistry.execute('canvas.openSymbolEditor')}
-      />
+    <div
+      data-testid="toolbar"
+      className="border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]"
+    >
+      <div className="h-8 px-2 border-b border-[var(--color-border)] flex items-center justify-between bg-[var(--color-surface-muted)]">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            data-testid="toolbar-sidebar-toggle"
+            title="Toggle Sidebar"
+            onClick={toggleSidebar}
+            className={`h-6 px-2 rounded text-xs flex items-center gap-1 border transition-colors ${
+              sidebarVisible
+                ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-text-primary)]'
+                : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]'
+            }`}
+          >
+            <PanelLeft size={14} />
+            Sidebar
+          </button>
+          <button
+            type="button"
+            data-testid="toolbar-panel-toggle"
+            title="Toggle Panel"
+            onClick={togglePanel}
+            className={`h-6 px-2 rounded text-xs flex items-center gap-1 border transition-colors ${
+              panelVisible
+                ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-text-primary)]'
+                : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]'
+            }`}
+          >
+            <PanelBottom size={14} />
+            Panel
+          </button>
+        </div>
+        <div className="text-xs text-[var(--color-text-secondary)]">
+          Simulation: <span className="text-[var(--color-text-primary)]">{isRunning ? 'Running' : isPaused ? 'Paused' : 'Stopped'}</span>
+        </div>
+      </div>
 
-      <ToolbarSeparator />
+      <div className="h-8 px-2 flex items-end gap-1 border-b border-[var(--color-border)]">
+        {ribbonTabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            data-testid={`ribbon-tab-${tab.id}`}
+            onClick={() => setActiveTab(tab.id)}
+            className={`h-7 px-3 rounded-t-md text-sm border-x border-t transition-colors ${
+              activeTab === tab.id
+                ? 'bg-[var(--color-bg-primary)] border-[var(--color-border)] text-[var(--color-text-primary)]'
+                : 'border-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-      {/* Simulation Group */}
-      <ToolbarButton
-        icon={<Play size={18} />}
-        tooltip={isPaused ? 'Resume Simulation (F6)' : 'Start Simulation (F5)'}
-        disabled={isRunning}
-        onClick={() => {
-          if (isPaused) {
-            commandRegistry.execute('simulation.resume');
-          } else {
-            commandRegistry.execute('simulation.start');
-          }
-        }}
-      />
-      <ToolbarButton
-        icon={<Pause size={18} />}
-        tooltip="Pause Simulation (F6)"
-        disabled={isStopped || isPaused}
-        onClick={() => commandRegistry.execute('simulation.pause')}
-      />
-      <ToolbarButton
-        icon={<Square size={18} />}
-        tooltip="Stop Simulation (Shift+F5)"
-        disabled={isStopped}
-        onClick={() => commandRegistry.execute('simulation.stop')}
-      />
-      <ToolbarButton
-        icon={<RotateCcw size={18} />}
-        tooltip="Reset Simulation (Ctrl+Shift+F5)"
-        onClick={() => commandRegistry.execute('simulation.reset')}
-      />
-      <ToolbarButton
-        icon={<StepForward size={18} />}
-        tooltip="Step (F10)"
-        disabled={!isPaused}
-        onClick={() => commandRegistry.execute('simulation.step')}
-      />
-
-      <ToolbarSeparator />
-
-      {/* View Group */}
-      <ToolbarButton
-        icon={<PanelLeft size={18} />}
-        tooltip="Toggle Sidebar (Ctrl+B)"
-        onClick={toggleSidebar}
-        active={sidebarVisible}
-      />
-      <ToolbarButton
-        icon={<PanelBottom size={18} />}
-        tooltip="Toggle Panel (Ctrl+J)"
-        onClick={togglePanel}
-        active={panelVisible}
-      />
+      <div className="h-[92px] px-2 py-1 overflow-x-auto scrollbar-hide bg-[var(--color-bg-primary)]">
+        <div className="flex items-stretch gap-2 min-w-max animate-tab-fade-in">
+          {activeGroups.map((group) => (
+            <RibbonGroupView key={group.id} {...group} />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

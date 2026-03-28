@@ -10,6 +10,7 @@ import { devtools } from 'zustand/middleware';
 import { PanelType, PANEL_TYPE_LABELS } from '../types/panel';
 import { TabState, TabData } from '../types/tab';
 import { useDocumentRegistry } from './documentRegistry';
+import { getNextActiveTabId } from '../utils/tabUtils';
 
 interface EditorAreaState {
   /** Array of tabs in the editor area */
@@ -59,6 +60,8 @@ interface EditorAreaActions {
   openTagBrowserTab: () => void;
   /** Open welcome tab (creates if not exists, focuses if exists) */
   openWelcomeTab: () => void;
+  /** Open OPC UA server tab (creates if not exists, focuses if exists) */
+  openOpcUaServerTab: () => void;
 }
 
 type EditorAreaStore = EditorAreaState & EditorAreaActions;
@@ -108,21 +111,9 @@ export const useEditorAreaStore = create<EditorAreaStore>()(
             const tabIndex = state.tabs.findIndex((t) => t.id === tabId);
             const newTabs = state.tabs.filter((t) => t.id !== tabId);
 
-            // Determine new active tab
-            let newActiveTabId = state.activeTabId;
-            if (state.activeTabId === tabId) {
-              if (newTabs.length === 0) {
-                newActiveTabId = null;
-              } else if (tabIndex >= newTabs.length) {
-                newActiveTabId = newTabs[newTabs.length - 1].id;
-              } else {
-                newActiveTabId = newTabs[tabIndex].id;
-              }
-            }
-
             return {
               tabs: newTabs,
-              activeTabId: newActiveTabId,
+              activeTabId: getNextActiveTabId(newTabs, tabIndex, state.activeTabId, tabId),
             };
           },
           false,
@@ -304,6 +295,18 @@ export const useEditorAreaStore = create<EditorAreaStore>()(
         }
 
         addTab('welcome', 'Welcome');
+      },
+
+      openOpcUaServerTab: () => {
+        const { tabs, addTab, setActiveTab } = get();
+
+        const existingTab = tabs.find((t) => t.panelType === 'opcua-server');
+        if (existingTab) {
+          setActiveTab(existingTab.id);
+          return;
+        }
+
+        addTab('opcua-server', 'OPC UA Server');
       },
     }),
     { name: 'editor-area-store' }
