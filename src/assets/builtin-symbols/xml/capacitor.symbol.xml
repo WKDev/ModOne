@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ms:SymbolDefinition
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://modone.io/schema/symbol/1.0 ../../symbol-schema/modone-symbol.xsd"
+  id="builtin:capacitor"
+  name="Capacitor"
+  version="1.0.0"
+  domain="circuit"
+  placeable="true">
+
+  <ms:Description>Capacitive passive element</ms:Description>
+  <ms:Category>passive</ms:Category>
+  <ms:Author>ModOne</ms:Author>
+  <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
+  <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
+
+  <ms:Layout width="40" height="40" unit="px"/>
+
+  <ms:Ports>
+    <ms:Port id="in" name="IN" number="1"
+      electricalType="passive" functionalRole="general"
+      shape="line" orientation="up"
+      x="20" y="0" length="0" sortOrder="1"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="out" name="OUT" number="2"
+      electricalType="passive" functionalRole="general"
+      shape="line" orientation="down"
+      x="20" y="40" length="0" sortOrder="2"
+      nameVisible="true" numberVisible="true"/>
+  </ms:Ports>
+
+  <ms:Graphics>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="20" y="4"/>
+      <ms:Point x="20" y="16"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="10" y="16"/>
+      <ms:Point x="30" y="16"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="10" y="24"/>
+      <ms:Point x="30" y="24"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="20" y="24"/>
+      <ms:Point x="20" y="36"/>
+    </ms:Polyline>
+  </ms:Graphics>
+
+  <ms:Properties>
+    <ms:Property key="designation" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>C1</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="value" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>10</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="unit" type="enum" editorType="select" visible="true">
+      <ms:DefaultValue>uF</ms:DefaultValue>
+      <ms:Options>
+        <ms:Option>pF</ms:Option>
+        <ms:Option>nF</ms:Option>
+        <ms:Option>uF</ms:Option>
+        <ms:Option>mF</ms:Option>
+      </ms:Options>
+    </ms:Property>
+    <ms:Property key="voltageRating" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>50</ms:DefaultValue>
+    </ms:Property>
+  </ms:Properties>
+
+</ms:SymbolDefinition>

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ms:SymbolDefinition
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://modone.io/schema/symbol/1.0 ../../symbol-schema/modone-symbol.xsd"
+  id="builtin:sensor"
+  name="Sensor"
+  version="1.0.0"
+  domain="circuit"
+  placeable="true">
+
+  <ms:Description>Three-wire industrial sensor</ms:Description>
+  <ms:Category>sensing</ms:Category>
+  <ms:Author>ModOne</ms:Author>
+  <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
+  <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
+
+  <ms:Layout width="40" height="40" unit="px"/>
+
+  <ms:Ports>
+    <ms:Port id="vcc" name="+V" number="1"
+      electricalType="input" functionalRole="general"
+      shape="line" orientation="up"
+      x="20" y="0" length="0" sortOrder="1"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="out" name="OUT" number="4"
+      electricalType="output" functionalRole="general"
+      shape="line" orientation="right"
+      x="40" y="20" length="0" sortOrder="2"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="gnd" name="0V" number="3"
+      electricalType="output" functionalRole="general"
+      shape="line" orientation="down"
+      x="20" y="40" length="0" sortOrder="3"
+      nameVisible="true" numberVisible="true"/>
+  </ms:Ports>
+
+  <ms:Graphics>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
+      <ms:Point x="20" y="0"/>
+      <ms:Point x="20" y="8"/>
+    </ms:Polyline>
+    <ms:Rect x="2" y="8" width="30" height="24" stroke="#888" fill="transparent" strokeWidth="2"/>
+    <ms:Arc cx="6" cy="20" r="6" startAngle="270" endAngle="90" stroke="#888" fill="none" strokeWidth="1.5"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
+      <ms:Point x="32" y="20"/>
+      <ms:Point x="40" y="20"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
+      <ms:Point x="20" y="32"/>
+      <ms:Point x="20" y="40"/>
+    </ms:Polyline>
+  </ms:Graphics>
+
+  <ms:Properties>
+    <ms:Property key="designation" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>B1</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="sensorType" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>proximity_inductive</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="outputType" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>PNP</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="detecting" type="boolean" editorType="checkbox" visible="true">
+      <ms:DefaultValue>false</ms:DefaultValue>
+    </ms:Property>
+  </ms:Properties>
+
+</ms:SymbolDefinition>

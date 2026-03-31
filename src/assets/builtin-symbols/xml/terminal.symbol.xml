@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ms:SymbolDefinition
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://modone.io/schema/symbol/1.0 ../../symbol-schema/modone-symbol.xsd"
+  id="builtin:terminal"
+  name="Terminal"
+  version="1.0.0"
+  domain="circuit"
+  placeable="true">
+
+  <ms:Description>Single connection terminal</ms:Description>
+  <ms:Category>connection</ms:Category>
+  <ms:Author>ModOne</ms:Author>
+  <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
+  <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
+
+  <ms:Layout width="40" height="40" unit="px"/>
+
+  <ms:Ports>
+    <ms:Port id="conn" name="T" number="1"
+      electricalType="bidirectional" functionalRole="general"
+      shape="line" orientation="left"
+      x="0" y="20" length="0" sortOrder="1"
+      nameVisible="true" numberVisible="true"/>
+  </ms:Ports>
+
+  <ms:Graphics>
+    <ms:Rect x="10" y="7" width="20" height="26" stroke="#888" fill="transparent" strokeWidth="2"/>
+    <ms:Circle cx="20" cy="20" r="2" stroke="#888" fill="transparent" strokeWidth="2"/>
+  </ms:Graphics>
+
+  <ms:Properties>
+    <ms:Property key="designation" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>X1</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="terminalType" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>generic</ms:DefaultValue>
+    </ms:Property>
+  </ms:Properties>
+
+</ms:SymbolDefinition>

@@ -72,7 +72,7 @@ const SWITCH_TEMPLATE: BehaviorTemplate = {
 };
 
 const BEHAVIOR_TEMPLATES: readonly BehaviorTemplate[] = [RELAY_TEMPLATE, LAMP_TEMPLATE, MOTOR_TEMPLATE, SWITCH_TEMPLATE];
-const TEMPLATE_BY_ID = new Map(BEHAVIOR_TEMPLATES.map((template) => [template.id, template]));
+const TEMPLATE_BY_ID = new Map<string, BehaviorTemplate>(BEHAVIOR_TEMPLATES.map((template) => [template.id, template]));
 const TEMPLATE_BY_BLOCK_TYPE = new Map<string, BehaviorTemplate>();
 for (const template of BEHAVIOR_TEMPLATES) {
   for (const blockType of template.blockTypes) {
@@ -106,7 +106,7 @@ export function getBehaviorTemplateForBlockType(blockType: string): BehaviorTemp
 
 export function getBehaviorTemplateForBlock(block: Block): BehaviorTemplate | undefined {
   if (block.behavior?.templateId) {
-    return TEMPLATE_BY_ID.get(block.behavior.templateId) ?? TEMPLATE_BY_BLOCK_TYPE.get(getBlockType(block));
+    return TEMPLATE_BY_ID.get(block.behavior.templateId as string) ?? TEMPLATE_BY_BLOCK_TYPE.get(getBlockType(block));
   }
   return TEMPLATE_BY_BLOCK_TYPE.get(getBlockType(block));
 }
@@ -137,7 +137,7 @@ export function resolveBehaviorBinding(block: Block): BlockBehaviorBinding | und
 
 export function createBehaviorPatch(blockType: string, blockId: string, props: Partial<Block> = {}): Partial<Block> {
   const template = props.behavior?.templateId
-    ? TEMPLATE_BY_ID.get(props.behavior.templateId)
+    ? TEMPLATE_BY_ID.get(props.behavior.templateId as string)
     : getBehaviorTemplateForBlockType(blockType);
 
   if (!template && !props.behavior && !props.runtimeState && !props.visualState) {

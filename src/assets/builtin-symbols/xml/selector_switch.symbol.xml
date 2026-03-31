@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ms:SymbolDefinition
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://modone.io/schema/symbol/1.0 ../../symbol-schema/modone-symbol.xsd"
+  id="builtin:selector_switch"
+  name="Selector Switch"
+  version="1.0.0"
+  domain="circuit"
+  placeable="true">
+
+  <ms:Description>Two-position selector switch</ms:Description>
+  <ms:Category>control</ms:Category>
+  <ms:Author>ModOne</ms:Author>
+  <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
+  <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
+
+  <ms:Layout width="80" height="80" unit="px"/>
+
+  <ms:Ports>
+    <ms:Port id="com" name="COM" number="C"
+      electricalType="input" functionalRole="general"
+      shape="line" orientation="left"
+      x="0" y="20" length="0" sortOrder="1"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="pos1" name="1" number="1"
+      electricalType="output" functionalRole="general"
+      shape="line" orientation="right"
+      x="80" y="20" length="0" sortOrder="2"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="pos2" name="2" number="2"
+      electricalType="output" functionalRole="general"
+      shape="line" orientation="right"
+      x="80" y="40" length="0" sortOrder="3"
+      nameVisible="true" numberVisible="true"/>
+  </ms:Ports>
+
+  <ms:Graphics>
+    <ms:Polyline id="lead-in" stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="0" y="20"/>
+      <ms:Point x="20" y="20"/>
+    </ms:Polyline>
+    <ms:Circle id="selector-body" cx="32" cy="20" r="10" stroke="#888" fill="transparent" strokeWidth="2"/>
+    <ms:Polyline id="selector-arm" stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="32" y="20"/>
+      <ms:Point x="56" y="12"/>
+    </ms:Polyline>
+    <ms:Polyline id="pos1-lead" stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="56" y="20"/>
+      <ms:Point x="80" y="20"/>
+    </ms:Polyline>
+    <ms:Polyline id="pos2-lead" stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="56" y="40"/>
+      <ms:Point x="80" y="40"/>
+    </ms:Polyline>
+  </ms:Graphics>
+
+  <ms:Properties>
+    <ms:Property key="designation" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>S1</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="positions" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>2</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="currentPosition" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>0</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="maintained" type="boolean" editorType="checkbox" visible="true">
+      <ms:DefaultValue>true</ms:DefaultValue>
+    </ms:Property>
+  </ms:Properties>
+
+  <ms:Behavior templateId="archetype:switch" archetype="switch" interactionMode="maintained" deviceScoped="false">
+    <ms:TerminalRoles>
+      <ms:TerminalRole portId="com" role="COM"/>
+      <ms:TerminalRole portId="pos1" role="NO"/>
+      <ms:TerminalRole portId="pos2" role="NC"/>
+    </ms:TerminalRoles>
+  </ms:Behavior>
+
+  <ms:VisualStates>
+    <ms:VisualState name="open">
+      <ms:PrimitiveOverrides>
+        <ms:Override targetId="selector-arm"/>
+      </ms:PrimitiveOverrides>
+    </ms:VisualState>
+    <ms:VisualState name="closed">
+      <ms:PrimitiveOverrides>
+        <ms:Override targetId="selector-body" stroke="#eab308" fill="#fef3c7"/>
+        <ms:Override targetId="selector-arm" stroke="#d97706"/>
+      </ms:PrimitiveOverrides>
+    </ms:VisualState>
+  </ms:VisualStates>
+
+</ms:SymbolDefinition>

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ms:SymbolDefinition
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://modone.io/schema/symbol/1.0 ../../symbol-schema/modone-symbol.xsd"
+  id="builtin:power_source_ac_2p"
+  name="AC Power Source (2-Port)"
+  version="1.0.0"
+  domain="circuit"
+  placeable="true">
+
+  <ms:Description>Two-port AC power generator (L and N)</ms:Description>
+  <ms:Category>power</ms:Category>
+  <ms:Author>ModOne</ms:Author>
+  <ms:CreatedAt>2026-03-10T00:00:00Z</ms:CreatedAt>
+  <ms:UpdatedAt>2026-03-10T00:00:00Z</ms:UpdatedAt>
+
+  <ms:Layout width="60" height="60" unit="px"/>
+
+  <ms:Ports>
+    <ms:Port id="l" name="L" number="1"
+      electricalType="power_out" functionalRole="general"
+      shape="line" orientation="up"
+      x="30" y="0" length="0" sortOrder="1"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="n" name="N" number="2"
+      electricalType="power_out" functionalRole="general"
+      shape="line" orientation="down"
+      x="30" y="60" length="0" sortOrder="2"
+      nameVisible="true" numberVisible="true"/>
+  </ms:Ports>
+
+  <ms:Graphics>
+    <ms:Circle cx="30" cy="30" r="16" stroke="#888" fill="transparent" strokeWidth="2"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="20" y="30"/>
+      <ms:Point x="25" y="26"/>
+      <ms:Point x="35" y="34"/>
+      <ms:Point x="40" y="30"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="30" y="14"/>
+      <ms:Point x="30" y="0"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="30" y="46"/>
+      <ms:Point x="30" y="60"/>
+    </ms:Polyline>
+  </ms:Graphics>
+
+  <ms:Properties>
+    <ms:Property key="designation" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>G1</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="voltage" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>230</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="frequency" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>50</ms:DefaultValue>
+    </ms:Property>
+  </ms:Properties>
+
+</ms:SymbolDefinition>

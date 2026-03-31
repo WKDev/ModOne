@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ms:SymbolDefinition
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://modone.io/schema/symbol/1.0 ../../symbol-schema/modone-symbol.xsd"
+  id="builtin:powersource"
+  name="Power Source"
+  version="1.0.0"
+  domain="circuit"
+  placeable="true">
+
+  <ms:Description>DC power source</ms:Description>
+  <ms:Category>power</ms:Category>
+  <ms:Author>ModOne</ms:Author>
+  <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
+  <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
+
+  <ms:Layout width="40" height="40" unit="px"/>
+
+  <ms:Ports>
+    <ms:Port id="out" name="+" number="1"
+      electricalType="power_out" functionalRole="general"
+      shape="line" orientation="down"
+      x="20" y="40" length="0" sortOrder="1"
+      nameVisible="true" numberVisible="true"/>
+  </ms:Ports>
+
+  <ms:Graphics>
+    <ms:Polyline stroke="#ef4444" fill="none" strokeWidth="2">
+      <ms:Point x="8" y="16"/>
+      <ms:Point x="32" y="16"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="4">
+      <ms:Point x="14" y="24"/>
+      <ms:Point x="26" y="24"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#ef4444" fill="none" strokeWidth="2">
+      <ms:Point x="20" y="16"/>
+      <ms:Point x="20" y="4"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="20" y="24"/>
+      <ms:Point x="20" y="40"/>
+    </ms:Polyline>
+  </ms:Graphics>
+
+  <ms:Properties>
+    <ms:Property key="voltage" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>24</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="polarity" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>positive</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="maxCurrent" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>1000</ms:DefaultValue>
+    </ms:Property>
+  </ms:Properties>
+
+</ms:SymbolDefinition>

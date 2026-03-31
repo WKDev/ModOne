@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ms:SymbolDefinition
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://modone.io/schema/symbol/1.0 ../../symbol-schema/modone-symbol.xsd"
+  id="builtin:overload_relay"
+  name="Overload Relay"
+  version="1.0.0"
+  domain="circuit"
+  placeable="true">
+
+  <ms:Description>Motor overload protection relay</ms:Description>
+  <ms:Category>protection</ms:Category>
+  <ms:Author>ModOne</ms:Author>
+  <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
+  <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
+
+  <ms:Layout width="80" height="80" unit="px"/>
+
+  <ms:Ports>
+    <ms:Port id="l1_in" name="1" number="1"
+      electricalType="input" functionalRole="general"
+      shape="line" orientation="up"
+      x="20" y="0" length="0" sortOrder="1"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="l2_in" name="3" number="3"
+      electricalType="input" functionalRole="general"
+      shape="line" orientation="up"
+      x="40" y="0" length="0" sortOrder="2"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="l3_in" name="5" number="5"
+      electricalType="input" functionalRole="general"
+      shape="line" orientation="up"
+      x="60" y="0" length="0" sortOrder="3"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="l1_out" name="2" number="2"
+      electricalType="output" functionalRole="general"
+      shape="line" orientation="down"
+      x="20" y="80" length="0" sortOrder="4"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="l2_out" name="4" number="4"
+      electricalType="output" functionalRole="general"
+      shape="line" orientation="down"
+      x="40" y="80" length="0" sortOrder="5"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="l3_out" name="6" number="6"
+      electricalType="output" functionalRole="general"
+      shape="line" orientation="down"
+      x="60" y="80" length="0" sortOrder="6"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="nc" name="95-96" number="95-96"
+      electricalType="output" functionalRole="general"
+      shape="line" orientation="right"
+      x="80" y="20" length="0" sortOrder="7"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="no" name="97-98" number="97-98"
+      electricalType="output" functionalRole="general"
+      shape="line" orientation="right"
+      x="80" y="60" length="0" sortOrder="8"
+      nameVisible="true" numberVisible="true"/>
+  </ms:Ports>
+
+  <ms:Graphics>
+    <ms:Rect x="8" y="10" width="56" height="60" stroke="#888" fill="transparent" strokeWidth="2"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
+      <ms:Point x="20" y="0"/>
+      <ms:Point x="20" y="80"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
+      <ms:Point x="40" y="0"/>
+      <ms:Point x="40" y="80"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
+      <ms:Point x="60" y="0"/>
+      <ms:Point x="60" y="80"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
+      <ms:Point x="64" y="20"/>
+      <ms:Point x="80" y="20"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
+      <ms:Point x="64" y="60"/>
+      <ms:Point x="80" y="60"/>
+    </ms:Polyline>
+  </ms:Graphics>
+
+  <ms:Units>
+    <ms:Unit unitId="1" name="Power">
+      <ms:Graphics>
+        <ms:Rect x="8" y="10" width="56" height="60" stroke="#888" fill="transparent" strokeWidth="2"/>
+        <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
+          <ms:Point x="20" y="0"/>
+          <ms:Point x="20" y="80"/>
+        </ms:Polyline>
+        <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
+          <ms:Point x="40" y="0"/>
+          <ms:Point x="40" y="80"/>
+        </ms:Polyline>
+        <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
+          <ms:Point x="60" y="0"/>
+          <ms:Point x="60" y="80"/>
+        </ms:Polyline>
+      </ms:Graphics>
+      <ms:Ports>
+        <ms:Port id="l1_in" name="1" number="1"
+          electricalType="input" functionalRole="general"
+          shape="line" orientation="up"
+          x="20" y="0" length="0" sortOrder="1"
+          nameVisible="true" numberVisible="true"/>
+        <ms:Port id="l2_in" name="3" number="3"
+          electricalType="input" functionalRole="general"
+          shape="line" orientation="up"
+          x="40" y="0" length="0" sortOrder="2"
+          nameVisible="true" numberVisible="true"/>
+        <ms:Port id="l3_in" name="5" number="5"
+          electricalType="input" functionalRole="general"
+          shape="line" orientation="up"
+          x="60" y="0" length="0" sortOrder="3"
+          nameVisible="true" numberVisible="true"/>
+        <ms:Port id="l1_out" name="2" number="2"
+          electricalType="output" functionalRole="general"
+          shape="line" orientation="down"
+          x="20" y="80" length="0" sortOrder="4"
+          nameVisible="true" numberVisible="true"/>
+        <ms:Port id="l2_out" name="4" number="4"
+          electricalType="output" functionalRole="general"
+          shape="line" orientation="down"
+          x="40" y="80" length="0" sortOrder="5"
+          nameVisible="true" numberVisible="true"/>
+        <ms:Port id="l3_out" name="6" number="6"
+          electricalType="output" functionalRole="general"
+          shape="line" orientation="down"
+          x="60" y="80" length="0" sortOrder="6"
+          nameVisible="true" numberVisible="true"/>
+      </ms:Ports>
+    </ms:Unit>
+    <ms:Unit unitId="2" name="Aux Contact">
+      <ms:Graphics>
+        <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
+          <ms:Point x="64" y="20"/>
+          <ms:Point x="80" y="20"/>
+        </ms:Polyline>
+        <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
+          <ms:Point x="64" y="60"/>
+          <ms:Point x="80" y="60"/>
+        </ms:Polyline>
+      </ms:Graphics>
+      <ms:Ports>
+        <ms:Port id="nc" name="95-96" number="95-96"
+          electricalType="output" functionalRole="general"
+          shape="line" orientation="right"
+          x="80" y="20" length="0" sortOrder="1"
+          nameVisible="true" numberVisible="true"/>
+        <ms:Port id="no" name="97-98" number="97-98"
+          electricalType="output" functionalRole="general"
+          shape="line" orientation="right"
+          x="80" y="60" length="0" sortOrder="2"
+          nameVisible="true" numberVisible="true"/>
+      </ms:Ports>
+    </ms:Unit>
+  </ms:Units>
+
+  <ms:Properties>
+    <ms:Property key="designation" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>F1</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="overloadClass" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>10</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="currentMin" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>1</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="currentMax" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>1.6</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="tripped" type="boolean" editorType="checkbox" visible="true">
+      <ms:DefaultValue>false</ms:DefaultValue>
+    </ms:Property>
+  </ms:Properties>
+
+</ms:SymbolDefinition>

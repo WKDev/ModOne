@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ms:SymbolDefinition
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://modone.io/schema/symbol/1.0 ../../symbol-schema/modone-symbol.xsd"
+  id="builtin:power_source_dc_2p"
+  name="DC Power Source (2-Port)"
+  version="1.0.0"
+  domain="circuit"
+  placeable="true">
+
+  <ms:Description>DC Battery / Power Source with two ports (+ and -)</ms:Description>
+  <ms:Category>power</ms:Category>
+  <ms:Author>ModOne</ms:Author>
+  <ms:CreatedAt>2026-03-10T00:00:00Z</ms:CreatedAt>
+  <ms:UpdatedAt>2026-03-10T00:00:00Z</ms:UpdatedAt>
+
+  <ms:Layout width="40" height="60" unit="px"/>
+
+  <ms:Ports>
+    <ms:Port id="pos" name="+" number="1"
+      electricalType="power_out" functionalRole="general"
+      shape="line" orientation="up"
+      x="20" y="0" length="0" sortOrder="1"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="neg" name="-" number="2"
+      electricalType="power_out" functionalRole="general"
+      shape="line" orientation="down"
+      x="20" y="60" length="0" sortOrder="2"
+      nameVisible="true" numberVisible="true"/>
+  </ms:Ports>
+
+  <ms:Graphics>
+    <ms:Polyline stroke="#ef4444" fill="none" strokeWidth="2">
+      <ms:Point x="8" y="26"/>
+      <ms:Point x="32" y="26"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="4">
+      <ms:Point x="14" y="34"/>
+      <ms:Point x="26" y="34"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#ef4444" fill="none" strokeWidth="2">
+      <ms:Point x="20" y="26"/>
+      <ms:Point x="20" y="0"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="20" y="34"/>
+      <ms:Point x="20" y="60"/>
+    </ms:Polyline>
+  </ms:Graphics>
+
+  <ms:Properties>
+    <ms:Property key="designation" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>BAT1</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="voltage" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>24</ms:DefaultValue>
+    </ms:Property>
+  </ms:Properties>
+
+</ms:SymbolDefinition>

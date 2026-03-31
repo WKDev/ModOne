@@ -31,11 +31,15 @@ export type BlockRuntimeValue = string | number | boolean;
 export type BlockRuntimeState = Record<string, BlockRuntimeValue>;
 
 export interface SymbolBehaviorBinding {
-  templateId: BehaviorTemplateId;
-  archetype: BehaviorArchetype;
+  templateId?: BehaviorTemplateId | (string & {});
+  archetype?: BehaviorArchetype | (string & {});
   interactionMode?: 'none' | 'momentary' | 'maintained';
   terminalRoles?: Record<string, string>;
   deviceScoped?: boolean;
+  /** IFTTT-style behavior rules (from XML) */
+  rules?: import('./behaviorRules').BehaviorRule[];
+  /** Block simulation domain */
+  domain?: import('./behaviorRules').BlockDomain;
 }
 
 export interface BlockBehaviorBinding extends SymbolBehaviorBinding {
@@ -72,8 +76,8 @@ export interface BehaviorSwitchEvaluation {
 export interface ComponentBehaviorState {
   componentId: string;
   deviceId?: string;
-  templateId: BehaviorTemplateId;
-  archetype: BehaviorArchetype;
+  templateId?: BehaviorTemplateId | (string & {});
+  archetype?: BehaviorArchetype | (string & {});
   visualState: BehaviorVisualState;
   powered: boolean;
   energized?: boolean;

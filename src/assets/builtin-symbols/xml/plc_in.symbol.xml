@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ms:SymbolDefinition
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://modone.io/schema/symbol/1.0 ../../symbol-schema/modone-symbol.xsd"
+  id="builtin:plc_in"
+  name="PLC Input"
+  version="1.0.0"
+  domain="circuit"
+  placeable="true">
+
+  <ms:Description>PLC digital input channel</ms:Description>
+  <ms:Category>plc</ms:Category>
+  <ms:Author>ModOne</ms:Author>
+  <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
+  <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
+
+  <ms:Layout width="80" height="40" unit="px"/>
+
+  <ms:Ports>
+    <ms:Port id="in" name="IN" number="1"
+      electricalType="input" functionalRole="plc_input"
+      shape="line" orientation="left"
+      x="0" y="20" length="0" sortOrder="1"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="out" name="OUT" number="2"
+      electricalType="output" functionalRole="plc_output"
+      shape="line" orientation="right"
+      x="80" y="20" length="0" sortOrder="2"
+      nameVisible="true" numberVisible="true"/>
+  </ms:Ports>
+
+  <ms:Graphics>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
+      <ms:Point x="0" y="20"/>
+      <ms:Point x="10" y="20"/>
+    </ms:Polyline>
+    <ms:Rect x="10" y="6" width="60" height="28" stroke="#888" fill="transparent" strokeWidth="2"/>
+    <ms:Text x="40" y="24" fontSize="14" fontFamily="Arial" fill="#888" anchor="middle">I</ms:Text>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
+      <ms:Point x="70" y="20"/>
+      <ms:Point x="80" y="20"/>
+    </ms:Polyline>
+  </ms:Graphics>
+
+  <ms:Properties>
+    <ms:Property key="address" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>DI:0x0000</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="thresholdVoltage" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>12</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="inverted" type="boolean" editorType="checkbox" visible="true">
+      <ms:DefaultValue>false</ms:DefaultValue>
+    </ms:Property>
+  </ms:Properties>
+
+</ms:SymbolDefinition>

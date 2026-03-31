@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ms:SymbolDefinition
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://modone.io/schema/symbol/1.0 ../../symbol-schema/modone-symbol.xsd"
+  id="builtin:scope"
+  name="Scope"
+  version="1.0.0"
+  domain="circuit"
+  placeable="true">
+
+  <ms:Description>Measurement oscilloscope</ms:Description>
+  <ms:Category>measurement</ms:Category>
+  <ms:Author>ModOne</ms:Author>
+  <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
+  <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
+
+  <ms:Layout width="100" height="80" unit="px"/>
+
+  <ms:Ports>
+    <ms:Port id="ch1" name="CH1" number="1"
+      electricalType="input" functionalRole="general"
+      shape="line" orientation="left"
+      x="0" y="20" length="0" sortOrder="1"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="ch2" name="CH2" number="2"
+      electricalType="input" functionalRole="general"
+      shape="line" orientation="left"
+      x="0" y="40" length="0" sortOrder="2"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="ch3" name="CH3" number="3"
+      electricalType="input" functionalRole="general"
+      shape="line" orientation="left"
+      x="0" y="60" length="0" sortOrder="3"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="ch4" name="CH4" number="4"
+      electricalType="input" functionalRole="general"
+      shape="line" orientation="left"
+      x="0" y="80" length="0" sortOrder="4"
+      nameVisible="true" numberVisible="true"/>
+  </ms:Ports>
+
+  <ms:Graphics>
+    <ms:Rect x="10" y="8" width="84" height="64" stroke="#888" fill="transparent" strokeWidth="2"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
+      <ms:Point x="18" y="48"/>
+      <ms:Point x="30" y="48"/>
+      <ms:Point x="38" y="28"/>
+      <ms:Point x="50" y="60"/>
+      <ms:Point x="62" y="36"/>
+      <ms:Point x="78" y="36"/>
+    </ms:Polyline>
+    <ms:Text x="52" y="22" fontSize="9" fontFamily="Arial" fill="#888" anchor="middle">SCOPE</ms:Text>
+  </ms:Graphics>
+
+  <ms:Properties>
+    <ms:Property key="channels" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>1</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="triggerMode" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>auto</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="timeBase" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>100</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="voltageScale" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>5</ms:DefaultValue>
+    </ms:Property>
+  </ms:Properties>
+
+</ms:SymbolDefinition>

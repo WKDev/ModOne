@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ms:SymbolDefinition
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://modone.io/schema/symbol/1.0 ../../symbol-schema/modone-symbol.xsd"
+  id="builtin:ground"
+  name="Ground"
+  version="1.0.0"
+  domain="circuit"
+  placeable="true">
+
+  <ms:Description>Reference ground node</ms:Description>
+  <ms:Category>power</ms:Category>
+  <ms:Author>ModOne</ms:Author>
+  <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
+  <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
+
+  <ms:Layout width="40" height="40" unit="px"/>
+
+  <ms:Ports>
+    <ms:Port id="in" name="GND" number="1"
+      electricalType="power_in" functionalRole="general"
+      shape="line" orientation="up"
+      x="20" y="0" length="0" sortOrder="1"
+      nameVisible="true" numberVisible="true"/>
+  </ms:Ports>
+
+  <ms:Graphics>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="20" y="4"/>
+      <ms:Point x="20" y="12"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="8" y="16"/>
+      <ms:Point x="32" y="16"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="12" y="22"/>
+      <ms:Point x="28" y="22"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="16" y="28"/>
+      <ms:Point x="24" y="28"/>
+    </ms:Polyline>
+  </ms:Graphics>
+
+  <ms:Properties>
+    <ms:Property key="designation" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>GND1</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="netName" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>0V</ms:DefaultValue>
+    </ms:Property>
+  </ms:Properties>
+
+</ms:SymbolDefinition>

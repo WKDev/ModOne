@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ms:SymbolDefinition
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://modone.io/schema/symbol/1.0 ../../symbol-schema/modone-symbol.xsd"
+  id="builtin:led"
+  name="LED"
+  version="1.0.0"
+  domain="circuit"
+  placeable="true">
+
+  <ms:Description>Light emitting diode</ms:Description>
+  <ms:Category>indicator</ms:Category>
+  <ms:Author>ModOne</ms:Author>
+  <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
+  <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
+
+  <ms:Layout width="40" height="60" unit="px"/>
+
+  <ms:Ports>
+    <ms:Port id="anode" name="+" number="A"
+      electricalType="input" functionalRole="general"
+      shape="line" orientation="up"
+      x="20" y="0" length="0" sortOrder="1"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="cathode" name="-" number="K"
+      electricalType="output" functionalRole="general"
+      shape="line" orientation="down"
+      x="20" y="60" length="0" sortOrder="2"
+      nameVisible="true" numberVisible="true"/>
+  </ms:Ports>
+
+  <ms:Graphics>
+    <ms:Polyline id="lead-top" stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="20" y="0"/>
+      <ms:Point x="20" y="10"/>
+    </ms:Polyline>
+    <ms:Polyline id="diode-body" stroke="#888" fill="transparent" strokeWidth="2">
+      <ms:Point x="10" y="20"/>
+      <ms:Point x="30" y="20"/>
+      <ms:Point x="20" y="34"/>
+      <ms:Point x="10" y="20"/>
+    </ms:Polyline>
+    <ms:Polyline id="cathode-bar" stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="10" y="38"/>
+      <ms:Point x="30" y="38"/>
+    </ms:Polyline>
+    <ms:Polyline id="ray-1" stroke="#888" fill="none" strokeWidth="1.5">
+      <ms:Point x="24" y="15"/>
+      <ms:Point x="30" y="9"/>
+    </ms:Polyline>
+    <ms:Polyline id="ray-2" stroke="#888" fill="none" strokeWidth="1.5">
+      <ms:Point x="28" y="19"/>
+      <ms:Point x="34" y="13"/>
+    </ms:Polyline>
+    <ms:Polyline id="lead-bottom" stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="20" y="38"/>
+      <ms:Point x="20" y="60"/>
+    </ms:Polyline>
+  </ms:Graphics>
+
+  <ms:Properties>
+    <ms:Property key="color" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>red</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="forwardVoltage" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>2</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="lit" type="boolean" editorType="checkbox" visible="true">
+      <ms:DefaultValue>false</ms:DefaultValue>
+    </ms:Property>
+  </ms:Properties>
+
+  <ms:Behavior templateId="archetype:lamp" archetype="lamp" interactionMode="none" deviceScoped="true">
+    <ms:TerminalRoles>
+      <ms:TerminalRole portId="anode" role="L+"/>
+      <ms:TerminalRole portId="cathode" role="L-"/>
+    </ms:TerminalRoles>
+  </ms:Behavior>
+
+  <ms:VisualStates>
+    <ms:VisualState name="lit">
+    </ms:VisualState>
+  </ms:VisualStates>
+
+</ms:SymbolDefinition>

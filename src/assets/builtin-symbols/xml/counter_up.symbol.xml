@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ms:SymbolDefinition
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://modone.io/schema/symbol/1.0 ../../symbol-schema/modone-symbol.xsd"
+  id="builtin:counter_up"
+  name="Counter Up"
+  version="1.0.0"
+  domain="circuit"
+  placeable="true">
+
+  <ms:Description>PLC up-counter block</ms:Description>
+  <ms:Category>plc</ms:Category>
+  <ms:Author>ModOne</ms:Author>
+  <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
+  <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
+
+  <ms:Layout width="80" height="80" unit="px"/>
+
+  <ms:Ports>
+    <ms:Port id="count_in" name="CU" number="1"
+      electricalType="input" functionalRole="general"
+      shape="line" orientation="left"
+      x="0" y="40" length="0" sortOrder="1"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="out" name="OUT" number="2"
+      electricalType="output" functionalRole="general"
+      shape="line" orientation="right"
+      x="80" y="40" length="0" sortOrder="2"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="reset" name="RST" number="3"
+      electricalType="input" functionalRole="general"
+      shape="line" orientation="down"
+      x="40" y="80" length="0" sortOrder="3"
+      nameVisible="true" numberVisible="true"/>
+  </ms:Ports>
+
+  <ms:Graphics>
+    <ms:Rect x="4" y="4" width="72" height="72" stroke="#888" fill="transparent" strokeWidth="2"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="18" y="50"/>
+      <ms:Point x="18" y="30"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="18" y="30"/>
+      <ms:Point x="22" y="38"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="18" y="30"/>
+      <ms:Point x="14" y="38"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="34" y="52"/>
+      <ms:Point x="42" y="28"/>
+      <ms:Point x="50" y="52"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="50" y="28"/>
+      <ms:Point x="50" y="52"/>
+    </ms:Polyline>
+  </ms:Graphics>
+
+  <ms:Properties>
+    <ms:Property key="designation" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>C1</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="preset" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>10</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="currentValue" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>0</ms:DefaultValue>
+    </ms:Property>
+  </ms:Properties>
+
+</ms:SymbolDefinition>

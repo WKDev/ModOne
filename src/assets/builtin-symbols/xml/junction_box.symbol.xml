@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ms:SymbolDefinition
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://modone.io/schema/symbol/1.0 ../../symbol-schema/modone-symbol.xsd"
+  id="builtin:junction_box"
+  name="Junction Box"
+  version="1.0.0"
+  domain="circuit"
+  placeable="true">
+
+  <ms:Description>Four-way electrical junction box</ms:Description>
+  <ms:Category>connection</ms:Category>
+  <ms:Author>ModOne</ms:Author>
+  <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
+  <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
+
+  <ms:Layout width="80" height="80" unit="px"/>
+
+  <ms:Ports>
+    <ms:Port id="top" name="TOP" number="1"
+      electricalType="bidirectional" functionalRole="general"
+      shape="line" orientation="up"
+      x="40" y="0" length="0" sortOrder="1"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="right" name="RIGHT" number="2"
+      electricalType="bidirectional" functionalRole="general"
+      shape="line" orientation="right"
+      x="80" y="40" length="0" sortOrder="2"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="bottom" name="BOT" number="3"
+      electricalType="bidirectional" functionalRole="general"
+      shape="line" orientation="down"
+      x="40" y="80" length="0" sortOrder="3"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="left" name="LEFT" number="4"
+      electricalType="bidirectional" functionalRole="general"
+      shape="line" orientation="left"
+      x="0" y="40" length="0" sortOrder="4"
+      nameVisible="true" numberVisible="true"/>
+  </ms:Ports>
+
+  <ms:Graphics>
+    <ms:Rect x="4" y="4" width="72" height="72" stroke="#888" fill="transparent" strokeWidth="2"/>
+    <ms:Circle cx="40" cy="8" r="3" stroke="#888" fill="transparent" strokeWidth="2"/>
+    <ms:Circle cx="72" cy="40" r="3" stroke="#888" fill="transparent" strokeWidth="2"/>
+    <ms:Circle cx="40" cy="72" r="3" stroke="#888" fill="transparent" strokeWidth="2"/>
+    <ms:Circle cx="8" cy="40" r="3" stroke="#888" fill="transparent" strokeWidth="2"/>
+  </ms:Graphics>
+
+  <ms:Properties>
+    <ms:Property key="designation" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>JB1</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="enclosureRating" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>IP65</ms:DefaultValue>
+    </ms:Property>
+  </ms:Properties>
+
+</ms:SymbolDefinition>

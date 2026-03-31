@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ms:SymbolDefinition
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://modone.io/schema/symbol/1.0 ../../symbol-schema/modone-symbol.xsd"
+  id="builtin:text"
+  name="Text"
+  version="1.0.0"
+  domain="circuit"
+  placeable="true">
+
+  <ms:Description>Text annotation block</ms:Description>
+  <ms:Category>annotation</ms:Category>
+  <ms:Author>ModOne</ms:Author>
+  <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
+  <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
+
+  <ms:Layout width="160" height="40" unit="px"/>
+
+  <ms:Ports>
+  </ms:Ports>
+
+  <ms:Graphics>
+    <ms:Rect x="2" y="2" width="156" height="36" stroke="#888" fill="transparent" strokeWidth="1.5"/>
+    <ms:Text x="80" y="24" fontSize="14" fontFamily="Arial" fill="#888" anchor="middle">Text</ms:Text>
+  </ms:Graphics>
+
+  <ms:Properties>
+    <ms:Property key="content" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>Text</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="textStyle" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>label</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="fontSize" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>14</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="textColor" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>#e5e5e5</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="backgroundColor" type="string" editorType="text" visible="true">
+      <ms:DefaultValue></ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="showBorder" type="boolean" editorType="checkbox" visible="true">
+      <ms:DefaultValue>false</ms:DefaultValue>
+    </ms:Property>
+  </ms:Properties>
+
+</ms:SymbolDefinition>

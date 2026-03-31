@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ms:SymbolDefinition
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://modone.io/schema/symbol/1.0 ../../symbol-schema/modone-symbol.xsd"
+  id="builtin:off_page_connector"
+  name="Off-Page Connector"
+  version="1.0.0"
+  domain="circuit"
+  placeable="true">
+
+  <ms:Description>Off-page signal continuation connector</ms:Description>
+  <ms:Category>connection</ms:Category>
+  <ms:Author>ModOne</ms:Author>
+  <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
+  <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
+
+  <ms:Layout width="80" height="40" unit="px"/>
+
+  <ms:Ports>
+    <ms:Port id="conn" name="CONN" number="1"
+      electricalType="bidirectional" functionalRole="general"
+      shape="line" orientation="left"
+      x="0" y="20" length="0" sortOrder="1"
+      nameVisible="true" numberVisible="true"/>
+  </ms:Ports>
+
+  <ms:Graphics>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="0" y="20"/>
+      <ms:Point x="12" y="20"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="transparent" strokeWidth="2">
+      <ms:Point x="12" y="6"/>
+      <ms:Point x="64" y="6"/>
+      <ms:Point x="78" y="20"/>
+      <ms:Point x="64" y="34"/>
+      <ms:Point x="12" y="34"/>
+      <ms:Point x="12" y="6"/>
+    </ms:Polyline>
+    <ms:Text x="42" y="24" fontSize="10" fontFamily="Arial" fill="#888" anchor="middle">OPC</ms:Text>
+  </ms:Graphics>
+
+  <ms:Properties>
+    <ms:Property key="signalLabel" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>SIGNAL</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="direction" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>outgoing</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="targetPageId" type="string" editorType="text" visible="true">
+      <ms:DefaultValue></ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="targetPageNumber" type="string" editorType="text" visible="true">
+      <ms:DefaultValue></ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="targetPageName" type="string" editorType="text" visible="true">
+      <ms:DefaultValue></ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="dangling" type="boolean" editorType="checkbox" visible="true">
+      <ms:DefaultValue>true</ms:DefaultValue>
+    </ms:Property>
+  </ms:Properties>
+
+</ms:SymbolDefinition>

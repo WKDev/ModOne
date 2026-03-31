@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ms:SymbolDefinition
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://modone.io/schema/symbol/1.0 ../../symbol-schema/modone-symbol.xsd"
+  id="builtin:relay"
+  name="Relay"
+  version="1.0.0"
+  domain="circuit"
+  placeable="true">
+
+  <ms:Description>Control relay with coil and changeover contact</ms:Description>
+  <ms:Category>switching</ms:Category>
+  <ms:Author>ModOne</ms:Author>
+  <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
+  <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
+
+  <ms:Layout width="80" height="80" unit="px"/>
+
+  <ms:Ports>
+    <ms:Port id="coil_in" name="A1" number="A1"
+      electricalType="input" functionalRole="general"
+      shape="line" orientation="up"
+      x="40" y="0" length="0" sortOrder="1"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="coil_out" name="A2" number="A2"
+      electricalType="output" functionalRole="general"
+      shape="line" orientation="down"
+      x="40" y="80" length="0" sortOrder="2"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="com" name="COM" number="11"
+      electricalType="input" functionalRole="general"
+      shape="line" orientation="left"
+      x="0" y="40" length="0" sortOrder="3"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="no" name="NO" number="14"
+      electricalType="output" functionalRole="general"
+      shape="line" orientation="right"
+      x="80" y="20" length="0" sortOrder="4"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="nc" name="NC" number="12"
+      electricalType="output" functionalRole="general"
+      shape="line" orientation="right"
+      x="80" y="60" length="0" sortOrder="5"
+      nameVisible="true" numberVisible="true"/>
+  </ms:Ports>
+
+  <ms:Graphics>
+    <ms:Rect id="coil-body" x="30" y="16" width="20" height="48" stroke="#888" fill="transparent" strokeWidth="2"/>
+    <ms:Text id="coil-label" x="40" y="40" fontSize="12" fontFamily="Arial" fill="#888" anchor="middle">K</ms:Text>
+  </ms:Graphics>
+
+  <ms:Units>
+    <ms:Unit unitId="1" name="Coil">
+      <ms:Graphics>
+        <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+          <ms:Point x="40" y="0"/>
+          <ms:Point x="40" y="16"/>
+        </ms:Polyline>
+        <ms:Rect x="30" y="16" width="20" height="48" stroke="#888" fill="transparent" strokeWidth="2"/>
+        <ms:Text x="40" y="40" fontSize="12" fontFamily="Arial" fill="#888" anchor="middle">K</ms:Text>
+        <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+          <ms:Point x="40" y="64"/>
+          <ms:Point x="40" y="80"/>
+        </ms:Polyline>
+      </ms:Graphics>
+      <ms:Ports>
+        <ms:Port id="coil_in" name="A1" number="A1"
+          electricalType="input" functionalRole="general"
+          shape="line" orientation="up"
+          x="40" y="0" length="0" sortOrder="1"
+          nameVisible="true" numberVisible="true"/>
+        <ms:Port id="coil_out" name="A2" number="A2"
+          electricalType="output" functionalRole="general"
+          shape="line" orientation="down"
+          x="40" y="80" length="0" sortOrder="2"
+          nameVisible="true" numberVisible="true"/>
+      </ms:Ports>
+    </ms:Unit>
+    <ms:Unit unitId="2" name="Contact">
+      <ms:Graphics>
+        <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+          <ms:Point x="0" y="40"/>
+          <ms:Point x="24" y="40"/>
+        </ms:Polyline>
+        <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+          <ms:Point x="56" y="20"/>
+          <ms:Point x="80" y="20"/>
+        </ms:Polyline>
+        <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+          <ms:Point x="56" y="60"/>
+          <ms:Point x="80" y="60"/>
+        </ms:Polyline>
+        <ms:Circle cx="24" cy="40" r="2" stroke="#888" fill="#888" strokeWidth="2"/>
+        <ms:Circle cx="56" cy="20" r="2" stroke="#888" fill="#888" strokeWidth="2"/>
+        <ms:Circle cx="56" cy="60" r="2" stroke="#888" fill="#888" strokeWidth="2"/>
+        <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+          <ms:Point x="24" y="40"/>
+          <ms:Point x="54" y="22"/>
+        </ms:Polyline>
+      </ms:Graphics>
+      <ms:Ports>
+        <ms:Port id="com" name="COM" number="11"
+          electricalType="input" functionalRole="general"
+          shape="line" orientation="left"
+          x="0" y="40" length="0" sortOrder="1"
+          nameVisible="true" numberVisible="true"/>
+        <ms:Port id="no" name="NO" number="14"
+          electricalType="output" functionalRole="general"
+          shape="line" orientation="right"
+          x="80" y="20" length="0" sortOrder="2"
+          nameVisible="true" numberVisible="true"/>
+        <ms:Port id="nc" name="NC" number="12"
+          electricalType="output" functionalRole="general"
+          shape="line" orientation="right"
+          x="80" y="60" length="0" sortOrder="3"
+          nameVisible="true" numberVisible="true"/>
+      </ms:Ports>
+    </ms:Unit>
+  </ms:Units>
+
+  <ms:Properties>
+    <ms:Property key="designation" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>K1</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="coilVoltage" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>24</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="contacts" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>NO</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="energized" type="boolean" editorType="checkbox" visible="true">
+      <ms:DefaultValue>false</ms:DefaultValue>
+    </ms:Property>
+  </ms:Properties>
+
+  <ms:Behavior templateId="archetype:relay" archetype="relay" interactionMode="none" deviceScoped="true">
+    <ms:TerminalRoles>
+      <ms:TerminalRole portId="coil_in" role="A1"/>
+      <ms:TerminalRole portId="coil_out" role="A2"/>
+      <ms:TerminalRole portId="com" role="COM"/>
+      <ms:TerminalRole portId="no" role="NO"/>
+      <ms:TerminalRole portId="nc" role="NC"/>
+    </ms:TerminalRoles>
+  </ms:Behavior>
+
+  <ms:VisualStates>
+    <ms:VisualState name="energized">
+      <ms:PrimitiveOverrides>
+        <ms:Override targetId="coil-body" stroke="#22c55e" fill="#d1fae5"/>
+        <ms:Override targetId="coil-label" fill="#15803d"/>
+      </ms:PrimitiveOverrides>
+    </ms:VisualState>
+  </ms:VisualStates>
+
+</ms:SymbolDefinition>

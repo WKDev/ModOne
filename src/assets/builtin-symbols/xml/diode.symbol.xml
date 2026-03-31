@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ms:SymbolDefinition
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://modone.io/schema/symbol/1.0 ../../symbol-schema/modone-symbol.xsd"
+  id="builtin:diode"
+  name="Diode"
+  version="1.0.0"
+  domain="circuit"
+  placeable="true">
+
+  <ms:Description>Current-direction control diode</ms:Description>
+  <ms:Category>passive</ms:Category>
+  <ms:Author>ModOne</ms:Author>
+  <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
+  <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
+
+  <ms:Layout width="40" height="40" unit="px"/>
+
+  <ms:Ports>
+    <ms:Port id="anode" name="A" number="1"
+      electricalType="input" functionalRole="general"
+      shape="line" orientation="up"
+      x="20" y="0" length="0" sortOrder="1"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="cathode" name="K" number="2"
+      electricalType="output" functionalRole="general"
+      shape="line" orientation="down"
+      x="20" y="40" length="0" sortOrder="2"
+      nameVisible="true" numberVisible="true"/>
+  </ms:Ports>
+
+  <ms:Graphics>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="20" y="4"/>
+      <ms:Point x="20" y="14"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="#1a1d23" strokeWidth="2">
+      <ms:Point x="10" y="14"/>
+      <ms:Point x="30" y="14"/>
+      <ms:Point x="20" y="26"/>
+      <ms:Point x="10" y="14"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="10" y="26"/>
+      <ms:Point x="30" y="26"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="20" y="26"/>
+      <ms:Point x="20" y="36"/>
+    </ms:Polyline>
+  </ms:Graphics>
+
+  <ms:Properties>
+    <ms:Property key="designation" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>D1</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="forwardVoltage" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>0.7</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="currentRatingMa" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>1000</ms:DefaultValue>
+    </ms:Property>
+  </ms:Properties>
+
+</ms:SymbolDefinition>

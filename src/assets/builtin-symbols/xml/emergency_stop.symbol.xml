@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ms:SymbolDefinition
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://modone.io/schema/symbol/1.0 ../../symbol-schema/modone-symbol.xsd"
+  id="builtin:emergency_stop"
+  name="Emergency Stop"
+  version="1.0.0"
+  domain="circuit"
+  placeable="true">
+
+  <ms:Description>Emergency stop pushbutton</ms:Description>
+  <ms:Category>control</ms:Category>
+  <ms:Author>ModOne</ms:Author>
+  <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
+  <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
+
+  <ms:Layout width="60" height="40" unit="px"/>
+
+  <ms:Ports>
+    <ms:Port id="in" name="IN" number="1"
+      electricalType="input" functionalRole="general"
+      shape="line" orientation="left"
+      x="0" y="20" length="0" sortOrder="1"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="out" name="OUT" number="2"
+      electricalType="output" functionalRole="general"
+      shape="line" orientation="right"
+      x="60" y="20" length="0" sortOrder="2"
+      nameVisible="true" numberVisible="true"/>
+  </ms:Ports>
+
+  <ms:Graphics>
+    <ms:Polyline id="lead-in" stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="0" y="20"/>
+      <ms:Point x="14" y="20"/>
+    </ms:Polyline>
+    <ms:Circle id="outer-ring" cx="30" cy="20" r="13" stroke="#888" fill="transparent" strokeWidth="2"/>
+    <ms:Circle id="inner-button" cx="30" cy="20" r="7" stroke="#888" fill="transparent" strokeWidth="1.5"/>
+    <ms:Polyline id="lead-out" stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="46" y="20"/>
+      <ms:Point x="60" y="20"/>
+    </ms:Polyline>
+  </ms:Graphics>
+
+  <ms:Properties>
+    <ms:Property key="designation" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>ES1</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="engaged" type="boolean" editorType="checkbox" visible="true">
+      <ms:DefaultValue>false</ms:DefaultValue>
+    </ms:Property>
+  </ms:Properties>
+
+  <ms:Behavior templateId="archetype:switch" archetype="switch" interactionMode="momentary" deviceScoped="false">
+    <ms:TerminalRoles>
+      <ms:TerminalRole portId="in" role="IN"/>
+      <ms:TerminalRole portId="out" role="OUT"/>
+    </ms:TerminalRoles>
+  </ms:Behavior>
+
+  <ms:VisualStates>
+    <ms:VisualState name="pressed">
+      <ms:PrimitiveOverrides>
+        <ms:Override targetId="outer-ring" stroke="#dc2626" fill="#fecaca"/>
+        <ms:Override targetId="inner-button" stroke="#991b1b" fill="#ef4444"/>
+        <ms:Override targetId="lead-in" stroke="#dc2626"/>
+        <ms:Override targetId="lead-out" stroke="#dc2626"/>
+      </ms:PrimitiveOverrides>
+    </ms:VisualState>
+  </ms:VisualStates>
+
+</ms:SymbolDefinition>

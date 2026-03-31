@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ms:SymbolDefinition
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://modone.io/schema/symbol/1.0 ../../symbol-schema/modone-symbol.xsd"
+  id="builtin:terminal_block"
+  name="Terminal Block"
+  version="1.0.0"
+  domain="circuit"
+  placeable="true">
+
+  <ms:Description>Feed-through terminal block</ms:Description>
+  <ms:Category>connection</ms:Category>
+  <ms:Author>ModOne</ms:Author>
+  <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
+  <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
+
+  <ms:Layout width="40" height="60" unit="px"/>
+
+  <ms:Ports>
+    <ms:Port id="in" name="IN" number="1"
+      electricalType="input" functionalRole="general"
+      shape="line" orientation="up"
+      x="20" y="0" length="0" sortOrder="1"
+      nameVisible="true" numberVisible="true"/>
+    <ms:Port id="out" name="OUT" number="2"
+      electricalType="output" functionalRole="general"
+      shape="line" orientation="down"
+      x="20" y="60" length="0" sortOrder="2"
+      nameVisible="true" numberVisible="true"/>
+  </ms:Ports>
+
+  <ms:Graphics>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="20" y="0"/>
+      <ms:Point x="20" y="12"/>
+    </ms:Polyline>
+    <ms:Rect x="6" y="12" width="28" height="36" stroke="#888" fill="transparent" strokeWidth="2"/>
+    <ms:Circle cx="20" cy="30" r="4" stroke="#888" fill="transparent" strokeWidth="1.5"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
+      <ms:Point x="20" y="48"/>
+      <ms:Point x="20" y="60"/>
+    </ms:Polyline>
+  </ms:Graphics>
+
+  <ms:Properties>
+    <ms:Property key="designation" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>X1:1</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="terminalType" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>feed_through</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="wireSizeMm2" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>2.5</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="terminalCount" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>1</ms:DefaultValue>
+    </ms:Property>
+  </ms:Properties>
+
+</ms:SymbolDefinition>
