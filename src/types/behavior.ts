@@ -14,6 +14,14 @@ export type BehaviorStateSource =
   | 'circuit'
   | 'default';
 
+/**
+ * BehaviorVisualState — free-string visual state name.
+ *
+ * The predefined values below are provided as IDE autocomplete hints, but
+ * any arbitrary string is accepted (e.g. "fault", "standby", "custom_anim").
+ * This replaces the previous hard-coded 11-value union to support user-defined
+ * states in the Symbol Editor.
+ */
 export type BehaviorVisualState =
   | 'idle'
   | 'open'
@@ -25,7 +33,8 @@ export type BehaviorVisualState =
   | 'running'
   | 'stopped'
   | 'energized'
-  | 'deenergized';
+  | 'deenergized'
+  | (string & {});
 
 export type BlockRuntimeValue = string | number | boolean;
 export type BlockRuntimeState = Record<string, BlockRuntimeValue>;

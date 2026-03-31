@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
-import { Save, AlertCircle, Check, ChevronDown, ChevronRight, Copy } from 'lucide-react';
-import type { GraphicPrimitive, SymbolDefinition, SymbolPin } from '../../types/symbol';
+import { Save, AlertCircle, Check, ChevronDown, ChevronRight, Copy, Layers, Trash2 } from 'lucide-react';
+import type { GraphicPrimitive, GraphicPrimitiveOverride, SymbolDefinition, SymbolPin } from '../../types/symbol';
 import type { BehaviorRule } from '../../types/behaviorRules';
 import { saveSymbol } from '../../services/symbolService';
 import { validateSymbol } from '../../utils/symbolValidation';
@@ -22,6 +22,13 @@ interface PropertiesPanelProps {
   onUpdatePrimitiveLabel?: (index: number, label: string) => void;
   onUpdatePrimitiveText?: (index: number, text: string) => void;
   onUpdatePin?: (pinId: string, updates: Partial<Pick<SymbolPin, 'name' | 'number'>>) => void;
+  // Sub-AC 3-1: Visual State context tracking
+  /** The currently active VisualState being edited (null = base) */
+  activeVisualState?: string | null;
+  /** Update (merge) a primitive's visual state override */
+  onUpdateVisualStateOverride?: (primitiveId: string, override: Partial<GraphicPrimitiveOverride>) => void;
+  /** Clear all overrides for a primitive in the active visual state */
+  onClearVisualStateOverride?: (primitiveId: string) => void;
 }
 
 type SelectedItem =
