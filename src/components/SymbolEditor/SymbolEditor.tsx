@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { Save, X, Layers, Eye, ChevronDown, Plus, FileDown, Play, Pencil } from 'lucide-react';
-import type { GraphicPrimitive, GraphicPrimitiveOverride, SymbolDefinition, SymbolPin, SymbolUnit, SymbolVisualVariant } from '../../types/symbol';
+import { Save, X, Layers, FileDown, Play, Pencil } from 'lucide-react';
+import type {
+  GraphicPrimitive,
+  GraphicPrimitiveOverride,
+  SymbolDefinition,
+  SymbolPin,
+  SymbolUnit,
+  SymbolVisualVariant,
+} from '../../types/symbol';
 import { EditorToolbar } from './EditorToolbar';
 import { PinConfigPopover } from './PinConfigPopover';
 import { PropertiesPanel } from './PropertiesPanel';
@@ -54,9 +61,9 @@ export interface EditorState {
   selectedIds: Set<string>;
   isDirty: boolean;
   /**
-   * The currently active VisualState context for editing.
+   * The currently active VisualState context for editing/preview.
    * null = editing the base/default appearance.
-   * string = editing overrides for that named visual state.
+   * string = viewing/editing overrides for that named visual state.
    */
   activeVisualState: string | null;
 }
@@ -86,6 +93,50 @@ interface LocalSymbol extends SymbolDefinition {
 
 const MAX_UNITS = 4;
 
+// ============================================================================
+// AC 7: Edge-snap helper — snaps a pin's body position to the nearest symbol edge
+// ============================================================================
+
+const EDGE_SNAP_THRESHOLD = 8; // distance in symbol-space units to trigger snap
+
+/**
+ * Snaps a pin position to the nearest edge of the symbol boundary (0,0)→(w,h).
+ * Also updates orientation to point outward from the snapped edge.
+ * Returns adjusted position + orientation, or original values if outside snap range.
+ */
+function snapPinToEdge(
+  pos: { x: number; y: number },
+  symbolWidth: number,
+  symbolHeight: number,
+): { position: { x: number; y: number }; orientation: 'left' | 'right' | 'up' | 'down' } | null {
+  if (symbolWidth <= 0 || symbolHeight <= 0) return null;
+
+  // Distances to each edge
+  const distLeft = Math.abs(pos.x);
+  const distRight = Math.abs(pos.x - symbolWidth);
+  const distTop = Math.abs(pos.y);
+  const distBottom = Math.abs(pos.y - symbolHeight);
+  const minDist = Math.min(distLeft, distRight, distTop, distBottom);
+
+  if (minDist > EDGE_SNAP_THRESHOLD) return null;
+
+  // Clamp the other axis to stay within bounds
+  const clampX = Math.max(0, Math.min(symbolWidth, pos.x));
+  const clampY = Math.max(0, Math.min(symbolHeight, pos.y));
+
+  if (minDist === distLeft) {
+    return { position: { x: 0, y: clampY }, orientation: 'left' };
+  }
+  if (minDist === distRight) {
+    return { position: { x: symbolWidth, y: clampY }, orientation: 'right' };
+  }
+  if (minDist === distTop) {
+    return { position: { x: clampX, y: 0 }, orientation: 'up' };
+  }
+  // distBottom
+  return { position: { x: clampX, y: symbolHeight }, orientation: 'down' };
+}
+
 function createBlankSymbol(): LocalSymbol {
   const timestamp = new Date().toISOString();
   return {
@@ -106,7 +157,7 @@ function createBlankSymbol(): LocalSymbol {
   };
 }
 
-function editorReducer(state: EditorState, action: EditorAction): EditorState {
+export function editorReducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
     case 'SET_TOOL':
       return { ...state, currentTool: action.tool };
@@ -131,7 +182,7 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
   }
 }
 
-const INITIAL_STATE: EditorState = {
+export const INITIAL_EDITOR_STATE: EditorState = {
   currentTool: 'select',
   zoom: 1,
   pan: { x: 200, y: 200 },
@@ -140,152 +191,53 @@ const INITIAL_STATE: EditorState = {
   activeVisualState: null,
 };
 
-// ============================================================================
-// VisualStateContextBar sub-component
-// ============================================================================
+/** @internal kept for backwards-compat inside the module */
+const INITIAL_STATE = INITIAL_EDITOR_STATE;
 
-interface VisualStateContextBarProps {
-  /** Currently active visual state name (null = base/default appearance) */
-  activeVisualState: string | null;
-  /** All visual state names defined on the symbol */
-  visualStateList: string[];
-  /** Controlled input value for adding a new custom state */
-  newStateName: string;
-  /** Called when the user selects a visual state tab */
-  onSetActive: (state: string | null) => void;
-  /** Called when the user confirms adding a new state */
-  onAddState: (name: string) => void;
-  /** Called when the custom state input changes */
-  onNewStateNameChange: (name: string) => void;
-}
+// ============================================================================
+// Visual State override helpers (module-level, pure functions)
+// ============================================================================
 
 /**
- * Tab bar for switching the active visual state context.
+ * Apply primitive overrides from a SymbolVisualVariant to a graphics array.
  *
- * Displays a "Base" tab (null state) plus one tab per defined visual state.
- * A "+" popover allows adding new states (predefined presets or free-text).
+ * Priority:
+ *   1. variant.graphics — replaces base graphics entirely
+ *   2. variant.primitiveOverrides — merged onto matching primitives by ID
+ *   3. No override present — returns original graphics unchanged
  */
-function VisualStateContextBar({
-  activeVisualState,
-  visualStateList,
-  newStateName,
-  onSetActive,
-  onAddState,
-  onNewStateNameChange,
-}: VisualStateContextBarProps) {
-  const [addOpen, setAddOpen] = useState(false);
+function applyVisualStateOverrides(
+  graphics: GraphicPrimitive[],
+  variant: SymbolVisualVariant | undefined,
+): GraphicPrimitive[] {
+  if (!variant) return graphics;
 
-  const handlePreset = (name: string) => {
-    onAddState(name);
-    setAddOpen(false);
-  };
+  // Full replacement takes priority
+  if (variant.graphics && variant.graphics.length > 0) {
+    return variant.graphics;
+  }
 
-  const handleCustomSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newStateName.trim()) {
-      onAddState(newStateName.trim());
-      setAddOpen(false);
+  // Per-primitive overrides
+  const overrides = variant.primitiveOverrides;
+  if (!overrides || Object.keys(overrides).length === 0) return graphics;
+
+  return graphics.map((prim) => {
+    const key = prim.id;
+    if (!key) return prim;
+    const ov: GraphicPrimitiveOverride | undefined = overrides[key];
+    if (!ov) return prim;
+    // Merge override fields — only copy defined values
+    const merged = { ...prim } as Record<string, unknown>;
+    if (ov.stroke !== undefined) merged['stroke'] = ov.stroke;
+    if (ov.fill !== undefined) merged['fill'] = ov.fill;
+    if (ov.strokeWidth !== undefined) merged['strokeWidth'] = ov.strokeWidth;
+    if (ov.opacity !== undefined) merged['opacity'] = ov.opacity;
+    if (prim.kind === 'text') {
+      if (ov.text !== undefined) merged['text'] = ov.text;
+      if (ov.fontSize !== undefined) merged['fontSize'] = ov.fontSize;
     }
-  };
-
-  // Presets not yet in the list
-  const unusedPresets = PREDEFINED_VISUAL_STATES.filter((p) => !visualStateList.includes(p));
-
-  return (
-    <div
-      data-testid="visual-state-context-bar"
-      className="flex items-center gap-1 px-4 py-1 border-b border-neutral-700 bg-neutral-850 overflow-x-auto shrink-0"
-    >
-      {/* Icon label */}
-      <Eye size={12} className="text-neutral-500 shrink-0 mr-1" />
-      <span className="text-[10px] text-neutral-500 uppercase tracking-wider mr-2 shrink-0">State:</span>
-
-      {/* Base tab */}
-      <button
-        type="button"
-        data-testid="visual-state-tab-base"
-        onClick={() => onSetActive(null)}
-        className={`px-2.5 py-0.5 text-xs rounded transition-colors shrink-0 ${
-          activeVisualState === null
-            ? 'bg-neutral-600 text-white'
-            : 'bg-neutral-750 text-neutral-400 hover:text-white hover:bg-neutral-700'
-        }`}
-      >
-        Base
-      </button>
-
-      {/* One tab per defined visual state */}
-      {visualStateList.map((stateName) => (
-        <button
-          key={stateName}
-          type="button"
-          data-testid={`visual-state-tab-${stateName}`}
-          onClick={() => onSetActive(stateName)}
-          className={`px-2.5 py-0.5 text-xs rounded transition-colors shrink-0 ${
-            activeVisualState === stateName
-              ? 'bg-purple-600 text-white'
-              : 'bg-neutral-750 text-neutral-400 hover:text-white hover:bg-neutral-700'
-          }`}
-        >
-          {stateName}
-        </button>
-      ))}
-
-      {/* Add state button */}
-      <div className="relative shrink-0">
-        <button
-          type="button"
-          data-testid="visual-state-add-btn"
-          onClick={() => setAddOpen((v) => !v)}
-          className="flex items-center gap-0.5 px-2 py-0.5 text-xs rounded bg-neutral-750 text-neutral-500 hover:text-neutral-200 hover:bg-neutral-700 transition-colors"
-          title="Add visual state"
-        >
-          <Plus size={10} />
-          <ChevronDown size={10} />
-        </button>
-
-        {addOpen && (
-          <div className="absolute top-full left-0 mt-1 z-50 w-52 bg-neutral-800 border border-neutral-600 rounded shadow-xl">
-            {/* Predefined presets */}
-            {unusedPresets.length > 0 && (
-              <div className="p-1 border-b border-neutral-700">
-                <p className="px-2 py-1 text-[10px] text-neutral-500 uppercase tracking-wider">Presets</p>
-                {unusedPresets.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => handlePreset(preset)}
-                    className="w-full text-left px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-700 rounded"
-                  >
-                    {preset}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Custom name input */}
-            <form onSubmit={handleCustomSubmit} className="p-2 flex gap-1">
-              <input
-                type="text"
-                value={newStateName}
-                onChange={(e) => onNewStateNameChange(e.target.value)}
-                placeholder="Custom state…"
-                className="flex-1 px-2 py-1 bg-neutral-900 border border-neutral-600 rounded text-xs text-neutral-200 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                autoFocus
-                data-testid="visual-state-custom-input"
-              />
-              <button
-                type="submit"
-                className="px-2 py-1 text-xs bg-purple-600 hover:bg-purple-500 text-white rounded"
-              >
-                Add
-              </button>
-            </form>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+    return merged as unknown as GraphicPrimitive;
+  });
 }
 
 // ============================================================================
@@ -314,18 +266,20 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
   // ── Add primitive ──────────────────────────────────────────────────────────
 
   const handleAddPrimitive = useCallback((prim: GraphicPrimitive) => {
+    // Always ensure a stable id so visual-state overrides can reference the primitive
+    const primWithId: GraphicPrimitive = prim.id ? prim : { ...prim, id: crypto.randomUUID() };
     const history = historyRef.current;
     if (isMultiUnit && activeUnit !== null) {
       setLocalSymbol((prev) => {
         const units = [...(prev.units ?? [])];
-        const unit = { ...units[activeUnit], graphics: [...units[activeUnit].graphics, prim] };
+        const unit = { ...units[activeUnit], graphics: [...units[activeUnit].graphics, primWithId] };
         units[activeUnit] = unit;
         return { ...prev, units, updatedAt: new Date().toISOString() };
       });
     } else {
       history.execute(new AddPrimitiveCommand(
         (fn) => setLocalSymbol((prev) => fn(prev) as LocalSymbol),
-        prim,
+        primWithId,
       ));
       bumpHistory();
     }
@@ -366,47 +320,63 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
   const handleMovePins = useCallback(
     (pinIds: string[], dx: number, dy: number) => {
       const history = historyRef.current;
+      const symW = localSymbol.width;
+      const symH = localSymbol.height;
+
+      // AC 7: Apply edge-snap after translation
+      const applySnapToPin = (p: SymbolPin): SymbolPin => {
+        if (!pinIds.includes(p.id)) return p;
+        const newPos = { x: p.position.x + dx, y: p.position.y + dy };
+        const snap = snapPinToEdge(newPos, symW, symH);
+        if (snap) {
+          return { ...p, position: snap.position, orientation: snap.orientation };
+        }
+        return { ...p, position: newPos };
+      };
+
       if (isMultiUnit && activeUnit !== null) {
         setLocalSymbol((prev) => {
           const units = [...(prev.units ?? [])];
           const unit = units[activeUnit];
-          const pins = unit.pins.map((p) =>
-            pinIds.includes(p.id)
-              ? { ...p, position: { x: p.position.x + dx, y: p.position.y + dy } }
-              : p,
-          );
+          const pins = unit.pins.map(applySnapToPin);
           units[activeUnit] = { ...unit, pins };
           return { ...prev, units, updatedAt: new Date().toISOString() };
         });
       } else {
-        history.execute(new TranslatePinsCommand(
-          (fn) => setLocalSymbol((prev) => fn(prev) as LocalSymbol),
-          pinIds,
-          dx,
-          dy,
-        ));
+        // Use direct state update with snap (TranslatePinsCommand doesn't support snap)
+        setLocalSymbol((prev) => {
+          const pins = prev.pins.map(applySnapToPin);
+          return { ...prev, pins, updatedAt: new Date().toISOString() };
+        });
         bumpHistory();
       }
       dispatch({ type: 'MARK_DIRTY' });
     },
-    [isMultiUnit, activeUnit, bumpHistory],
+    [isMultiUnit, activeUnit, bumpHistory, localSymbol.width, localSymbol.height],
   );
 
   // ── Add pin ────────────────────────────────────────────────────────────────
 
   const handleAddPin = useCallback((pin: SymbolPin) => {
     const history = historyRef.current;
+
+    // AC 7: Edge-snap new pins to nearest symbol edge
+    const snap = snapPinToEdge(pin.position, localSymbol.width, localSymbol.height);
+    const snappedPin: SymbolPin = snap
+      ? { ...pin, position: snap.position, orientation: snap.orientation }
+      : pin;
+
     if (isMultiUnit && activeUnit !== null) {
       setLocalSymbol((prev) => {
         const units = [...(prev.units ?? [])];
         const currentUnit = units[activeUnit];
-        const enrichedPin: SymbolPin = { ...pin, sortOrder: pin.sortOrder ?? currentUnit.pins.length };
+        const enrichedPin: SymbolPin = { ...snappedPin, sortOrder: snappedPin.sortOrder ?? currentUnit.pins.length };
         const unit = { ...currentUnit, pins: [...currentUnit.pins, enrichedPin] };
         units[activeUnit] = unit;
         return { ...prev, units, updatedAt: new Date().toISOString() };
       });
     } else {
-      const enrichedPin: SymbolPin = { ...pin, sortOrder: pin.sortOrder ?? localSymbol.pins.length };
+      const enrichedPin: SymbolPin = { ...snappedPin, sortOrder: snappedPin.sortOrder ?? localSymbol.pins.length };
       history.execute(new AddPinCommand(
         (fn) => setLocalSymbol((prev) => fn(prev) as LocalSymbol),
         enrichedPin,
@@ -423,6 +393,12 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
 
     const history = historyRef.current;
 
+    // AC 8: Filter out locked pins — they cannot be deleted
+    const currentPins = isMultiUnit && activeUnit !== null
+      ? (localSymbol.units?.[activeUnit]?.pins ?? [])
+      : (localSymbol.pins ?? []);
+    const lockedPinIds = new Set(currentPins.filter(p => p.locked).map(p => p.id));
+
     if (isMultiUnit && activeUnit !== null) {
       setLocalSymbol((prev) => {
         const units = [...(prev.units ?? [])];
@@ -430,7 +406,7 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
         units[activeUnit] = {
           ...unit,
           graphics: unit.graphics.filter((_, i) => !state.selectedIds.has(`g-${i}`)),
-          pins: unit.pins.filter((p) => !state.selectedIds.has(p.id)),
+          pins: unit.pins.filter((p) => !state.selectedIds.has(p.id) || lockedPinIds.has(p.id)),
         };
         return { ...prev, units, updatedAt: new Date().toISOString() };
       });
@@ -438,7 +414,7 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
       const graphicIndices = Array.from(state.selectedIds)
         .filter((id) => id.startsWith('g-'))
         .map((id) => parseInt(id.slice(2), 10));
-      const pinIds = Array.from(state.selectedIds).filter((id) => !id.startsWith('g-'));
+      const pinIds = Array.from(state.selectedIds).filter((id) => !id.startsWith('g-') && !lockedPinIds.has(id));
 
       if (graphicIndices.length > 0) {
         history.execute(new RemovePrimitivesCommand(
@@ -457,7 +433,108 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
 
     dispatch({ type: 'DESELECT_ALL' });
     dispatch({ type: 'MARK_DIRTY' });
-  }, [state.selectedIds, isMultiUnit, activeUnit, bumpHistory]);
+  }, [state.selectedIds, isMultiUnit, activeUnit, localSymbol, bumpHistory]);
+
+  // ── Ensure primitive has an id (required for visual-state overrides) ──────
+
+  /**
+   * If the primitive at `index` has no `id`, assign a stable UUID to it.
+   * Triggers a state update so PropertiesPanel re-renders with the new id.
+   */
+  const handleEnsurePrimitiveId = useCallback(
+    (index: number) => {
+      setLocalSymbol((prev) => {
+        const isInUnit = isMultiUnit && activeUnit !== null;
+        const graphics = isInUnit
+          ? (prev.units?.[activeUnit!]?.graphics ?? [])
+          : prev.graphics;
+        const prim = graphics[index];
+        if (!prim || prim.id) return prev; // Already has id — no change
+
+        const newId = crypto.randomUUID();
+        if (isInUnit) {
+          const units = [...(prev.units ?? [])];
+          const unit = units[activeUnit!];
+          const newGraphics = unit.graphics.map((g, i) =>
+            i === index ? { ...g, id: newId } : g,
+          );
+          units[activeUnit!] = { ...unit, graphics: newGraphics };
+          return { ...prev, units, updatedAt: new Date().toISOString() };
+        } else {
+          const newGraphics = prev.graphics.map((g, i) =>
+            i === index ? { ...g, id: newId } : g,
+          );
+          return { ...prev, graphics: newGraphics, updatedAt: new Date().toISOString() };
+        }
+      });
+      dispatch({ type: 'MARK_DIRTY' });
+    },
+    [isMultiUnit, activeUnit],
+  );
+
+  // ── Update primitive label / text ──────────────────────────────────────────
+
+  const handleUpdatePrimitiveLabel = useCallback(
+    (index: number, label: string) => {
+      setLocalSymbol((prev) => {
+        if (isMultiUnit && activeUnit !== null) {
+          const units = [...(prev.units ?? [])];
+          const unit = units[activeUnit];
+          const graphics = unit.graphics.map((g, i) => (i === index ? { ...g, label } : g));
+          units[activeUnit] = { ...unit, graphics };
+          return { ...prev, units, updatedAt: new Date().toISOString() };
+        }
+        const graphics = prev.graphics.map((g, i) => (i === index ? { ...g, label } : g));
+        return { ...prev, graphics, updatedAt: new Date().toISOString() };
+      });
+      dispatch({ type: 'MARK_DIRTY' });
+    },
+    [isMultiUnit, activeUnit],
+  );
+
+  const handleUpdatePrimitiveText = useCallback(
+    (index: number, text: string) => {
+      setLocalSymbol((prev) => {
+        if (isMultiUnit && activeUnit !== null) {
+          const units = [...(prev.units ?? [])];
+          const unit = units[activeUnit];
+          const graphics = unit.graphics.map((g, i) => {
+            if (i !== index || g.kind !== 'text') return g;
+            return { ...g, text };
+          });
+          units[activeUnit] = { ...unit, graphics };
+          return { ...prev, units, updatedAt: new Date().toISOString() };
+        }
+        const graphics = prev.graphics.map((g, i) => {
+          if (i !== index || g.kind !== 'text') return g;
+          return { ...g, text };
+        });
+        return { ...prev, graphics, updatedAt: new Date().toISOString() };
+      });
+      dispatch({ type: 'MARK_DIRTY' });
+    },
+    [isMultiUnit, activeUnit],
+  );
+
+  // ── Update pin name / number ───────────────────────────────────────────────
+
+  const handleUpdatePin = useCallback(
+    (pinId: string, updates: Partial<Pick<SymbolPin, 'name' | 'number'>>) => {
+      setLocalSymbol((prev) => {
+        if (isMultiUnit && activeUnit !== null) {
+          const units = [...(prev.units ?? [])];
+          const unit = units[activeUnit];
+          const pins = unit.pins.map((p) => (p.id === pinId ? { ...p, ...updates } : p));
+          units[activeUnit] = { ...unit, pins };
+          return { ...prev, units, updatedAt: new Date().toISOString() };
+        }
+        const pins = prev.pins.map((p) => (p.id === pinId ? { ...p, ...updates } : p));
+        return { ...prev, pins, updatedAt: new Date().toISOString() };
+      });
+      dispatch({ type: 'MARK_DIRTY' });
+    },
+    [isMultiUnit, activeUnit],
+  );
 
   // ── Undo / Redo ────────────────────────────────────────────────────────────
 
@@ -541,46 +618,120 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
     dispatch({ type: 'MARK_DIRTY' });
   };
 
-  // ── Canvas symbol (current unit or full symbol) ────────────────────────────
-
-  const canvasSymbol: SymbolDefinition | null = (() => {
-    if (!isMultiUnit || activeUnit === null) return localSymbol;
-    const unit = localSymbol.units?.[activeUnit];
-    if (!unit) return localSymbol;
-    return {
-      ...localSymbol,
-      graphics: unit.graphics,
-      pins: unit.pins,
-    };
-  })();
-
   // ── VisualState management ─────────────────────────────────────────────────
 
+  /** Keys of currently defined visual states on the symbol */
   const visualStateNames = useMemo(
     () => Object.keys(localSymbol.visualStates ?? {}),
     [localSymbol.visualStates],
   );
 
+  /**
+   * Create (or ensure existence of) a named visual state entry.
+   * After adding, automatically switches the active state to the new one.
+   */
   const handleAddVisualState = useCallback((name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
     setLocalSymbol((prev) => ({
       ...prev,
       visualStates: {
         ...prev.visualStates,
-        [name]: { primitiveOverrides: {} },
+        // Initialize with empty overrides if the state does not exist yet
+        [trimmed]: prev.visualStates?.[trimmed] ?? { primitiveOverrides: {} },
       },
       updatedAt: new Date().toISOString(),
     }));
+    dispatch({ type: 'SET_VISUAL_STATE', state: trimmed });
     dispatch({ type: 'MARK_DIRTY' });
   }, []);
 
+  /** Remove a visual state. If it was the active one, switch back to base. */
   const handleRemoveVisualState = useCallback((name: string) => {
     setLocalSymbol((prev) => {
-      const vs = { ...prev.visualStates };
+      const vs = { ...(prev.visualStates ?? {}) };
       delete vs[name];
       return { ...prev, visualStates: vs, updatedAt: new Date().toISOString() };
     });
+    // Switch back to base if the removed state was active
+    dispatch({ type: 'SET_VISUAL_STATE', state: null });
     dispatch({ type: 'MARK_DIRTY' });
   }, []);
+
+  /**
+   * Update (or create) a visual state override for a specific primitive.
+   *
+   * @param primitiveId - The `id` field of the GraphicPrimitive to override
+   * @param override    - Partial override object to merge into the existing override
+   */
+  const handleUpdateVisualStateOverride = useCallback(
+    (primitiveId: string, override: Partial<GraphicPrimitiveOverride>) => {
+      const stateName = state.activeVisualState;
+      if (!stateName) return;
+      setLocalSymbol((prev) => {
+        const visualStates: Record<string, SymbolVisualVariant> = { ...(prev.visualStates ?? {}) };
+        const currentVariant: SymbolVisualVariant = { ...(visualStates[stateName] ?? {}) };
+        const primitiveOverrides = { ...(currentVariant.primitiveOverrides ?? {}) };
+        const existing = primitiveOverrides[primitiveId] ?? {};
+        primitiveOverrides[primitiveId] = { ...existing, ...override };
+        currentVariant.primitiveOverrides = primitiveOverrides;
+        visualStates[stateName] = currentVariant;
+        return { ...prev, visualStates, updatedAt: new Date().toISOString() };
+      });
+      dispatch({ type: 'MARK_DIRTY' });
+    },
+    [state.activeVisualState],
+  );
+
+  /** Clear the visual state override for a specific primitive. */
+  const handleClearVisualStateOverride = useCallback(
+    (primitiveId: string) => {
+      const stateName = state.activeVisualState;
+      if (!stateName) return;
+      setLocalSymbol((prev) => {
+        const visualStates: Record<string, SymbolVisualVariant> = { ...(prev.visualStates ?? {}) };
+        const currentVariant: SymbolVisualVariant = { ...(visualStates[stateName] ?? {}) };
+        const primitiveOverrides = { ...(currentVariant.primitiveOverrides ?? {}) };
+        delete primitiveOverrides[primitiveId];
+        currentVariant.primitiveOverrides = primitiveOverrides;
+        visualStates[stateName] = currentVariant;
+        return { ...prev, visualStates, updatedAt: new Date().toISOString() };
+      });
+      dispatch({ type: 'MARK_DIRTY' });
+    },
+    [state.activeVisualState],
+  );
+
+  // ── Canvas symbol (current unit + visual state overrides applied) ──────────
+
+  const canvasSymbol: SymbolDefinition | null = useMemo(() => {
+    // Step 1: resolve multi-unit
+    let base: SymbolDefinition;
+    if (!isMultiUnit || activeUnit === null) {
+      base = localSymbol;
+    } else {
+      const unit = localSymbol.units?.[activeUnit];
+      if (!unit) return localSymbol;
+      base = {
+        ...localSymbol,
+        graphics: unit.graphics,
+        pins: unit.pins,
+      };
+    }
+
+    // Step 2: apply visual state overrides for preview/edit
+    if (state.activeVisualState !== null) {
+      const variant = localSymbol.visualStates?.[state.activeVisualState];
+      if (variant) {
+        return {
+          ...base,
+          graphics: applyVisualStateOverrides(base.graphics, variant),
+        };
+      }
+    }
+
+    return base;
+  }, [localSymbol, isMultiUnit, activeUnit, state.activeVisualState]);
 
   // ── XML Export ─────────────────────────────────────────────────────────────
 
@@ -595,77 +746,17 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
     URL.revokeObjectURL(url);
   }, [localSymbol]);
 
-  // ── Preview mode ──────────────────────────────────────────────────────────
+  // ── Preview mode ───────────────────────────────────────────────────────────
 
   const [previewMode, setPreviewMode] = useState(false);
   const [previewPoweredPorts, setPreviewPoweredPorts] = useState<Set<string>>(new Set());
-
-  const handleTogglePreviewPort = useCallback((portId: string) => {
-    setPreviewPoweredPorts((prev) => {
-      const next = new Set(prev);
-      if (next.has(portId)) next.delete(portId);
-      else next.add(portId);
-      return next;
-    });
-  }, []);
+  void previewPoweredPorts; // used by future Preview sub-AC
 
   // ── Save ───────────────────────────────────────────────────────────────────
 
   const handleSave = () => {
     onSave?.(localSymbol);
   };
-
-  // ── Visual State overrides ─────────────────────────────────────────────────
-
-  /**
-   * Update (or create) a visual state override for a specific primitive.
-   *
-   * @param primitiveId - The `id` field of the GraphicPrimitive to override
-   * @param override    - Partial override object to merge into the existing override
-   */
-  const handleUpdateVisualStateOverride = useCallback(
-    (primitiveId: string, override: Partial<GraphicPrimitiveOverride>) => {
-      const stateName = state.activeVisualState;
-      if (!stateName) return;
-      setLocalSymbol((prev) => {
-        const visualStates = {
-          ...(prev.visualStates as Record<string, SymbolVisualVariant> | undefined),
-        } as Record<string, SymbolVisualVariant>;
-        const currentVariant = { ...(visualStates[stateName] ?? {}) };
-        const primitiveOverrides = { ...(currentVariant.primitiveOverrides ?? {}) };
-        const existing = primitiveOverrides[primitiveId] ?? {};
-        primitiveOverrides[primitiveId] = { ...existing, ...override };
-        currentVariant.primitiveOverrides = primitiveOverrides;
-        visualStates[stateName] = currentVariant;
-        return { ...prev, visualStates, updatedAt: new Date().toISOString() };
-      });
-      dispatch({ type: 'MARK_DIRTY' });
-    },
-    [state.activeVisualState],
-  );
-
-  /**
-   * Clear the visual state override for a specific primitive.
-   */
-  const handleClearVisualStateOverride = useCallback(
-    (primitiveId: string) => {
-      const stateName = state.activeVisualState;
-      if (!stateName) return;
-      setLocalSymbol((prev) => {
-        const visualStates = {
-          ...(prev.visualStates as Record<string, SymbolVisualVariant> | undefined),
-        } as Record<string, SymbolVisualVariant>;
-        const currentVariant = { ...(visualStates[stateName] ?? {}) };
-        const primitiveOverrides = { ...(currentVariant.primitiveOverrides ?? {}) };
-        delete primitiveOverrides[primitiveId];
-        currentVariant.primitiveOverrides = primitiveOverrides;
-        visualStates[stateName] = currentVariant;
-        return { ...prev, visualStates, updatedAt: new Date().toISOString() };
-      });
-      dispatch({ type: 'MARK_DIRTY' });
-    },
-    [state.activeVisualState],
-  );
 
   const canUndo = historyRef.current.canUndo;
   const canRedo = historyRef.current.canRedo;
@@ -681,6 +772,12 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
           <h2 className="text-sm font-semibold text-white">Symbol Editor</h2>
           <span className="text-sm text-neutral-400">{localSymbol.name}</span>
           {state.isDirty && <span className="text-xs text-amber-400">Unsaved</span>}
+          {/* Active visual state indicator */}
+          {state.activeVisualState && (
+            <span className="px-2 py-0.5 text-xs rounded bg-green-900/50 text-green-400 font-medium border border-green-800/60">
+              State: {state.activeVisualState}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -688,8 +785,10 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
           <button
             type="button"
             onClick={() => {
-              setPreviewMode(!previewMode);
-              if (!previewMode) setPreviewPoweredPorts(new Set());
+              setPreviewMode((v) => {
+                if (!v) setPreviewPoweredPorts(new Set());
+                return !v;
+              });
             }}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded transition-colors ${
               previewMode
@@ -809,22 +908,41 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
         </div>
 
         {/* SVG drawing canvas */}
-        <div data-testid="symbol-editor-canvas" className="flex-1 overflow-hidden">
+        <div data-testid="symbol-editor-canvas" className="relative flex-1 overflow-hidden">
           <SvgSymbolCanvas
             symbol={canvasSymbol}
-            currentTool={state.currentTool}
+            currentTool={previewMode ? 'select' : state.currentTool}
             selectedIds={state.selectedIds}
             dispatch={dispatch}
-            onAddPrimitive={handleAddPrimitive}
-            onMovePrimitives={handleMovePrimitives}
-            onMovePins={handleMovePins}
-            onDeleteSelected={handleDeleteSelected}
-            onOpenPinPopover={(screenX, screenY, canvasX, canvasY) => {
+            onAddPrimitive={previewMode ? undefined : handleAddPrimitive}
+            onMovePrimitives={previewMode ? undefined : handleMovePrimitives}
+            onMovePins={previewMode ? undefined : handleMovePins}
+            onDeleteSelected={previewMode ? undefined : handleDeleteSelected}
+            onOpenPinPopover={previewMode ? undefined : (screenX, screenY, canvasX, canvasY) => {
               setPinPopover({ screenX, screenY, canvasX, canvasY });
             }}
             activeVisualState={state.activeVisualState}
             style={{ width: '100%', height: '100%' }}
           />
+
+          {/* Visual state context overlay — shown when editing a non-base state */}
+          {!previewMode && state.activeVisualState && (
+            <div
+              data-testid="visual-state-canvas-badge"
+              className="pointer-events-none absolute left-1/2 top-2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-purple-500/40 bg-purple-900/75 px-3 py-0.5 text-xs font-medium text-purple-200 backdrop-blur-sm"
+            >
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-purple-400" />
+              Editing: <span className="font-bold">{state.activeVisualState}</span>
+            </div>
+          )}
+
+          {/* Preview mode overlay */}
+          {previewMode && (
+            <div
+              data-testid="preview-mode-overlay"
+              className="pointer-events-none absolute inset-0 z-10 rounded border-2 border-amber-500/30"
+            />
+          )}
         </div>
 
         {/* Right properties panel */}
@@ -839,6 +957,10 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
           activeVisualState={state.activeVisualState}
           onUpdateVisualStateOverride={handleUpdateVisualStateOverride}
           onClearVisualStateOverride={handleClearVisualStateOverride}
+          onEnsurePrimitiveId={handleEnsurePrimitiveId}
+          onUpdatePrimitiveLabel={handleUpdatePrimitiveLabel}
+          onUpdatePrimitiveText={handleUpdatePrimitiveText}
+          onUpdatePin={handleUpdatePin}
         />
       </div>
 
