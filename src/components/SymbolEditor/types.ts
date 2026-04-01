@@ -64,6 +64,15 @@ export interface GhostMarquee {
   height: number;
 }
 
+/** Pin drag ghost (used by SelectTool when dragging a pin) */
+export interface GhostPin {
+  kind: 'pin';
+  x: number;
+  y: number;
+  orientation: 'right' | 'left' | 'up' | 'down';
+  length: number;
+}
+
 /** Union of all ghost shapes — returned by tool.onMouseMove() */
 export type GhostShape =
   | GhostRect
@@ -71,7 +80,31 @@ export type GhostShape =
   | GhostLine
   | GhostArc
   | GhostPolyline
-  | GhostMarquee;
+  | GhostMarquee
+  | GhostPin;
+
+// ============================================================================
+// Resize Handle
+// ============================================================================
+
+/**
+ * Identifies one of the 8 edge/corner resize handles or the rotation handle.
+ * Used by SelectTool when a resizable primitive (rect, circle, text) is selected.
+ *
+ * Layout:
+ *   nw ── n ── ne
+ *   │           │
+ *   w           e
+ *   │           │
+ *   sw ── s ── se
+ *
+ *   rotate: appears above the top edge (above n), for future rotation support.
+ */
+export type ResizeHandleKind =
+  | 'nw' | 'n' | 'ne'
+  | 'w'          | 'e'
+  | 'sw' | 's' | 'se'
+  | 'rotate';
 
 // ============================================================================
 // Layer System

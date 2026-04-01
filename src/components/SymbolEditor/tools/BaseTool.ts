@@ -73,10 +73,17 @@ export abstract class BaseTool {
   abstract onMouseDown(pt: CanvasPoint, callbacks: ToolCallbacks): void;
   abstract onMouseMove(pt: CanvasPoint, callbacks: ToolCallbacks): GhostShape | null;
   abstract onMouseUp(pt: CanvasPoint, callbacks: ToolCallbacks): void;
-  
+
   // Optional handlers
   onKeyDown?(e: KeyboardEvent, callbacks: ToolCallbacks): void;
   onDoubleClick?(pt: CanvasPoint, callbacks: ToolCallbacks): void;
+
+  /**
+   * Whether the tool is in a multi-step drawing operation (e.g. polyline point placement).
+   * When true, the host should NOT clear the ghost preview on mouseUp,
+   * allowing the preview to persist between clicks.
+   */
+  isDrawing(): boolean { return false; }
 
   // Optional cleanup or cancel operation
   cancel(): void {}

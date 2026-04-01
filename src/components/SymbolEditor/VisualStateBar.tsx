@@ -6,7 +6,7 @@
  * Users can add custom state names and remove existing ones.
  */
 import { useState } from 'react';
-import { Plus, X, Eye, EyeOff } from 'lucide-react';
+import { Plus, X, Eye } from 'lucide-react';
 
 interface VisualStateBarProps {
   /** Names of all defined visual states (from symbol.visualStates keys) */
@@ -65,18 +65,32 @@ export function VisualStateBar({
   const unusedSuggestions = SUGGESTED_STATES.filter((s) => !stateNames.includes(s));
 
   return (
-    <div className="border-b border-neutral-700 bg-neutral-800/80">
+    <div
+      data-testid="visual-state-bar"
+      className="border-b border-neutral-700 bg-neutral-800/80"
+    >
       <div className="flex items-center gap-1 px-4 py-1.5 overflow-x-auto">
         {/* Preview mode indicator */}
         {previewMode && (
-          <span className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-amber-400 bg-amber-900/30 rounded mr-2">
+          <span
+            data-testid="visual-state-preview-badge"
+            className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-amber-400 bg-amber-900/30 rounded mr-2 shrink-0"
+          >
             <Eye size={10} /> PREVIEW
+          </span>
+        )}
+
+        {/* Label */}
+        {!previewMode && (
+          <span className="text-[10px] text-neutral-500 uppercase tracking-wider mr-1 shrink-0">
+            State:
           </span>
         )}
 
         {/* Base state tab */}
         <button
           type="button"
+          data-testid="visual-state-tab-base"
           onClick={() => onStateChange(null)}
           className={`px-3 py-1 text-xs rounded transition-colors shrink-0 ${
             activeState === null
@@ -92,93 +106,107 @@ export function VisualStateBar({
           <button
             key={name}
             type="button"
+            data-testid={`visual-state-tab-${name}`}
             onClick={() => onStateChange(name)}
             className={`group flex items-center gap-1 px-3 py-1 text-xs rounded transition-colors shrink-0 ${
               activeState === name
-                ? 'bg-green-600 text-white'
+                ? 'bg-purple-600 text-white'
                 : 'bg-neutral-700 text-neutral-400 hover:text-white hover:bg-neutral-600'
             }`}
           >
             {name}
-            <span
-              role="button"
-              tabIndex={0}
-              className="opacity-0 group-hover:opacity-60 hover:!opacity-100 ml-0.5"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (activeState === name) onStateChange(null);
-                onRemoveState(name);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+            {!previewMode && (
+              <span
+                role="button"
+                tabIndex={0}
+                aria-label={`Remove ${name} state`}
+                className="opacity-0 group-hover:opacity-60 hover:!opacity-100 ml-0.5"
+                onClick={(e) => {
                   e.stopPropagation();
                   if (activeState === name) onStateChange(null);
                   onRemoveState(name);
-                }
-              }}
-            >
-              <X size={10} />
-            </span>
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.stopPropagation();
+                    if (activeState === name) onStateChange(null);
+                    onRemoveState(name);
+                  }
+                }}
+              >
+                <X size={10} />
+              </span>
+            )}
           </button>
         ))}
 
-        {/* Add state button */}
-        {!showAddInput ? (
-          <button
-            type="button"
-            onClick={() => { setShowAddInput(true); setShowSuggestions(true); }}
-            className="px-2 py-1 text-xs rounded bg-neutral-700 text-neutral-500 hover:text-neutral-200 hover:bg-neutral-600 shrink-0"
-            title="Add visual state"
-          >
-            <Plus size={12} />
-          </button>
-        ) : (
-          <div className="relative flex items-center gap-1 shrink-0">
-            <input
-              type="text"
-              value={newStateName}
-              onChange={(e) => setNewStateName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleAdd();
-                if (e.key === 'Escape') { setShowAddInput(false); setShowSuggestions(false); }
-              }}
-              onFocus={() => setShowSuggestions(true)}
-              placeholder="State name..."
-              className="w-28 px-2 py-1 text-xs bg-neutral-900 border border-neutral-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-              autoFocus
-            />
+        {/* Add state button — hidden in preview mode */}
+        {!previewMode && (
+          !showAddInput ? (
             <button
               type="button"
-              onClick={handleAdd}
-              className="px-1.5 py-1 text-xs rounded bg-green-700 text-white hover:bg-green-600"
+              data-testid="visual-state-add-btn"
+              onClick={() => { setShowAddInput(true); setShowSuggestions(true); }}
+              className="px-2 py-1 text-xs rounded bg-neutral-700 text-neutral-500 hover:text-neutral-200 hover:bg-neutral-600 shrink-0"
+              title="Add visual state"
             >
-              Add
+              <Plus size={12} />
             </button>
-            <button
-              type="button"
-              onClick={() => { setShowAddInput(false); setShowSuggestions(false); }}
-              className="px-1 py-1 text-xs text-neutral-500 hover:text-neutral-300"
-            >
-              <X size={12} />
-            </button>
+          ) : (
+            <div className="relative flex items-center gap-1 shrink-0">
+              <input
+                type="text"
+                data-testid="visual-state-custom-input"
+                value={newStateName}
+                onChange={(e) => setNewStateName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleAdd();
+                  if (e.key === 'Escape') { setShowAddInput(false); setShowSuggestions(false); }
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                placeholder="State name..."
+                className="w-28 px-2 py-1 text-xs bg-neutral-900 border border-neutral-600 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                autoFocus
+              />
+              <button
+                type="button"
+                data-testid="visual-state-add-confirm-btn"
+                onClick={handleAdd}
+                className="px-1.5 py-1 text-xs rounded bg-purple-700 text-white hover:bg-purple-600"
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                data-testid="visual-state-add-cancel-btn"
+                onClick={() => { setShowAddInput(false); setShowSuggestions(false); }}
+                className="px-1 py-1 text-xs text-neutral-500 hover:text-neutral-300"
+              >
+                <X size={12} />
+              </button>
 
-            {/* Suggestions dropdown */}
-            {showSuggestions && unusedSuggestions.length > 0 && (
-              <div className="absolute top-full left-0 mt-1 z-50 bg-neutral-800 border border-neutral-600 rounded shadow-lg max-h-48 overflow-y-auto w-48">
-                <div className="px-2 py-1 text-[10px] text-neutral-500 uppercase">Suggested</div>
-                {unusedSuggestions.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => handleSuggestionClick(s)}
-                    className="w-full text-left px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-700 transition-colors"
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+              {/* Suggestions dropdown */}
+              {showSuggestions && unusedSuggestions.length > 0 && (
+                <div
+                  data-testid="visual-state-suggestions"
+                  className="absolute top-full left-0 mt-1 z-50 bg-neutral-800 border border-neutral-600 rounded shadow-lg max-h-48 overflow-y-auto w-48"
+                >
+                  <div className="px-2 py-1 text-[10px] text-neutral-500 uppercase">Suggested</div>
+                  {unusedSuggestions.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      data-testid={`visual-state-suggestion-${s}`}
+                      onClick={() => handleSuggestionClick(s)}
+                      className="w-full text-left px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-700 transition-colors"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
         )}
       </div>
     </div>

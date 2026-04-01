@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
-import { Save, AlertCircle, Check, ChevronDown, ChevronRight, Copy, Layers, Trash2 } from 'lucide-react';
-import type { GraphicPrimitive, GraphicPrimitiveOverride, SymbolDefinition, SymbolPin } from '../../types/symbol';
+import { Save, AlertCircle, Check, ChevronDown, ChevronRight, Copy, Trash2, Layers2 } from 'lucide-react';
+import type { GraphicPrimitive, GraphicPrimitiveOverride, SymbolDefinition, SymbolPin, SymbolVisualVariant } from '../../types/symbol';
 import type { BehaviorRule } from '../../types/behaviorRules';
 import { saveSymbol } from '../../services/symbolService';
 import { validateSymbol } from '../../utils/symbolValidation';
@@ -16,15 +16,17 @@ interface PropertiesPanelProps {
   projectDir: string;
   isDirty: boolean;
   onSaveSuccess?: () => void;
-  // Sub-AC 4-3: shape naming & selection inspection
+  // Shape naming & selection inspection
   selectedIds?: Set<string>;
   activeUnit?: number | null;
   onUpdatePrimitiveLabel?: (index: number, label: string) => void;
   onUpdatePrimitiveText?: (index: number, text: string) => void;
-  onUpdatePin?: (pinId: string, updates: Partial<Pick<SymbolPin, 'name' | 'number'>>) => void;
+  onUpdatePin?: (pinId: string, updates: Partial<Pick<SymbolPin, 'name' | 'number' | 'type' | 'orientation' | 'position'>>) => void;
   // Sub-AC 3-1: Visual State context tracking
   /** The currently active VisualState being edited (null = base) */
   activeVisualState?: string | null;
+  /** Assign a stable id to the primitive at `index` if it doesn't have one */
+  onEnsurePrimitiveId?: (index: number) => void;
   /** Update (merge) a primitive's visual state override */
   onUpdateVisualStateOverride?: (primitiveId: string, override: Partial<GraphicPrimitiveOverride>) => void;
   /** Clear all overrides for a primitive in the active visual state */
@@ -81,6 +83,17 @@ function primitiveKindLabel(kind: GraphicPrimitive['kind']): string {
     text: 'Text',
   };
   return labels[kind] ?? kind;
+}
+
+/** Resolve the current override record for a primitive in a given visual state */
+function resolveOverride(
+  symbol: SymbolDefinition,
+  stateName: string | null | undefined,
+  primitiveId: string | undefined,
+): GraphicPrimitiveOverride | undefined {
+  if (!stateName || !primitiveId) return undefined;
+  const variant = (symbol.visualStates as Record<string, SymbolVisualVariant> | undefined)?.[stateName];
+  return variant?.primitiveOverrides?.[primitiveId];
 }
 
 // ============================================================================
@@ -154,26 +167,250 @@ const inputClass = (hasError?: boolean) =>
   }`;
 
 // ============================================================================
+// Visual State Override Panel
+// ============================================================================
+
+interface VisualStateOverridePanelProps {
+  /** Currently active visual state name */
+  activeVisualState: string;
+  /** The primitive being inspected */
+  primitiveIndex: number;
+  primitive: GraphicPrimitive;
+  /** Existing override record for this primitive+state (may be undefined) */
+  currentOverride: GraphicPrimitiveOverride | undefined;
+  onEnsurePrimitiveId?: (index: number) => void;
+  onUpdateOverride?: (primitiveId: string, override: Partial<GraphicPrimitiveOverride>) => void;
+  onClearOverride?: (primitiveId: string) => void;
+}
+
+/**
+ * Compact panel shown inside the Shape Inspector when a named visual state
+ * is active.  Displays the current override record for the selected primitive
+ * and provides controls to edit or clear it.
+ */
+function VisualStateOverridePanel({
+  activeVisualState,
+  primitiveIndex,
+  primitive,
+  currentOverride,
+  onEnsurePrimitiveId,
+  onUpdateOverride,
+  onClearOverride,
+}: VisualStateOverridePanelProps) {
+  const primitiveId = primitive.id;
+  const hasOverride = currentOverride !== undefined && Object.keys(currentOverride).length > 0;
+
+  // Helper: ensure the primitive has an id, then call the update handler.
+  const handleChange = (field: keyof GraphicPrimitiveOverride, value: unknown) => {
+    if (!primitiveId) return;
+    onUpdateOverride?.(primitiveId, { [field]: value } as Partial<GraphicPrimitiveOverride>);
+  };
+
+  return (
+    <div className="rounded border border-purple-700/50 bg-purple-950/20 p-3 space-y-2.5">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Layers2 size={11} className="text-purple-400" />
+          <span className="text-[10px] font-semibold text-purple-300 uppercase tracking-wider">
+            Visual State
+          </span>
+          <span className="px-1.5 py-0.5 text-[10px] rounded bg-purple-700/60 text-purple-200 font-medium">
+            {activeVisualState}
+          </span>
+        </div>
+
+        {hasOverride && primitiveId && (
+          <button
+            type="button"
+            onClick={() => onClearOverride?.(primitiveId)}
+            className="flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded bg-neutral-700 text-neutral-400 hover:text-red-300 hover:bg-red-900/30 transition-colors"
+            title="Clear all overrides for this state"
+          >
+            <Trash2 size={10} />
+            Clear
+          </button>
+        )}
+      </div>
+
+      {/* No ID — need to enable overrides */}
+      {!primitiveId && (
+        <div className="space-y-2">
+          <p className="text-[11px] text-neutral-400 leading-relaxed">
+            This shape has no stable ID. Assign one to enable per-state visual overrides.
+          </p>
+          <button
+            type="button"
+            onClick={() => onEnsurePrimitiveId?.(primitiveIndex)}
+            className="w-full px-2 py-1.5 text-xs rounded bg-purple-700 hover:bg-purple-600 text-white transition-colors"
+          >
+            Enable Visual State Overrides
+          </button>
+        </div>
+      )}
+
+      {/* Has ID — show override controls */}
+      {primitiveId && (
+        <>
+          {/* Status badge */}
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${hasOverride ? 'bg-purple-400' : 'bg-neutral-600'}`}
+            />
+            <span className="text-[10px] text-neutral-400">
+              {hasOverride
+                ? `${Object.keys(currentOverride!).length} override${Object.keys(currentOverride!).length > 1 ? 's' : ''} active`
+                : 'Inherits base appearance'}
+            </span>
+          </div>
+
+          {/* Visible toggle */}
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-neutral-400">Visible</span>
+            <button
+              type="button"
+              onClick={() => {
+                const nextVisible = currentOverride?.visible === false ? undefined : false;
+                if (nextVisible === undefined) {
+                  // Remove the visible override
+                  if (currentOverride) {
+                    const { visible: _v, ...rest } = currentOverride;
+                    if (Object.keys(rest).length === 0) {
+                      onClearOverride?.(primitiveId);
+                    } else {
+                      onUpdateOverride?.(primitiveId, rest);
+                    }
+                  }
+                } else {
+                  handleChange('visible', nextVisible);
+                }
+              }}
+              className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
+                currentOverride?.visible === false
+                  ? 'bg-red-700/60 text-red-200 hover:bg-red-600/60'
+                  : 'bg-neutral-700 text-neutral-300 hover:bg-neutral-600'
+              }`}
+            >
+              {currentOverride?.visible === false ? 'Hidden' : 'Visible'}
+            </button>
+          </div>
+
+          {/* Opacity slider */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-neutral-400">Opacity</span>
+              <span className="text-[10px] text-neutral-500 font-mono">
+                {currentOverride?.opacity !== undefined
+                  ? Math.round(currentOverride.opacity * 100) + '%'
+                  : '100% (base)'}
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={currentOverride?.opacity ?? 1}
+              onChange={(e) => handleChange('opacity', parseFloat(e.target.value))}
+              className="w-full h-1.5 accent-purple-500"
+            />
+          </div>
+
+          {/* Stroke color (only for non-text primitives) */}
+          {primitive.kind !== 'text' && (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] text-neutral-400">Stroke</span>
+              <div className="flex items-center gap-1.5">
+                {currentOverride?.stroke !== undefined && (
+                  <span className="text-[10px] text-neutral-500 font-mono">
+                    {currentOverride.stroke}
+                  </span>
+                )}
+                <input
+                  type="color"
+                  value={currentOverride?.stroke ?? ('stroke' in primitive ? primitive.stroke : '#ffffff')}
+                  onChange={(e) => handleChange('stroke', e.target.value)}
+                  className="w-7 h-6 rounded border border-neutral-600 cursor-pointer bg-transparent"
+                  title="Stroke color override"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Fill color */}
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] text-neutral-400">Fill</span>
+            <div className="flex items-center gap-1.5">
+              {currentOverride?.fill !== undefined && (
+                <span className="text-[10px] text-neutral-500 font-mono">
+                  {currentOverride.fill}
+                </span>
+              )}
+              <input
+                type="color"
+                value={
+                  currentOverride?.fill ??
+                  ('fill' in primitive ? primitive.fill : '#000000')
+                }
+                onChange={(e) => handleChange('fill', e.target.value)}
+                className="w-7 h-6 rounded border border-neutral-600 cursor-pointer bg-transparent"
+                title="Fill color override"
+              />
+            </div>
+          </div>
+
+          {/* Text override (only for text primitives) */}
+          {primitive.kind === 'text' && (
+            <div className="space-y-1">
+              <span className="text-[11px] text-neutral-400 block">Text Override</span>
+              <input
+                type="text"
+                value={currentOverride?.text ?? ''}
+                onChange={(e) => handleChange('text', e.target.value || undefined)}
+                placeholder={`(base: "${primitive.text}")`}
+                className="w-full px-2 py-1 bg-neutral-900 border border-neutral-700 rounded text-xs text-neutral-300 focus:outline-none focus:ring-1 focus:ring-purple-500"
+              />
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
 // Shape Inspector Section
 // ============================================================================
 
 interface ShapeInspectorProps {
   selectedItem: SelectedItem;
+  symbol: SymbolDefinition;
+  activeVisualState?: string | null;
+  currentOverride?: GraphicPrimitiveOverride;
   onUpdatePrimitiveLabel?: (index: number, label: string) => void;
   onUpdatePrimitiveText?: (index: number, text: string) => void;
-  onUpdatePin?: (pinId: string, updates: Partial<Pick<SymbolPin, 'name' | 'number'>>) => void;
+  onUpdatePin?: (pinId: string, updates: Partial<Pick<SymbolPin, 'name' | 'number' | 'type' | 'orientation' | 'position'>>) => void;
+  onEnsurePrimitiveId?: (index: number) => void;
+  onUpdateVisualStateOverride?: (primitiveId: string, override: Partial<GraphicPrimitiveOverride>) => void;
+  onClearVisualStateOverride?: (primitiveId: string) => void;
 }
 
 function ShapeInspector({
   selectedItem,
+  activeVisualState,
+  currentOverride,
   onUpdatePrimitiveLabel,
   onUpdatePrimitiveText,
   onUpdatePin,
+  onEnsurePrimitiveId,
+  onUpdateVisualStateOverride,
+  onClearVisualStateOverride,
 }: ShapeInspectorProps) {
   if (!selectedItem) return null;
 
   if (selectedItem.type === 'primitive') {
     const { primitive, index } = selectedItem;
+    const inNamedState = activeVisualState !== null && activeVisualState !== undefined;
 
     return (
       <Section title="Shape Inspector" defaultOpen={true} badge={primitiveKindLabel(primitive.kind)}>
@@ -257,6 +494,19 @@ function ShapeInspector({
             </p>
           )}
         </div>
+
+        {/* ── Visual State Override Section ── */}
+        {inNamedState && (
+          <VisualStateOverridePanel
+            activeVisualState={activeVisualState!}
+            primitiveIndex={index}
+            primitive={primitive}
+            currentOverride={currentOverride}
+            onEnsurePrimitiveId={onEnsurePrimitiveId}
+            onUpdateOverride={onUpdateVisualStateOverride}
+            onClearOverride={onClearVisualStateOverride}
+          />
+        )}
       </Section>
     );
   }
@@ -288,21 +538,56 @@ function ShapeInspector({
           />
         </Field>
 
-        {/* Pin metadata (read-only) */}
-        <div className="rounded bg-neutral-900/60 border border-neutral-700/50 px-3 py-2 text-xs space-y-1">
-          <p className="text-neutral-500 font-medium uppercase tracking-wider text-[10px]">Pin Info</p>
-          <p className="text-neutral-400">
-            <span className="text-neutral-500">type</span>{' '}
-            <span className="font-mono">{pin.type}</span>
-          </p>
-          <p className="text-neutral-400">
-            <span className="text-neutral-500">orient</span>{' '}
-            <span className="font-mono">{pin.orientation}</span>
-          </p>
-          <p className="text-neutral-400">
-            <span className="text-neutral-500">pos</span>{' '}
-            <span className="font-mono">({pin.position.x}, {pin.position.y})</span>
-          </p>
+        <Field id="pin-type" label="Electrical Type">
+          <select
+            id="pin-type"
+            value={pin.type}
+            onChange={(e) => onUpdatePin?.(pin.id, { type: e.target.value as SymbolPin['type'] })}
+            className={inputClass()}
+          >
+            <option value="input">Input</option>
+            <option value="output">Output</option>
+            <option value="bidirectional">Bidirectional</option>
+            <option value="power">Power</option>
+            <option value="passive">Passive</option>
+          </select>
+        </Field>
+
+        <Field id="pin-orientation" label="Orientation">
+          <select
+            id="pin-orientation"
+            value={pin.orientation}
+            onChange={(e) => onUpdatePin?.(pin.id, { orientation: e.target.value as SymbolPin['orientation'] })}
+            className={inputClass()}
+          >
+            <option value="right">Right</option>
+            <option value="left">Left</option>
+            <option value="up">Up</option>
+            <option value="down">Down</option>
+          </select>
+        </Field>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Field id="pin-pos-x" label="Position X">
+            <input
+              id="pin-pos-x"
+              type="number"
+              value={pin.position.x}
+              onChange={(e) => onUpdatePin?.(pin.id, { position: { ...pin.position, x: parseFloat(e.target.value) || 0 } })}
+              className={inputClass()}
+              step={1}
+            />
+          </Field>
+          <Field id="pin-pos-y" label="Position Y">
+            <input
+              id="pin-pos-y"
+              type="number"
+              value={pin.position.y}
+              onChange={(e) => onUpdatePin?.(pin.id, { position: { ...pin.position, y: parseFloat(e.target.value) || 0 } })}
+              className={inputClass()}
+              step={1}
+            />
+          </Field>
         </div>
       </Section>
     );
@@ -323,9 +608,13 @@ export function PropertiesPanel({
   onSaveSuccess,
   selectedIds,
   activeUnit,
+  activeVisualState,
   onUpdatePrimitiveLabel,
   onUpdatePrimitiveText,
   onUpdatePin,
+  onEnsurePrimitiveId,
+  onUpdateVisualStateOverride,
+  onClearVisualStateOverride,
 }: PropertiesPanelProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -337,6 +626,12 @@ export function PropertiesPanel({
     () => resolveSelectedItem(symbol, selectedIds, activeUnit),
     [symbol, selectedIds, activeUnit],
   );
+
+  // Resolve the current visual state override for the selected primitive
+  const currentOverride = useMemo(() => {
+    if (selectedItem?.type !== 'primitive') return undefined;
+    return resolveOverride(symbol, activeVisualState, selectedItem.primitive.id);
+  }, [symbol, activeVisualState, selectedItem]);
 
   const handleChange = useCallback(
     (field: keyof SymbolDefinition, value: string | number) => {
@@ -448,7 +743,15 @@ export function PropertiesPanel({
       {/* Header */}
       <div className="px-4 py-3 border-b border-neutral-700 flex items-center justify-between shrink-0">
         <h3 className="text-sm font-semibold text-white">Properties</h3>
-        {isDirty && <span className="w-2 h-2 rounded-full bg-amber-400" title="Unsaved changes" />}
+        <div className="flex items-center gap-2">
+          {/* Active visual state badge in header */}
+          {activeVisualState && (
+            <span className="px-1.5 py-0.5 text-[10px] rounded bg-purple-700/50 text-purple-300 font-medium">
+              {activeVisualState}
+            </span>
+          )}
+          {isDirty && <span className="w-2 h-2 rounded-full bg-amber-400" title="Unsaved changes" />}
+        </div>
       </div>
 
       {/* Scrollable content */}
@@ -458,9 +761,15 @@ export function PropertiesPanel({
         {hasSelection && !multiSelection && selectedItem && (
           <ShapeInspector
             selectedItem={selectedItem}
+            symbol={symbol}
+            activeVisualState={activeVisualState}
+            currentOverride={currentOverride}
             onUpdatePrimitiveLabel={onUpdatePrimitiveLabel}
             onUpdatePrimitiveText={onUpdatePrimitiveText}
             onUpdatePin={onUpdatePin}
+            onEnsurePrimitiveId={onEnsurePrimitiveId}
+            onUpdateVisualStateOverride={onUpdateVisualStateOverride}
+            onClearVisualStateOverride={onClearVisualStateOverride}
           />
         )}
 
@@ -608,6 +917,7 @@ export function PropertiesPanel({
             graphicIds={symbol.graphics
               .map((g) => g.id)
               .filter((id): id is string => id != null)}
+            visualStateNames={Object.keys(symbol.visualStates ?? {})}
             onChange={(rules: BehaviorRule[]) => {
               onChange({
                 ...symbol,

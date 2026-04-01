@@ -20,6 +20,8 @@ interface BehaviorRulesPanelProps {
   pins: SymbolPin[];
   graphicIds: string[];
   onChange: (rules: BehaviorRule[]) => void;
+  /** Dynamic visual state names defined on this symbol (from symbol.visualStates keys) */
+  visualStateNames?: string[];
 }
 
 // ============================================================================
@@ -44,10 +46,24 @@ const ACTION_OPTIONS: { value: ActionType; label: string; group: string }[] = [
   { value: 'emit_event', label: 'Emit event', group: 'Event' },
 ];
 
-const VISUAL_STATES = [
+/**
+ * Predefined state names shown as suggestions when no custom states are defined.
+ * These are merged with the symbol's actual visualState names in the UI.
+ */
+const PREDEFINED_STATE_SUGGESTIONS = [
   'idle', 'energized', 'deenergized', 'lit', 'dark',
   'running', 'stopped', 'open', 'closed', 'pressed', 'released',
 ];
+
+/**
+ * Build the combined list of state name options for dropdowns/datalists.
+ * Symbol-defined states appear first; predefined suggestions fill gaps.
+ */
+function buildStateOptions(visualStateNames: string[]): string[] {
+  const defined = new Set(visualStateNames);
+  const extras = PREDEFINED_STATE_SUGGESTIONS.filter((s) => !defined.has(s));
+  return [...visualStateNames, ...extras];
+}
 
 const inputClass = 'w-full px-2 py-1 bg-neutral-900 border border-neutral-700 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500';
 const selectClass = 'w-full px-2 py-1 bg-neutral-900 border border-neutral-700 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500';
@@ -59,11 +75,13 @@ const selectClass = 'w-full px-2 py-1 bg-neutral-900 border border-neutral-700 r
 function ConditionEditor({
   condition,
   pins,
+  visualStateNames,
   onChange,
   onRemove,
 }: {
   condition: BehaviorCondition;
   pins: SymbolPin[];
+  visualStateNames: string[];
   onChange: (c: BehaviorCondition) => void;
   onRemove: () => void;
 }) {
@@ -111,18 +129,24 @@ function ConditionEditor({
           />
         )}
 
-        {/* State name for state_is */}
+        {/* State name for state_is — hybrid: free text + datalist suggestions */}
         {condition.type === 'state_is' && (
-          <select
-            value={condition.stateName ?? ''}
-            onChange={(e) => onChange({ ...condition, stateName: e.target.value })}
-            className={selectClass}
-          >
-            <option value="">Select state...</option>
-            {VISUAL_STATES.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
+          <div className="relative">
+            <input
+              type="text"
+              list="condition-state-datalist"
+              value={condition.stateName ?? ''}
+              onChange={(e) => onChange({ ...condition, stateName: e.target.value })}
+              className={inputClass}
+              placeholder="State name (or type custom)..."
+              data-testid="condition-state-input"
+            />
+            <datalist id="condition-state-datalist">
+              {buildStateOptions(visualStateNames).map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
+          </div>
         )}
 
         {/* Property key + value for property_equals */}
@@ -160,6 +184,7 @@ function ActionEditor({
   action,
   pins,
   graphicIds: _graphicIds,
+  visualStateNames,
   label,
   labelColor,
   onChange,
@@ -168,6 +193,7 @@ function ActionEditor({
   action: BehaviorAction;
   pins: SymbolPin[];
   graphicIds: string[];
+  visualStateNames: string[];
   label: string;
   labelColor: string;
   onChange: (a: BehaviorAction) => void;
@@ -189,18 +215,24 @@ function ActionEditor({
           ))}
         </select>
 
-        {/* State name for set_state/clear_state */}
+        {/* State name for set_state/clear_state — hybrid: free text + datalist suggestions */}
         {(action.type === 'set_state' || action.type === 'clear_state') && (
-          <select
-            value={action.stateName ?? ''}
-            onChange={(e) => onChange({ ...action, stateName: e.target.value })}
-            className={selectClass}
-          >
-            <option value="">Select state...</option>
-            {VISUAL_STATES.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
+          <div className="relative">
+            <input
+              type="text"
+              list={`action-state-datalist-${label}`}
+              value={action.stateName ?? ''}
+              onChange={(e) => onChange({ ...action, stateName: e.target.value })}
+              className={inputClass}
+              placeholder="State name (or type custom)..."
+              data-testid={`action-state-input-${label.toLowerCase()}`}
+            />
+            <datalist id={`action-state-datalist-${label}`}>
+              {buildStateOptions(visualStateNames).map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
+          </div>
         )}
 
         {/* Port for energize/block */}
@@ -264,6 +296,7 @@ function RuleEditor({
   index,
   pins,
   graphicIds,
+  visualStateNames,
   onChange,
   onRemove,
 }: {
@@ -271,6 +304,7 @@ function RuleEditor({
   index: number;
   pins: SymbolPin[];
   graphicIds: string[];
+  visualStateNames: string[];
   onChange: (r: BehaviorRule) => void;
   onRemove: () => void;
 }) {
@@ -387,6 +421,7 @@ function RuleEditor({
                 key={i}
                 condition={c}
                 pins={pins}
+                visualStateNames={visualStateNames}
                 onChange={(updated) => updateCondition(i, updated)}
                 onRemove={() => removeCondition(i)}
               />
@@ -409,6 +444,7 @@ function RuleEditor({
                 action={a}
                 pins={pins}
                 graphicIds={graphicIds}
+                visualStateNames={visualStateNames}
                 label="THEN"
                 labelColor="text-green-400"
                 onChange={(updated) => updateThenAction(i, updated)}
@@ -433,6 +469,7 @@ function RuleEditor({
                 action={a}
                 pins={pins}
                 graphicIds={graphicIds}
+                visualStateNames={visualStateNames}
                 label="ELSE"
                 labelColor="text-amber-400"
                 onChange={(updated) => updateElseAction(i, updated)}
@@ -457,7 +494,7 @@ function RuleEditor({
 // Main Panel
 // ============================================================================
 
-export function BehaviorRulesPanel({ rules, pins, graphicIds, onChange }: BehaviorRulesPanelProps) {
+export function BehaviorRulesPanel({ rules, pins, graphicIds, onChange, visualStateNames = [] }: BehaviorRulesPanelProps) {
   const updateRule = useCallback((index: number, rule: BehaviorRule) => {
     const updated = [...rules];
     updated[index] = rule;
@@ -501,6 +538,7 @@ export function BehaviorRulesPanel({ rules, pins, graphicIds, onChange }: Behavi
               index={i}
               pins={pins}
               graphicIds={graphicIds}
+              visualStateNames={visualStateNames}
               onChange={(r) => updateRule(i, r)}
               onRemove={() => removeRule(i)}
             />

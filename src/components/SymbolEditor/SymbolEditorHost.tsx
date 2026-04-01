@@ -553,7 +553,11 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
         tool.onMouseUp(point, getToolCallbacks());
       }
 
-      ghostRendererRef.current?.render(null);
+      // Only clear ghost if the tool is NOT in a multi-step drawing mode
+      // (e.g. polyline point placement keeps the preview visible between clicks)
+      if (!tool.isDrawing()) {
+        ghostRendererRef.current?.render(null);
+      }
     };
 
     const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {

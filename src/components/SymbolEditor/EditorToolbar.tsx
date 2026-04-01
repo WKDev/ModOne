@@ -3,6 +3,7 @@ import {
   MousePointer2,
   Square,
   Circle,
+  Minus,
   Pen,
   GitBranch,
   Type,
@@ -28,13 +29,14 @@ interface ToolDef {
 }
 
 const TOOLS: ToolDef[] = [
-  { tool: 'select', label: 'Select', icon: <MousePointer2 size={18} /> },
-  { tool: 'rect', label: 'Rect', icon: <Square size={18} /> },
-  { tool: 'circle', label: 'Circle', icon: <Circle size={18} /> },
-  { tool: 'polyline', label: 'Polyline', icon: <Pen size={18} /> },
-  { tool: 'arc', label: 'Arc', icon: <GitBranch size={18} /> },
-  { tool: 'text', label: 'Text', icon: <Type size={18} /> },
-  { tool: 'pin', label: 'Pin', icon: <MapPin size={18} /> },
+  { tool: 'select',   label: 'Select (V)',         icon: <MousePointer2 size={18} /> },
+  { tool: 'rect',     label: 'Rectangle (R)',       icon: <Square size={18} /> },
+  { tool: 'circle',   label: 'Circle (C)',          icon: <Circle size={18} /> },
+  { tool: 'line',     label: 'Line (L)',            icon: <Minus size={18} /> },
+  { tool: 'polyline', label: 'Polyline (P)',        icon: <Pen size={18} /> },
+  { tool: 'arc',      label: 'Arc (A)',             icon: <GitBranch size={18} /> },
+  { tool: 'text',     label: 'Text (T)',            icon: <Type size={18} /> },
+  { tool: 'pin',      label: 'Pin (N)',             icon: <MapPin size={18} /> },
 ];
 
 export const EditorToolbar = memo(function EditorToolbar({
