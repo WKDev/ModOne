@@ -73,6 +73,8 @@ export interface GraphicPrimitiveBase {
   id?: string;
   /** Human-readable label for identifying this shape element in the editor */
   label?: string;
+  /** Rotation angle in degrees (clockwise). Applied around the primitive's center. */
+  rotation?: number;
 }
 
 /** Rectangle primitive */

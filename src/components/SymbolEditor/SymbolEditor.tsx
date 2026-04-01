@@ -374,6 +374,7 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
           units[activeUnit] = { ...unit, graphics };
           return { ...prev, units, updatedAt: new Date().toISOString() };
         });
+        bumpHistory();
       } else {
         setLocalSymbol((prev) => {
           const graphics = prev.graphics.map((prim, i) =>
@@ -384,6 +385,34 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
         bumpHistory();
       }
       dispatch({ type: 'MARK_DIRTY' });
+    },
+    [isMultiUnit, activeUnit, bumpHistory],
+  );
+
+  // ── Rotate primitive (SelectTool rotation handle) ─────────────────────────
+
+  const handleRotatePrimitive = useCallback(
+    (index: number, angle: number) => {
+      if (isMultiUnit && activeUnit !== null) {
+        setLocalSymbol((prev) => {
+          const units = [...(prev.units ?? [])];
+          const unit = units[activeUnit];
+          const graphics = unit.graphics.map((prim, i) =>
+            i === index ? { ...prim, rotation: angle } : prim,
+          );
+          units[activeUnit] = { ...unit, graphics };
+          return { ...prev, units, updatedAt: new Date().toISOString() };
+        });
+      } else {
+        setLocalSymbol((prev) => {
+          const graphics = prev.graphics.map((prim, i) =>
+            i === index ? { ...prim, rotation: angle } : prim,
+          );
+          return { ...prev, graphics, updatedAt: new Date().toISOString() };
+        });
+      }
+      dispatch({ type: 'MARK_DIRTY' });
+      bumpHistory();
     },
     [isMultiUnit, activeUnit, bumpHistory],
   );
@@ -406,9 +435,10 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
           return { ...prev, graphics, updatedAt: new Date().toISOString() };
         });
       }
+      bumpHistory();
       dispatch({ type: 'MARK_DIRTY' });
     },
-    [isMultiUnit, activeUnit],
+    [isMultiUnit, activeUnit, bumpHistory],
   );
 
   // ── Move pins (SelectTool drag) ────────────────────────────────────────────
@@ -616,14 +646,23 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
   const handleUpdatePin = useCallback(
     (pinId: string, updates: Partial<Pick<SymbolPin, 'name' | 'number' | 'type' | 'orientation' | 'position'>>) => {
       setLocalSymbol((prev) => {
+        // If position is being updated, apply edge-snap
+        let finalUpdates = updates;
+        if (updates.position) {
+          const snap = snapPinToEdge(updates.position, prev.width, prev.height);
+          if (snap) {
+            finalUpdates = { ...updates, position: snap.position, orientation: snap.orientation };
+          }
+        }
+
         if (isMultiUnit && activeUnit !== null) {
           const units = [...(prev.units ?? [])];
           const unit = units[activeUnit];
-          const pins = unit.pins.map((p) => (p.id === pinId ? { ...p, ...updates } : p));
+          const pins = unit.pins.map((p) => (p.id === pinId ? { ...p, ...finalUpdates } : p));
           units[activeUnit] = { ...unit, pins };
           return { ...prev, units, updatedAt: new Date().toISOString() };
         }
-        const pins = prev.pins.map((p) => (p.id === pinId ? { ...p, ...updates } : p));
+        const pins = prev.pins.map((p) => (p.id === pinId ? { ...p, ...finalUpdates } : p));
         return { ...prev, pins, updatedAt: new Date().toISOString() };
       });
       dispatch({ type: 'MARK_DIRTY' });
@@ -1016,6 +1055,7 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
             onMovePrimitives={previewMode ? undefined : handleMovePrimitives}
             onMovePins={previewMode ? undefined : handleMovePins}
             onResizePrimitive={previewMode ? undefined : handleResizePrimitive}
+            onRotatePrimitive={previewMode ? undefined : handleRotatePrimitive}
             onUpdatePrimitive={previewMode ? undefined : handleUpdatePrimitive}
             onDeleteSelected={previewMode ? undefined : handleDeleteSelected}
             onOpenPinPopover={previewMode ? undefined : (screenX, screenY, canvasX, canvasY) => {
