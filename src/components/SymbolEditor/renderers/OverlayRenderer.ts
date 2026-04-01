@@ -1,9 +1,10 @@
 /**
- * OverlayRenderer — Origin Crosshair & Selection Highlights
+ * OverlayRenderer — Origin Crosshair & Selection Highlights + Resize/Rotate Handles
  *
  * Renders:
  * 1. Origin crosshair at (0,0) — always visible
  * 2. Selection highlight outlines around selected primitives/pins
+ * 3. Resize handles (8) and rotation handle when a single resizable primitive is selected
  */
 
 import { Graphics, type Container } from 'pixi.js';
@@ -25,12 +26,43 @@ const SELECTION_WIDTH = 1.5;
 const SELECTION_PADDING = 4;
 const TOLERANCE = 5;
 
+// Handle visual constants
+const HANDLE_SIZE = 6;
+const HANDLE_HALF = HANDLE_SIZE / 2;
+const HANDLE_FILL = 0xffffff;
+const HANDLE_STROKE = 0x4dabf7;
+const HANDLE_STROKE_WIDTH = 1.5;
+const HANDLE_HIT_RADIUS = 8;
+const ROTATION_HANDLE_DISTANCE = 20;
+const ROTATION_HANDLE_RADIUS = 4;
+
+/** Types of resize handles */
+export type HandleType =
+  | 'nw' | 'n' | 'ne'
+  | 'e'  | 'se' | 's'
+  | 'sw' | 'w'
+  | 'rotate';
+
+/** Handle position data for hit-testing */
+interface HandlePosition {
+  type: HandleType;
+  x: number;
+  y: number;
+}
+
+/** Resizable primitive kinds — polyline and pins are excluded */
+const RESIZABLE_KINDS = new Set(['rect', 'circle', 'text', 'arc']);
+
 export class OverlayRenderer {
   private _selectionLayer: Container;
   private _overlayLayer: Container;
   private _originGraphics: Graphics;
   private _selectionGraphics: Graphics;
+  private _handleGraphics: Graphics;
   private _destroyed = false;
+
+  /** Stored handle positions for hit-testing — updated each renderSelection call */
+  private _handlePositions: HandlePosition[] = [];
 
   constructor(options: OverlayRendererOptions) {
     this._selectionLayer = options.selectionLayer;
@@ -46,6 +78,11 @@ export class OverlayRenderer {
     this._selectionGraphics.label = 'selection-highlights';
     this._selectionLayer.addChild(this._selectionGraphics);
 
+    // Resize/rotate handles on selection layer (above highlights)
+    this._handleGraphics = new Graphics();
+    this._handleGraphics.label = 'resize-handles';
+    this._selectionLayer.addChild(this._handleGraphics);
+
     // Draw origin crosshair once (static)
     this._drawOrigin();
   }
@@ -60,6 +97,40 @@ export class OverlayRenderer {
   }
 
   /**
+   * Check if a world-space point hits a resize/rotate handle.
+   * Returns the handle type or null.
+   */
+  getHandleAt(x: number, y: number): HandleType | null {
+    for (const hp of this._handlePositions) {
+      const dx = x - hp.x;
+      const dy = y - hp.y;
+      if (dx * dx + dy * dy <= HANDLE_HIT_RADIUS * HANDLE_HIT_RADIUS) {
+        return hp.type;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Get the bounding box of the single selected resizable primitive.
+   * Returns null if conditions are not met (not exactly 1 resizable prim selected).
+   */
+  getSelectedResizableBounds(
+    selectedIds: Set<string>,
+    graphics: GraphicPrimitive[],
+  ): { x: number; y: number; width: number; height: number } | null {
+    // Only show handles for single graphic primitive selection
+    const graphicIds = Array.from(selectedIds).filter(id => id.startsWith('g-'));
+    if (graphicIds.length !== 1) return null;
+
+    const idx = parseInt(graphicIds[0].slice(2), 10);
+    const prim = graphics[idx];
+    if (!prim || !RESIZABLE_KINDS.has(prim.kind)) return null;
+
+    return this._getPrimitiveBounds(prim);
+  }
+
+  /**
    * Render selection highlights around selected primitives and pins.
    */
   renderSelection(
@@ -71,9 +142,12 @@ export class OverlayRenderer {
 
     const g = this._selectionGraphics;
     g.clear();
+    this._handleGraphics.clear();
+    this._handlePositions = [];
 
     if (selectedIds.size === 0) {
       g.visible = false;
+      this._handleGraphics.visible = false;
       return;
     }
 
@@ -114,12 +188,76 @@ export class OverlayRenderer {
       width: SELECTION_WIDTH,
       pixelLine: true,
     });
+
+    // Draw resize/rotate handles when exactly 1 resizable primitive is selected
+    const resizableBounds = this.getSelectedResizableBounds(selectedIds, graphics);
+    if (resizableBounds) {
+      this._drawHandles(resizableBounds);
+    }
+  }
+
+  /**
+   * Draw the 8 resize handles + 1 rotation handle around the given bounds.
+   */
+  private _drawHandles(bounds: { x: number; y: number; width: number; height: number }): void {
+    const h = this._handleGraphics;
+    h.visible = true;
+    h.clear();
+
+    const { x, y, width: w, height: ht } = bounds;
+    const pad = SELECTION_PADDING;
+
+    // Padded bounds (handles sit on the selection box, not the primitive)
+    const bx = x - pad;
+    const by = y - pad;
+    const bw = w + pad * 2;
+    const bh = ht + pad * 2;
+
+    // Handle positions: corners + edge midpoints
+    const handles: HandlePosition[] = [
+      { type: 'nw', x: bx,          y: by },
+      { type: 'n',  x: bx + bw / 2, y: by },
+      { type: 'ne', x: bx + bw,     y: by },
+      { type: 'e',  x: bx + bw,     y: by + bh / 2 },
+      { type: 'se', x: bx + bw,     y: by + bh },
+      { type: 's',  x: bx + bw / 2, y: by + bh },
+      { type: 'sw', x: bx,          y: by + bh },
+      { type: 'w',  x: bx,          y: by + bh / 2 },
+    ];
+
+    // Rotation handle: above top-center
+    const rotateX = bx + bw / 2;
+    const rotateY = by - ROTATION_HANDLE_DISTANCE;
+    handles.push({ type: 'rotate', x: rotateX, y: rotateY });
+
+    this._handlePositions = handles;
+
+    // Draw connection line from top-center to rotation handle
+    h.moveTo(bx + bw / 2, by);
+    h.lineTo(rotateX, rotateY);
+    h.stroke({ color: HANDLE_STROKE, width: 1, pixelLine: true });
+
+    // Draw rotation handle (circle)
+    h.circle(rotateX, rotateY, ROTATION_HANDLE_RADIUS);
+    h.fill({ color: HANDLE_FILL });
+    h.stroke({ color: HANDLE_STROKE, width: HANDLE_STROKE_WIDTH });
+
+    // Draw 8 resize handles (squares)
+    for (const hp of handles) {
+      if (hp.type === 'rotate') continue;
+      h.rect(hp.x - HANDLE_HALF, hp.y - HANDLE_HALF, HANDLE_SIZE, HANDLE_SIZE);
+      h.fill({ color: HANDLE_FILL });
+      h.stroke({ color: HANDLE_STROKE, width: HANDLE_STROKE_WIDTH });
+    }
   }
 
   /** Clear selection highlights */
   clearSelection(): void {
     this._selectionGraphics.clear();
     this._selectionGraphics.visible = false;
+    this._handleGraphics.clear();
+    this._handleGraphics.visible = false;
+    this._handlePositions = [];
   }
 
   private _getPrimitiveBounds(
@@ -180,5 +318,6 @@ export class OverlayRenderer {
     this._destroyed = true;
     this._originGraphics.destroy();
     this._selectionGraphics.destroy();
+    this._handleGraphics.destroy();
   }
 }

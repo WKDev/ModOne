@@ -1,7 +1,7 @@
 /**
- * SelectTool — Selection and Move Tool for Symbol Editor
+ * SelectTool — Selection, Move, Resize & Rotate Tool for Symbol Editor
  *
- * Handles three distinct interaction modes:
+ * Handles five distinct interaction modes:
  *
  * 1. Marquee (rubber-band) selection
  *    - Click on empty canvas → deselect all
@@ -17,11 +17,23 @@
  *    - If the pointer moves more than MOVE_THRESHOLD → transition to "moving"
  *    - On mouseup in "moving" state → commit via callbacks.onMovePrimitives / onMovePins
  *    - Arrow keys → nudge selected items by 1 (or 10 with Shift)
+ *
+ * 4. Resize via handles (AC2-AC5, AC7)
+ *    - When a single resizable primitive is selected, 8 handles appear
+ *    - Dragging a handle enters "resizing" state
+ *    - Shift+drag = aspect ratio lock (AC4)
+ *    - Alt+drag = center-based resize (AC5)
+ *    - Minimum size 10x10px enforced (AC7)
+ *
+ * 5. Rotate via handle (AC6)
+ *    - Rotation handle above top-center of selection
+ *    - Shift+rotate = 45° snap
  */
 
 import { BaseTool, type CanvasPoint, type ToolCallbacks } from './BaseTool';
 import type { GraphicPrimitive, SymbolPin } from '../../../types/symbol';
 import type { GhostShape } from '../types';
+import type { HandleType } from '../renderers/OverlayRenderer';
 
 // ============================================================================
 // Internal state machine
@@ -29,12 +41,17 @@ import type { GhostShape } from '../types';
 
 type SelectState =
   | 'idle'
-  | 'pending'   // mousedown on selected item — waiting to see if it becomes a move
-  | 'marquee'   // dragging a rubber-band selection box
-  | 'moving';   // dragging selected items
+  | 'pending'    // mousedown on selected item — waiting to see if it becomes a move
+  | 'marquee'    // dragging a rubber-band selection box
+  | 'moving'     // dragging selected items
+  | 'resizing'   // dragging a resize handle
+  | 'rotating';  // dragging the rotation handle
 
 /** Minimum canvas-unit movement required to start a move */
 const MOVE_THRESHOLD = 3;
+
+/** Minimum primitive size in canvas units (AC7) */
+const MIN_SIZE = 10;
 
 // ============================================================================
 // Bounding-box helpers
@@ -189,6 +206,125 @@ function hitTestPin(pt: CanvasPoint, pin: SymbolPin): boolean {
 }
 
 // ============================================================================
+// Resize computation helpers
+// ============================================================================
+
+/**
+ * Compute new bounds from dragging a resize handle.
+ * Returns { x, y, width, height } after applying constraints.
+ */
+function computeResizedBounds(
+  initialBounds: { x: number; y: number; width: number; height: number },
+  handleType: HandleType,
+  dx: number,
+  dy: number,
+  shiftKey: boolean,
+  altKey: boolean,
+): { x: number; y: number; width: number; height: number } {
+  let { x, y, width, height } = initialBounds;
+
+  // Apply deltas based on handle type
+  switch (handleType) {
+    case 'nw':
+      x += dx; y += dy; width -= dx; height -= dy;
+      break;
+    case 'n':
+      y += dy; height -= dy;
+      break;
+    case 'ne':
+      y += dy; width += dx; height -= dy;
+      break;
+    case 'e':
+      width += dx;
+      break;
+    case 'se':
+      width += dx; height += dy;
+      break;
+    case 's':
+      height += dy;
+      break;
+    case 'sw':
+      x += dx; width -= dx; height += dy;
+      break;
+    case 'w':
+      x += dx; width -= dx;
+      break;
+    default:
+      break;
+  }
+
+  // Shift = aspect ratio lock (AC4)
+  if (shiftKey) {
+    const initialRatio = initialBounds.width / initialBounds.height;
+    if (initialRatio > 0) {
+      // Determine which dimension to constrain based on handle
+      const isHorizontal = handleType === 'e' || handleType === 'w';
+      const isVertical = handleType === 'n' || handleType === 's';
+
+      if (isHorizontal) {
+        height = width / initialRatio;
+      } else if (isVertical) {
+        width = height * initialRatio;
+      } else {
+        // Corner handles: use the larger delta to drive
+        const newRatio = width / height;
+        if (newRatio > initialRatio) {
+          width = height * initialRatio;
+        } else {
+          height = width / initialRatio;
+        }
+      }
+
+      // Adjust position for handles that anchor on top/left
+      if (handleType === 'nw' || handleType === 'sw' || handleType === 'w') {
+        x = initialBounds.x + initialBounds.width - width;
+      }
+      if (handleType === 'nw' || handleType === 'ne' || handleType === 'n') {
+        y = initialBounds.y + initialBounds.height - height;
+      }
+    }
+  }
+
+  // Alt = center-based resize (AC5)
+  // Mirror the resize around the center of the original bounds so both
+  // opposing sides move symmetrically.  We compute the signed growth on
+  // each axis (new size – original size) and distribute half to each side.
+  if (altKey) {
+    const cx = initialBounds.x + initialBounds.width / 2;
+    const cy = initialBounds.y + initialBounds.height / 2;
+
+    // Double the growth: when the user drags east by δ the west side also
+    // shrinks by δ, yielding 2δ total width change.  We achieve this by
+    // computing how much the dragged edge changed relative to the original
+    // bounds and applying that same delta to the opposite edge.
+    const dw = width - initialBounds.width;   // signed growth on width axis
+    const dh = height - initialBounds.height;  // signed growth on height axis
+    width  = initialBounds.width  + dw * 2;
+    height = initialBounds.height + dh * 2;
+
+    // Re-center on the original center
+    x = cx - width / 2;
+    y = cy - height / 2;
+  }
+
+  // Enforce minimum size (AC7)
+  if (width < MIN_SIZE) {
+    if (handleType === 'nw' || handleType === 'sw' || handleType === 'w') {
+      x = x + width - MIN_SIZE;
+    }
+    width = MIN_SIZE;
+  }
+  if (height < MIN_SIZE) {
+    if (handleType === 'nw' || handleType === 'ne' || handleType === 'n') {
+      y = y + height - MIN_SIZE;
+    }
+    height = MIN_SIZE;
+  }
+
+  return { x, y, width, height };
+}
+
+// ============================================================================
 // SelectTool
 // ============================================================================
 
@@ -198,12 +334,81 @@ export class SelectTool extends BaseTool {
   /** True when the initial mousedown target was a locked pin */
   private _hitLockedPin = false;
 
+  // Resize state
+  private _resizeHandle: HandleType | null = null;
+  private _resizeInitialBounds: { x: number; y: number; width: number; height: number } | null = null;
+  private _resizePrimIndex: number = -1;
+  private _shiftKey = false;
+  private _altKey = false;
+  /**
+   * Aspect-ratio lock flag — true when Shift is held during an active resize drag.
+   *
+   * This flag is managed by the resize drag handler and reflects the real-time
+   * Shift key state read from `CanvasPoint.shiftKey` (populated by SymbolEditorHost
+   * from the React mouse event's `shiftKey` property).
+   *
+   * When true, `computeResizedBounds` constrains the resize so the primitive's
+   * width/height ratio stays constant throughout the drag operation.
+   * Releasing Shift mid-drag immediately disables the constraint for subsequent
+   * mousemove events until Shift is pressed again.
+   */
+  private _constrainAspect = false;
+
+  // Rotation state
+  private _rotateCenter: CanvasPoint | null = null;
+  private _rotatePrimIndex: number = -1;
+
+  /** Overlay renderer's handle hit-test function — injected by Host */
+  getHandleAt: ((x: number, y: number) => HandleType | null) | null = null;
+
+  /** Overlay renderer's selected bounds getter — injected by Host */
+  getSelectedResizableBounds: ((selectedIds: Set<string>, graphics: GraphicPrimitive[]) => { x: number; y: number; width: number; height: number } | null) | null = null;
+
   onMouseDown(pt: CanvasPoint, callbacks: ToolCallbacks): void {
     this.startPt = pt;
     const graphics = callbacks.symbol?.graphics ?? [];
     const pins = callbacks.symbol?.pins ?? [];
     const selectedIds = callbacks.selectedIds ?? new Set<string>();
 
+    // --- Check resize/rotate handles first (before primitive hit-test) ---
+    if (this.getHandleAt && this.getSelectedResizableBounds && selectedIds.size > 0) {
+      const handleType = this.getHandleAt(pt.x, pt.y);
+      if (handleType) {
+        if (handleType === 'rotate') {
+          // Enter rotating state
+          const bounds = this.getSelectedResizableBounds(selectedIds, graphics);
+          if (bounds) {
+            this.state = 'rotating';
+            this._rotateCenter = {
+              x: bounds.x + bounds.width / 2,
+              y: bounds.y + bounds.height / 2,
+            };
+            // Find the primitive index
+            const graphicIds = Array.from(selectedIds).filter(id => id.startsWith('g-'));
+            if (graphicIds.length === 1) {
+              this._rotatePrimIndex = parseInt(graphicIds[0].slice(2), 10);
+            }
+            return;
+          }
+        } else {
+          // Enter resizing state
+          const bounds = this.getSelectedResizableBounds(selectedIds, graphics);
+          if (bounds) {
+            this.state = 'resizing';
+            this._resizeHandle = handleType;
+            this._resizeInitialBounds = { ...bounds };
+            // Find the primitive index
+            const graphicIds = Array.from(selectedIds).filter(id => id.startsWith('g-'));
+            if (graphicIds.length === 1) {
+              this._resizePrimIndex = parseInt(graphicIds[0].slice(2), 10);
+            }
+            return;
+          }
+        }
+      }
+    }
+
+    // --- Normal hit-test ---
     // Hit-test primitives (last in array = top-most)
     let hitId: string | null = null;
     for (let i = graphics.length - 1; i >= 0; i--) {
@@ -270,6 +475,53 @@ export class SelectTool extends BaseTool {
       }
     }
 
+    // --- Resizing: show ghost rect of new bounds ---
+    if (this.state === 'resizing' && this._resizeInitialBounds && this._resizeHandle) {
+      const dx = pt.x - this.startPt.x;
+      const dy = pt.y - this.startPt.y;
+
+      // ── Sub-AC 1: Detect Shift key state from the pointer event ──────────────
+      // `pt.shiftKey` is set by SymbolEditorHost from the React mouse event.
+      // This allows the aspect-ratio lock to engage/disengage in real-time
+      // while the user holds or releases Shift during an active resize drag.
+      // The `_constrainAspect` flag reflects the current Shift state and is
+      // consumed by computeResizedBounds to enforce aspect-ratio locking.
+      this._constrainAspect = pt.shiftKey === true;
+      // Keep _shiftKey in sync (used by onMouseUp commit path)
+      this._shiftKey = this._constrainAspect;
+
+      const newBounds = computeResizedBounds(
+        this._resizeInitialBounds,
+        this._resizeHandle,
+        dx, dy,
+        this._constrainAspect,
+        this._altKey,
+      );
+      return {
+        kind: 'marquee',
+        x: newBounds.x,
+        y: newBounds.y,
+        width: newBounds.width,
+        height: newBounds.height,
+      };
+    }
+
+    // --- Rotating: show ghost rect at rotated position ---
+    if (this.state === 'rotating' && this._rotateCenter) {
+      // For rotation preview, show the original bounds (rotation is applied on commit)
+      // This is a simplification — full rotation preview would require a rotated rect ghost
+      const bounds = this._resizeInitialBounds;
+      if (bounds) {
+        return {
+          kind: 'marquee',
+          x: bounds.x,
+          y: bounds.y,
+          width: bounds.width,
+          height: bounds.height,
+        };
+      }
+    }
+
     return null;
   }
 
@@ -315,13 +567,66 @@ export class SelectTool extends BaseTool {
       }
     }
 
+    // --- Commit resize ---
+    if (this.state === 'resizing' && this.startPt && this._resizeInitialBounds && this._resizeHandle) {
+      const dx = pt.x - this.startPt.x;
+      const dy = pt.y - this.startPt.y;
+      if (dx !== 0 || dy !== 0) {
+        // Use the latest Shift key state from the mouseup event (pt.shiftKey),
+        // but fall back to the last tracked state (_constrainAspect) in case
+        // the host fires mouseup without modifier info.
+        const constrainOnCommit = pt.shiftKey !== undefined ? pt.shiftKey : this._constrainAspect;
+        const newBounds = computeResizedBounds(
+          this._resizeInitialBounds,
+          this._resizeHandle,
+          dx, dy,
+          constrainOnCommit,
+          this._altKey,
+        );
+        if (this._resizePrimIndex >= 0) {
+          callbacks.onResizePrimitive?.(this._resizePrimIndex, newBounds);
+        }
+      }
+    }
+
+    // --- Commit rotation ---
+    if (this.state === 'rotating' && this.startPt && this._rotateCenter) {
+      const startAngle = Math.atan2(
+        this.startPt.y - this._rotateCenter.y,
+        this.startPt.x - this._rotateCenter.x,
+      );
+      const endAngle = Math.atan2(
+        pt.y - this._rotateCenter.y,
+        pt.x - this._rotateCenter.x,
+      );
+      let angleDeg = (endAngle - startAngle) * 180 / Math.PI;
+
+      // Shift = 45° snap (AC6)
+      if (this._shiftKey) {
+        angleDeg = Math.round(angleDeg / 45) * 45;
+      }
+
+      if (angleDeg !== 0 && this._rotatePrimIndex >= 0) {
+        callbacks.onRotatePrimitive?.(this._rotatePrimIndex, angleDeg);
+      }
+    }
+
     this.state = 'idle';
     this.startPt = null;
     this._hitLockedPin = false;
+    this._resizeHandle = null;
+    this._resizeInitialBounds = null;
+    this._resizePrimIndex = -1;
+    this._rotateCenter = null;
+    this._rotatePrimIndex = -1;
   }
 
-  // Arrow-key nudge
+  // Arrow-key nudge + modifier tracking
   onKeyDown(e: KeyboardEvent, callbacks: ToolCallbacks): void {
+    // Track modifier keys for resize/rotate
+    this._shiftKey = e.shiftKey;
+    this._altKey = e.altKey;
+
     if (e.key === 'Escape') { this.cancel(); return; }
 
     const NUDGE = e.shiftKey ? 10 : 1;
@@ -347,8 +652,22 @@ export class SelectTool extends BaseTool {
     }
   }
 
+  /**
+   * Update modifier key state from mouse events.
+   * Called by SymbolEditorHost to keep shift/alt state in sync during drag.
+   */
+  updateModifiers(shiftKey: boolean, altKey: boolean): void {
+    this._shiftKey = shiftKey;
+    this._altKey = altKey;
+  }
+
   cancel(): void {
     this.state = 'idle';
     this.startPt = null;
+    this._resizeHandle = null;
+    this._resizeInitialBounds = null;
+    this._resizePrimIndex = -1;
+    this._rotateCenter = null;
+    this._rotatePrimIndex = -1;
   }
 }

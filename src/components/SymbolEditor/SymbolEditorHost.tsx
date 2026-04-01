@@ -68,6 +68,8 @@ export interface SymbolEditorHostProps {
   onMovePrimitives?: (indices: number[], dx: number, dy: number) => void;
   /** Callback when selected pins are dragged */
   onMovePins?: (pinIds: string[], dx: number, dy: number) => void;
+  /** Callback when a primitive is resized via handles */
+  onResizePrimitive?: (index: number, newBounds: { x: number; y: number; width: number; height: number }) => void;
   /** Callback to delete selected items */
   onDeleteSelected?: () => void;
   /** Callback to open pin config popover */
@@ -164,6 +166,7 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       onMovePin,
       onMovePrimitives,
       onMovePins,
+      onResizePrimitive,
       onDeleteSelected,
       onOpenPinPopover,
       className,
@@ -204,6 +207,8 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
     onMovePrimitivesRef.current = onMovePrimitives;
     const onMovePinsRef = useRef(onMovePins);
     onMovePinsRef.current = onMovePins;
+    const onResizePrimitiveRef = useRef(onResizePrimitive);
+    onResizePrimitiveRef.current = onResizePrimitive;
     const onDeleteSelectedRef = useRef(onDeleteSelected);
     onDeleteSelectedRef.current = onDeleteSelected;
     const onOpenPinPopoverRef = useRef(onOpenPinPopover);
@@ -316,6 +321,15 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
           overlayLayer: getLayer(layers, 'overlay'),
         });
 
+        // 5b. Inject overlay handle methods into the initial SelectTool
+        const currentTool = toolRef.current;
+        if (currentTool instanceof SelectTool) {
+          const overlay = overlayRendererRef.current;
+          currentTool.getHandleAt = (x: number, y: number) => overlay.getHandleAt(x, y);
+          currentTool.getSelectedResizableBounds = (ids: Set<string>, graphics: GraphicPrimitive[]) =>
+            overlay.getSelectedResizableBounds(ids, graphics);
+        }
+
         // 6. Initial grid render
         gridRendererRef.current.render(
           viewport.visibleBounds,
@@ -389,22 +403,41 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       }
     }, [selectedIds, symbol]);
 
-    // React to tool changes → swap tool instance
+    // React to tool changes → swap tool instance + inject overlay methods
     useEffect(() => {
       toolRef.current.cancel();
       ghostRendererRef.current?.render(null);
-      toolRef.current = createTool(currentTool);
+      const newTool = createTool(currentTool);
+
+      // Inject overlay renderer's handle methods into SelectTool
+      if (newTool instanceof SelectTool && overlayRendererRef.current) {
+        const overlay = overlayRendererRef.current;
+        newTool.getHandleAt = (x: number, y: number) => overlay.getHandleAt(x, y);
+        newTool.getSelectedResizableBounds = (ids: Set<string>, graphics: GraphicPrimitive[]) =>
+          overlay.getSelectedResizableBounds(ids, graphics);
+      }
+
+      toolRef.current = newTool;
     }, [currentTool]);
 
     // ========================================================================
     // Coordinate conversion
     // ========================================================================
 
-    const toCanvasPoint = (screenX: number, screenY: number): CanvasPoint | null => {
+    /**
+     * Convert a screen position to a snapped canvas/symbol-space point.
+     * Optionally carries pointer modifier state (shiftKey) for tools that need it.
+     */
+    const toCanvasPoint = (
+      screenX: number,
+      screenY: number,
+      shiftKey = false,
+      altKey = false,
+    ): CanvasPoint | null => {
       const coordSys = coordSysRef.current;
       if (!coordSys) return null;
       const world = coordSys.screenToWorldSnapped(screenX, screenY);
-      return { x: world.x, y: world.y };
+      return { x: world.x, y: world.y, shiftKey, altKey };
     };
 
     // ========================================================================
@@ -417,6 +450,7 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       onAddPrimitive: onAddPrimitiveRef.current ?? (() => {}),
       onMovePrimitives: onMovePrimitivesRef.current,
       onMovePins: onMovePinsRef.current,
+      onResizePrimitive: onResizePrimitiveRef.current,
       onMovePin: onMovePinRef.current,
       dispatch: dispatchRef.current,
     });
@@ -436,10 +470,14 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
 
       if (e.button !== 0) return;
 
-      const point = toCanvasPoint(e.clientX, e.clientY);
+      const point = toCanvasPoint(e.clientX, e.clientY, e.shiftKey, e.altKey);
       if (!point) return;
 
       const tool = toolRef.current;
+      // Update modifier keys for resize/rotate
+      if (tool instanceof SelectTool) {
+        tool.updateModifiers(e.shiftKey, e.altKey);
+      }
       if (tool instanceof PinTool) {
         tool.setLastScreen(e.clientX, e.clientY);
         tool.onMouseDown(point, getPinToolCallbacks());
@@ -455,12 +493,16 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
         return;
       }
 
-      const point = toCanvasPoint(e.clientX, e.clientY);
+      const point = toCanvasPoint(e.clientX, e.clientY, e.shiftKey, e.altKey);
       if (!point) return;
 
       const tool = toolRef.current;
       let ghost: GhostShape | null = null;
 
+      // Update modifier keys for resize/rotate
+      if (tool instanceof SelectTool) {
+        tool.updateModifiers(e.shiftKey, e.altKey);
+      }
       if (tool instanceof PinTool) {
         tool.setLastScreen(e.clientX, e.clientY);
         ghost = tool.onMouseMove(point, getPinToolCallbacks());
@@ -479,10 +521,14 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
 
       if (e.button !== 0) return;
 
-      const point = toCanvasPoint(e.clientX, e.clientY);
+      const point = toCanvasPoint(e.clientX, e.clientY, e.shiftKey, e.altKey);
       if (!point) return;
 
       const tool = toolRef.current;
+      // Update modifier keys for resize/rotate commit
+      if (tool instanceof SelectTool) {
+        tool.updateModifiers(e.shiftKey, e.altKey);
+      }
       if (tool instanceof PinTool) {
         tool.setLastScreen(e.clientX, e.clientY);
         tool.onMouseUp(point, getPinToolCallbacks());
@@ -496,7 +542,7 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
     const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
       if (e.button !== 0) return;
 
-      const point = toCanvasPoint(e.clientX, e.clientY);
+      const point = toCanvasPoint(e.clientX, e.clientY, e.shiftKey, e.altKey);
       if (!point) return;
 
       const tool = toolRef.current;

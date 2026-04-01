@@ -5,12 +5,56 @@ import type { GhostShape } from '../types';
 export interface CanvasPoint {
   x: number;
   y: number;
+  /**
+   * True when the Shift key is held during this pointer event.
+   * Used by SelectTool's resize drag handler to activate aspect-ratio lock mode.
+   */
+  shiftKey?: boolean;
+  /**
+   * True when the Alt key is held during this pointer event.
+   * Used by SelectTool's resize drag handler to activate center-based resize mode.
+   */
+  altKey?: boolean;
 }
 
 export interface ToolCallbacks {
   symbol: SymbolDefinition | null;
   onAddPrimitive: (prim: GraphicPrimitive) => void;
   dispatch: React.Dispatch<EditorAction>;
+  /**
+   * Current selection set. Provided by SvgSymbolCanvas so SelectTool can
+   * distinguish a click on an already-selected item (→ potential move) from
+   * a click on an unselected item (→ select first, then move).
+   */
+  selectedIds?: Set<string>;
+  /**
+   * Called by SelectTool when the user drags selected graphic primitives.
+   * @param indices - Indices into symbol.graphics[] to translate
+   * @param dx      - Horizontal delta in symbol-space units
+   * @param dy      - Vertical delta in symbol-space units
+   */
+  onMovePrimitives?: (indices: number[], dx: number, dy: number) => void;
+  /**
+   * Called by SelectTool when the user drags selected pins.
+   * @param pinIds  - Pin IDs to translate
+   * @param dx      - Horizontal delta in symbol-space units
+   * @param dy      - Vertical delta in symbol-space units
+   */
+  onMovePins?: (pinIds: string[], dx: number, dy: number) => void;
+  /** Legacy single-pin move (kept for backwards compat); prefer onMovePins */
+  onMovePin?: (pinId: string, newPosition: { x: number; y: number }) => void;
+  /**
+   * Called by SelectTool when the user finishes resizing a primitive via handles.
+   * @param index     - Index into symbol.graphics[]
+   * @param newBounds - New bounding box in symbol-space units
+   */
+  onResizePrimitive?: (index: number, newBounds: { x: number; y: number; width: number; height: number }) => void;
+  /**
+   * Called by SelectTool when the user finishes rotating a primitive via the rotation handle.
+   * @param index - Index into symbol.graphics[]
+   * @param angle - Rotation angle in degrees
+   */
+  onRotatePrimitive?: (index: number, angle: number) => void;
 }
 
 export abstract class BaseTool {

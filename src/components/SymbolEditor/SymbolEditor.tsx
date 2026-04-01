@@ -20,7 +20,6 @@ import {
   AddPinCommand,
   RemovePinsCommand,
   MovePrimitivesCommand,
-  TranslatePinsCommand,
   translatePrimitive,
 } from './history';
 import { SymbolEditorHost } from './SymbolEditorHost';
@@ -135,6 +134,38 @@ function snapPinToEdge(
   }
   // distBottom
   return { position: { x: clampX, y: symbolHeight }, orientation: 'down' };
+}
+
+/**
+ * Apply resize bounds to a primitive, updating its geometry.
+ * Only supports rect, circle, text (not polyline/pin).
+ */
+function applyResizeToPrimitive(
+  prim: GraphicPrimitive,
+  bounds: { x: number; y: number; width: number; height: number },
+): GraphicPrimitive {
+  switch (prim.kind) {
+    case 'rect':
+      return { ...prim, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height };
+    case 'circle': {
+      // Use the smaller dimension as diameter to keep it circular
+      const r = Math.min(bounds.width, bounds.height) / 2;
+      return { ...prim, cx: bounds.x + bounds.width / 2, cy: bounds.y + bounds.height / 2, r };
+    }
+    case 'arc': {
+      const r = Math.min(bounds.width, bounds.height) / 2;
+      return { ...prim, cx: bounds.x + bounds.width / 2, cy: bounds.y + bounds.height / 2, r };
+    }
+    case 'text': {
+      // Move position and scale fontSize proportionally based on height change
+      const oldHeight = prim.fontSize * 1.2;
+      const scale = bounds.height / oldHeight;
+      const newFontSize = Math.max(4, prim.fontSize * scale);
+      return { ...prim, x: bounds.x, y: bounds.y + newFontSize, fontSize: newFontSize };
+    }
+    default:
+      return prim;
+  }
 }
 
 function createBlankSymbol(): LocalSymbol {
@@ -315,11 +346,38 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
     [isMultiUnit, activeUnit, bumpHistory],
   );
 
+  // ── Resize primitive (SelectTool resize handles) ───────────────────────────
+
+  const handleResizePrimitive = useCallback(
+    (index: number, newBounds: { x: number; y: number; width: number; height: number }) => {
+      if (isMultiUnit && activeUnit !== null) {
+        setLocalSymbol((prev) => {
+          const units = [...(prev.units ?? [])];
+          const unit = units[activeUnit];
+          const graphics = unit.graphics.map((prim, i) =>
+            i === index ? applyResizeToPrimitive(prim, newBounds) : prim,
+          );
+          units[activeUnit] = { ...unit, graphics };
+          return { ...prev, units, updatedAt: new Date().toISOString() };
+        });
+      } else {
+        setLocalSymbol((prev) => {
+          const graphics = prev.graphics.map((prim, i) =>
+            i === index ? applyResizeToPrimitive(prim, newBounds) : prim,
+          );
+          return { ...prev, graphics, updatedAt: new Date().toISOString() };
+        });
+        bumpHistory();
+      }
+      dispatch({ type: 'MARK_DIRTY' });
+    },
+    [isMultiUnit, activeUnit, bumpHistory],
+  );
+
   // ── Move pins (SelectTool drag) ────────────────────────────────────────────
 
   const handleMovePins = useCallback(
     (pinIds: string[], dx: number, dy: number) => {
-      const history = historyRef.current;
       const symW = localSymbol.width;
       const symH = localSymbol.height;
 
@@ -917,6 +975,7 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
             onAddPrimitive={previewMode ? undefined : handleAddPrimitive}
             onMovePrimitives={previewMode ? undefined : handleMovePrimitives}
             onMovePins={previewMode ? undefined : handleMovePins}
+            onResizePrimitive={previewMode ? undefined : handleResizePrimitive}
             onDeleteSelected={previewMode ? undefined : handleDeleteSelected}
             onOpenPinPopover={previewMode ? undefined : (screenX, screenY, canvasX, canvasY) => {
               setPinPopover({ screenX, screenY, canvasX, canvasY });
