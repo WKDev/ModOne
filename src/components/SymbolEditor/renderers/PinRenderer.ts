@@ -64,14 +64,23 @@ export class PinRenderer {
     if (pin.orientation === 'up') dy = -markerLength;
     if (pin.orientation === 'down') dy = markerLength;
 
+    // AC 9: Use pin.color as fill, fall back to default
+    const pinColor = pin.color ?? PIN_COLOR;
+
     // Pin dot
     g.circle(x, y, PIN_RADIUS);
-    g.fill(PIN_COLOR);
+    g.fill(pinColor);
 
     // Direction line
     g.moveTo(x, y);
     g.lineTo(x + dx, y + dy);
-    g.stroke({ color: PIN_COLOR, width: PIN_LINE_WIDTH, pixelLine: true });
+    g.stroke({ color: pinColor, width: PIN_LINE_WIDTH, pixelLine: true });
+
+    // AC 8: Lock indicator for locked pins
+    if (pin.locked) {
+      g.rect(x - 2.5, y - 2.5, 5, 5);
+      g.stroke({ color: 0xf59e0b, width: 1, pixelLine: true });
+    }
 
     // Pin number label
     if (pin.number) {
@@ -104,6 +113,22 @@ export class PinRenderer {
 
       this._layer.addChild(label);
       this._labels.push(label);
+    }
+
+    // AC 11: Group label
+    if (pin.group) {
+      const groupStyle: TextStyleOptions = {
+        fontSize: PIN_LABEL_SIZE * 0.75,
+        fontFamily: 'sans-serif',
+        fontStyle: 'italic',
+        fill: 0x94a3b8,
+      };
+      const groupLabel = new PixiText({ text: `[${pin.group}]`, style: groupStyle });
+      groupLabel.x = x;
+      groupLabel.y = y - PIN_RADIUS - 6;
+      groupLabel.anchor.set(0.5, 1);
+      this._layer.addChild(groupLabel);
+      this._labels.push(groupLabel);
     }
   }
 

@@ -40,7 +40,7 @@ import { GhostRenderer } from './renderers/GhostRenderer';
 import { OverlayRenderer } from './renderers/OverlayRenderer';
 
 import type { BaseTool, CanvasPoint, ToolCallbacks } from './tools';
-import { SelectTool, RectTool, CircleTool, PolylineTool, ArcTool, TextTool, PinTool } from './tools';
+import { SelectTool, RectTool, CircleTool, LineTool, PolylineTool, ArcTool, TextTool, PinTool } from './tools';
 import type { PinToolCallbacks } from './tools/PinTool';
 
 import type { EditorTool } from './SymbolEditor';
@@ -62,10 +62,18 @@ export interface SymbolEditorHostProps {
   onAddPrimitive?: (prim: GraphicPrimitive) => void;
   /** Callback when a pin is being placed (opens popover) */
   onAddPin?: (pin: SymbolPin) => void;
+  /** Callback when an existing pin is dragged to a new position (legacy singular) */
+  onMovePin?: (pinId: string, newPosition: { x: number; y: number }) => void;
+  /** Callback when selected primitives are dragged */
+  onMovePrimitives?: (indices: number[], dx: number, dy: number) => void;
+  /** Callback when selected pins are dragged */
+  onMovePins?: (pinIds: string[], dx: number, dy: number) => void;
   /** Callback to delete selected items */
   onDeleteSelected?: () => void;
   /** Callback to open pin config popover */
   onOpenPinPopover?: (screenX: number, screenY: number, canvasX: number, canvasY: number) => void;
+  /** Active visual state context (null = base/default). Overrides applied upstream. */
+  activeVisualState?: string | null;
   /** Container CSS class */
   className?: string;
   /** Container CSS style overrides */
@@ -130,6 +138,7 @@ function createTool(toolName: EditorTool): BaseTool {
   switch (toolName) {
     case 'rect': return new RectTool();
     case 'circle': return new CircleTool();
+    case 'line': return new LineTool();
     case 'polyline': return new PolylineTool();
     case 'arc': return new ArcTool();
     case 'text': return new TextTool();
@@ -152,6 +161,9 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       selectedIds,
       dispatch,
       onAddPrimitive,
+      onMovePin,
+      onMovePrimitives,
+      onMovePins,
       onDeleteSelected,
       onOpenPinPopover,
       className,
@@ -186,6 +198,12 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
     dispatchRef.current = dispatch;
     const onAddPrimitiveRef = useRef(onAddPrimitive);
     onAddPrimitiveRef.current = onAddPrimitive;
+    const onMovePinRef = useRef(onMovePin);
+    onMovePinRef.current = onMovePin;
+    const onMovePrimitivesRef = useRef(onMovePrimitives);
+    onMovePrimitivesRef.current = onMovePrimitives;
+    const onMovePinsRef = useRef(onMovePins);
+    onMovePinsRef.current = onMovePins;
     const onDeleteSelectedRef = useRef(onDeleteSelected);
     onDeleteSelectedRef.current = onDeleteSelected;
     const onOpenPinPopoverRef = useRef(onOpenPinPopover);
@@ -395,7 +413,11 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
 
     const getToolCallbacks = (): ToolCallbacks => ({
       symbol: symbolRef.current,
+      selectedIds: selectedIdsRef.current,
       onAddPrimitive: onAddPrimitiveRef.current ?? (() => {}),
+      onMovePrimitives: onMovePrimitivesRef.current,
+      onMovePins: onMovePinsRef.current,
+      onMovePin: onMovePinRef.current,
       dispatch: dispatchRef.current,
     });
 

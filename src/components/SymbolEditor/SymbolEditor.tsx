@@ -23,7 +23,7 @@ import {
   TranslatePinsCommand,
   translatePrimitive,
 } from './history';
-import { SvgSymbolCanvas } from './svg/SvgSymbolCanvas';
+import { SymbolEditorHost } from './SymbolEditorHost';
 
 // ============================================================================
 // Predefined visual states (expandable via free-text)
@@ -907,9 +907,9 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
           />
         </div>
 
-        {/* SVG drawing canvas */}
+        {/* PixiJS drawing canvas */}
         <div data-testid="symbol-editor-canvas" className="relative flex-1 overflow-hidden">
-          <SvgSymbolCanvas
+          <SymbolEditorHost
             symbol={canvasSymbol}
             currentTool={previewMode ? 'select' : state.currentTool}
             selectedIds={state.selectedIds}
