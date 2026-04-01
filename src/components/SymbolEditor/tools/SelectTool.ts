@@ -462,6 +462,11 @@ export class SelectTool extends BaseTool {
   /** Snapshot of polyline points at the start of a point-move drag */
   private _pointEditOriginalPoints: Array<{ x: number; y: number }> = [];
 
+  /** Return current interaction state (used by Host for cursor feedback) */
+  getState(): SelectState {
+    return this.state;
+  }
+
   /** Overlay renderer's handle hit-test function — injected by Host */
   getHandleAt: ((x: number, y: number) => HandleType | null) | null = null;
 

@@ -70,6 +70,8 @@ export interface SymbolEditorHostProps {
   onMovePins?: (pinIds: string[], dx: number, dy: number) => void;
   /** Callback when a primitive is resized via handles */
   onResizePrimitive?: (index: number, newBounds: { x: number; y: number; width: number; height: number }) => void;
+  /** Callback when a primitive is rotated via the rotation handle */
+  onRotatePrimitive?: (index: number, angle: number) => void;
   /** Callback when a primitive is updated (e.g. polyline point editing) */
   onUpdatePrimitive?: (index: number, prim: GraphicPrimitive) => void;
   /** Index of polyline in point-edit mode (null = not editing) */
@@ -96,6 +98,19 @@ const CONTAINER_STYLE: CSSProperties = {
   overflow: 'hidden',
   position: 'relative',
   cursor: 'crosshair',
+};
+
+/** Maps resize-handle IDs to CSS cursor values */
+const HANDLE_CURSOR_MAP: Record<string, string> = {
+  'nw': 'nwse-resize',
+  'se': 'nwse-resize',
+  'ne': 'nesw-resize',
+  'sw': 'nesw-resize',
+  'n': 'ns-resize',
+  's': 'ns-resize',
+  'e': 'ew-resize',
+  'w': 'ew-resize',
+  'rotate': 'grab',
 };
 
 const GRID_SIZE = 20;
@@ -171,6 +186,7 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       onMovePrimitives,
       onMovePins,
       onResizePrimitive,
+      onRotatePrimitive,
       onUpdatePrimitive,
       editingPolylineIndex,
       onDeleteSelected,
@@ -200,6 +216,9 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
     // Pan drag tracking (middle-mouse)
     const panDragRef = useRef({ active: false, x: 0, y: 0 });
 
+    // Cursor feedback
+    const cursorRef = useRef<string>('crosshair');
+
     // Stable refs for callbacks (avoid stale closures)
     const symbolRef = useRef(symbol);
     symbolRef.current = symbol;
@@ -215,6 +234,8 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
     onMovePinsRef.current = onMovePins;
     const onResizePrimitiveRef = useRef(onResizePrimitive);
     onResizePrimitiveRef.current = onResizePrimitive;
+    const onRotatePrimitiveRef = useRef(onRotatePrimitive);
+    onRotatePrimitiveRef.current = onRotatePrimitive;
     const onUpdatePrimitiveRef = useRef(onUpdatePrimitive);
     onUpdatePrimitiveRef.current = onUpdatePrimitive;
     const editingPolylineIndexRef = useRef(editingPolylineIndex);
@@ -433,6 +454,13 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       }
 
       toolRef.current = newTool;
+
+      // Reset cursor when switching tools
+      const defaultCursor = currentTool === 'select' ? 'default' : 'crosshair';
+      if (containerRef.current) {
+        containerRef.current.style.cursor = defaultCursor;
+        cursorRef.current = defaultCursor;
+      }
     }, [currentTool]);
 
     // ========================================================================
@@ -466,6 +494,7 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       onMovePrimitives: onMovePrimitivesRef.current,
       onMovePins: onMovePinsRef.current,
       onResizePrimitive: onResizePrimitiveRef.current,
+      onRotatePrimitive: onRotatePrimitiveRef.current,
       onUpdatePrimitive: onUpdatePrimitiveRef.current,
       editingPolylineIndex: editingPolylineIndexRef.current,
       onMovePin: onMovePinRef.current,
@@ -528,6 +557,45 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       }
 
       ghostRendererRef.current?.render(ghost);
+
+      // ── Dynamic cursor feedback ──
+      let cursor = 'crosshair';
+      if (currentToolRef.current === 'select' && tool instanceof SelectTool) {
+        const state = tool.getState();
+        switch (state) {
+          case 'moving':
+          case 'point-move':
+            cursor = 'move';
+            break;
+          case 'rotating':
+            cursor = 'grabbing';
+            break;
+          case 'resizing': {
+            const handle = (tool as unknown as { _resizeHandle: string | null })._resizeHandle;
+            cursor = (handle && HANDLE_CURSOR_MAP[handle]) || 'nwse-resize';
+            break;
+          }
+          default: {
+            const overlay = overlayRendererRef.current;
+            if (overlay) {
+              const handle = overlay.getHandleAt(point.x, point.y);
+              if (handle) {
+                cursor = HANDLE_CURSOR_MAP[handle] || 'crosshair';
+              } else {
+                cursor = 'default';
+              }
+            } else {
+              cursor = 'default';
+            }
+            break;
+          }
+        }
+      }
+
+      if (containerRef.current && cursorRef.current !== cursor) {
+        containerRef.current.style.cursor = cursor;
+        cursorRef.current = cursor;
+      }
     };
 
     const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
