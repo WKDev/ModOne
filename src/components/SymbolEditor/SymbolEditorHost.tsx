@@ -70,6 +70,10 @@ export interface SymbolEditorHostProps {
   onMovePins?: (pinIds: string[], dx: number, dy: number) => void;
   /** Callback when a primitive is resized via handles */
   onResizePrimitive?: (index: number, newBounds: { x: number; y: number; width: number; height: number }) => void;
+  /** Callback when a primitive is updated (e.g. polyline point editing) */
+  onUpdatePrimitive?: (index: number, prim: GraphicPrimitive) => void;
+  /** Index of polyline in point-edit mode (null = not editing) */
+  editingPolylineIndex?: number | null;
   /** Callback to delete selected items */
   onDeleteSelected?: () => void;
   /** Callback to open pin config popover */
@@ -167,6 +171,8 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       onMovePrimitives,
       onMovePins,
       onResizePrimitive,
+      onUpdatePrimitive,
+      editingPolylineIndex,
       onDeleteSelected,
       onOpenPinPopover,
       className,
@@ -209,6 +215,10 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
     onMovePinsRef.current = onMovePins;
     const onResizePrimitiveRef = useRef(onResizePrimitive);
     onResizePrimitiveRef.current = onResizePrimitive;
+    const onUpdatePrimitiveRef = useRef(onUpdatePrimitive);
+    onUpdatePrimitiveRef.current = onUpdatePrimitive;
+    const editingPolylineIndexRef = useRef(editingPolylineIndex);
+    editingPolylineIndexRef.current = editingPolylineIndex;
     const onDeleteSelectedRef = useRef(onDeleteSelected);
     onDeleteSelectedRef.current = onDeleteSelected;
     const onOpenPinPopoverRef = useRef(onOpenPinPopover);
@@ -401,7 +411,12 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
           symbol?.pins ?? [],
         );
       }
-    }, [selectedIds, symbol]);
+      // Update point-edit handles
+      overlayRendererRef.current.renderPointEditHandles(
+        editingPolylineIndex ?? null,
+        symbol?.graphics ?? [],
+      );
+    }, [selectedIds, symbol, editingPolylineIndex]);
 
     // React to tool changes → swap tool instance + inject overlay methods
     useEffect(() => {
@@ -451,6 +466,8 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       onMovePrimitives: onMovePrimitivesRef.current,
       onMovePins: onMovePinsRef.current,
       onResizePrimitive: onResizePrimitiveRef.current,
+      onUpdatePrimitive: onUpdatePrimitiveRef.current,
+      editingPolylineIndex: editingPolylineIndexRef.current,
       onMovePin: onMovePinRef.current,
       dispatch: dispatchRef.current,
     });
@@ -562,8 +579,45 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
 
     useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
+        // ── Tool switching shortcuts (no modifiers, not in input fields) ──
+        const target = event.target as HTMLElement;
+        const isInputField =
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable;
+
+        if (
+          !isInputField &&
+          !event.ctrlKey &&
+          !event.altKey &&
+          !event.metaKey
+        ) {
+          const toolMap: Record<string, EditorTool> = {
+            v: 'select',
+            r: 'rect',
+            c: 'circle',
+            l: 'line',
+            p: 'polyline',
+            a: 'arc',
+            t: 'text',
+            n: 'pin',
+          };
+          const mapped = toolMap[event.key.toLowerCase()];
+          if (mapped) {
+            event.preventDefault();
+            dispatchRef.current({ type: 'SET_TOOL', tool: mapped });
+            ghostRendererRef.current?.render(null);
+            return;
+          }
+        }
+
         if (event.key === 'Delete' || event.key === 'Backspace') {
-          onDeleteSelectedRef.current?.();
+          // Don't delete the whole primitive when in point-edit mode
+          // (the SelectTool's onKeyDown handles vertex deletion)
+          if ((editingPolylineIndexRef.current ?? null) === null) {
+            onDeleteSelectedRef.current?.();
+          }
         }
 
         const tool = toolRef.current;

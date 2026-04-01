@@ -110,6 +110,25 @@ export class GhostRenderer {
           pixelLine: true,
           alpha: GHOST_ALPHA,
         });
+
+        // Show close indicator: small circle at first point when cursor is near it
+        // (detected by PolylineTool adding the first point as the last preview point)
+        if (pts.length >= 4) {
+          const first = pts[0];
+          const last = pts[pts.length - 1];
+          const dx = last.x - first.x;
+          const dy = last.y - first.y;
+          if (dx * dx + dy * dy < 1) {
+            // Cursor snapped to first point — show close indicator
+            this._graphics.circle(first.x, first.y, 6);
+            this._graphics.stroke({
+              color: 0x44cc44,
+              width: 1.5,
+              pixelLine: true,
+              alpha: 0.9,
+            });
+          }
+        }
         break;
       }
 
@@ -122,6 +141,35 @@ export class GhostRenderer {
           pixelLine: true,
         });
         break;
+
+      case 'pin': {
+        // Ghost pin: semi-transparent dot + orientation line (mirrors PinRenderer)
+        const PIN_GHOST_COLOR = 0xff8844;
+        const PIN_GHOST_ALPHA = 0.75;
+        const markerLength = Math.min(shape.length, 12);
+
+        let dx = 0;
+        let dy = 0;
+        if (shape.orientation === 'right') dx = markerLength;
+        else if (shape.orientation === 'left') dx = -markerLength;
+        else if (shape.orientation === 'up') dy = -markerLength;
+        else dy = markerLength; // 'down'
+
+        // Dot at pin anchor position
+        this._graphics.circle(shape.x, shape.y, 4);
+        this._graphics.fill({ color: PIN_GHOST_COLOR, alpha: PIN_GHOST_ALPHA });
+
+        // Orientation line
+        this._graphics.moveTo(shape.x, shape.y);
+        this._graphics.lineTo(shape.x + dx, shape.y + dy);
+        this._graphics.stroke({
+          color: PIN_GHOST_COLOR,
+          width: 1.5,
+          pixelLine: true,
+          alpha: PIN_GHOST_ALPHA,
+        });
+        break;
+      }
     }
   }
 

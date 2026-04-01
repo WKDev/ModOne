@@ -95,6 +95,9 @@ export class PrimitiveRenderer {
         for (let i = 1; i < prim.points.length; i++) {
           g.lineTo(prim.points[i].x, prim.points[i].y);
         }
+        if (prim.closed) {
+          g.closePath();
+        }
         if (hasFill(prim.fill)) {
           g.fill({ color: parseColor(prim.fill) });
         }

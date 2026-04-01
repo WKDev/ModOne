@@ -6,7 +6,7 @@
  * and library management.
  */
 import type { BaseBlock } from '../components/OneCanvas/types';
-import type { BehaviorVisualState, SymbolBehaviorBinding } from './behavior';
+import type { SymbolBehaviorBinding } from './behavior';
 
 // ============================================================================
 // Pin Types (PLC-Optimized)
@@ -51,6 +51,16 @@ export interface SymbolPin {
   nameVisible?: boolean;
   /** v2: Whether pin number is visible */
   numberVisible?: boolean;
+  /** v3: Human-readable description / tooltip text */
+  description?: string;
+  /** v3: Logical group label (e.g. "Power", "Data") */
+  group?: string;
+  /** v3: Lock state — blocks drag/delete when true */
+  locked?: boolean;
+  /** v3: CSS fill color override (stroke retains default) */
+  color?: string;
+  /** v3: Pixel offset of the port name label from default position */
+  labelOffset?: { x: number; y: number };
 }
 
 // ============================================================================
@@ -61,6 +71,8 @@ export interface SymbolPin {
 export interface GraphicPrimitiveBase {
   /** Stable identifier for stateful visual overrides */
   id?: string;
+  /** Human-readable label for identifying this shape element in the editor */
+  label?: string;
 }
 
 /** Rectangle primitive */
@@ -93,6 +105,8 @@ export interface PolylinePrimitive extends GraphicPrimitiveBase {
   stroke: string;
   fill: string;
   strokeWidth: number;
+  /** When true, the last point connects back to the first (closed polygon) */
+  closed?: boolean;
 }
 
 /** Arc primitive */
@@ -243,10 +257,10 @@ export interface SymbolDefinition {
   behavior?: SymbolBehaviorBinding;
   /** Optional runtime state schema (JSON Schema) */
   runtimeStateSchema?: Record<string, unknown>;
-  /** Optional state-driven visual variants */
-  visualStates?: Partial<Record<BehaviorVisualState, SymbolVisualVariant>>;
-  /** Optional animations for active visual states */
-  animations?: Partial<Record<BehaviorVisualState, SymbolAnimationSpec[]>>;
+  /** Optional state-driven visual variants (free-string keys, not limited to BehaviorVisualState) */
+  visualStates?: Record<string, SymbolVisualVariant>;
+  /** Optional animations for active visual states (free-string keys) */
+  animations?: Record<string, SymbolAnimationSpec[]>;
 }
 
 // ============================================================================

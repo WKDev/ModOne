@@ -31,7 +31,7 @@
  */
 
 import { BaseTool, type CanvasPoint, type ToolCallbacks } from './BaseTool';
-import type { GraphicPrimitive, SymbolPin } from '../../../types/symbol';
+import type { GraphicPrimitive, SymbolPin, PolylinePrimitive } from '../../../types/symbol';
 import type { GhostShape } from '../types';
 import type { HandleType } from '../renderers/OverlayRenderer';
 
@@ -45,13 +45,20 @@ type SelectState =
   | 'marquee'    // dragging a rubber-band selection box
   | 'moving'     // dragging selected items
   | 'resizing'   // dragging a resize handle
-  | 'rotating';  // dragging the rotation handle
+  | 'rotating'   // dragging the rotation handle
+  | 'point-move'; // dragging a polyline vertex in point-edit mode
 
 /** Minimum canvas-unit movement required to start a move */
 const MOVE_THRESHOLD = 3;
 
 /** Minimum primitive size in canvas units (AC7) */
 const MIN_SIZE = 10;
+
+/** Hit radius for polyline point handles in point-edit mode */
+const POINT_HIT_RADIUS = 6;
+
+/** Distance threshold for hitting a polyline segment (to insert a point) */
+const SEGMENT_HIT_TOL = 5;
 
 // ============================================================================
 // Bounding-box helpers
@@ -167,6 +174,12 @@ function hitTestPrimitive(pt: CanvasPoint, prim: GraphicPrimitive): boolean {
       for (let i = 0; i < prim.points.length - 1; i++) {
         if (distToSegment(pt, prim.points[i], prim.points[i + 1]) <= HIT_TOL) return true;
       }
+      // Also test closing segment for closed polygons
+      if (prim.closed && prim.points.length >= 3) {
+        const last = prim.points[prim.points.length - 1];
+        const first = prim.points[0];
+        if (distToSegment(pt, last, first) <= HIT_TOL) return true;
+      }
       return false;
     case 'arc': {
       const dist = Math.sqrt((pt.x - prim.cx) ** 2 + (pt.y - prim.cy) ** 2);
@@ -212,8 +225,32 @@ function hitTestPin(pt: CanvasPoint, pin: SymbolPin): boolean {
 /**
  * Compute new bounds from dragging a resize handle.
  * Returns { x, y, width, height } after applying constraints.
+ *
+ * @param initialBounds - Bounding box of the primitive at drag start
+ * @param handleType    - Which handle is being dragged
+ * @param dx            - Horizontal delta from drag start (canvas units)
+ * @param dy            - Vertical delta from drag start (canvas units)
+ * @param shiftKey      - true = maintain original aspect ratio (width/height locked)
+ * @param altKey        - true = resize from center outward
+ *
+ * @remarks Aspect-ratio lock (shiftKey=true) mathematics:
+ *   Let R = initialBounds.width / initialBounds.height.
+ *   - Edge handles (e, w): width is driven by drag. height = width / R.
+ *     The shape is re-centered vertically on the original center-y.
+ *   - Edge handles (n, s): height is driven by drag. width = height * R.
+ *     The shape is re-centered horizontally on the original center-x.
+ *   - Corner handles (nw, ne, sw, se): "fit-within" strategy —
+ *     compare widthScale = width / initialWidth vs heightScale = height / initialHeight.
+ *     If widthScale > heightScale (width grew proportionally more), snap width = height * R.
+ *     Otherwise snap height = width / R.
+ *     Then apply fixed-edge correction so that the edges NOT moved by the handle
+ *     remain at their original screen positions:
+ *       right edge fixed (nw, sw, w handles): x = initialRight  - newWidth
+ *       bottom edge fixed (nw, ne, n handles): y = initialBottom - newHeight
+ *
+ * @exported for unit testing
  */
-function computeResizedBounds(
+export function computeResizedBounds(
   initialBounds: { x: number; y: number; width: number; height: number },
   handleType: HandleType,
   dx: number,
@@ -254,28 +291,87 @@ function computeResizedBounds(
   }
 
   // Shift = aspect ratio lock (AC4)
+  //
+  // Mathematical basis:
+  //   Let R = initialBounds.width / initialBounds.height  (the locked ratio).
+  //   After the drag we must satisfy:  new_width / new_height = R
+  //   i.e.  new_width = new_height * R   OR   new_height = new_width / R
+  //
+  // Handle semantics determine which axis is "driven" by the drag and which
+  // axis is "constrained" to maintain the ratio:
+  //
+  //   • Edge handles (e, w) — the drag moves only one vertical edge, so
+  //     `width` is driven.  `height` is recalculated as width / R.
+  //     Because neither the top nor bottom edge is anchored by an e/w drag,
+  //     the shape is re-centered vertically on the original center-y.
+  //
+  //   • Edge handles (n, s) — the drag moves only one horizontal edge, so
+  //     `height` is driven.  `width` is recalculated as height * R.
+  //     The shape is re-centered horizontally on the original center-x.
+  //
+  //   • Corner handles (nw, ne, sw, se) — both axes are affected.  We use a
+  //     "fit-within" strategy: pick whichever raw dimension has the *smaller*
+  //     scale factor relative to the initial size, and constrain the other
+  //     dimension to satisfy R.  This keeps the resized shape within the
+  //     rectangle swept by the drag.
+  //
+  // After the ratio constraint is applied, a second pass adjusts the origin
+  // (x, y) so that the *fixed* edges (those not moved by the handle) remain
+  // anchored at their original screen positions:
+  //   • nw, n (top edge moved)  → bottom edge is fixed → y = bottom - height
+  //   • nw, w, sw (left edge)   → right edge is fixed  → x = right  - width
+  //   • n/s (neither left/right moved) → center-x was set above (no override)
+  //   • e/w (neither top/bottom moved) → center-y was set above (no override)
   if (shiftKey) {
     const initialRatio = initialBounds.width / initialBounds.height;
     if (initialRatio > 0) {
-      // Determine which dimension to constrain based on handle
       const isHorizontal = handleType === 'e' || handleType === 'w';
-      const isVertical = handleType === 'n' || handleType === 's';
+      const isVertical   = handleType === 'n' || handleType === 's';
 
       if (isHorizontal) {
+        // Width is driven by the drag → constrain height to maintain ratio.
+        // Neither the top nor bottom edge is anchored by an e/w drag, so
+        // re-center the shape vertically on the original center-y.
         height = width / initialRatio;
+        const cy = initialBounds.y + initialBounds.height / 2;
+        y = cy - height / 2;
       } else if (isVertical) {
+        // Height is driven by the drag → constrain width to maintain ratio.
+        // Neither the left nor right edge is anchored by an n/s drag, so
+        // re-center the shape horizontally on the original center-x.
         width = height * initialRatio;
+        const cx = initialBounds.x + initialBounds.width / 2;
+        x = cx - width / 2;
       } else {
-        // Corner handles: use the larger delta to drive
+        // Corner handles: fit-within strategy.
+        //   widthScale  = width  / initialBounds.width
+        //   heightScale = height / initialBounds.height
+        // If widthScale > heightScale (equivalent to newRatio > R) the width
+        // grew proportionally more, so we snap it down to match the height's
+        // scale.  Otherwise the height grew more, so we snap it down instead.
         const newRatio = width / height;
         if (newRatio > initialRatio) {
+          // Width is proportionally too large → constrain width to match height
           width = height * initialRatio;
         } else {
+          // Height is proportionally too large → constrain height to match width
           height = width / initialRatio;
         }
       }
 
-      // Adjust position for handles that anchor on top/left
+      // ── Fixed-edge position correction ───────────────────────────────────
+      // Ensure that the edges NOT moved by the drag stay at their original
+      // screen position after the ratio constraint modified width/height.
+      //
+      //   Right edge fixed  (nw, sw, w handles): x = initial_right  - new_width
+      //   Bottom edge fixed (nw, ne, n handles): y = initial_bottom - new_height
+      //
+      // For n/s the x was already set to the centered value above; since n/s
+      // are not in the x-adjustment set that assignment is preserved.
+      // For w   the y was already set to the centered value above; since w is
+      // not in the y-adjustment set that assignment is preserved.
+      // For n   both the centered-x (from isVertical branch) and the
+      //         bottom-anchored y (from this block) apply correctly.
       if (handleType === 'nw' || handleType === 'sw' || handleType === 'w') {
         x = initialBounds.x + initialBounds.width - width;
       }
@@ -358,6 +454,14 @@ export class SelectTool extends BaseTool {
   private _rotateCenter: CanvasPoint | null = null;
   private _rotatePrimIndex: number = -1;
 
+  // Point-edit state (polyline vertex editing)
+  /** Index of the vertex being dragged in point-edit mode (-1 = none) */
+  private _pointEditVertexIndex = -1;
+  /** Index of the last-clicked/selected vertex (for Delete key removal) */
+  private _selectedVertexIndex = -1;
+  /** Snapshot of polyline points at the start of a point-move drag */
+  private _pointEditOriginalPoints: Array<{ x: number; y: number }> = [];
+
   /** Overlay renderer's handle hit-test function — injected by Host */
   getHandleAt: ((x: number, y: number) => HandleType | null) | null = null;
 
@@ -369,6 +473,58 @@ export class SelectTool extends BaseTool {
     const graphics = callbacks.symbol?.graphics ?? [];
     const pins = callbacks.symbol?.pins ?? [];
     const selectedIds = callbacks.selectedIds ?? new Set<string>();
+    const editIdx = callbacks.editingPolylineIndex ?? null;
+
+    // --- Point-edit mode: handle vertex interactions first ---
+    if (editIdx !== null && editIdx >= 0) {
+      const prim = graphics[editIdx];
+      if (prim && prim.kind === 'polyline') {
+        const polyline = prim as PolylinePrimitive;
+
+        // Check if clicking on an existing vertex
+        for (let i = 0; i < polyline.points.length; i++) {
+          const vp = polyline.points[i];
+          const dx = pt.x - vp.x;
+          const dy = pt.y - vp.y;
+          if (dx * dx + dy * dy <= POINT_HIT_RADIUS * POINT_HIT_RADIUS) {
+            // Start dragging this vertex and mark it as selected
+            this.state = 'point-move';
+            this._pointEditVertexIndex = i;
+            this._selectedVertexIndex = i;
+            this._pointEditOriginalPoints = polyline.points.map(p => ({ ...p }));
+            return;
+          }
+        }
+
+        // Check if clicking on a segment (insert a new point)
+        for (let i = 0; i < polyline.points.length - 1; i++) {
+          if (distToSegment(pt, polyline.points[i], polyline.points[i + 1]) <= SEGMENT_HIT_TOL) {
+            // Insert point on this segment
+            const newPoints = [...polyline.points];
+            newPoints.splice(i + 1, 0, { x: pt.x, y: pt.y });
+            const updated: PolylinePrimitive = { ...polyline, points: newPoints };
+            callbacks.onUpdatePrimitive?.(editIdx, updated);
+            return;
+          }
+        }
+        // Also check the closing segment for closed polygons
+        if (polyline.closed && polyline.points.length >= 3) {
+          const last = polyline.points[polyline.points.length - 1];
+          const first = polyline.points[0];
+          if (distToSegment(pt, last, first) <= SEGMENT_HIT_TOL) {
+            const newPoints = [...polyline.points];
+            newPoints.push({ x: pt.x, y: pt.y });
+            const updated: PolylinePrimitive = { ...polyline, points: newPoints };
+            callbacks.onUpdatePrimitive?.(editIdx, updated);
+            return;
+          }
+        }
+
+        // Click on empty space while in point-edit → exit point-edit mode
+        callbacks.dispatch({ type: 'EXIT_POINT_EDIT' });
+        // Fall through to normal selection
+      }
+    }
 
     // --- Check resize/rotate handles first (before primitive hit-test) ---
     if (this.getHandleAt && this.getSelectedResizableBounds && selectedIds.size > 0) {
@@ -440,6 +596,21 @@ export class SelectTool extends BaseTool {
     if (!this.startPt) return null;
     const selectedIds = callbacks.selectedIds ?? new Set<string>();
 
+    // --- Point-move: live-update vertex position ---
+    if (this.state === 'point-move' && this._pointEditVertexIndex >= 0) {
+      const editIdx = callbacks.editingPolylineIndex ?? -1;
+      if (editIdx >= 0) {
+        const prim = callbacks.symbol?.graphics[editIdx];
+        if (prim && prim.kind === 'polyline') {
+          const newPoints = this._pointEditOriginalPoints.map(p => ({ ...p }));
+          newPoints[this._pointEditVertexIndex] = { x: pt.x, y: pt.y };
+          const updated: PolylinePrimitive = { ...(prim as PolylinePrimitive), points: newPoints };
+          callbacks.onUpdatePrimitive?.(editIdx, updated);
+        }
+      }
+      return null;
+    }
+
     if (this.state === 'marquee') {
       return {
         kind: 'marquee',
@@ -490,6 +661,14 @@ export class SelectTool extends BaseTool {
       // Keep _shiftKey in sync (used by onMouseUp commit path)
       this._shiftKey = this._constrainAspect;
 
+      // ── Sub-AC 5: Detect Alt key state from the pointer event ───────────────
+      // `pt.altKey` is set by SymbolEditorHost from the React mouse event.
+      // This allows center-based resize to engage/disengage in real-time
+      // while the user holds or releases Alt during an active resize drag.
+      if (pt.altKey !== undefined) {
+        this._altKey = pt.altKey;
+      }
+
       const newBounds = computeResizedBounds(
         this._resizeInitialBounds,
         this._resizeHandle,
@@ -527,6 +706,16 @@ export class SelectTool extends BaseTool {
 
   onMouseUp(pt: CanvasPoint, callbacks: ToolCallbacks): void {
     const selectedIds = callbacks.selectedIds ?? new Set<string>();
+
+    // --- Point-move commit ---
+    if (this.state === 'point-move') {
+      // The vertex was already live-updated via onMouseMove; just reset state
+      this.state = 'idle';
+      this.startPt = null;
+      this._pointEditVertexIndex = -1;
+      this._pointEditOriginalPoints = [];
+      return;
+    }
 
     if (this.state === 'marquee' && this.startPt) {
       const x1 = Math.min(this.startPt.x, pt.x), y1 = Math.min(this.startPt.y, pt.y);
@@ -572,16 +761,17 @@ export class SelectTool extends BaseTool {
       const dx = pt.x - this.startPt.x;
       const dy = pt.y - this.startPt.y;
       if (dx !== 0 || dy !== 0) {
-        // Use the latest Shift key state from the mouseup event (pt.shiftKey),
-        // but fall back to the last tracked state (_constrainAspect) in case
+        // Use the latest modifier key states from the mouseup event,
+        // but fall back to the last tracked state in case
         // the host fires mouseup without modifier info.
         const constrainOnCommit = pt.shiftKey !== undefined ? pt.shiftKey : this._constrainAspect;
+        const altOnCommit = pt.altKey !== undefined ? pt.altKey : this._altKey;
         const newBounds = computeResizedBounds(
           this._resizeInitialBounds,
           this._resizeHandle,
           dx, dy,
           constrainOnCommit,
-          this._altKey,
+          altOnCommit,
         );
         if (this._resizePrimIndex >= 0) {
           callbacks.onResizePrimitive?.(this._resizePrimIndex, newBounds);
@@ -621,11 +811,66 @@ export class SelectTool extends BaseTool {
     this._rotatePrimIndex = -1;
   }
 
+  // Double-click: enter polyline point-edit mode
+  onDoubleClick(pt: CanvasPoint, callbacks: ToolCallbacks): void {
+    const graphics = callbacks.symbol?.graphics ?? [];
+    const selectedIds = callbacks.selectedIds ?? new Set<string>();
+
+    // Check if a selected polyline was double-clicked
+    const graphicIds = Array.from(selectedIds).filter(id => id.startsWith('g-'));
+    if (graphicIds.length === 1) {
+      const idx = parseInt(graphicIds[0].slice(2), 10);
+      const prim = graphics[idx];
+      if (prim && prim.kind === 'polyline' && hitTestPrimitive(pt, prim)) {
+        // Enter point-edit mode
+        callbacks.dispatch({ type: 'ENTER_POINT_EDIT', index: idx });
+        return;
+      }
+    }
+
+    // Also allow double-click on any polyline to select + enter point-edit
+    for (let i = graphics.length - 1; i >= 0; i--) {
+      const prim = graphics[i];
+      if (prim.kind === 'polyline' && hitTestPrimitive(pt, prim)) {
+        callbacks.dispatch({ type: 'SELECT', ids: [`g-${i}`] });
+        callbacks.dispatch({ type: 'ENTER_POINT_EDIT', index: i });
+        return;
+      }
+    }
+  }
+
   // Arrow-key nudge + modifier tracking
   onKeyDown(e: KeyboardEvent, callbacks: ToolCallbacks): void {
     // Track modifier keys for resize/rotate
     this._shiftKey = e.shiftKey;
     this._altKey = e.altKey;
+
+    // Point-edit mode key handling
+    const editIdx = callbacks.editingPolylineIndex ?? null;
+    if (editIdx !== null && editIdx >= 0) {
+      // Escape → exit point-edit mode
+      if (e.key === 'Escape') {
+        this._selectedVertexIndex = -1;
+        callbacks.dispatch({ type: 'EXIT_POINT_EDIT' });
+        return;
+      }
+      // Delete/Backspace → remove selected vertex (min 2 points)
+      if ((e.key === 'Delete' || e.key === 'Backspace') && this._selectedVertexIndex >= 0) {
+        const prim = callbacks.symbol?.graphics[editIdx];
+        if (prim && prim.kind === 'polyline') {
+          const polyline = prim as PolylinePrimitive;
+          const minPoints = polyline.closed ? 3 : 2;
+          if (polyline.points.length > minPoints) {
+            const newPoints = polyline.points.filter((_, i) => i !== this._selectedVertexIndex);
+            const updated: PolylinePrimitive = { ...polyline, points: newPoints };
+            callbacks.onUpdatePrimitive?.(editIdx, updated);
+            this._selectedVertexIndex = -1;
+            e.preventDefault();
+          }
+        }
+        return;
+      }
+    }
 
     if (e.key === 'Escape') { this.cancel(); return; }
 
@@ -669,5 +914,8 @@ export class SelectTool extends BaseTool {
     this._resizePrimIndex = -1;
     this._rotateCenter = null;
     this._rotatePrimIndex = -1;
+    this._pointEditVertexIndex = -1;
+    this._selectedVertexIndex = -1;
+    this._pointEditOriginalPoints = [];
   }
 }

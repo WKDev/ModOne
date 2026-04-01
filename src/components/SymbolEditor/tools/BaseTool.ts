@@ -55,6 +55,18 @@ export interface ToolCallbacks {
    * @param angle - Rotation angle in degrees
    */
   onRotatePrimitive?: (index: number, angle: number) => void;
+  /**
+   * Called by SelectTool to replace a primitive at a given index with updated data.
+   * Used for polyline point editing (move/add/delete points).
+   * @param index - Index into symbol.graphics[]
+   * @param prim  - The updated primitive
+   */
+  onUpdatePrimitive?: (index: number, prim: GraphicPrimitive) => void;
+  /**
+   * Index of the polyline primitive currently in point-edit mode.
+   * Set by double-clicking a selected polyline. null = not editing points.
+   */
+  editingPolylineIndex?: number | null;
 }
 
 export abstract class BaseTool {

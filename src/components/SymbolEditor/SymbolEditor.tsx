@@ -65,6 +65,11 @@ export interface EditorState {
    * string = viewing/editing overrides for that named visual state.
    */
   activeVisualState: string | null;
+  /**
+   * Index of the polyline primitive currently in point-edit mode.
+   * null = not editing any polyline's points.
+   */
+  editingPolylineIndex: number | null;
 }
 
 export type EditorAction =
@@ -77,7 +82,11 @@ export type EditorAction =
   | { type: 'MARK_DIRTY' }
   | { type: 'MARK_CLEAN' }
   /** Set the active VisualState context (null = base/default) */
-  | { type: 'SET_VISUAL_STATE'; state: string | null };
+  | { type: 'SET_VISUAL_STATE'; state: string | null }
+  /** Enter polyline point-edit mode */
+  | { type: 'ENTER_POINT_EDIT'; index: number }
+  /** Exit polyline point-edit mode */
+  | { type: 'EXIT_POINT_EDIT' };
 
 export interface SymbolEditorProps {
   symbol?: SymbolDefinition | null;
@@ -191,7 +200,7 @@ function createBlankSymbol(): LocalSymbol {
 export function editorReducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
     case 'SET_TOOL':
-      return { ...state, currentTool: action.tool };
+      return { ...state, currentTool: action.tool, editingPolylineIndex: null };
     case 'SET_ZOOM':
       return { ...state, zoom: action.zoom };
     case 'SET_PAN':
@@ -201,13 +210,17 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     case 'SELECT':
       return { ...state, selectedIds: new Set(action.ids) };
     case 'DESELECT_ALL':
-      return { ...state, selectedIds: new Set() };
+      return { ...state, selectedIds: new Set(), editingPolylineIndex: null };
     case 'MARK_DIRTY':
       return { ...state, isDirty: true };
     case 'MARK_CLEAN':
       return { ...state, isDirty: false };
     case 'SET_VISUAL_STATE':
       return { ...state, activeVisualState: action.state };
+    case 'ENTER_POINT_EDIT':
+      return { ...state, editingPolylineIndex: action.index };
+    case 'EXIT_POINT_EDIT':
+      return { ...state, editingPolylineIndex: null };
     default:
       return state;
   }
@@ -220,6 +233,7 @@ export const INITIAL_EDITOR_STATE: EditorState = {
   selectedIds: new Set(),
   isDirty: false,
   activeVisualState: null,
+  editingPolylineIndex: null,
 };
 
 /** @internal kept for backwards-compat inside the module */
@@ -372,6 +386,29 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
       dispatch({ type: 'MARK_DIRTY' });
     },
     [isMultiUnit, activeUnit, bumpHistory],
+  );
+
+  // ── Update primitive (polyline point editing) ──────────────────────────────
+
+  const handleUpdatePrimitive = useCallback(
+    (index: number, prim: GraphicPrimitive) => {
+      if (isMultiUnit && activeUnit !== null) {
+        setLocalSymbol((prev) => {
+          const units = [...(prev.units ?? [])];
+          const unit = units[activeUnit];
+          const graphics = unit.graphics.map((g, i) => (i === index ? prim : g));
+          units[activeUnit] = { ...unit, graphics };
+          return { ...prev, units, updatedAt: new Date().toISOString() };
+        });
+      } else {
+        setLocalSymbol((prev) => {
+          const graphics = prev.graphics.map((g, i) => (i === index ? prim : g));
+          return { ...prev, graphics, updatedAt: new Date().toISOString() };
+        });
+      }
+      dispatch({ type: 'MARK_DIRTY' });
+    },
+    [isMultiUnit, activeUnit],
   );
 
   // ── Move pins (SelectTool drag) ────────────────────────────────────────────
@@ -577,7 +614,7 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
   // ── Update pin name / number ───────────────────────────────────────────────
 
   const handleUpdatePin = useCallback(
-    (pinId: string, updates: Partial<Pick<SymbolPin, 'name' | 'number'>>) => {
+    (pinId: string, updates: Partial<Pick<SymbolPin, 'name' | 'number' | 'type' | 'orientation' | 'position'>>) => {
       setLocalSymbol((prev) => {
         if (isMultiUnit && activeUnit !== null) {
           const units = [...(prev.units ?? [])];
@@ -614,6 +651,9 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
         e.preventDefault();
         handleUndo();
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
+        e.preventDefault();
+        handleRedo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'y' && !e.shiftKey) {
         e.preventDefault();
         handleRedo();
       }
@@ -976,10 +1016,12 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
             onMovePrimitives={previewMode ? undefined : handleMovePrimitives}
             onMovePins={previewMode ? undefined : handleMovePins}
             onResizePrimitive={previewMode ? undefined : handleResizePrimitive}
+            onUpdatePrimitive={previewMode ? undefined : handleUpdatePrimitive}
             onDeleteSelected={previewMode ? undefined : handleDeleteSelected}
             onOpenPinPopover={previewMode ? undefined : (screenX, screenY, canvasX, canvasY) => {
               setPinPopover({ screenX, screenY, canvasX, canvasY });
             }}
+            editingPolylineIndex={state.editingPolylineIndex}
             activeVisualState={state.activeVisualState}
             style={{ width: '100%', height: '100%' }}
           />

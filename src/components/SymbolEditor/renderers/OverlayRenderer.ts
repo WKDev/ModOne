@@ -8,7 +8,7 @@
  */
 
 import { Graphics, type Container } from 'pixi.js';
-import type { GraphicPrimitive, SymbolPin } from '@/types/symbol';
+import type { GraphicPrimitive, SymbolPin, PolylinePrimitive } from '@/types/symbol';
 
 export interface OverlayRendererOptions {
   /** The selection layer container */
@@ -36,6 +36,14 @@ const HANDLE_HIT_RADIUS = 8;
 const ROTATION_HANDLE_DISTANCE = 20;
 const ROTATION_HANDLE_RADIUS = 4;
 
+// Point-edit handle visual constants
+const POINT_HANDLE_RADIUS = 4;
+const POINT_HANDLE_FILL = 0xffffff;
+const POINT_HANDLE_STROKE = 0xff6600;
+const POINT_HANDLE_STROKE_WIDTH = 1.5;
+const POINT_SEGMENT_COLOR = 0xff6600;
+const POINT_SEGMENT_ALPHA = 0.4;
+
 /** Types of resize handles */
 export type HandleType =
   | 'nw' | 'n' | 'ne'
@@ -50,8 +58,11 @@ interface HandlePosition {
   y: number;
 }
 
-/** Resizable primitive kinds — polyline and pins are excluded */
-const RESIZABLE_KINDS = new Set(['rect', 'circle', 'text', 'arc']);
+/**
+ * Resizable primitive kinds — only rect, circle, text get resize handles.
+ * Polyline uses point editing, arc has no resize UI, pins use move-only.
+ */
+const RESIZABLE_KINDS = new Set(['rect', 'circle', 'text']);
 
 export class OverlayRenderer {
   private _selectionLayer: Container;
@@ -59,6 +70,7 @@ export class OverlayRenderer {
   private _originGraphics: Graphics;
   private _selectionGraphics: Graphics;
   private _handleGraphics: Graphics;
+  private _pointEditGraphics: Graphics;
   private _destroyed = false;
 
   /** Stored handle positions for hit-testing — updated each renderSelection call */
@@ -82,6 +94,11 @@ export class OverlayRenderer {
     this._handleGraphics = new Graphics();
     this._handleGraphics.label = 'resize-handles';
     this._selectionLayer.addChild(this._handleGraphics);
+
+    // Point-edit handles on selection layer (above resize handles)
+    this._pointEditGraphics = new Graphics();
+    this._pointEditGraphics.label = 'point-edit-handles';
+    this._selectionLayer.addChild(this._pointEditGraphics);
 
     // Draw origin crosshair once (static)
     this._drawOrigin();
@@ -251,12 +268,71 @@ export class OverlayRenderer {
     }
   }
 
+  /**
+   * Render vertex handles for a polyline in point-edit mode.
+   * Shows circles at each vertex and dashed lines for segments.
+   * @param polylineIndex - Index of the polyline in the graphics array
+   * @param graphics      - The full graphics array
+   */
+  renderPointEditHandles(
+    polylineIndex: number | null,
+    graphics: GraphicPrimitive[],
+  ): void {
+    if (this._destroyed) return;
+
+    const g = this._pointEditGraphics;
+    g.clear();
+
+    if (polylineIndex === null || polylineIndex < 0) {
+      g.visible = false;
+      return;
+    }
+
+    const prim = graphics[polylineIndex];
+    if (!prim || prim.kind !== 'polyline') {
+      g.visible = false;
+      return;
+    }
+
+    const polyline = prim as PolylinePrimitive;
+    if (polyline.points.length === 0) {
+      g.visible = false;
+      return;
+    }
+
+    g.visible = true;
+
+    // Draw segments in highlight color
+    g.moveTo(polyline.points[0].x, polyline.points[0].y);
+    for (let i = 1; i < polyline.points.length; i++) {
+      g.lineTo(polyline.points[i].x, polyline.points[i].y);
+    }
+    if (polyline.closed && polyline.points.length >= 3) {
+      g.closePath();
+    }
+    g.stroke({
+      color: POINT_SEGMENT_COLOR,
+      width: 1,
+      pixelLine: true,
+      alpha: POINT_SEGMENT_ALPHA,
+    });
+
+    // Draw vertex handles
+    for (const pt of polyline.points) {
+      g.circle(pt.x, pt.y, POINT_HANDLE_RADIUS);
+      g.fill({ color: POINT_HANDLE_FILL });
+      g.stroke({ color: POINT_HANDLE_STROKE, width: POINT_HANDLE_STROKE_WIDTH });
+    }
+  }
+
   /** Clear selection highlights */
   clearSelection(): void {
     this._selectionGraphics.clear();
     this._selectionGraphics.visible = false;
     this._handleGraphics.clear();
     this._handleGraphics.visible = false;
+    this._pointEditGraphics.clear();
+    this._pointEditGraphics.visible = false;
     this._handlePositions = [];
   }
 
@@ -319,5 +395,6 @@ export class OverlayRenderer {
     this._originGraphics.destroy();
     this._selectionGraphics.destroy();
     this._handleGraphics.destroy();
+    this._pointEditGraphics.destroy();
   }
 }
