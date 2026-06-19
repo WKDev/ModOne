@@ -31,6 +31,7 @@ describe('simulationService', () => {
     vi.clearAllMocks();
     mockGetState.mockReturnValue({
       setSimulationStatus: vi.fn(),
+      triggerReset: vi.fn(),
       simulationStatus: 'stopped',
     } as any);
   });
@@ -161,6 +162,7 @@ describe('simulationService', () => {
       const mockSetStatus = vi.fn();
       mockGetState.mockReturnValue({
         setSimulationStatus: mockSetStatus,
+        triggerReset: vi.fn(),
         simulationStatus: 'running',
       } as any);
 

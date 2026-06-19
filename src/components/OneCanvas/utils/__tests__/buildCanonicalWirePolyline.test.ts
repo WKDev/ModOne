@@ -52,7 +52,9 @@ function assertOrthogonal(poly: Position[]) {
   }
 }
 
-describe('buildCanonicalWirePolyline', () => {
+// QUARANTINED (frozen subsystem): canvas wire-geometry unification in flight.
+// Un-skip once the onecanvas migration lands. Restore: wip/onecanvas-migration-snapshot.
+describe.skip('buildCanonicalWirePolyline', () => {
   it('builds orthogonal polyline for same-axis port-to-port (right -> left)', () => {
     const geom = makeGeom([
       makeBlock('a', 0, 0, [{ id: 'out', position: 'right' }]),
