@@ -15,10 +15,8 @@ interface SymbolEditorTabData {
 export function SymbolEditorPanel({ data }: SymbolEditorPanelProps) {
   const panelData = data as SymbolEditorTabData | undefined;
   const currentProjectPath = useProjectStore((state) => state.currentProjectPath);
-  const { activeTabId, removeTab } = useEditorAreaStore((state) => ({
-    activeTabId: state.activeTabId,
-    removeTab: state.removeTab,
-  }));
+  const activeTabId = useEditorAreaStore((state) => state.activeTabId);
+  const removeTab = useEditorAreaStore((state) => state.removeTab);
 
   const handleClose = useCallback(() => {
     if (activeTabId) {

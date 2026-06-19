@@ -394,14 +394,20 @@ impl CanvasSync {
     ///
     /// Called when a circuit's state changes affecting a plc_in block.
     /// Writes the state to the corresponding device in the canonical runtime.
-    pub fn handle_plc_input_change(&self, block_id: &str, circuit_state: bool) -> CanvasSyncResult<()> {
-        let mapping = self.get_mapping(block_id)
+    pub fn handle_plc_input_change(
+        &self,
+        block_id: &str,
+        circuit_state: bool,
+    ) -> CanvasSyncResult<()> {
+        let mapping = self
+            .get_mapping(block_id)
             .ok_or_else(|| CanvasSyncError::MappingNotFound(block_id.to_string()))?;
 
         if mapping.block_type != PlcBlockType::PlcIn {
-            return Err(CanvasSyncError::MappingNotFound(
-                format!("{} is not a PlcIn block", block_id)
-            ));
+            return Err(CanvasSyncError::MappingNotFound(format!(
+                "{} is not a PlcIn block",
+                block_id
+            )));
         }
 
         // Apply inverted logic
@@ -428,7 +434,11 @@ impl CanvasSync {
                 Ok(()) => success_count += 1,
                 Err(e) => {
                     // Log error but continue processing other changes
-                    log::warn!("Failed to handle plc input change for {}: {}", change.block_id, e);
+                    log::warn!(
+                        "Failed to handle plc input change for {}: {}",
+                        change.block_id,
+                        e
+                    );
                 }
             }
         }
@@ -524,8 +534,8 @@ impl CanvasSync {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sim::tag_registry::TagRegistry;
     use crate::plc_runtime::{CanonicalAddress, CanonicalAreaKind};
+    use crate::sim::tag_registry::TagRegistry;
 
     fn bit_binding(area: CanonicalAreaKind, index: u32) -> RuntimeBinding {
         RuntimeBinding::canonical(CanonicalAddress::new(area, index))
@@ -544,7 +554,11 @@ mod tests {
     fn test_register_mapping() {
         let sync = create_test_sync();
 
-        let mapping = PlcBlockMapping::new_plc_out("block1", bit_binding(CanonicalAreaKind::InternalBit, 0), "M0");
+        let mapping = PlcBlockMapping::new_plc_out(
+            "block1",
+            bit_binding(CanonicalAreaKind::InternalBit, 0),
+            "M0",
+        );
         sync.register_mapping(mapping.clone());
 
         assert_eq!(sync.mapping_count(), 1);
@@ -555,8 +569,11 @@ mod tests {
     fn test_register_mapping_replaces_existing() {
         let sync = create_test_sync();
 
-        let mapping1 =
-            PlcBlockMapping::new_plc_out("block1", bit_binding(CanonicalAreaKind::InternalBit, 0), "M0");
+        let mapping1 = PlcBlockMapping::new_plc_out(
+            "block1",
+            bit_binding(CanonicalAreaKind::InternalBit, 0),
+            "M0",
+        );
         let mapping2 = PlcBlockMapping::new_plc_out(
             "block1",
             bit_binding(CanonicalAreaKind::InternalBit, 100),
@@ -632,8 +649,11 @@ mod tests {
             )
             .unwrap();
 
-        let mapping =
-            PlcBlockMapping::new_plc_out("block1", bit_binding(CanonicalAreaKind::InternalBit, 0), "M0");
+        let mapping = PlcBlockMapping::new_plc_out(
+            "block1",
+            bit_binding(CanonicalAreaKind::InternalBit, 0),
+            "M0",
+        );
         let state = sync.read_device_state(&mapping).unwrap();
 
         assert!(state);
@@ -648,7 +668,7 @@ mod tests {
             bit_binding(CanonicalAreaKind::InternalBit, 0),
             "M0",
         )
-            .with_normally_open(true);
+        .with_normally_open(true);
 
         assert!(sync.apply_output_logic(true, &mapping));
         assert!(!sync.apply_output_logic(false, &mapping));
@@ -663,7 +683,7 @@ mod tests {
             bit_binding(CanonicalAreaKind::InternalBit, 0),
             "M0",
         )
-            .with_normally_open(false);
+        .with_normally_open(false);
 
         // NC contact: output is inverted
         assert!(!sync.apply_output_logic(true, &mapping));
@@ -679,7 +699,7 @@ mod tests {
             bit_binding(CanonicalAreaKind::InternalBit, 0),
             "M0",
         )
-            .with_inverted(true);
+        .with_inverted(true);
 
         assert!(!sync.apply_output_logic(true, &mapping));
         assert!(sync.apply_output_logic(false, &mapping));
@@ -694,8 +714,8 @@ mod tests {
             bit_binding(CanonicalAreaKind::InternalBit, 0),
             "M0",
         )
-            .with_normally_open(false)
-            .with_inverted(true);
+        .with_normally_open(false)
+        .with_inverted(true);
 
         // NC + inverted = double inversion = same as input
         assert!(sync.apply_output_logic(true, &mapping));
@@ -711,8 +731,11 @@ mod tests {
         let runtime = Arc::new(CanonicalRuntimeFacade::new());
         let sync = CanvasSync::new(Arc::clone(&runtime), Arc::new(TagRegistry::new()));
 
-        let mapping =
-            PlcBlockMapping::new_plc_in("sensor1", bit_binding(CanonicalAreaKind::InputBit, 0), "P0");
+        let mapping = PlcBlockMapping::new_plc_in(
+            "sensor1",
+            bit_binding(CanonicalAreaKind::InputBit, 0),
+            "P0",
+        );
         sync.register_mapping(mapping);
 
         // Handle input change
@@ -740,7 +763,7 @@ mod tests {
             bit_binding(CanonicalAreaKind::InputBit, 0),
             "P0",
         )
-            .with_inverted(true);
+        .with_inverted(true);
         sync.register_mapping(mapping);
 
         // Handle input change with inversion
@@ -768,8 +791,11 @@ mod tests {
         let sync = create_test_sync();
 
         // Register as PlcOut, not PlcIn
-        let mapping =
-            PlcBlockMapping::new_plc_out("block1", bit_binding(CanonicalAreaKind::InternalBit, 0), "M0");
+        let mapping = PlcBlockMapping::new_plc_out(
+            "block1",
+            bit_binding(CanonicalAreaKind::InternalBit, 0),
+            "M0",
+        );
         sync.register_mapping(mapping);
 
         let result = sync.handle_plc_input_change("block1", true);
@@ -813,9 +839,9 @@ mod tests {
             bit_binding(CanonicalAreaKind::InternalBit, 100),
             "M100",
         )
-            .with_normally_open(false)
-            .with_inverted(true)
-            .with_label("Status LED");
+        .with_normally_open(false)
+        .with_inverted(true)
+        .with_label("Status LED");
 
         assert_eq!(mapping.block_id, "led1");
         assert_eq!(mapping.block_type, PlcBlockType::PlcOut);

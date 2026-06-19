@@ -6,6 +6,20 @@ export interface CanvasPoint {
   x: number;
   y: number;
   /**
+   * Raw (unsnapped) world X coordinate.
+   * Used by SelectTool's handle hit-testing to detect handles that sit at
+   * non-grid positions (e.g. the center of a rect placed at an odd coordinate).
+   * Falls back to `x` when not provided.
+   */
+  rawX?: number;
+  /**
+   * Raw (unsnapped) world Y coordinate.
+   * Used by SelectTool's handle hit-testing to detect handles that sit at
+   * non-grid positions (e.g. the center of a rect placed at an odd coordinate).
+   * Falls back to `y` when not provided.
+   */
+  rawY?: number;
+  /**
    * True when the Shift key is held during this pointer event.
    * Used by SelectTool's resize drag handler to activate aspect-ratio lock mode.
    */

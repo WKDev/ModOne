@@ -154,7 +154,7 @@ describe('ConnectivityGraph — net resolution with floating endpoints', () => {
     private wires: Wire[] = [];
     private dirty = true;
     private nets: Map<string, Set<string>> = new Map();
-    private GRID_SNAP_PX = 20;
+    private GRID_SNAP_PX = 5;
 
     addWire(wire: Wire) {
       this.wires.push(wire);

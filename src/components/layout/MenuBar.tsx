@@ -135,6 +135,11 @@ const baseMenus: Menu[] = [
             shortcut: 'Ctrl+Shift+N',
             action: () => fileDialogService.requestNewScenario(),
           },
+          {
+            label: 'New Sheet',
+            shortcut: 'Ctrl+Shift+E',
+            action: () => fileDialogService.requestNewSheet(),
+          },
         ],
       },
       {

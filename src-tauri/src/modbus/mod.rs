@@ -15,8 +15,7 @@ pub use adapter::{
 };
 pub use memory::ModbusMemory;
 pub use rtu::{
-    list_available_ports, ModbusRtuServer, PortInfo, RtuConfig, RtuDataBits, RtuParity,
-    RtuStopBits,
+    list_available_ports, ModbusRtuServer, PortInfo, RtuConfig, RtuDataBits, RtuParity, RtuStopBits,
 };
 pub use tcp::ModbusTcpServer;
 pub use types::{

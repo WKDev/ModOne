@@ -4,3 +4,5 @@ export { SimulationSettings } from './SimulationSettings';
 export { ModbusSettings } from './ModbusSettings';
 export { AppearanceSettings } from './AppearanceSettings';
 export { KeyboardShortcutsSettings } from './KeyboardShortcutsSettings';
+export { UserAccountManager } from './UserAccountManager';
+export { SessionMonitoringTable } from './SessionMonitoringTable';

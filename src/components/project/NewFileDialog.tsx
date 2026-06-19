@@ -6,7 +6,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { X, Loader2, CircuitBoard, Workflow, PlayCircle } from 'lucide-react';
+import { X, Loader2, CircuitBoard, Workflow, PlayCircle, FileSpreadsheet } from 'lucide-react';
 import explorerService from '../../services/explorerService';
 import { useExplorerStore } from '../../stores/explorerStore';
 import type { FileType } from '../../services/fileDialogService';
@@ -45,6 +45,12 @@ const FILE_TYPE_CONFIG: Record<FileType, {
     extension: '.csv',
     icon: <PlayCircle size={20} className="text-[var(--color-accent)]" />,
     description: '시나리오 테스트 CSV 파일',
+  },
+  sheet: {
+    label: 'Sheet',
+    extension: '.sheet.xml',
+    icon: <FileSpreadsheet size={20} className="text-[var(--color-accent)]" />,
+    description: '도면 시트 XML 파일',
   },
 };
 

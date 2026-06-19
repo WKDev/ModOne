@@ -143,8 +143,6 @@ export interface UseCanvasDocumentReturn {
 // Constants
 // ============================================================================
 
-const MIN_ZOOM = 0.1;
-const MAX_ZOOM = 4.0;
 const MIN_GRID_SIZE = 5;
 
 // ============================================================================
@@ -732,10 +730,8 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
   const setZoom = useCallback(
     (zoom: number) => {
       if (!documentId) return;
-
-      const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
       updateCanvasData(documentId, (docData) => {
-        docData.zoom = clampedZoom;
+        docData.zoom = zoom;
       });
     },
     [documentId, updateCanvasData]

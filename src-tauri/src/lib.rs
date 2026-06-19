@@ -186,6 +186,7 @@ use commands::{
     parser_save_program,
     path_exists,
     read_file_contents,
+    write_file_contents,
     recover_project_from_backup,
     remove_from_recent,
     save_app_settings,
@@ -274,8 +275,17 @@ use commands::{
     symbol_list,
     symbol_list_all,
     symbol_load,
-    // Symbol commands
+    // Symbol commands (JSON-backed)
     symbol_save,
+    // Project block loader commands (XML-backed)
+    project_block_list,
+    project_block_load,
+    project_block_load_all,
+    project_block_load_all_with_warnings,
+    project_block_delete,
+    project_block_ensure_dir,
+    project_block_import_xml,
+    project_block_symbols_dir,
     validate_project_integrity,
     window_close_floating,
     // Window commands
@@ -719,6 +729,7 @@ pub fn run() {
             // Explorer commands
             list_project_files,
             read_file_contents,
+            write_file_contents,
             path_exists,
             get_file_info,
             create_project_file,
@@ -738,12 +749,21 @@ pub fn run() {
             schematic_list,
             schematic_exists,
             schematic_delete,
-            // Symbol commands
+            // Symbol commands (JSON-backed)
             symbol_save,
             symbol_load,
             symbol_delete,
             symbol_list,
             symbol_list_all,
+            // Project block loader commands (XML-backed)
+            project_block_list,
+            project_block_load,
+            project_block_load_all,
+            project_block_load_all_with_warnings,
+            project_block_delete,
+            project_block_ensure_dir,
+            project_block_import_xml,
+            project_block_symbols_dir,
             // Network commands
             network_list_interfaces,
             network_check_ip,

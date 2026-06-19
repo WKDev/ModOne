@@ -327,7 +327,7 @@ function restoreLadderFromHistory(snapshot: LadderHistoryData): Pick<LadderDocum
     rungLabels: new Map(snapshot.rungLabels ?? []),
     topologyCache: undefined,
   };
-  rebuildLadderTopologyCache(restored as LadderDocumentData);
+  (restored as LadderDocumentData).topologyCache = rebuildLadderTopologyCache(restored as LadderDocumentData);
   return restored;
 }
 

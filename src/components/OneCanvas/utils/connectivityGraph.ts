@@ -6,7 +6,7 @@
  * connectivity by coordinate proximity: endpoints at the same grid-snapped
  * position belong to the same electrical net.
  *
- * Grid key: round to nearest GRID_SNAP_PX (20px) boundary.
+ * Grid key: round to nearest grid-step boundary (default 5 mm).
  */
 
 import type { Wire, Block, Junction, Position, WireEndpoint } from '../types';
@@ -14,12 +14,11 @@ import { isPortEndpoint, isJunctionEndpoint, isFloatingEndpoint } from '../types
 import { UnionFind } from './netBuilder';
 import type { Net } from './netBuilder';
 import { getPortRelativePosition } from './wirePathCalculator';
+import { GRID_MODULE_MM } from '../canvasUnits';
 
-const GRID_SNAP_PX = 20;
-
-function gridKey(pos: Position): string {
-  const x = Math.round(pos.x / GRID_SNAP_PX) * GRID_SNAP_PX;
-  const y = Math.round(pos.y / GRID_SNAP_PX) * GRID_SNAP_PX;
+function gridKey(pos: Position, step: number = GRID_MODULE_MM): string {
+  const x = Math.round(pos.x / step) * step;
+  const y = Math.round(pos.y / step) * step;
   return `${x}:${y}`;
 }
 
@@ -59,6 +58,11 @@ class ConnectivityGraph {
   private _wires: Wire[] = [];
   private _components: Map<string, Block> = new Map();
   private _junctions: Map<string, Junction> = new Map();
+  private _gridStep: number = GRID_MODULE_MM;
+
+  set gridStep(value: number) {
+    if (value > 0) this._gridStep = value;
+  }
 
   rebuild(wires: Wire[], components: Map<string, Block>, junctions: Map<string, Junction>): void {
     this._wires = wires;
@@ -83,7 +87,7 @@ class ConnectivityGraph {
       this._resolve();
     }
 
-    const key = gridKey(position);
+    const key = gridKey(position, this._gridStep);
     return this._nets.find((net) => net.members.has(key));
   }
 
@@ -115,8 +119,8 @@ class ConnectivityGraph {
         continue;
       }
 
-      const fromKey = gridKey(fromPos);
-      const toKey = gridKey(toPos);
+      const fromKey = gridKey(fromPos, this._gridStep);
+      const toKey = gridKey(toPos, this._gridStep);
       uf.union(fromKey, toKey);
     }
 
@@ -127,12 +131,12 @@ class ConnectivityGraph {
           x: component.position.x + relative.x,
           y: component.position.y + relative.y,
         };
-        uf.find(gridKey(absolute));
+        uf.find(gridKey(absolute, this._gridStep));
       }
     }
 
     for (const [, junction] of this._junctions) {
-      uf.find(gridKey(junction.position));
+      uf.find(gridKey(junction.position, this._gridStep));
     }
 
     const netMap = new Map<string, Set<string>>();

@@ -347,7 +347,7 @@ fn secure_server_supports_browse_read_write_subscription_and_security_child() {
     let session_guard = session.write();
     session_guard.disconnect();
     drop(session_guard);
-    fixture.server.stop().unwrap();
+    fixture.server.stop(None).unwrap();
     trace_to(trace_path, "server stopped");
 
     let _ = (

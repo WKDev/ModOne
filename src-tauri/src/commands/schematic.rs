@@ -152,7 +152,10 @@ pub async fn schematic_load(path: String) -> Result<SchematicLoadResult, String>
     }
 
     if !base.is_dir() {
-        return Err(format!("Schematic path is not a directory: {}", base.display()));
+        return Err(format!(
+            "Schematic path is not a directory: {}",
+            base.display()
+        ));
     }
 
     // Read manifest
@@ -161,8 +164,8 @@ pub async fn schematic_load(path: String) -> Result<SchematicLoadResult, String>
         return Err(format!("Manifest not found: {}", manifest_path.display()));
     }
 
-    let manifest =
-        fs::read_to_string(&manifest_path).map_err(|e| format!("Failed to read manifest: {}", e))?;
+    let manifest = fs::read_to_string(&manifest_path)
+        .map_err(|e| format!("Failed to read manifest: {}", e))?;
 
     // Read all page files (page_*.yaml)
     let mut pages = Vec::new();

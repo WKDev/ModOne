@@ -192,7 +192,9 @@ impl ErrorLogger {
     /// Rotate log files (errors.jsonl -> errors.1.jsonl, etc.)
     fn rotate_files(&self) -> Result<(), std::io::Error> {
         // Delete oldest file if at max
-        let oldest = self.logs_dir.join(format!("errors.{}.jsonl", MAX_LOG_FILES));
+        let oldest = self
+            .logs_dir
+            .join(format!("errors.{}.jsonl", MAX_LOG_FILES));
         if oldest.exists() {
             fs::remove_file(&oldest)?;
         }

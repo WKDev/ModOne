@@ -32,11 +32,8 @@ export interface PixiViewportOptions {
  */
 export class PixiViewport {
   private _viewport: Viewport | null = null;
-  private _config: CanvasConfig | null = null;
   private _onViewportChange: ((state: ViewportState) => void) | null = null;
   private _destroyed = false;
-  private _worldWidth = 50000;
-  private _worldHeight = 50000;
 
   /** The underlying pixi-viewport instance */
   get viewport(): Viewport {
@@ -84,10 +81,7 @@ export class PixiViewport {
       onViewportChange,
     } = options;
 
-    this._config = config ?? null;
     this._onViewportChange = onViewportChange ?? null;
-    this._worldWidth = worldWidth;
-    this._worldHeight = worldHeight;
 
     // Create pixi-viewport with Pixi v8 events integration
     this._viewport = new Viewport({
@@ -110,22 +104,24 @@ export class PixiViewport {
     this._viewport
       .drag({ mouseButtons: 'middle-right' }) // Middle/right button for pan
       .pinch()                                  // Two-finger pinch to zoom
-      .wheel({ smooth: 3 })                    // Scroll wheel zoom with smoothing
-      .decelerate({ friction: 0.92 })           // Inertial scrolling
-      .clamp({ direction: 'all', underflow: 'center' }); // Keep pan inside the active sheet
+      .wheel({ smooth: 0 })                    // Scroll wheel zoom (instant)
+      .decelerate({ friction: 0.92 });          // Inertial scrolling
 
-    this._refreshZoomClamp();
-    this._viewport.scale.set(this._getMinimumAllowedScale(), this._getMinimumAllowedScale());
-    this._clampToWorld();
+    // Apply zoom limits when provided via config
+    if (config?.minZoom != null || config?.maxZoom != null) {
+      this._viewport.clampZoom({
+        minScale: config.minZoom,
+        maxScale: config.maxZoom,
+      });
+    }
+
+    this._viewport.scale.set(DEFAULT_VIEWPORT.zoom, DEFAULT_VIEWPORT.zoom);
 
     // Listen for viewport changes
     this._viewport.on('moved', () => {
-      this._clampToWorld();
       this._emitChange();
     });
     this._viewport.on('zoomed', () => {
-      this._clampZoomToBounds();
-      this._clampToWorld();
       this._emitChange();
     });
 
@@ -143,8 +139,6 @@ export class PixiViewport {
     if (state.zoom !== undefined) {
       this._viewport.scale.set(state.zoom, state.zoom);
     }
-    this._clampZoomToBounds();
-    this._clampToWorld();
   }
 
   /**
@@ -156,8 +150,6 @@ export class PixiViewport {
     if (zoom !== undefined) {
       this._viewport.scale.set(zoom, zoom);
     }
-    this._clampZoomToBounds();
-    this._clampToWorld();
   }
 
   /**
@@ -175,14 +167,9 @@ export class PixiViewport {
     const scaleY = this._viewport.screenHeight / worldHeight;
     const scale = Math.min(scaleX, scaleY);
 
-    const clampedScale = Math.max(
-      this._getMinimumAllowedScale(),
-      Math.min(this._config?.maxZoom ?? 10, scale)
-    );
-
-    this._viewport.scale.set(clampedScale, clampedScale);
+    const safeScale = Number.isFinite(scale) && scale > 0 ? scale : DEFAULT_VIEWPORT.zoom;
+    this._viewport.scale.set(safeScale, safeScale);
     this._viewport.moveCenter(centerX, centerY);
-    this._clampToWorld();
   }
 
   /**
@@ -191,9 +178,6 @@ export class PixiViewport {
   resize(screenWidth: number, screenHeight: number): void {
     if (!this._viewport || this._destroyed) return;
     this._viewport.resize(screenWidth, screenHeight);
-    this._refreshZoomClamp();
-    this._clampZoomToBounds();
-    this._clampToWorld();
   }
 
   /**
@@ -210,73 +194,11 @@ export class PixiViewport {
     }
 
     this._onViewportChange = null;
-    this._config = null;
   }
 
   private _emitChange(): void {
     if (this._onViewportChange && this._viewport && !this._destroyed) {
       this._onViewportChange(this.state);
     }
-  }
-
-  private _clampToWorld(): void {
-    if (!this._viewport) return;
-
-    const visibleWorldWidth = this._viewport.worldScreenWidth;
-    const visibleWorldHeight = this._viewport.worldScreenHeight;
-    const halfVisibleWorldWidth = visibleWorldWidth / 2;
-    const halfVisibleWorldHeight = visibleWorldHeight / 2;
-
-    const minCenterX = halfVisibleWorldWidth;
-    const maxCenterX = this._viewport.worldWidth - halfVisibleWorldWidth;
-    const minCenterY = halfVisibleWorldHeight;
-    const maxCenterY = this._viewport.worldHeight - halfVisibleWorldHeight;
-
-    const currentCenter = this._viewport.center;
-    const clampedCenterX = visibleWorldWidth >= this._viewport.worldWidth
-      ? this._viewport.worldWidth / 2
-      : Math.min(Math.max(currentCenter.x, minCenterX), maxCenterX);
-    const clampedCenterY = visibleWorldHeight >= this._viewport.worldHeight
-      ? this._viewport.worldHeight / 2
-      : Math.min(Math.max(currentCenter.y, minCenterY), maxCenterY);
-
-    this._viewport.moveCenter(clampedCenterX, clampedCenterY);
-  }
-
-  private _clampZoomToBounds(): void {
-    if (!this._viewport) return;
-
-    const currentScale = this._viewport.scale.x;
-    const clampedScale = Math.max(
-      this._getMinimumAllowedScale(),
-      Math.min(this._config?.maxZoom ?? 10, currentScale),
-    );
-
-    if (clampedScale !== currentScale) {
-      this._viewport.scale.set(clampedScale, clampedScale);
-    }
-  }
-
-  private _refreshZoomClamp(): void {
-    if (!this._viewport) return;
-
-    this._viewport.plugins.remove('clamp-zoom');
-    this._viewport.clampZoom({
-      minScale: this._getMinimumAllowedScale(),
-      maxScale: this._config?.maxZoom ?? 10,
-    });
-  }
-
-  private _getMinimumAllowedScale(): number {
-    if (!this._viewport) {
-      return this._config?.minZoom ?? 0.05;
-    }
-
-    const screenCoverScale = Math.max(
-      this._viewport.screenWidth / this._worldWidth,
-      this._viewport.screenHeight / this._worldHeight,
-    );
-
-    return Math.max(this._config?.minZoom ?? 0.05, screenCoverScale);
   }
 }

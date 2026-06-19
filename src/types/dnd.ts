@@ -1,5 +1,32 @@
 import { PanelType } from './panel';
 
+// ============================================================================
+// Tag Drag-and-Drop Types
+// ============================================================================
+
+/** Drag source type discriminator for tag browser drags */
+export const TAG_DRAG_TYPE = 'tag-list-item' as const;
+
+/** Droppable ID for the watch list drop zone */
+export const WATCH_LIST_DROP_ID = 'watch-list-drop-zone' as const;
+
+/**
+ * Data carried during a tag drag operation from the tag list.
+ * When multi-select is active, `tagIds` contains all selected tag IDs.
+ */
+export interface TagDragData {
+  /** Discriminator so the handler can distinguish tag drags from panel drags */
+  type: typeof TAG_DRAG_TYPE;
+  /** The primary tag ID being dragged */
+  tagId: string;
+  /** All selected tag IDs (for multi-select drag) */
+  tagIds: string[];
+}
+
+// ============================================================================
+// Panel Drag-and-Drop Types
+// ============================================================================
+
 /**
  * Position where a panel can be dropped relative to another panel
  */

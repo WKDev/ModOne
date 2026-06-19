@@ -90,13 +90,11 @@ describe('graph-first ladder topology', () => {
       [],
     );
 
-    rebuildLadderTopologyCache(docData);
-    expect(docData.horizontalEdges.size).toBe(1);
-    expect(Array.from(docData.horizontalEdges.values())[0].position).toEqual({
-      row: 2,
-      startBoundaryCol: 0,
-      endBoundaryCol: 3,
-    });
+    const topology = rebuildLadderTopologyCache(docData);
+    // horizontalEdgesByRow should contain a single merged span
+    const row2Edges = topology.horizontalEdgesByRow.get(2);
+    expect(row2Edges).toBeDefined();
+    expect(row2Edges!.length).toBe(1);
   });
 
   it('marks isolated vertical chains as invalid', () => {

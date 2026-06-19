@@ -52,7 +52,10 @@ impl ModbusTcpServer {
     }
 
     /// Emit a connection event
-    fn emit_connection_event(app_handle: &Arc<RwLock<Option<Arc<tauri::AppHandle>>>>, event: ConnectionEvent) {
+    fn emit_connection_event(
+        app_handle: &Arc<RwLock<Option<Arc<tauri::AppHandle>>>>,
+        event: ConnectionEvent,
+    ) {
         if let Some(handle) = app_handle.read().as_ref() {
             let _ = handle.emit(EVENT_CONNECTION, event);
         }
@@ -245,7 +248,9 @@ async fn handle_connection(
 
         // Read the rest of the PDU (length - 1 because unit ID is already read)
         let pdu_len = length - 1;
-        let n = stream.read(&mut request_buffer[MBAP_HEADER_SIZE..MBAP_HEADER_SIZE + pdu_len]).await?;
+        let n = stream
+            .read(&mut request_buffer[MBAP_HEADER_SIZE..MBAP_HEADER_SIZE + pdu_len])
+            .await?;
         if n < pdu_len {
             log::warn!("Incomplete PDU received");
             continue;
@@ -259,7 +264,11 @@ async fn handle_connection(
 
         // Process the request
         let function_code = request_buffer[MBAP_HEADER_SIZE];
-        let response_pdu = pdu::process_request(memory, function_code, &request_buffer[MBAP_HEADER_SIZE..MBAP_HEADER_SIZE + pdu_len]);
+        let response_pdu = pdu::process_request(
+            memory,
+            function_code,
+            &request_buffer[MBAP_HEADER_SIZE..MBAP_HEADER_SIZE + pdu_len],
+        );
 
         // Build response
         let response_length = (response_pdu.len() + 1) as u16; // +1 for unit ID
@@ -276,7 +285,6 @@ async fn handle_connection(
 
     Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -345,10 +353,7 @@ mod tests {
         assert!(!server.is_running());
 
         // Try to stop again (should fail - already stopped)
-        assert!(matches!(
-            server.stop().await,
-            Err(ModbusError::NotRunning)
-        ));
+        assert!(matches!(server.stop().await, Err(ModbusError::NotRunning)));
     }
 
     #[test]
@@ -358,5 +363,4 @@ mod tests {
         assert_eq!(info.address, "127.0.0.1:12345");
         assert!(!info.connected_at.is_empty());
     }
-
 }

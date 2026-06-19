@@ -110,17 +110,17 @@ export function rebuildLadderTopologyCache(data: LadderDocumentData): DerivedTop
       logicalElements.set(id, element);
     }
   }
-  data.elements = logicalElements;
-  data.horizontalEdges = normalizeHorizontalEdges(data.horizontalEdges);
+  const elements = logicalElements;
+  const horizontalEdges = normalizeHorizontalEdges(data.horizontalEdges);
 
   const dualGrid = buildDualGridTopology({
-    components: Array.from(data.elements.values()).map((element) => ({
+    components: Array.from(elements.values()).map((element) => ({
       id: element.id,
       x: element.position.col,
       y: element.position.row,
       width: 1,
     })),
-    horizontalSegments: Array.from(data.horizontalEdges.values()).map((edge) => ({
+    horizontalSegments: Array.from(horizontalEdges.values()).map((edge) => ({
       id: edge.id,
       xStart: edge.position.startBoundaryCol,
       xEnd: edge.position.endBoundaryCol,
@@ -134,12 +134,12 @@ export function rebuildLadderTopologyCache(data: LadderDocumentData): DerivedTop
   });
 
   const cellsByCoord = new Map<string, string>();
-  for (const element of data.elements.values()) {
+  for (const element of elements.values()) {
     cellsByCoord.set(buildCellCoordKey(element.position.row, element.position.col), element.id);
   }
 
   const horizontalEdgesByRow = new Map<number, string[]>();
-  for (const edge of data.horizontalEdges.values()) {
+  for (const edge of horizontalEdges.values()) {
     const rowEdges = horizontalEdgesByRow.get(edge.position.row);
     if (rowEdges) {
       rowEdges.push(edge.id);
@@ -279,6 +279,5 @@ export function rebuildLadderTopologyCache(data: LadderDocumentData): DerivedTop
     issues,
   };
 
-  data.topologyCache = topology;
   return topology;
 }

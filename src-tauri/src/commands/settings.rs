@@ -48,16 +48,32 @@ pub struct AppSettings {
     pub font_size: u8,
     pub grid_display: bool,
     pub animation_enabled: bool,
+    #[serde(default = "default_false")]
+    pub canvas_crosshair_enabled: bool,
 
     // Ladder settings
     #[serde(default)]
     pub ladder_shortcut_profile: LadderShortcutProfile,
+
+    // Sheet settings
+    #[serde(default = "default_sheet")]
+    pub default_sheet: String,
+    #[serde(default = "default_sheet_snap_grid")]
+    pub sheet_snap_grid: u32,
 
     // Keyboard shortcut overrides
     // Only stores user-modified bindings. Key: command ID, Value: key combo string.
     // e.g. { "edit.undo": "Ctrl+Shift+Z" }
     #[serde(default)]
     pub keybinding_overrides: HashMap<String, String>,
+}
+
+fn default_sheet() -> String {
+    "A3-landscape".to_string()
+}
+
+fn default_sheet_snap_grid() -> u32 {
+    5
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -139,9 +155,14 @@ impl Default for AppSettings {
             font_size: 14,
             grid_display: true,
             animation_enabled: true,
+            canvas_crosshair_enabled: false,
 
             // Ladder
             ladder_shortcut_profile: LadderShortcutProfile::Default,
+
+            // Sheet
+            default_sheet: default_sheet(),
+            sheet_snap_grid: default_sheet_snap_grid(),
 
             // Keyboard shortcut overrides (empty = all defaults)
             keybinding_overrides: HashMap::new(),
@@ -158,6 +179,10 @@ const SETTINGS_FILE: &str = "settings.json";
 /// Helper for serde default that returns true
 fn default_true() -> bool {
     true
+}
+
+fn default_false() -> bool {
+    false
 }
 
 /// Get the path to the settings file in the app data directory
@@ -186,12 +211,12 @@ pub async fn get_app_settings(app_handle: AppHandle) -> Result<AppSettings, Stri
         return Ok(AppSettings::default());
     }
 
-    let file = File::open(&settings_path)
-        .map_err(|e| format!("Failed to open settings file: {}", e))?;
+    let file =
+        File::open(&settings_path).map_err(|e| format!("Failed to open settings file: {}", e))?;
 
     let reader = BufReader::new(file);
-    let settings: AppSettings = serde_json::from_reader(reader)
-        .map_err(|e| format!("Failed to parse settings: {}", e))?;
+    let settings: AppSettings =
+        serde_json::from_reader(reader).map_err(|e| format!("Failed to parse settings: {}", e))?;
 
     log::info!("Loaded settings from {:?}", settings_path);
     Ok(settings)
@@ -199,10 +224,7 @@ pub async fn get_app_settings(app_handle: AppHandle) -> Result<AppSettings, Stri
 
 /// Save application settings to disk
 #[tauri::command]
-pub async fn save_app_settings(
-    app_handle: AppHandle,
-    settings: AppSettings,
-) -> Result<(), String> {
+pub async fn save_app_settings(app_handle: AppHandle, settings: AppSettings) -> Result<(), String> {
     let settings_path = get_settings_path(&app_handle)?;
 
     // Create parent directories if needed

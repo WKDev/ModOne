@@ -2,8 +2,12 @@
 //!
 //! Defines the structure for config.yml files in project packages.
 
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
+
+use crate::opcua::{OpcUaMappingConfig, OpcUaSecurityPolicy, UserAccount};
 
 /// Main project configuration structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,6 +42,16 @@ pub struct ProjectConfig {
     /// OPC UA server settings
     #[serde(default)]
     pub opcua: OpcUaSettings,
+
+    /// IDs of tags pinned to the watch list in the Tag Browser.
+    /// Persisted so the watch list survives project close/reopen.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub watched_tag_ids: Vec<String>,
+
+    /// Per-tag OPC UA mapping configurations, keyed by tag ID.
+    /// Persisted so that custom OPC UA type mappings survive project close/reopen.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub opcua_mappings: HashMap<String, OpcUaMappingConfig>,
 }
 
 impl Default for ProjectConfig {
@@ -52,6 +66,8 @@ impl Default for ProjectConfig {
             canvas: CanvasSettings::default(),
             network: NetworkSettings::default(),
             opcua: OpcUaSettings::default(),
+            watched_tag_ids: Vec::new(),
+            opcua_mappings: HashMap::new(),
         }
     }
 }
@@ -102,6 +118,23 @@ pub struct OpcUaSettings {
     /// Optional password for UA user/password authentication.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub password: Option<String>,
+    /// Enabled OPC UA security policies for the server.
+    /// Persisted to project config; used to generate server endpoints on start.
+    #[serde(default = "OpcUaSecurityPolicy::default_enabled")]
+    pub security_policies: Vec<OpcUaSecurityPolicy>,
+    /// Whether anonymous (unauthenticated) client connections are allowed.
+    /// Defaults to `false` — disabled for security.
+    #[serde(default)]
+    pub allow_anonymous: bool,
+    /// Multiple user accounts for OPC UA authentication.
+    /// Each entry stores a username and bcrypt-hashed password.
+    /// Replaces the legacy single `username`/`password` fields.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub user_accounts: Vec<UserAccount>,
+    /// Number of days to retain audit log entries before automatic deletion.
+    /// Defaults to 90 days. Minimum 1 day.
+    #[serde(default = "default_audit_retention_days")]
+    pub audit_retention_days: u32,
     /// True when an old `security_policy: None` value was migrated on load.
     #[serde(skip)]
     pub legacy_insecure_policy_seen: bool,
@@ -118,6 +151,10 @@ impl Default for OpcUaSettings {
             server_name: "ModOne PLC Simulator".to_string(),
             username: None,
             password: None,
+            security_policies: OpcUaSecurityPolicy::default_enabled(),
+            allow_anonymous: false,
+            user_accounts: Vec::new(),
+            audit_retention_days: default_audit_retention_days(),
             legacy_insecure_policy_seen: false,
             legacy_anonymous_access_seen: false,
         }
@@ -145,6 +182,14 @@ impl<'de> Deserialize<'de> for OpcUaSettings {
             username: Option<String>,
             #[serde(default)]
             password: Option<String>,
+            #[serde(default = "default_security_policies")]
+            security_policies: Vec<OpcUaSecurityPolicy>,
+            #[serde(default)]
+            allow_anonymous: bool,
+            #[serde(default)]
+            user_accounts: Vec<UserAccount>,
+            #[serde(default = "default_audit_retention_days")]
+            audit_retention_days: u32,
         }
 
         let raw = RawOpcUaSettings::deserialize(deserializer)?;
@@ -154,6 +199,10 @@ impl<'de> Deserialize<'de> for OpcUaSettings {
             server_name: raw.server_name,
             username: raw.username,
             password: raw.password,
+            security_policies: raw.security_policies,
+            allow_anonymous: raw.allow_anonymous,
+            user_accounts: raw.user_accounts,
+            audit_retention_days: raw.audit_retention_days.max(1),
             legacy_insecure_policy_seen: matches!(
                 raw.security_policy,
                 Some(LegacyOpcUaSecurityPolicySetting::None)
@@ -161,6 +210,10 @@ impl<'de> Deserialize<'de> for OpcUaSettings {
             legacy_anonymous_access_seen: raw.anonymous_access.unwrap_or(false),
         })
     }
+}
+
+fn default_security_policies() -> Vec<OpcUaSecurityPolicy> {
+    OpcUaSecurityPolicy::default_enabled()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -178,6 +231,10 @@ impl Default for OpcUaSecurityPolicySetting {
 enum LegacyOpcUaSecurityPolicySetting {
     None,
     Basic256Sha256,
+}
+
+fn default_audit_retention_days() -> u32 {
+    90
 }
 
 fn default_opcua_port() -> u16 {

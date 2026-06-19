@@ -335,11 +335,15 @@ impl ScenarioExecutor {
         match (self.start_time, self.pause_time) {
             (Some(start), Some(pause)) => {
                 // Currently paused - use pause time
-                pause.duration_since(start).saturating_sub(self.paused_duration)
+                pause
+                    .duration_since(start)
+                    .saturating_sub(self.paused_duration)
             }
             (Some(start), None) => {
                 // Currently running
-                Instant::now().duration_since(start).saturating_sub(self.paused_duration)
+                Instant::now()
+                    .duration_since(start)
+                    .saturating_sub(self.paused_duration)
             }
             _ => Duration::ZERO,
         }
@@ -1129,18 +1133,16 @@ mod tests {
         let scenario = Scenario {
             metadata: crate::scenario::ScenarioMetadata::default(),
             settings: crate::scenario::ScenarioSettings::default(),
-            events: vec![
-                ScenarioEvent {
-                    id: "1".to_string(),
-                    time: 1.0,
-                    address: "C:0x0001".to_string(),
-                    value: 1,
-                    persist: true,
-                    persist_duration: None,
-                    note: String::new(),
-                    enabled: true,
-                },
-            ],
+            events: vec![ScenarioEvent {
+                id: "1".to_string(),
+                time: 1.0,
+                address: "C:0x0001".to_string(),
+                value: 1,
+                persist: true,
+                persist_duration: None,
+                note: String::new(),
+                enabled: true,
+            }],
         };
 
         executor.load(scenario).unwrap();

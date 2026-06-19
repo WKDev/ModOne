@@ -19,6 +19,15 @@ export const LEGACY_PX_PER_MM = 1 / LEGACY_MM_PER_PX;
 export const GRID_MODULE_MM = 5;
 export const SCREEN_PX_PER_MM = 96 / 25.4;
 
+/**
+ * Scale factor for converting symbol pixel definitions to mm world coordinates.
+ * Symbol graphics are authored in pixel units; this factor controls how large
+ * they appear on the canvas relative to the grid (GRID_MODULE_MM = 5mm).
+ *
+ * 0.5 → a 40px symbol spans 20mm (4 grid cells).
+ */
+export const SYMBOL_PX_TO_MM = 0.5;
+
 function roundToPrecision(value: number, digits: number = 4): number {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
@@ -63,6 +72,14 @@ export function normalizeLegacyValueToMm(value: number): number {
   return normalizeToGridModuleMm(legacyPxToMm(value));
 }
 
+export function symbolPxToMm(value: number): number {
+  return roundToPrecision(value * SYMBOL_PX_TO_MM);
+}
+
+export function normalizeSymbolValueToMm(value: number): number {
+  return normalizeToGridModuleMm(symbolPxToMm(value));
+}
+
 export function normalizeRuntimePosition(position: Position): Position {
   return {
     x: roundToPrecision(position.x),
@@ -81,6 +98,25 @@ export function normalizeLegacySizeToMm(size: Size): Size {
   return {
     width: normalizeLegacyValueToMm(size.width),
     height: normalizeLegacyValueToMm(size.height),
+  };
+}
+
+export function normalizeSymbolSizeToMm(size: Size): Size {
+  return {
+    width: normalizeSymbolValueToMm(size.width),
+    height: normalizeSymbolValueToMm(size.height),
+  };
+}
+
+export function normalizeSymbolPortToMm(port: Port): Port {
+  return {
+    ...port,
+    absolutePosition: port.absolutePosition
+      ? {
+          x: symbolPxToMm(port.absolutePosition.x),
+          y: symbolPxToMm(port.absolutePosition.y),
+        }
+      : undefined,
   };
 }
 

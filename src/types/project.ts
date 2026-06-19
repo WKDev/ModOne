@@ -149,6 +149,7 @@ export interface DirectoryConfig {
   canvas: string;
   ladder: string;
   scenario: string;
+  sheets: string;
 }
 
 // Full project configuration (matches config.yml schema)
@@ -162,6 +163,9 @@ export interface ProjectConfig {
   canvas?: CanvasSettings;
   network?: NetworkSettings;
   opcua?: OpcUaSettings;
+  /** Active sheet file name (relative to sheets/ directory) */
+  sheet?: string;
+  directories?: DirectoryConfig;
   /** IDs of tags pinned to the watch list in the Tag Browser */
   watched_tag_ids?: string[];
 }
@@ -226,20 +230,30 @@ export interface OpcUaStatus {
   allowAnonymous?: boolean;
 }
 
-/** Detailed information about an active OPC UA client session. */
+/** Detailed information about an active OPC UA client session (Prosys-style). */
 export interface OpcUaSessionInfo {
   /** Unique identifier for this session (opaque string) */
   sessionId: string;
-  /** Client application name as reported during session creation */
+  /** Client application name / session name as reported during session creation */
   clientName: string;
+  /** Client application description (product URI, application URI) */
+  clientDescription: string;
   /** Remote IP address of the connected client */
   clientIp: string;
+  /** Server endpoint URI this session connected to */
+  serverUri: string;
   /** Security policy URI active on this session's channel */
   securityPolicy: string;
   /** Message security mode ("None", "Sign", "SignAndEncrypt") */
   securityMode: string;
   /** ISO 8601 timestamp when the session was created */
   connectedAt: string;
+  /** ISO 8601 timestamp of last observed activity */
+  lastContactTime: string;
+  /** Secure channel identifier for this session's transport channel */
+  secureChannelId: string;
+  /** Session lifecycle state: "Created", "Activated", or "Closing" */
+  state: string;
   /** Number of active subscriptions on this session */
   subscriptionCount: number;
 }

@@ -9,11 +9,11 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 use tokio::sync::Mutex;
 
+use crate::commands::network::NetworkState;
 use crate::modbus::{
     list_available_ports, MemoryMapSettings, ModbusMemory, ModbusRtuServer, ModbusTcpServer,
     PortInfo, RtuConfig, RtuDataBits, RtuParity, RtuStopBits, TcpConfig,
 };
-use crate::commands::network::NetworkState;
 use crate::project::{ModbusSimulationTransport, Parity as ProjectParity, ProjectConfig};
 
 /// Managed state for Modbus functionality

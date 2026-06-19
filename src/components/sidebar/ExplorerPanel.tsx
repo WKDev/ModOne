@@ -334,6 +334,10 @@ export function ExplorerPanel() {
           fileDialogService.requestNewScenario(node.absolutePath);
           break;
 
+        case 'newSheet':
+          fileDialogService.requestNewSheet(node.absolutePath);
+          break;
+
         case 'importXG5000':
           importService.requestImportXG5000(node.absolutePath);
           break;

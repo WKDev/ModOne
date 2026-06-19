@@ -201,7 +201,8 @@ pub fn validate_mop_integrity(path: &Path) -> MopIntegrityResult {
                 let name = entry.name().to_string();
 
                 // Check for required structure
-                if name == CONFIG_FILE || name == format!("{}/", CONFIG_FILE.trim_end_matches('/')) {
+                if name == CONFIG_FILE || name == format!("{}/", CONFIG_FILE.trim_end_matches('/'))
+                {
                     result.has_config = true;
                 }
                 if name.starts_with(MODONE_DIR) {
@@ -211,7 +212,9 @@ pub fn validate_mop_integrity(path: &Path) -> MopIntegrityResult {
                 result.readable_files.push(name);
             }
             Err(e) => {
-                result.errors.push(format!("Cannot read entry {}: {}", i, e));
+                result
+                    .errors
+                    .push(format!("Cannot read entry {}: {}", i, e));
             }
         }
     }
@@ -258,9 +261,8 @@ pub fn attempt_partial_recovery(
     })?;
 
     // Try to open the corrupted file
-    let file = File::open(corrupted_path).map_err(|e| {
-        ModOneError::RecoveryFailed(format!("Cannot open corrupted file: {}", e))
-    })?;
+    let file = File::open(corrupted_path)
+        .map_err(|e| ModOneError::RecoveryFailed(format!("Cannot open corrupted file: {}", e)))?;
 
     let reader = BufReader::new(file);
     let mut archive = match ZipArchive::new(reader) {
@@ -285,7 +287,9 @@ pub fn attempt_partial_recovery(
 
                 // Security check
                 if !outpath.starts_with(output_dir) {
-                    result.failed_files.push(format!("{} (path traversal)", name));
+                    result
+                        .failed_files
+                        .push(format!("{} (path traversal)", name));
                     continue;
                 }
 
@@ -418,9 +422,8 @@ pub fn recover_from_backup(backup_path: &Path, target_path: &Path) -> ModOneResu
     }
 
     // Copy backup to target
-    fs::copy(backup_path, target_path).map_err(|e| {
-        ModOneError::RecoveryFailed(format!("Cannot copy backup file: {}", e))
-    })?;
+    fs::copy(backup_path, target_path)
+        .map_err(|e| ModOneError::RecoveryFailed(format!("Cannot copy backup file: {}", e)))?;
 
     Ok(())
 }
@@ -457,15 +460,15 @@ mod tests {
     fn create_valid_mop(path: &Path) {
         let file = File::create(path).unwrap();
         let mut zip = ZipWriter::new(file);
-        let options = FileOptions::default()
-            .compression_method(CompressionMethod::Stored);
+        let options = FileOptions::default().compression_method(CompressionMethod::Stored);
 
         // Add modone directory
         zip.add_directory("modone/", options).unwrap();
 
         // Add config.yml
         zip.start_file("modone/config.yml", options).unwrap();
-        zip.write_all(b"version: '1.0'\nproject:\n  name: Test\n").unwrap();
+        zip.write_all(b"version: '1.0'\nproject:\n  name: Test\n")
+            .unwrap();
 
         zip.finish().unwrap();
     }
@@ -551,8 +554,7 @@ mod tests {
         // Create ZIP without config.yml
         let file = File::create(&mop_path).unwrap();
         let mut zip = ZipWriter::new(file);
-        let options = FileOptions::default()
-            .compression_method(CompressionMethod::Stored);
+        let options = FileOptions::default().compression_method(CompressionMethod::Stored);
 
         zip.add_directory("modone/", options).unwrap();
         zip.finish().unwrap();

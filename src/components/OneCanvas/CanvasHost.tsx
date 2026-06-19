@@ -58,6 +58,8 @@ import { GhostPreviewRenderer } from './renderers/GhostPreviewRenderer';
 import { PageGuideRenderer } from './renderers/PageGuideRenderer';
 import { SimulationRenderer } from './renderers/SimulationRenderer';
 import { SimulationOverlay } from './renderers/SimulationOverlay';
+import { SheetOverlayRenderer } from './renderers/SheetOverlayRenderer';
+import { useProjectSheet } from '../../hooks/useProjectSheet';
 
 import { EventBridge } from './interaction/EventBridge';
 import { KeyboardShortcuts } from './interaction/KeyboardShortcuts';
@@ -259,6 +261,13 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
     const simulationRendererRef = useRef<SimulationRenderer | null>(null);
     const simulationOverlayRef = useRef<SimulationOverlay | null>(null);
     const ghostPreviewRef = useRef<GhostPreviewRenderer | null>(null);
+    const sheetOverlayRef = useRef<SheetOverlayRenderer | null>(null);
+
+    // Sheet overlay: load project sheet and push to renderer
+    const projectSheet = useProjectSheet();
+    useEffect(() => {
+      sheetOverlayRef.current?.setDocument(projectSheet);
+    }, [projectSheet]);
 
     // Sync layer refs
     const syncEngineRef = useRef<SyncEngine | null>(null);
@@ -403,6 +412,11 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
           pdfOutputBounds: DEFAULT_PDF_OUTPUT_GUIDE,
         });
         pageGuideRendererRef.current = pageGuideRenderer;
+
+        // 6a. Sheet overlay renderer (non-interactive drawing sheet background)
+        const sheetOverlay = new SheetOverlayRenderer();
+        sheetOverlay.init(layerMgr.getLayer('sheet'));
+        sheetOverlayRef.current = sheetOverlay;
 
         blockRendererRef.current = new BlockRenderer({
           layer: layerMgr.getLayer('blocks'),
@@ -644,6 +658,7 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
         portRendererRef.current?.destroy();
         wireRendererRef.current?.destroy();
         blockRendererRef.current?.destroy();
+        sheetOverlayRef.current?.destroy();
         gridRendererRef.current?.destroy();
 
         hitTesterRef.current?.destroy();

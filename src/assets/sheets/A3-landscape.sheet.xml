@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sheet version="1.0" unit="mm">
+  <page width="420" height="297">
+    <margins top="10" right="10" bottom="10" left="20"/>
+  </page>
+  <elements>
+    <!-- Page border (outer frame) -->
+    <rect id="border-outer" x="20" y="10" w="390" h="277" stroke="black" strokeWidth="0.7" fill="none"/>
+    <!-- Inner drawing area border -->
+    <rect id="border-inner" x="20" y="10" w="390" h="257" stroke="black" strokeWidth="0.35" fill="none"/>
+
+    <!-- Title block area (bottom-right, KS A 0005 style) -->
+    <rect id="tb-frame" x="230" y="267" w="180" h="20" stroke="black" strokeWidth="0.7" fill="none"/>
+
+    <!-- Title block vertical dividers -->
+    <line id="tb-v1" x1="270" y1="267" x2="270" y2="287" stroke="black" strokeWidth="0.35"/>
+    <line id="tb-v2" x1="330" y1="267" x2="330" y2="287" stroke="black" strokeWidth="0.35"/>
+
+    <!-- Title block horizontal divider -->
+    <line id="tb-h1" x1="230" y1="277" x2="410" y2="277" stroke="black" strokeWidth="0.35"/>
+
+    <!-- Title block table -->
+    <table id="tb-table" x="230" y="267" stroke="black" strokeWidth="0.35" fontSize="7" fontFamily="sans-serif">
+      <col key="label" label="" width="40"/>
+      <col key="value1" label="" width="60"/>
+      <col key="value2" label="" width="80"/>
+      <row height="10">
+        <cell col="label">Drawing No.</cell>
+        <cell col="value1">${project.name}</cell>
+        <cell col="value2">${title}</cell>
+      </row>
+      <row height="10">
+        <cell col="label">Drawn by</cell>
+        <cell col="value1">${author}</cell>
+        <cell col="value2">${company}</cell>
+      </row>
+    </table>
+
+    <!-- Revision block -->
+    <table id="rev-table" x="230" y="257" stroke="black" strokeWidth="0.35" fontSize="6" fontFamily="sans-serif">
+      <col key="rev" label="Rev" width="20"/>
+      <col key="date" label="Date" width="30"/>
+      <col key="desc" label="Description" width="90"/>
+      <col key="by" label="By" width="40"/>
+      <row height="5">
+        <cell col="rev">Rev</cell>
+        <cell col="date">Date</cell>
+        <cell col="desc">Description</cell>
+        <cell col="by">By</cell>
+      </row>
+      <row height="5">
+        <cell col="rev"></cell>
+        <cell col="date"></cell>
+        <cell col="desc"></cell>
+        <cell col="by"></cell>
+      </row>
+    </table>
+
+    <!-- Scale & page info -->
+    <text id="scale-label" x="25" y="282" size="6" fontFamily="sans-serif" align="left" color="black">Scale: ${scale}</text>
+    <text id="page-label" x="25" y="288" size="6" fontFamily="sans-serif" align="left" color="black">Sheet ${page_num} of ${page_total}</text>
+  </elements>
+  <templates>
+    <var key="title">Untitled Drawing</var>
+    <var key="author"></var>
+    <var key="company"></var>
+    <var key="scale">1:1</var>
+    <var key="page_num">1</var>
+    <var key="page_total">1</var>
+  </templates>
+</sheet>

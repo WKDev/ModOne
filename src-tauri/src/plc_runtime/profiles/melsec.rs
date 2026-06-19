@@ -4,9 +4,8 @@ use super::super::{
     profile::{
         format_vendor_address, split_vendor_address, ModbusAddressSpace, ModbusMappingPolicy,
         ModbusMappingRule, ModbusMappingSource, OpcUaAliasPolicy, VendorAddress,
-        VendorAddressMetadata,
-        VendorAddressNumberBase, VendorDataKind, VendorProfile, VendorProfileError,
-        VendorProfileId,
+        VendorAddressMetadata, VendorAddressNumberBase, VendorDataKind, VendorProfile,
+        VendorProfileError, VendorProfileId,
     },
     types::{CanonicalAddress, CanonicalAreaKind},
 };
@@ -342,21 +341,27 @@ mod tests {
     fn parses_fx_addresses_with_octal_io() {
         let profile = MelsecFxQProfile::new("FX5U".to_string(), PlcHardwareTopology::default());
 
-        let x = profile.parse_address("X17").expect("X address should parse");
+        let x = profile
+            .parse_address("X17")
+            .expect("X address should parse");
         assert_eq!(x.index, 0o17);
         assert_eq!(profile.format_address(&x).unwrap(), "X17");
 
         let d = profile.parse_address("D100.3").expect("D bit should parse");
         assert_eq!(d.bit_index, Some(3));
-        assert_eq!(profile.to_canonical(&d).unwrap().area, CanonicalAreaKind::DataWord);
+        assert_eq!(
+            profile.to_canonical(&d).unwrap().area,
+            CanonicalAreaKind::DataWord
+        );
     }
 
     #[test]
     fn parses_q_addresses_with_hex_io() {
-        let profile =
-            MelsecFxQProfile::new("Q03UDE".to_string(), PlcHardwareTopology::default());
+        let profile = MelsecFxQProfile::new("Q03UDE".to_string(), PlcHardwareTopology::default());
 
-        let y = profile.parse_address("Y1F").expect("Y address should parse");
+        let y = profile
+            .parse_address("Y1F")
+            .expect("Y address should parse");
         assert_eq!(y.index, 0x1F);
         assert_eq!(profile.format_address(&y).unwrap(), "Y1F");
     }

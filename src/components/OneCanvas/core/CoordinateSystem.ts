@@ -15,7 +15,7 @@ import type { Position } from '../types';
 
 export class CoordinateSystem {
   private _viewport: Viewport | null = null;
-  private _gridSize: number = 20;
+  private _gridSize: number = 5;
   private _snapEnabled: boolean = true;
 
   /** Current grid size in world units */

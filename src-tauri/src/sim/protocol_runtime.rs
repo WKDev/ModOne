@@ -60,10 +60,7 @@ impl ProtocolRuntime {
 
         {
             let mut adapters = self.adapters.lock();
-            adapters.push(NamedAdapter {
-                id,
-                adapter,
-            });
+            adapters.push(NamedAdapter { id, adapter });
         }
 
         *self.runtime_ref.lock() = Some(Arc::clone(&runtime));
@@ -186,7 +183,11 @@ impl ProtocolRuntime {
 
 /// Collect current adapter Arc references from the shared list.
 fn collect_adapters(adapters: &SharedAdapterList) -> Vec<Arc<dyn ProtocolAdapter>> {
-    adapters.lock().iter().map(|a| Arc::clone(&a.adapter)).collect()
+    adapters
+        .lock()
+        .iter()
+        .map(|a| Arc::clone(&a.adapter))
+        .collect()
 }
 
 fn merge_event(

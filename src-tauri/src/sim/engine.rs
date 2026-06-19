@@ -392,7 +392,11 @@ impl OneSimEngine {
             max_scan_time_us: self.max_scan_time_us.load(Ordering::Relaxed),
             min_scan_time_us: {
                 let min = self.min_scan_time_us.load(Ordering::Relaxed);
-                if min == u64::MAX { 0 } else { min }
+                if min == u64::MAX {
+                    0
+                } else {
+                    min
+                }
             },
             error: self.last_error.read().clone(),
             last_update_time: chrono::Utc::now().to_rfc3339(),
@@ -515,8 +519,12 @@ impl OneSimEngine {
         }
 
         // Update average (simple running average)
-        let total = self.total_scan_time_us.fetch_add(elapsed_us, Ordering::Relaxed) + elapsed_us;
-        self.avg_scan_time_us.store(total / count, Ordering::Relaxed);
+        let total = self
+            .total_scan_time_us
+            .fetch_add(elapsed_us, Ordering::Relaxed)
+            + elapsed_us;
+        self.avg_scan_time_us
+            .store(total / count, Ordering::Relaxed);
     }
 
     /// Check watchdog timeout
@@ -615,7 +623,9 @@ mod tests {
     use super::*;
     use crate::plc_runtime::profiles::LsProfile;
     use crate::project::PlcHardwareTopology;
-    use crate::sim::executor::{compile_program, CompiledProgram, LadderNetwork, LadderNode, LadderProgram, NodeType};
+    use crate::sim::executor::{
+        compile_program, CompiledProgram, LadderNetwork, LadderNode, LadderProgram, NodeType,
+    };
     use crate::sim::types::SimBitDeviceType;
 
     fn create_test_program() -> LadderProgram {
@@ -728,7 +738,10 @@ mod tests {
         *engine.program.write() = Some(program);
 
         // Set M0 true
-        engine.runtime.write_bit(SimBitDeviceType::M, 0, true).unwrap();
+        engine
+            .runtime
+            .write_bit(SimBitDeviceType::M, 0, true)
+            .unwrap();
 
         // Execute scan
         engine.single_scan().unwrap();

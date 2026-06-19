@@ -617,7 +617,10 @@ fn compile_optional_address(
         .transpose()
 }
 
-fn compile_address(address: &str, profile: &dyn VendorProfile) -> ExecutionResult<CanonicalAddress> {
+fn compile_address(
+    address: &str,
+    profile: &dyn VendorProfile,
+) -> ExecutionResult<CanonicalAddress> {
     let vendor_address = profile
         .parse_address(address)
         .map_err(|_| ExecutionError::InvalidAddress(address.to_string()))?;
@@ -938,7 +941,10 @@ impl ProgramExecutor {
     // Helper Methods
     // ========================================================================
 
-    fn require_address(&self, address: Option<CanonicalAddress>) -> ExecutionResult<CanonicalAddress> {
+    fn require_address(
+        &self,
+        address: Option<CanonicalAddress>,
+    ) -> ExecutionResult<CanonicalAddress> {
         address.ok_or_else(|| ExecutionError::InvalidAddress("Missing address".to_string()))
     }
 
@@ -954,9 +960,11 @@ impl ProgramExecutor {
 
     fn write_device_bool(&self, addr: CanonicalAddress, value: bool) -> ExecutionResult<()> {
         if addr.area.is_bit_area() || addr.bit_index.is_some() {
-            Ok(self
-                .runtime
-                .write_bool(addr, value, crate::plc_runtime::CanonicalWriteSource::Simulation)?)
+            Ok(self.runtime.write_bool(
+                addr,
+                value,
+                crate::plc_runtime::CanonicalWriteSource::Simulation,
+            )?)
         } else {
             Ok(self.runtime.write_word_value(
                 addr,
@@ -973,7 +981,11 @@ impl ProgramExecutor {
                 if address.area.is_word_area() && address.bit_index.is_none() {
                     Ok(self.runtime.read_word_value(*address)? as i16 as i32)
                 } else {
-                    Ok(if self.runtime.read_bool(*address)? { 1 } else { 0 })
+                    Ok(if self.runtime.read_bool(*address)? {
+                        1
+                    } else {
+                        0
+                    })
                 }
             }
         }
@@ -1022,19 +1034,19 @@ impl ProgramExecutor {
                 .update(addr.index as u16, timer_type, input, preset, time_base);
 
         // Update T contact
-        let _ = self
-            .runtime
-            .write_bool(
-                addr,
-                done,
-                crate::plc_runtime::CanonicalWriteSource::InternalRuntime,
-            );
-        self.runtime
-            .write_word_value(
-                CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::TimerValueWord, addr.index),
-                _elapsed as u16,
-                crate::plc_runtime::CanonicalWriteSource::InternalRuntime,
-            )?;
+        let _ = self.runtime.write_bool(
+            addr,
+            done,
+            crate::plc_runtime::CanonicalWriteSource::InternalRuntime,
+        );
+        self.runtime.write_word_value(
+            CanonicalAddress::new(
+                crate::plc_runtime::CanonicalAreaKind::TimerValueWord,
+                addr.index,
+            ),
+            _elapsed as u16,
+            crate::plc_runtime::CanonicalWriteSource::InternalRuntime,
+        )?;
 
         Ok(())
     }
@@ -1065,13 +1077,11 @@ impl ProgramExecutor {
         );
 
         // Update C contact
-        let _ = self
-            .runtime
-            .write_bool(
-                addr,
-                done,
-                crate::plc_runtime::CanonicalWriteSource::InternalRuntime,
-            )?;
+        let _ = self.runtime.write_bool(
+            addr,
+            done,
+            crate::plc_runtime::CanonicalWriteSource::InternalRuntime,
+        )?;
         if let Some(state) = self.counter_mgr.get_state(addr.index as u16) {
             self.runtime.write_word_value(
                 CanonicalAddress::new(
@@ -1108,8 +1118,11 @@ impl ProgramExecutor {
         let result = op(op1, op2);
 
         if dest.area.is_word_area() && dest.bit_index.is_none() {
-            self.runtime
-                .write_word_value(dest, result as u16, crate::plc_runtime::CanonicalWriteSource::Simulation)?;
+            self.runtime.write_word_value(
+                dest,
+                result as u16,
+                crate::plc_runtime::CanonicalWriteSource::Simulation,
+            )?;
         }
 
         Ok(())

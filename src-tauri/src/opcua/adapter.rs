@@ -100,14 +100,19 @@ impl ProtocolAdapter for OpcUaAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plc_runtime::{CanonicalAddress, CanonicalAreaKind, CanonicalMemory, CanonicalValue};
     use crate::opcua::types::OpcUaConfig;
+    use crate::plc_runtime::{
+        CanonicalAddress, CanonicalAreaKind, CanonicalMemory, CanonicalValue,
+    };
 
     #[test]
     fn apply_external_writes_updates_canonical_memory() {
         let canonical = Arc::new(RwLock::new(CanonicalMemory::new()));
         let opcua_memory = Arc::new(OpcUaMemory::new());
-        let server = Arc::new(OpcUaServer::new(OpcUaConfig::default(), Arc::clone(&opcua_memory)));
+        let server = Arc::new(OpcUaServer::new(
+            OpcUaConfig::default(),
+            Arc::clone(&opcua_memory),
+        ));
         let adapter = OpcUaAdapter::new(Arc::clone(&canonical), Arc::clone(&opcua_memory), server);
 
         // Simulate OPC UA client writing a value
@@ -126,11 +131,13 @@ mod tests {
         // Verify canonical memory was updated
         let mem = canonical.read();
         assert_eq!(
-            mem.read(CanonicalAddress::new(CanonicalAreaKind::DataWord, 42)).unwrap(),
+            mem.read(CanonicalAddress::new(CanonicalAreaKind::DataWord, 42))
+                .unwrap(),
             CanonicalValue::U16(1234)
         );
         assert_eq!(
-            mem.read(CanonicalAddress::new(CanonicalAreaKind::InternalBit, 7)).unwrap(),
+            mem.read(CanonicalAddress::new(CanonicalAreaKind::InternalBit, 7))
+                .unwrap(),
             CanonicalValue::Bool(true)
         );
 
@@ -142,7 +149,10 @@ mod tests {
     fn full_sync_applies_writes_then_publishes() {
         let canonical = Arc::new(RwLock::new(CanonicalMemory::new()));
         let opcua_memory = Arc::new(OpcUaMemory::new());
-        let server = Arc::new(OpcUaServer::new(OpcUaConfig::default(), Arc::clone(&opcua_memory)));
+        let server = Arc::new(OpcUaServer::new(
+            OpcUaConfig::default(),
+            Arc::clone(&opcua_memory),
+        ));
         let adapter = OpcUaAdapter::new(Arc::clone(&canonical), Arc::clone(&opcua_memory), server);
 
         // Record a write and do full sync
@@ -156,7 +166,8 @@ mod tests {
         // Should be applied
         let mem = canonical.read();
         assert_eq!(
-            mem.read(CanonicalAddress::new(CanonicalAreaKind::DataWord, 0)).unwrap(),
+            mem.read(CanonicalAddress::new(CanonicalAreaKind::DataWord, 0))
+                .unwrap(),
             CanonicalValue::U16(9999)
         );
     }

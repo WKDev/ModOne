@@ -194,7 +194,32 @@
         "sortOrder": { "type": "integer" },
         "nameVisible": { "type": "boolean" },
         "numberVisible": { "type": "boolean" },
-        "hidden": { "type": "boolean" }
+        "hidden": { "type": "boolean" },
+        "description": {
+          "type": "string",
+          "description": "v3: Human-readable description / tooltip text"
+        },
+        "group": {
+          "type": "string",
+          "description": "v3: Logical group label (e.g. 'Power', 'Data')"
+        },
+        "locked": {
+          "type": "boolean",
+          "description": "v3: Lock state — blocks drag/delete when true"
+        },
+        "color": {
+          "type": "string",
+          "description": "v3: CSS fill color override (stroke retains default)"
+        },
+        "labelOffset": {
+          "type": "object",
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+          },
+          "required": ["x", "y"],
+          "description": "v3: Pixel offset of the port name label from default position"
+        }
       }
     },
     "SpicePinMapping": {
@@ -303,6 +328,51 @@
         "hidden": {
           "type": "boolean",
           "description": "Whether pin is hidden from display"
+        },
+        "electricalType": {
+          "$ref": "#/definitions/PinElectricalTypeV2",
+          "description": "v2: KiCad-compatible electrical type"
+        },
+        "functionalRole": {
+          "$ref": "#/definitions/PinFunctionalRole",
+          "description": "v2: PLC functional role"
+        },
+        "sortOrder": {
+          "type": "integer",
+          "description": "v2: Sort order for pin numbering"
+        },
+        "nameVisible": {
+          "type": "boolean",
+          "description": "v2: Whether pin name is visible"
+        },
+        "numberVisible": {
+          "type": "boolean",
+          "description": "v2: Whether pin number is visible"
+        },
+        "description": {
+          "type": "string",
+          "description": "v3: Human-readable description / tooltip text"
+        },
+        "group": {
+          "type": "string",
+          "description": "v3: Logical group label (e.g. 'Power', 'Data')"
+        },
+        "locked": {
+          "type": "boolean",
+          "description": "v3: Lock state — blocks drag/delete when true"
+        },
+        "color": {
+          "type": "string",
+          "description": "v3: CSS fill color override (stroke retains default)"
+        },
+        "labelOffset": {
+          "type": "object",
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+          },
+          "required": ["x", "y"],
+          "description": "v3: Pixel offset of the port name label from default position"
         }
       }
     },

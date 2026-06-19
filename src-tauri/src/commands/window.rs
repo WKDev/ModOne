@@ -84,24 +84,23 @@ pub async fn window_create_floating(
 
     // Create the URL for the floating window
     // The frontend will handle routing based on query params
-    let url = format!("index.html?floating=true&windowId={}&panelId={}&panelType={}",
-        window_id, panel_id, panel_type);
+    let url = format!(
+        "index.html?floating=true&windowId={}&panelId={}&panelType={}",
+        window_id, panel_id, panel_type
+    );
 
     // Build the new window (Tauri v2 builder uses logical coordinates/sizes)
-    let _window = WebviewWindowBuilder::new(
-        &app,
-        &window_id,
-        WebviewUrl::App(url.into()),
-    )
-    .title(format!("ModOne - {}", panel_type))
-    .inner_size(bounds.width, bounds.height)
-    .position(bounds.x, bounds.y)
-    .resizable(true)
-    .decorations(true)
-    .visible(true)
-    .focused(true)
-    .build()
-    .map_err(|e| format!("Failed to create floating window: {}", e))?;
+    let _window = WebviewWindowBuilder::new(&app, &window_id, WebviewUrl::App(url.into()))
+        .title(format!("ModOne - {}", panel_type))
+        .inner_size(bounds.width, bounds.height)
+        .position(bounds.x, bounds.y)
+        .resizable(true)
+        .decorations(false)
+        .shadow(true)
+        .visible(true)
+        .focused(true)
+        .build()
+        .map_err(|e| format!("Failed to create floating window: {}", e))?;
 
     // Clone bounds before moving into info
     let event_bounds = bounds.clone();
@@ -120,17 +119,25 @@ pub async fn window_create_floating(
     }
 
     // Emit event to notify frontend
-    app.emit("floating-window-created", &serde_json::json!({
-        "windowId": window_id,
-        "panelId": panel_id,
-        "panelType": panel_type,
-        "x": event_bounds.x,
-        "y": event_bounds.y,
-        "width": event_bounds.width,
-        "height": event_bounds.height,
-    })).map_err(|e| format!("Failed to emit event: {}", e))?;
+    app.emit(
+        "floating-window-created",
+        &serde_json::json!({
+            "windowId": window_id,
+            "panelId": panel_id,
+            "panelType": panel_type,
+            "x": event_bounds.x,
+            "y": event_bounds.y,
+            "width": event_bounds.width,
+            "height": event_bounds.height,
+        }),
+    )
+    .map_err(|e| format!("Failed to emit event: {}", e))?;
 
-    log::info!("Created floating window: {} for panel: {}", window_id, panel_id);
+    log::info!(
+        "Created floating window: {} for panel: {}",
+        window_id,
+        panel_id
+    );
 
     Ok(window_id)
 }
@@ -143,11 +150,14 @@ pub async fn window_close_floating(
     window_id: String,
 ) -> Result<(), String> {
     // Get the window
-    let window = app.get_webview_window(&window_id)
+    let window = app
+        .get_webview_window(&window_id)
         .ok_or_else(|| format!("Window not found: {}", window_id))?;
 
     // Close the window
-    window.close().map_err(|e| format!("Failed to close window: {}", e))?;
+    window
+        .close()
+        .map_err(|e| format!("Failed to close window: {}", e))?;
 
     // Unregister from state
     {
@@ -156,9 +166,13 @@ pub async fn window_close_floating(
     }
 
     // Emit event
-    app.emit("floating-window-closed", &serde_json::json!({
-        "windowId": window_id,
-    })).map_err(|e| format!("Failed to emit event: {}", e))?;
+    app.emit(
+        "floating-window-closed",
+        &serde_json::json!({
+            "windowId": window_id,
+        }),
+    )
+    .map_err(|e| format!("Failed to emit event: {}", e))?;
 
     log::info!("Closed floating window: {}", window_id);
 
@@ -174,14 +188,17 @@ pub async fn window_update_bounds(
     bounds: WindowBounds,
 ) -> Result<(), String> {
     // Get the window
-    let window = app.get_webview_window(&window_id)
+    let window = app
+        .get_webview_window(&window_id)
         .ok_or_else(|| format!("Window not found: {}", window_id))?;
 
     // Update position and size
-    window.set_position(tauri::LogicalPosition::new(bounds.x, bounds.y))
+    window
+        .set_position(tauri::LogicalPosition::new(bounds.x, bounds.y))
         .map_err(|e| format!("Failed to set position: {}", e))?;
 
-    window.set_size(tauri::LogicalSize::new(bounds.width, bounds.height))
+    window
+        .set_size(tauri::LogicalSize::new(bounds.width, bounds.height))
         .map_err(|e| format!("Failed to set size: {}", e))?;
 
     // Update state
@@ -195,19 +212,23 @@ pub async fn window_update_bounds(
 
 /// Focus a floating window (bring to front)
 #[tauri::command]
-pub async fn window_focus_floating(
-    app: AppHandle,
-    window_id: String,
-) -> Result<(), String> {
-    let window = app.get_webview_window(&window_id)
+pub async fn window_focus_floating(app: AppHandle, window_id: String) -> Result<(), String> {
+    let window = app
+        .get_webview_window(&window_id)
         .ok_or_else(|| format!("Window not found: {}", window_id))?;
 
-    window.set_focus().map_err(|e| format!("Failed to focus window: {}", e))?;
+    window
+        .set_focus()
+        .map_err(|e| format!("Failed to focus window: {}", e))?;
 
     // Emit event
-    app.emit("floating-window-focused", &serde_json::json!({
-        "windowId": window_id,
-    })).map_err(|e| format!("Failed to emit event: {}", e))?;
+    app.emit(
+        "floating-window-focused",
+        &serde_json::json!({
+            "windowId": window_id,
+        }),
+    )
+    .map_err(|e| format!("Failed to emit event: {}", e))?;
 
     Ok(())
 }
@@ -230,9 +251,15 @@ pub async fn window_get_floating_info(
 ) -> Result<Option<FloatingWindowInfo>, String> {
     // Try to get current bounds from the actual window
     if let Some(window) = app.get_webview_window(&window_id) {
-        let position = window.outer_position().map_err(|e| format!("Failed to get position: {}", e))?;
-        let size = window.outer_size().map_err(|e| format!("Failed to get size: {}", e))?;
-        let scale_factor = window.scale_factor().map_err(|e| format!("Failed to get scale factor: {}", e))?;
+        let position = window
+            .outer_position()
+            .map_err(|e| format!("Failed to get position: {}", e))?;
+        let size = window
+            .outer_size()
+            .map_err(|e| format!("Failed to get size: {}", e))?;
+        let scale_factor = window
+            .scale_factor()
+            .map_err(|e| format!("Failed to get scale factor: {}", e))?;
 
         let mut registry = state.lock().unwrap_or_else(|e| e.into_inner());
 
@@ -253,31 +280,33 @@ pub async fn window_get_floating_info(
 
 /// Minimize a floating window
 #[tauri::command]
-pub async fn window_minimize_floating(
-    app: AppHandle,
-    window_id: String,
-) -> Result<(), String> {
-    let window = app.get_webview_window(&window_id)
+pub async fn window_minimize_floating(app: AppHandle, window_id: String) -> Result<(), String> {
+    let window = app
+        .get_webview_window(&window_id)
         .ok_or_else(|| format!("Window not found: {}", window_id))?;
 
-    window.minimize().map_err(|e| format!("Failed to minimize window: {}", e))?;
+    window
+        .minimize()
+        .map_err(|e| format!("Failed to minimize window: {}", e))?;
 
     Ok(())
 }
 
 /// Maximize/restore a floating window
 #[tauri::command]
-pub async fn window_maximize_floating(
-    app: AppHandle,
-    window_id: String,
-) -> Result<(), String> {
-    let window = app.get_webview_window(&window_id)
+pub async fn window_maximize_floating(app: AppHandle, window_id: String) -> Result<(), String> {
+    let window = app
+        .get_webview_window(&window_id)
         .ok_or_else(|| format!("Window not found: {}", window_id))?;
 
     if window.is_maximized().unwrap_or(false) {
-        window.unmaximize().map_err(|e| format!("Failed to unmaximize window: {}", e))?;
+        window
+            .unmaximize()
+            .map_err(|e| format!("Failed to unmaximize window: {}", e))?;
     } else {
-        window.maximize().map_err(|e| format!("Failed to maximize window: {}", e))?;
+        window
+            .maximize()
+            .map_err(|e| format!("Failed to maximize window: {}", e))?;
     }
 
     Ok(())
@@ -285,10 +314,7 @@ pub async fn window_maximize_floating(
 
 /// Check if a floating window exists
 #[tauri::command]
-pub async fn window_floating_exists(
-    app: AppHandle,
-    window_id: String,
-) -> Result<bool, String> {
+pub async fn window_floating_exists(app: AppHandle, window_id: String) -> Result<bool, String> {
     Ok(app.get_webview_window(&window_id).is_some())
 }
 
@@ -297,7 +323,11 @@ pub async fn window_floating_exists(
 pub fn close_all_floating_windows(app: &tauri::AppHandle, state: &FloatingWindowState) {
     let window_ids: Vec<String> = {
         let registry = state.lock().unwrap_or_else(|e| e.into_inner());
-        registry.list().iter().map(|info| info.window_id.clone()).collect()
+        registry
+            .list()
+            .iter()
+            .map(|info| info.window_id.clone())
+            .collect()
     };
 
     for window_id in window_ids {

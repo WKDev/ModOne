@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
-use super::manifest::ProjectManifest;
 use super::config::PlcSettings;
+use super::manifest::ProjectManifest;
 
 /// Errors specific to folder-based project operations
 #[derive(Error, Debug)]
@@ -77,7 +77,9 @@ impl FolderProject {
     ) -> Result<Self, FolderProjectError> {
         // Check if directory already exists
         if project_dir.exists() {
-            return Err(FolderProjectError::DirectoryExists(project_dir.to_path_buf()));
+            return Err(FolderProjectError::DirectoryExists(
+                project_dir.to_path_buf(),
+            ));
         }
 
         // Create project directory
@@ -91,10 +93,12 @@ impl FolderProject {
         let canvas_dir = project_dir.join(&manifest.directories.canvas);
         let ladder_dir = project_dir.join(&manifest.directories.ladder);
         let scenario_dir = project_dir.join(&manifest.directories.scenario);
+        let sheets_dir = project_dir.join(&manifest.directories.sheets);
 
         fs::create_dir_all(&canvas_dir)?;
         fs::create_dir_all(&ladder_dir)?;
         fs::create_dir_all(&scenario_dir)?;
+        fs::create_dir_all(&sheets_dir)?;
 
         // Write manifest file
         let manifest_filename = format!("{}.mop", name);
@@ -117,12 +121,16 @@ impl FolderProject {
     /// * `manifest_path` - Path to the .mop manifest file
     pub fn open(manifest_path: &Path) -> Result<Self, FolderProjectError> {
         if !manifest_path.exists() {
-            return Err(FolderProjectError::ManifestNotFound(manifest_path.to_path_buf()));
+            return Err(FolderProjectError::ManifestNotFound(
+                manifest_path.to_path_buf(),
+            ));
         }
 
         // Verify it's a YAML file (not a ZIP)
         if Self::is_zip_file(manifest_path)? {
-            return Err(FolderProjectError::NotFolderProject(manifest_path.to_path_buf()));
+            return Err(FolderProjectError::NotFolderProject(
+                manifest_path.to_path_buf(),
+            ));
         }
 
         // Read manifest
@@ -141,7 +149,9 @@ impl FolderProject {
         // Get project root (parent of manifest file)
         let project_root = manifest_path
             .parent()
-            .ok_or_else(|| FolderProjectError::InvalidManifest("Invalid manifest path".to_string()))?
+            .ok_or_else(|| {
+                FolderProjectError::InvalidManifest("Invalid manifest path".to_string())
+            })?
             .to_path_buf();
 
         if !project_root.exists() {
@@ -180,16 +190,27 @@ impl FolderProject {
     ) -> Result<(), FolderProjectError> {
         // Check if target already exists
         if new_project_dir.exists() {
-            return Err(FolderProjectError::DirectoryExists(new_project_dir.to_path_buf()));
+            return Err(FolderProjectError::DirectoryExists(
+                new_project_dir.to_path_buf(),
+            ));
         }
 
         // Create new directory structure
         fs::create_dir_all(new_project_dir)?;
 
         // Copy data directories if they exist
-        self.copy_directory_if_exists(&self.canvas_dir(), &new_project_dir.join(&self.manifest.directories.canvas))?;
-        self.copy_directory_if_exists(&self.ladder_dir(), &new_project_dir.join(&self.manifest.directories.ladder))?;
-        self.copy_directory_if_exists(&self.scenario_dir(), &new_project_dir.join(&self.manifest.directories.scenario))?;
+        self.copy_directory_if_exists(
+            &self.canvas_dir(),
+            &new_project_dir.join(&self.manifest.directories.canvas),
+        )?;
+        self.copy_directory_if_exists(
+            &self.ladder_dir(),
+            &new_project_dir.join(&self.manifest.directories.ladder),
+        )?;
+        self.copy_directory_if_exists(
+            &self.scenario_dir(),
+            &new_project_dir.join(&self.manifest.directories.scenario),
+        )?;
 
         // Update manifest
         if let Some(name) = new_name {
@@ -250,6 +271,11 @@ impl FolderProject {
     /// Get the scenario directory path
     pub fn scenario_dir(&self) -> PathBuf {
         self.project_root.join(&self.manifest.directories.scenario)
+    }
+
+    /// Get the sheets directory path
+    pub fn sheets_dir(&self) -> PathBuf {
+        self.project_root.join(&self.manifest.directories.sheets)
     }
 
     // ==========================================================================
@@ -359,8 +385,8 @@ pub fn is_legacy_project(path: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::manifest::MANIFEST_VERSION;
+    use super::*;
     use tempfile::TempDir;
 
     #[test]
@@ -368,11 +394,8 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let project_dir = temp_dir.path().join("TestProject");
 
-        let project = FolderProject::create_new(
-            &project_dir,
-            "TestProject",
-            PlcSettings::default(),
-        ).unwrap();
+        let project =
+            FolderProject::create_new(&project_dir, "TestProject", PlcSettings::default()).unwrap();
 
         // Verify structure
         assert!(project_dir.exists());
@@ -392,11 +415,8 @@ mod tests {
         let project_dir = temp_dir.path().join("OpenTest");
 
         // Create project
-        let project = FolderProject::create_new(
-            &project_dir,
-            "OpenTest",
-            PlcSettings::default(),
-        ).unwrap();
+        let project =
+            FolderProject::create_new(&project_dir, "OpenTest", PlcSettings::default()).unwrap();
 
         let manifest_path = project.manifest_path().to_path_buf();
 
@@ -410,11 +430,8 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let project_dir = temp_dir.path().join("SaveTest");
 
-        let mut project = FolderProject::create_new(
-            &project_dir,
-            "SaveTest",
-            PlcSettings::default(),
-        ).unwrap();
+        let mut project =
+            FolderProject::create_new(&project_dir, "SaveTest", PlcSettings::default()).unwrap();
 
         // Modify and save
         project.manifest_mut().project.description = "Updated description".to_string();
@@ -423,7 +440,10 @@ mod tests {
         // Reopen and verify
         let manifest_path = project.manifest_path().to_path_buf();
         let reopened = FolderProject::open(&manifest_path).unwrap();
-        assert_eq!(reopened.manifest().project.description, "Updated description");
+        assert_eq!(
+            reopened.manifest().project.description,
+            "Updated description"
+        );
     }
 
     #[test]
@@ -436,7 +456,10 @@ mod tests {
 
         // Try to create again - should fail
         let result = FolderProject::create_new(&project_dir, "ExistsTest", PlcSettings::default());
-        assert!(matches!(result, Err(FolderProjectError::DirectoryExists(_))));
+        assert!(matches!(
+            result,
+            Err(FolderProjectError::DirectoryExists(_))
+        ));
     }
 
     #[test]
@@ -444,11 +467,8 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let project_dir = temp_dir.path().join("FolderCheck");
 
-        let project = FolderProject::create_new(
-            &project_dir,
-            "FolderCheck",
-            PlcSettings::default(),
-        ).unwrap();
+        let project =
+            FolderProject::create_new(&project_dir, "FolderCheck", PlcSettings::default()).unwrap();
 
         assert!(is_folder_project(project.manifest_path()));
         assert!(!is_legacy_project(project.manifest_path()));

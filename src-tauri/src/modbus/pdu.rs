@@ -168,7 +168,11 @@ pub fn process_request(memory: &ModbusMemory, function_code: u8, pdu: &[u8]) -> 
                 .map(|i| u16::from_be_bytes([pdu[6 + i * 2], pdu[7 + i * 2]]))
                 .collect();
 
-            match memory.write_holding_registers_with_source(start_addr, &values, ChangeSource::External) {
+            match memory.write_holding_registers_with_source(
+                start_addr,
+                &values,
+                ChangeSource::External,
+            ) {
                 Ok(_) => {
                     vec![function_code, pdu[1], pdu[2], pdu[3], pdu[4]]
                 }

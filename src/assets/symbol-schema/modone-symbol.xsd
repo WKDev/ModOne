@@ -1,0 +1,1270 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ModOne Symbol Definition Schema (XSD)
+  Version: 1.0.0
+  Namespace: http://modone.io/schema/symbol/1.0
+
+  Design references:
+    - IEC 62714 / AutomationML CAEX for hierarchical component modeling
+    - IEC 62714-4 (PCE RoleClass library) for terminal role conventions
+    - IEC 60617 for electrical symbol conventions
+    - KiCad .kicad_sym format for pin type / shape vocabulary
+
+  CAEX concept mapping:
+    CAEXFile          → SymbolLibrary (root library container)
+    SystemUnitClass   → SymbolDefinition (reusable block template)
+    ExternalInterface → Port (connection point on a symbol)
+    Attribute         → Property (configurable parameter)
+    RoleClass         → BehaviorArchetype (behavior template)
+    SupportedRoleClass→ Behavior (binding a symbol to an archetype)
+    MappingObject     → TerminalRole (port-to-archetype-role mapping)
+    InternalElement   → Unit (logical sub-unit of a multi-unit symbol)
+
+  Block domain constraints (enforced at parse-time):
+    domain="circuit"    → reacts ONLY to netlist-based power flow
+    domain="plc"        → may read/write PLC memory registers
+    domain="annotation" → no electrical meaning, pure documentation
+-->
+<xs:schema
+  xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  targetNamespace="http://modone.io/schema/symbol/1.0"
+  elementFormDefault="qualified"
+  attributeFormDefault="unqualified"
+  version="1.0.0">
+
+  <!-- ======================================================================
+       SIMPLE TYPE ENUMERATIONS
+       ====================================================================== -->
+
+  <!-- Electrical type of a port/pin (CAEX: RefBaseClassPath equivalent) -->
+  <xs:simpleType name="ElectricalTypeType">
+    <xs:restriction base="xs:string">
+      <!-- Core types -->
+      <xs:enumeration value="input"/>
+      <xs:enumeration value="output"/>
+      <xs:enumeration value="bidirectional"/>
+      <xs:enumeration value="power"/>
+      <xs:enumeration value="passive"/>
+      <!-- KiCad-compatible extended types -->
+      <xs:enumeration value="tri_state"/>
+      <xs:enumeration value="power_in"/>
+      <xs:enumeration value="power_out"/>
+      <xs:enumeration value="open_collector"/>
+      <xs:enumeration value="open_emitter"/>
+      <xs:enumeration value="free"/>
+      <xs:enumeration value="unspecified"/>
+      <xs:enumeration value="no_connect"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- PLC-specific functional role of a port -->
+  <xs:simpleType name="FunctionalRoleType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="general"/>
+      <xs:enumeration value="plc_input"/>
+      <xs:enumeration value="plc_output"/>
+      <xs:enumeration value="communication"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Visual shape of a pin stub -->
+  <xs:simpleType name="PinShapeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="line"/>
+      <xs:enumeration value="inverted"/>
+      <xs:enumeration value="clock"/>
+      <xs:enumeration value="inverted_clock"/>
+      <xs:enumeration value="input_low"/>
+      <xs:enumeration value="clock_low"/>
+      <xs:enumeration value="output_low"/>
+      <xs:enumeration value="edge_clock_high"/>
+      <xs:enumeration value="non_logic"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Port orientation direction (which side the wire exits toward) -->
+  <xs:simpleType name="OrientationType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="right"/>
+      <xs:enumeration value="left"/>
+      <xs:enumeration value="up"/>
+      <xs:enumeration value="down"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Canvas edge the port sits on -->
+  <xs:simpleType name="EdgePositionType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="top"/>
+      <xs:enumeration value="bottom"/>
+      <xs:enumeration value="left"/>
+      <xs:enumeration value="right"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Property data type -->
+  <xs:simpleType name="PropertyTypeEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="string"/>
+      <xs:enumeration value="number"/>
+      <xs:enumeration value="boolean"/>
+      <xs:enumeration value="enum"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Property editor widget type -->
+  <xs:simpleType name="EditorTypeEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="text"/>
+      <xs:enumeration value="number"/>
+      <xs:enumeration value="checkbox"/>
+      <xs:enumeration value="select"/>
+      <xs:enumeration value="color"/>
+      <xs:enumeration value="range"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Block semantic category (IEC 60617 inspired) -->
+  <xs:simpleType name="BlockCategoryType">
+    <xs:restriction base="xs:string">
+      <!-- Power / source -->
+      <xs:enumeration value="power_source"/>
+      <!-- Protection devices -->
+      <xs:enumeration value="protection"/>
+      <!-- Switching devices (relays, contactors, switches) -->
+      <xs:enumeration value="switching"/>
+      <!-- Passive components (R, L, C) -->
+      <xs:enumeration value="passive"/>
+      <!-- Semiconductor devices (diode, LED, transistor) -->
+      <xs:enumeration value="semiconductor"/>
+      <!-- Power conversion (transformer, rectifier) -->
+      <xs:enumeration value="transformer"/>
+      <!-- PLC I/O terminals -->
+      <xs:enumeration value="plc_io"/>
+      <!-- Timer functions -->
+      <xs:enumeration value="timer"/>
+      <!-- Counter functions -->
+      <xs:enumeration value="counter"/>
+      <!-- Actuators (motor, solenoid, valve) -->
+      <xs:enumeration value="actuator"/>
+      <!-- Sensors (proximity, optical, temp) -->
+      <xs:enumeration value="sensor"/>
+      <!-- Indicators (pilot lamp, LED indicator) -->
+      <xs:enumeration value="indicator"/>
+      <!-- Terminals and connectors -->
+      <xs:enumeration value="terminal"/>
+      <xs:enumeration value="connector"/>
+      <!-- Documentation / annotation -->
+      <xs:enumeration value="annotation"/>
+      <!-- User-defined custom -->
+      <xs:enumeration value="custom"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Block simulation domain -->
+  <xs:simpleType name="BlockDomainType">
+    <xs:annotation>
+      <xs:documentation>
+        Controls which simulation engine processes this block.
+        circuit: netlist-based power flow only (cannot access PLC registers)
+        plc:     PLC ladder/coil logic; may read/write memory registers
+        annotation: no electrical meaning; purely visual/documentation
+      </xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="circuit"/>
+      <xs:enumeration value="plc"/>
+      <xs:enumeration value="annotation"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- User interaction mode -->
+  <xs:simpleType name="InteractionModeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="none"/>
+      <xs:enumeration value="click"/>
+      <xs:enumeration value="toggle"/>
+      <xs:enumeration value="drag"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Animation type -->
+  <xs:simpleType name="AnimationTypeEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="rotate"/>
+      <xs:enumeration value="blink"/>
+      <xs:enumeration value="translate"/>
+      <xs:enumeration value="scale"/>
+      <xs:enumeration value="color_cycle"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Text anchor alignment -->
+  <xs:simpleType name="TextAnchorType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="start"/>
+      <xs:enumeration value="middle"/>
+      <xs:enumeration value="end"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- CSS color string (hex, rgba, named, transparent) -->
+  <xs:simpleType name="ColorType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\)|transparent|none|[a-z]+)"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Semantic version string (e.g., "1.0.0", "2.1.3-beta") -->
+  <xs:simpleType name="SemVerType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Library scope -->
+  <xs:simpleType name="LibraryScopeType">
+    <xs:restriction base="xs:string">
+      <!-- Shipped with the application -->
+      <xs:enumeration value="builtin"/>
+      <!-- Stored in the project folder -->
+      <xs:enumeration value="project"/>
+      <!-- Stored in global user config -->
+      <xs:enumeration value="global"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ======================================================================
+       PORT DEFINITION
+       Inspired by CAEX ExternalInterface — a typed connection point on a
+       symbol that allows wiring to other blocks.
+       ====================================================================== -->
+
+  <xs:complexType name="PortType">
+    <xs:annotation>
+      <xs:documentation>
+        A connection point (port / terminal) on a symbol block.
+        Position is in the symbol's local coordinate system (origin = top-left).
+        CAEX analog: ExternalInterface with RefBaseClassPath pointing to
+        a port role class (e.g., ElectricalInput, ElectricalOutput).
+      </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="Description" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+    <!-- Unique identifier within the symbol definition -->
+    <xs:attribute name="id" type="xs:NCName" use="required"/>
+    <!-- Display name shown on schematic (e.g., "A1", "COM", "+") -->
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <!-- IEC terminal number used for documentation (e.g., "1", "A1") -->
+    <xs:attribute name="number" type="xs:string" use="required"/>
+    <!-- Electrical type (determines compatible connections) -->
+    <xs:attribute name="electricalType" type="ms:ElectricalTypeType" use="required"/>
+    <!-- PLC functional role (plc_input/plc_output gate PLC register access) -->
+    <xs:attribute name="functionalRole" type="ms:FunctionalRoleType" default="general"/>
+    <!-- Visual pin shape -->
+    <xs:attribute name="shape" type="ms:PinShapeType" default="line"/>
+    <!-- Direction the wire stub extends from port -->
+    <xs:attribute name="orientation" type="ms:OrientationType" use="required"/>
+    <!-- X position in symbol coordinates (px) -->
+    <xs:attribute name="x" type="xs:decimal" use="required"/>
+    <!-- Y position in symbol coordinates (px) -->
+    <xs:attribute name="y" type="xs:decimal" use="required"/>
+    <!-- Pin stub line length in pixels (0 = no stub) -->
+    <xs:attribute name="length" type="xs:nonNegativeInteger" default="0"/>
+    <!-- Sort order for port numbering in property panels -->
+    <xs:attribute name="sortOrder" type="xs:positiveInteger"/>
+    <!-- Whether pin name is visible on the schematic -->
+    <xs:attribute name="nameVisible" type="xs:boolean" default="true"/>
+    <!-- Whether pin number is visible on the schematic -->
+    <xs:attribute name="numberVisible" type="xs:boolean" default="true"/>
+    <!-- Hidden pins are not shown but remain electrically active -->
+    <xs:attribute name="hidden" type="xs:boolean" default="false"/>
+    <!-- Maximum simultaneous wire connections (0 = unlimited) -->
+    <xs:attribute name="maxConnections" type="xs:nonNegativeInteger" default="0"/>
+    <!-- Canvas edge this port is snapped to (for routing hints) -->
+    <xs:attribute name="edgePosition" type="ms:EdgePositionType"/>
+    <!-- Fractional offset along the edge (0.0 = start, 1.0 = end) -->
+    <xs:attribute name="edgeOffset" type="xs:decimal"/>
+    <!-- v3: Logical group label for port clustering (e.g. "Power", "Data") -->
+    <xs:attribute name="group" type="xs:string"/>
+    <!-- v3: When true, port is locked — drag/delete/rename blocked -->
+    <xs:attribute name="locked" type="xs:boolean" default="false"/>
+    <!-- v3: CSS hex color applied to port fill only; stroke retains default -->
+    <xs:attribute name="color" type="ms:ColorType"/>
+    <!-- v3: Label offset X from default position in pixels -->
+    <xs:attribute name="labelOffsetX" type="xs:decimal"/>
+    <!-- v3: Label offset Y from default position in pixels -->
+    <xs:attribute name="labelOffsetY" type="xs:decimal"/>
+  </xs:complexType>
+
+  <!-- ======================================================================
+       GRAPHIC PRIMITIVES
+       SVG-inspired vector graphics that define the symbol's appearance.
+       All coordinates are in the symbol's local coordinate space.
+       ====================================================================== -->
+
+  <!-- Shared visual attributes across all graphic primitives -->
+  <xs:attributeGroup name="GraphicPrimitiveAttrs">
+    <!-- Stable identifier for per-state overrides (VisualState.Override) -->
+    <xs:attribute name="id" type="xs:NCName"/>
+    <xs:attribute name="stroke" type="ms:ColorType" default="#888888"/>
+    <xs:attribute name="fill" type="ms:ColorType" default="transparent"/>
+    <xs:attribute name="strokeWidth" type="xs:decimal" default="2"/>
+    <xs:attribute name="opacity" type="xs:decimal" default="1.0"/>
+    <!-- CSS stroke-dasharray for dashed lines (e.g., "4 2") -->
+    <xs:attribute name="strokeDasharray" type="xs:string"/>
+    <!-- Stroke line cap style -->
+    <xs:attribute name="strokeLinecap">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="butt"/>
+          <xs:enumeration value="round"/>
+          <xs:enumeration value="square"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <!-- Stroke line join style -->
+    <xs:attribute name="strokeLinejoin">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="miter"/>
+          <xs:enumeration value="round"/>
+          <xs:enumeration value="bevel"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:attributeGroup>
+
+  <!-- Rectangle: axis-aligned rectangle with optional rounded corners -->
+  <xs:complexType name="RectType">
+    <xs:attributeGroup ref="ms:GraphicPrimitiveAttrs"/>
+    <xs:attribute name="x" type="xs:decimal" use="required"/>
+    <xs:attribute name="y" type="xs:decimal" use="required"/>
+    <xs:attribute name="width" type="xs:decimal" use="required"/>
+    <xs:attribute name="height" type="xs:decimal" use="required"/>
+    <!-- Horizontal corner radius -->
+    <xs:attribute name="rx" type="xs:decimal" default="0"/>
+    <!-- Vertical corner radius -->
+    <xs:attribute name="ry" type="xs:decimal" default="0"/>
+  </xs:complexType>
+
+  <!-- Circle: center + radius -->
+  <xs:complexType name="CircleType">
+    <xs:attributeGroup ref="ms:GraphicPrimitiveAttrs"/>
+    <xs:attribute name="cx" type="xs:decimal" use="required"/>
+    <xs:attribute name="cy" type="xs:decimal" use="required"/>
+    <xs:attribute name="r" type="xs:decimal" use="required"/>
+  </xs:complexType>
+
+  <!-- A single point in a polyline or polygon path -->
+  <xs:complexType name="PointType">
+    <xs:attribute name="x" type="xs:decimal" use="required"/>
+    <xs:attribute name="y" type="xs:decimal" use="required"/>
+  </xs:complexType>
+
+  <!-- Polyline: open or closed path of connected line segments -->
+  <xs:complexType name="PolylineType">
+    <xs:sequence>
+      <!-- Minimum 2 points required for a valid polyline -->
+      <xs:element name="Point" type="ms:PointType" minOccurs="2" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="ms:GraphicPrimitiveAttrs"/>
+    <!-- Whether the path is closed (connects last point back to first) -->
+    <xs:attribute name="closed" type="xs:boolean" default="false"/>
+  </xs:complexType>
+
+  <!-- Arc: partial circle defined by center, radius, and angle range -->
+  <xs:complexType name="ArcType">
+    <xs:attributeGroup ref="ms:GraphicPrimitiveAttrs"/>
+    <xs:attribute name="cx" type="xs:decimal" use="required"/>
+    <xs:attribute name="cy" type="xs:decimal" use="required"/>
+    <xs:attribute name="r" type="xs:decimal" use="required"/>
+    <!-- Start angle in degrees (0 = rightward, clockwise positive) -->
+    <xs:attribute name="startAngle" type="xs:decimal" use="required"/>
+    <!-- End angle in degrees -->
+    <xs:attribute name="endAngle" type="xs:decimal" use="required"/>
+  </xs:complexType>
+
+  <!-- Text label within the symbol body -->
+  <xs:complexType name="TextPrimitiveType">
+    <xs:annotation>
+      <xs:documentation>
+        The text content is the element's text node value.
+        May contain ${propertyKey} variable references that are substituted
+        with the block's actual property values at render time.
+        Example: &lt;Text&gt;${designation}&lt;/Text&gt;
+      </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:extension base="xs:string">
+        <xs:attribute name="id" type="xs:NCName"/>
+        <xs:attribute name="x" type="xs:decimal" use="required"/>
+        <xs:attribute name="y" type="xs:decimal" use="required"/>
+        <xs:attribute name="fontSize" type="xs:positiveInteger" default="12"/>
+        <xs:attribute name="fontFamily" type="xs:string" default="Arial"/>
+        <xs:attribute name="fill" type="ms:ColorType" default="#888888"/>
+        <xs:attribute name="anchor" type="ms:TextAnchorType" default="middle"/>
+        <xs:attribute name="opacity" type="xs:decimal" default="1.0"/>
+        <xs:attribute name="fontWeight">
+          <xs:simpleType>
+            <xs:restriction base="xs:string">
+              <xs:enumeration value="normal"/>
+              <xs:enumeration value="bold"/>
+            </xs:restriction>
+          </xs:simpleType>
+        </xs:attribute>
+        <xs:attribute name="fontStyle">
+          <xs:simpleType>
+            <xs:restriction base="xs:string">
+              <xs:enumeration value="normal"/>
+              <xs:enumeration value="italic"/>
+            </xs:restriction>
+          </xs:simpleType>
+        </xs:attribute>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+
+  <!-- Embedded SVG fragment for complex graphics that cannot be expressed
+       via the primitive types above -->
+  <xs:complexType name="SvgEmbedType">
+    <xs:annotation>
+      <xs:documentation>
+        Embeds a raw SVG subtree directly. Useful for complex paths (d="M...Z")
+        or custom shapes. The renderer will inject these SVG elements directly
+        into the Pixi.js graphics layer via SVGScene.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:any namespace="http://www.w3.org/2000/svg"
+              minOccurs="0" maxOccurs="unbounded"
+              processContents="lax"/>
+    </xs:sequence>
+    <xs:attribute name="id" type="xs:NCName"/>
+    <!-- SVG viewBox for scaling the embedded content -->
+    <xs:attribute name="viewBox" type="xs:string"/>
+    <xs:attribute name="width" type="xs:decimal"/>
+    <xs:attribute name="height" type="xs:decimal"/>
+    <!-- Offset within the symbol coordinate system -->
+    <xs:attribute name="x" type="xs:decimal" default="0"/>
+    <xs:attribute name="y" type="xs:decimal" default="0"/>
+  </xs:complexType>
+
+  <!-- Container for an ordered list of graphic primitives -->
+  <xs:complexType name="GraphicsType">
+    <xs:annotation>
+      <xs:documentation>
+        Ordered list of graphic primitives drawn back-to-front (painter's order).
+        Primitives with id attributes can be targeted by VisualState overrides.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element name="Rect" type="ms:RectType"/>
+        <xs:element name="Circle" type="ms:CircleType"/>
+        <xs:element name="Polyline" type="ms:PolylineType"/>
+        <xs:element name="Arc" type="ms:ArcType"/>
+        <xs:element name="Text" type="ms:TextPrimitiveType"/>
+        <xs:element name="SvgEmbed" type="ms:SvgEmbedType"/>
+      </xs:choice>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ======================================================================
+       VISUAL STATE OVERRIDES
+       Per-state visual modifications applied on top of the base Graphics.
+       ====================================================================== -->
+
+  <!-- Transform override applied to a specific primitive -->
+  <xs:complexType name="PrimitiveTransformType">
+    <xs:attribute name="translateX" type="xs:decimal"/>
+    <xs:attribute name="translateY" type="xs:decimal"/>
+    <xs:attribute name="rotation" type="xs:decimal"/>
+    <xs:attribute name="scaleX" type="xs:decimal"/>
+    <xs:attribute name="scaleY" type="xs:decimal"/>
+    <!-- Pivot point for rotation/scale (in symbol coordinates) -->
+    <xs:attribute name="pivotX" type="xs:decimal"/>
+    <xs:attribute name="pivotY" type="xs:decimal"/>
+  </xs:complexType>
+
+  <!-- Override for a single named graphic primitive -->
+  <xs:complexType name="PrimitiveOverrideType">
+    <xs:annotation>
+      <xs:documentation>
+        Overrides visual attributes of one graphic primitive (referenced by id)
+        when a specific simulation state is active.
+        All override attributes are optional; unspecified attributes retain
+        their base values.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="Transform" type="ms:PrimitiveTransformType" minOccurs="0"/>
+    </xs:sequence>
+    <!-- ID of the target primitive (must match a primitive's id attribute) -->
+    <xs:attribute name="targetId" type="xs:NCName" use="required"/>
+    <!-- Visibility override -->
+    <xs:attribute name="visible" type="xs:boolean"/>
+    <xs:attribute name="opacity" type="xs:decimal"/>
+    <!-- Style overrides -->
+    <xs:attribute name="stroke" type="ms:ColorType"/>
+    <xs:attribute name="fill" type="ms:ColorType"/>
+    <xs:attribute name="strokeWidth" type="xs:decimal"/>
+    <!-- Text content override (only for Text primitives) -->
+    <xs:attribute name="text" type="xs:string"/>
+    <xs:attribute name="fontSize" type="xs:positiveInteger"/>
+    <xs:attribute name="fontFamily" type="xs:string"/>
+  </xs:complexType>
+
+  <!-- Visual state: graphics overrides active in a named simulation state -->
+  <xs:complexType name="VisualStateType">
+    <xs:annotation>
+      <xs:documentation>
+        Defines how the symbol looks when in a particular simulation state.
+        State names are defined by the symbol's behavior archetype.
+        Common states: energized, de_energized, running, stopped, tripped,
+                       pressed, released, open, closed, detecting, fault.
+        Two override strategies:
+          1. PrimitiveOverrides: modify individual named primitives
+          2. Graphics: replace ALL graphics for this state
+        Strategy 1 is preferred for incremental changes.
+        Strategy 2 is used for completely different appearances.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <!-- Replace entire graphic list (mutually exclusive with PrimitiveOverrides) -->
+      <xs:element name="Graphics" type="ms:GraphicsType" minOccurs="0"/>
+      <!-- Override individual named primitives -->
+      <xs:element name="PrimitiveOverrides" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="Override" type="ms:PrimitiveOverrideType"
+                         minOccurs="0" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+    <!-- Simulation state name this applies to -->
+    <xs:attribute name="name" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <!-- ======================================================================
+       ANIMATIONS
+       Lightweight procedural animations driven by simulation state.
+       ====================================================================== -->
+
+  <!-- Single animation specification -->
+  <xs:complexType name="AnimationSpecType">
+    <xs:annotation>
+      <xs:documentation>
+        Specifies a continuous animation applied to a named graphic primitive
+        while a simulation state is active.
+
+        rotate:      Continuously rotates the target around a pivot point.
+        blink:       Alternates visibility between on/off on a timed cycle.
+        translate:   Oscillates position along X and/or Y axes.
+        scale:       Oscillates scale factor.
+        color_cycle: Cycles through a list of colors.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:attribute name="type" type="ms:AnimationTypeEnum" use="required"/>
+    <!-- ID of target graphic primitive -->
+    <xs:attribute name="target" type="xs:NCName" use="required"/>
+    <!-- Speed: deg/s for rotate, Hz for blink, px/s for translate, factor/s for scale -->
+    <xs:attribute name="speed" type="xs:decimal"/>
+    <!-- Rotate pivot in symbol coordinates (defaults to primitive center) -->
+    <xs:attribute name="pivotX" type="xs:decimal"/>
+    <xs:attribute name="pivotY" type="xs:decimal"/>
+    <!-- Blink: on/off duty cycle (0.5 = equal on/off) -->
+    <xs:attribute name="dutyCycle" type="xs:decimal" default="0.5"/>
+    <!-- Translation amplitude in pixels -->
+    <xs:attribute name="amplitudeX" type="xs:decimal"/>
+    <xs:attribute name="amplitudeY" type="xs:decimal"/>
+    <!-- Number of animation loops (0 = infinite) -->
+    <xs:attribute name="loopCount" type="xs:nonNegativeInteger" default="0"/>
+    <!-- Color list for color_cycle (comma-separated hex colors) -->
+    <xs:attribute name="colors" type="xs:string"/>
+  </xs:complexType>
+
+  <!-- Animations active in a specific simulation state -->
+  <xs:complexType name="StateAnimationsType">
+    <xs:sequence>
+      <xs:element name="Animation" type="ms:AnimationSpecType"
+                   minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <!-- State name that activates these animations -->
+    <xs:attribute name="state" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <!-- ======================================================================
+       SYMBOL UNIT (Multi-unit symbols)
+       Inspired by CAEX InternalElement — a logical sub-component.
+       ====================================================================== -->
+
+  <xs:complexType name="UnitType">
+    <xs:annotation>
+      <xs:documentation>
+        A logical unit within a multi-unit symbol.
+        Used for components where coil and contacts are placed separately,
+        e.g., a relay has Unit 1 (Coil) and Unit 2 (Contact).
+
+        CAEX analog: InternalElement within a SystemUnitClass,
+        with its own ExternalInterface set.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="Graphics" type="ms:GraphicsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>
+            Graphics specific to this unit. Overrides the symbol's base
+            Graphics when this unit is placed on the schematic.
+          </xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Ports">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="Port" type="ms:PortType"
+                         minOccurs="0" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+    <!-- 1-based unit identifier -->
+    <xs:attribute name="unitId" type="xs:positiveInteger" use="required"/>
+    <!-- Display name (e.g., "Coil", "Contact", "A", "B", "Unit 1") -->
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <!-- Optional description -->
+    <xs:attribute name="description" type="xs:string"/>
+  </xs:complexType>
+
+  <!-- ======================================================================
+       PROPERTIES
+       Inspired by CAEX Attribute — typed configurable parameters.
+       ====================================================================== -->
+
+  <xs:complexType name="PropertyType">
+    <xs:annotation>
+      <xs:documentation>
+        A configurable property on a symbol instance.
+        Properties appear in the block's properties panel and can drive
+        behavior rules and visual state transitions.
+
+        CAEX analog: Attribute with AttributeDataType and Value.
+
+        Design notes:
+        - 'key' is the programmatic property name (camelCase)
+        - 'type' determines how the value is parsed and validated
+        - 'editorType' determines the UI widget in the property panel
+        - Text values in the Text element are the default value
+      </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <!-- Default value (text content; parsed according to 'type') -->
+      <xs:element name="DefaultValue" type="xs:string" minOccurs="0"/>
+      <!-- Options for enum/select properties -->
+      <xs:element name="Options" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="Option" type="xs:string"
+                         minOccurs="1" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <!-- Optional human-readable description for the property panel tooltip -->
+      <xs:element name="Description" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+    <!-- Programmatic key (camelCase, e.g., "designation", "coilVoltage") -->
+    <xs:attribute name="key" type="xs:string" use="required"/>
+    <!-- Data type for parsing and validation -->
+    <xs:attribute name="type" type="ms:PropertyTypeEnum" use="required"/>
+    <!-- UI editor widget type -->
+    <xs:attribute name="editorType" type="ms:EditorTypeEnum" default="text"/>
+    <!-- Whether visible in the properties panel -->
+    <xs:attribute name="visible" type="xs:boolean" default="true"/>
+    <!-- Numeric constraints (for type="number") -->
+    <xs:attribute name="min" type="xs:decimal"/>
+    <xs:attribute name="max" type="xs:decimal"/>
+    <xs:attribute name="step" type="xs:decimal"/>
+    <!-- Physical unit label shown next to the number field (e.g., "V", "A", "kW") -->
+    <xs:attribute name="unit" type="xs:string"/>
+    <!-- Display label override (if different from the key) -->
+    <xs:attribute name="label" type="xs:string"/>
+  </xs:complexType>
+
+  <!-- ======================================================================
+       BEHAVIOR BINDING
+       Inspired by CAEX SupportedRoleClass + MappingObject.
+       Supports both archetype references and direct IFTTT-style rules.
+       ====================================================================== -->
+
+  <!-- Maps a symbol port to a behavior archetype's terminal role -->
+  <xs:complexType name="TerminalRoleType">
+    <xs:annotation>
+      <xs:documentation>
+        Maps a port (by id) to a named role in the behavior archetype.
+        CAEX analog: MappingObject / ExternalInterfaceProxy.
+        Example: portId="coil_in" role="A1" means the 'coil_in' port
+        fulfills the A1 terminal role of the relay archetype.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:attribute name="portId" type="xs:NCName" use="required"/>
+    <xs:attribute name="role" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <!-- IFTTT-style condition for a behavior rule -->
+  <xs:complexType name="BehaviorConditionType">
+    <xs:annotation>
+      <xs:documentation>
+        Conditions are evaluated during circuit/PLC simulation.
+        Domain constraints apply:
+        - port_powered: valid for domain="circuit"
+        - register_equals/above/below: valid ONLY for domain="plc"
+        - timer_elapsed/counter_reached: valid for timers/counters
+      </xs:documentation>
+    </xs:annotation>
+    <xs:attribute name="type" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <!-- Circuit domain conditions -->
+          <xs:enumeration value="port_powered"/>        <!-- Port receives voltage -->
+          <xs:enumeration value="port_voltage_above"/>  <!-- Port voltage ≥ threshold -->
+          <xs:enumeration value="port_voltage_below"/>  <!-- Port voltage &lt; threshold -->
+          <xs:enumeration value="port_current_above"/>  <!-- Port current ≥ threshold -->
+          <!-- PLC domain conditions (domain="plc" only) -->
+          <xs:enumeration value="register_equals"/>     <!-- Register value == val -->
+          <xs:enumeration value="register_above"/>      <!-- Register value > val -->
+          <xs:enumeration value="register_below"/>      <!-- Register value &lt; val -->
+          <xs:enumeration value="bit_set"/>             <!-- Register bit N is 1 -->
+          <xs:enumeration value="bit_clear"/>           <!-- Register bit N is 0 -->
+          <!-- State / property conditions -->
+          <xs:enumeration value="property_equals"/>     <!-- Block property == val -->
+          <xs:enumeration value="state_is"/>            <!-- Current state == name -->
+          <!-- Time/counter conditions -->
+          <xs:enumeration value="timer_elapsed"/>       <!-- Timer has expired -->
+          <xs:enumeration value="counter_reached"/>     <!-- Counter >= preset -->
+          <!-- Always / never -->
+          <xs:enumeration value="always"/>
+          <xs:enumeration value="never"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <!-- Port to evaluate (for port_* conditions) -->
+    <xs:attribute name="portId" type="xs:NCName"/>
+    <!-- Voltage/current threshold value -->
+    <xs:attribute name="threshold" type="xs:decimal"/>
+    <!-- PLC register address (e.g., "MW100", "DB1.DBX0.0") -->
+    <xs:attribute name="registerAddress" type="xs:string"/>
+    <!-- Bit index within register (for bit_set/bit_clear) -->
+    <xs:attribute name="bitIndex" type="xs:nonNegativeInteger"/>
+    <!-- Property key for property_equals condition -->
+    <xs:attribute name="propertyKey" type="xs:string"/>
+    <!-- Value to compare against -->
+    <xs:attribute name="value" type="xs:string"/>
+    <!-- State name to compare against (for state_is) -->
+    <xs:attribute name="stateName" type="xs:string"/>
+    <!-- Negate this condition -->
+    <xs:attribute name="negate" type="xs:boolean" default="false"/>
+  </xs:complexType>
+
+  <!-- IFTTT-style action taken when conditions are met -->
+  <xs:complexType name="BehaviorActionType">
+    <xs:annotation>
+      <xs:documentation>
+        Actions are executed by the simulation engine when conditions are satisfied.
+        Domain constraints:
+        - energize_port/block_port: circuit domain only
+        - write_register/read_register: PLC domain only
+      </xs:documentation>
+    </xs:annotation>
+    <xs:attribute name="type" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <!-- Visual state transitions -->
+          <xs:enumeration value="set_state"/>           <!-- Set visual state -->
+          <xs:enumeration value="clear_state"/>         <!-- Clear visual state -->
+          <!-- Property mutations -->
+          <xs:enumeration value="set_property"/>        <!-- Set property value -->
+          <!-- Circuit domain actions -->
+          <xs:enumeration value="energize_port"/>       <!-- Pass power to port -->
+          <xs:enumeration value="block_port"/>          <!-- Block power at port -->
+          <!-- PLC domain actions (domain="plc" only) -->
+          <xs:enumeration value="write_register"/>      <!-- Write PLC register -->
+          <xs:enumeration value="read_register"/>       <!-- Read PLC register into property -->
+          <xs:enumeration value="set_bit"/>             <!-- Set register bit -->
+          <xs:enumeration value="clear_bit"/>           <!-- Clear register bit -->
+          <!-- Timer actions -->
+          <xs:enumeration value="start_timer"/>         <!-- Start delay timer -->
+          <xs:enumeration value="stop_timer"/>          <!-- Stop timer -->
+          <xs:enumeration value="reset_timer"/>         <!-- Reset timer to 0 -->
+          <!-- Counter actions -->
+          <xs:enumeration value="increment_counter"/>   <!-- Increment counter value -->
+          <xs:enumeration value="decrement_counter"/>   <!-- Decrement counter value -->
+          <xs:enumeration value="reset_counter"/>       <!-- Reset counter to 0 -->
+          <!-- Event system -->
+          <xs:enumeration value="emit_event"/>          <!-- Emit a named event -->
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <!-- Target port (for port-related actions) -->
+    <xs:attribute name="portId" type="xs:NCName"/>
+    <!-- State name (for set_state/clear_state) -->
+    <xs:attribute name="stateName" type="xs:string"/>
+    <!-- Property key (for set_property) -->
+    <xs:attribute name="propertyKey" type="xs:string"/>
+    <!-- Value to set/write -->
+    <xs:attribute name="value" type="xs:string"/>
+    <!-- PLC register address (for write_register/read_register/set_bit/clear_bit) -->
+    <xs:attribute name="registerAddress" type="xs:string"/>
+    <!-- Bit index (for set_bit/clear_bit) -->
+    <xs:attribute name="bitIndex" type="xs:nonNegativeInteger"/>
+    <!-- Event name (for emit_event) -->
+    <xs:attribute name="eventName" type="xs:string"/>
+    <!-- Target property to write register value into (for read_register) -->
+    <xs:attribute name="targetProperty" type="xs:string"/>
+  </xs:complexType>
+
+  <!-- A complete IFTTT-style behavior rule: IF conditions THEN actions [ELSE actions] -->
+  <xs:complexType name="BehaviorRuleType">
+    <xs:annotation>
+      <xs:documentation>
+        One discrete behavior rule evaluated each simulation tick.
+        Rules are evaluated in priority order (lower number = higher priority).
+        Multiple If elements: combined with conditionLogic (AND/OR).
+        Multiple Then/Else elements: all executed when condition is met/not-met.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="If" type="ms:BehaviorConditionType"
+                   minOccurs="1" maxOccurs="unbounded"/>
+      <xs:element name="Then" type="ms:BehaviorActionType"
+                   minOccurs="1" maxOccurs="unbounded"/>
+      <xs:element name="Else" type="ms:BehaviorActionType"
+                   minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <!-- Optional stable identifier for this rule -->
+    <xs:attribute name="id" type="xs:NCName"/>
+    <!-- Human-readable rule name -->
+    <xs:attribute name="name" type="xs:string"/>
+    <!-- Evaluation priority (1 = highest) -->
+    <xs:attribute name="priority" type="xs:positiveInteger" default="1"/>
+    <!-- How multiple If elements are combined -->
+    <xs:attribute name="conditionLogic" default="all">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <!-- All conditions must be true (logical AND) -->
+          <xs:enumeration value="all"/>
+          <!-- Any condition must be true (logical OR) -->
+          <xs:enumeration value="any"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <!-- Whether this rule is currently active -->
+    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+  </xs:complexType>
+
+  <!-- Complete behavior binding for a symbol definition -->
+  <xs:complexType name="BehaviorType">
+    <xs:annotation>
+      <xs:documentation>
+        Links a symbol to a behavior archetype and/or defines custom rules.
+        CAEX analog: SupportedRoleClass (archetype reference) +
+                     MappingObject (terminal role mapping).
+
+        Two behavioral modes:
+        1. Archetype mode: reference a registered archetype (templateId/archetype).
+           The simulation engine uses the archetype's built-in logic, supplemented
+           by TerminalRoles to connect ports to the archetype's terminals.
+
+        2. Rules mode: define IFTTT-style rules directly in the XML.
+           Useful for custom blocks with unique behavior not covered by archetypes.
+
+        Both modes can be combined on the same symbol.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <!-- Terminal-to-role mappings (CAEX: MappingObject) -->
+      <xs:element name="TerminalRoles" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="TerminalRole" type="ms:TerminalRoleType"
+                         minOccurs="0" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <!-- Direct IFTTT-style behavior rules -->
+      <xs:element name="Rules" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="Rule" type="ms:BehaviorRuleType"
+                         minOccurs="0" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+    <!-- Reference ID of a registered behavior template -->
+    <xs:attribute name="templateId" type="xs:string"/>
+    <!-- Well-known archetype name (relay, motor, switch_no, plc_input, etc.) -->
+    <xs:attribute name="archetype" type="xs:string"/>
+    <!-- User interaction mode during simulation -->
+    <xs:attribute name="interactionMode" type="ms:InteractionModeType" default="none"/>
+    <!-- Whether behavior is scoped to a specific PLC device instance -->
+    <xs:attribute name="deviceScoped" type="xs:boolean" default="false"/>
+    <!-- Simulation domain override (inherits from SymbolDefinition.domain if omitted) -->
+    <xs:attribute name="domain" type="ms:BlockDomainType"/>
+  </xs:complexType>
+
+  <!-- ======================================================================
+       SYMBOL DEFINITION
+       Inspired by CAEX SystemUnitClass — the canonical template for one
+       type of block.
+       ====================================================================== -->
+
+  <xs:complexType name="SymbolDefinitionType">
+    <xs:annotation>
+      <xs:documentation>
+        Complete definition of a symbol block type.
+        Corresponds to CAEX SystemUnitClass.
+
+        Lifecycle of a SymbolDefinition:
+        1. Loaded from XML at app startup (builtin) or project open (project/global)
+        2. Registered in the SymbolRegistry (keyed by id)
+        3. Instantiated as blocks on the canvas (BlockType="custom_symbol" or canonical)
+        4. Rendered by Pixi.js using the Graphics primitives
+        5. Simulated by the runtime engine using the Behavior binding
+
+        Domain enforcement:
+        - domain="circuit": Behavior.Rules may NOT use register_* or bit_* actions
+        - domain="plc": Behavior.Rules may use any action type
+        - domain="annotation": No Behavior element should be present
+      </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <!-- Human-readable description -->
+      <xs:element name="Description" type="xs:string" minOccurs="0"/>
+      <!-- IEC 60617 / taxonomy category -->
+      <xs:element name="Category" type="ms:BlockCategoryType"/>
+      <!-- Original author -->
+      <xs:element name="Author" type="xs:string" minOccurs="0" default="ModOne"/>
+      <!-- ISO 8601 creation timestamp -->
+      <xs:element name="CreatedAt" type="xs:dateTime"/>
+      <!-- ISO 8601 last-modified timestamp -->
+      <xs:element name="UpdatedAt" type="xs:dateTime"/>
+
+      <!-- Symbol bounding box dimensions -->
+      <xs:element name="Layout">
+        <xs:complexType>
+          <xs:attribute name="width" type="xs:decimal" use="required"/>
+          <xs:attribute name="height" type="xs:decimal" use="required"/>
+          <!-- Coordinate unit for width/height and all primitive coordinates -->
+          <xs:attribute name="unit" default="px">
+            <xs:simpleType>
+              <xs:restriction base="xs:string">
+                <xs:enumeration value="px"/>  <!-- CSS pixels -->
+                <xs:enumeration value="mm"/>  <!-- Millimeters -->
+                <xs:enumeration value="mil"/> <!-- Thousandths of an inch -->
+              </xs:restriction>
+            </xs:simpleType>
+          </xs:attribute>
+        </xs:complexType>
+      </xs:element>
+
+      <!-- Connection ports (CAEX: ExternalInterface list) -->
+      <xs:element name="Ports">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="Port" type="ms:PortType"
+                         minOccurs="0" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+
+      <!-- Base graphics (displayed when no unit is selected) -->
+      <xs:element name="Graphics" type="ms:GraphicsType" minOccurs="0"/>
+
+      <!-- Multi-unit decomposition (CAEX: InternalElement hierarchy) -->
+      <xs:element name="Units" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="Unit" type="ms:UnitType"
+                         minOccurs="1" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+
+      <!-- Configurable instance properties (CAEX: Attribute list) -->
+      <xs:element name="Properties">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="Property" type="ms:PropertyType"
+                         minOccurs="0" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+
+      <!-- Simulation behavior (CAEX: SupportedRoleClass + MappingObject) -->
+      <xs:element name="Behavior" type="ms:BehaviorType" minOccurs="0"/>
+
+      <!-- Visual state overrides (e.g., energized, running, tripped) -->
+      <xs:element name="VisualStates" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="VisualState" type="ms:VisualStateType"
+                         minOccurs="0" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+
+      <!-- Animation specifications per simulation state -->
+      <xs:element name="Animations" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="StateAnimations" type="ms:StateAnimationsType"
+                         minOccurs="0" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+
+      <!-- Standards cross-reference (IEC, SPICE) -->
+      <xs:element name="StandardsRef" minOccurs="0">
+        <xs:complexType>
+          <xs:annotation>
+            <xs:documentation>
+              Cross-references to international standards for this component type.
+              Used for documentation export and BOM generation.
+            </xs:documentation>
+          </xs:annotation>
+          <!-- IEC 60617 section reference -->
+          <xs:attribute name="iecSection" type="xs:string"/>
+          <!-- IEC device category code (e.g., "K" for relays, "M" for motors) -->
+          <xs:attribute name="iecCategory" type="xs:string"/>
+          <!-- Default reference designator prefix (e.g., "K", "M", "F") -->
+          <xs:attribute name="refDesignator" type="xs:string"/>
+          <!-- SPICE device model name -->
+          <xs:attribute name="spiceDevice" type="xs:string"/>
+          <!-- SPICE model library file -->
+          <xs:attribute name="spiceLibrary" type="xs:string"/>
+        </xs:complexType>
+      </xs:element>
+
+      <!-- Symbol inheritance (extends another SymbolDefinition) -->
+      <xs:element name="Extends" minOccurs="0">
+        <xs:complexType>
+          <xs:annotation>
+            <xs:documentation>
+              Inherit graphics, ports, and properties from a parent symbol.
+              Child definitions override only what they specify.
+              CAEX analog: RefBaseClassPath for inheritance.
+            </xs:documentation>
+          </xs:annotation>
+          <xs:attribute name="symbolId" type="xs:string" use="required"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+
+    <!-- Unique identifier: "builtin:relay", "myproject:custom_valve", etc.
+         Format: [scope]:[unique-name] where scope is "builtin", "project", or library id -->
+    <xs:attribute name="id" type="xs:string" use="required"/>
+    <!-- Display name shown in symbol library browser -->
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <!-- Semantic version for change tracking -->
+    <xs:attribute name="version" type="ms:SemVerType" use="required"/>
+    <!-- Simulation domain (constrains allowed behavior actions) -->
+    <xs:attribute name="domain" type="ms:BlockDomainType" default="circuit"/>
+    <!-- Maps to a CanonicalBlockType for backward compatibility with legacy blocks -->
+    <xs:attribute name="canonicalType" type="xs:string"/>
+    <!-- Whether this symbol can be used as a canvas block directly -->
+    <xs:attribute name="placeable" type="xs:boolean" default="true"/>
+  </xs:complexType>
+
+  <!-- ======================================================================
+       BEHAVIOR ARCHETYPE LIBRARY
+       Inspired by CAEX RoleClassLib — library of reusable behavior roles.
+       ====================================================================== -->
+
+  <xs:complexType name="BehaviorArchetypeType">
+    <xs:annotation>
+      <xs:documentation>
+        Defines a reusable simulation behavior template.
+        Symbol definitions reference archetypes via Behavior.archetype.
+        The simulation engine provides built-in implementations for each archetype.
+
+        CAEX analog: RoleClass.
+
+        Built-in archetypes:
+          relay           - Electromagnetic relay (coil + contacts)
+          motor           - Electric motor (3-phase)
+          switch_no       - Normally-open contact
+          switch_nc       - Normally-closed contact
+          fuse            - Overcurrent protection fuse
+          circuit_breaker - Thermal/magnetic circuit breaker
+          contactor       - Main power contactor
+          timer_on_delay  - ON-delay timer (TON)
+          timer_off_delay - OFF-delay timer (TOF)
+          counter_up      - Up counter (CTU)
+          counter_down    - Down counter (CTD)
+          plc_input       - PLC digital input terminal
+          plc_output      - PLC digital output terminal
+          power_source    - DC/AC voltage source
+          ground          - Reference ground node
+          led             - LED indicator
+          pilot_lamp      - Pilot lamp indicator
+          sensor          - Proximity/optical sensor
+          solenoid_valve  - Solenoid-actuated valve
+      </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="Description" type="xs:string" minOccurs="0"/>
+      <!-- Terminal definitions for this archetype -->
+      <xs:element name="Terminals" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="Terminal" minOccurs="0" maxOccurs="unbounded">
+              <xs:complexType>
+                <!-- Role name (e.g., "A1", "COM", "NO", "L1") -->
+                <xs:attribute name="name" type="xs:string" use="required"/>
+                <!-- Semantic role identifier -->
+                <xs:attribute name="role" type="xs:string" use="required"/>
+                <!-- Electrical type for this terminal role -->
+                <xs:attribute name="electricalType" type="ms:ElectricalTypeType"/>
+                <!-- Whether a port must be mapped to this terminal -->
+                <xs:attribute name="required" type="xs:boolean" default="true"/>
+                <!-- Description of this terminal's function -->
+                <xs:attribute name="description" type="xs:string"/>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <!-- Simulation states this archetype supports -->
+      <xs:element name="States" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="State" minOccurs="0" maxOccurs="unbounded">
+              <xs:complexType>
+                <xs:attribute name="name" type="xs:string" use="required"/>
+                <xs:attribute name="description" type="xs:string"/>
+                <!-- Whether this is the initial state after reset -->
+                <xs:attribute name="initial" type="xs:boolean" default="false"/>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+    <!-- Unique archetype identifier -->
+    <xs:attribute name="id" type="xs:NCName" use="required"/>
+    <!-- Display name -->
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <!-- Domain this archetype belongs to -->
+    <xs:attribute name="domain" type="ms:BlockDomainType" default="circuit"/>
+    <!-- Archetype schema version -->
+    <xs:attribute name="version" type="ms:SemVerType" default="1.0.0"/>
+  </xs:complexType>
+
+  <!-- ======================================================================
+       SYMBOL LIBRARY (ROOT CONTAINER)
+       Inspired by CAEX CAEXFile — the top-level document container.
+       ====================================================================== -->
+
+  <xs:complexType name="SymbolLibraryType">
+    <xs:annotation>
+      <xs:documentation>
+        Root container element for a ModOne symbol library XML file.
+        CAEX analog: CAEXFile / SystemUnitClassLib.
+
+        Usage patterns:
+          builtin library  → shipped in app bundle (src/assets/builtin-symbols/xml/)
+          project library  → stored in [project]/symbols/ directory
+          global library   → stored in OS user config directory
+
+        Loading order (later overrides earlier):
+          1. Builtin library (read-only)
+          2. Global library (user's personal symbols)
+          3. Project library (project-specific symbols)
+      </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <!-- Library-level metadata (CAEX: SourceDocumentInformation) -->
+      <xs:element name="MetaInformation">
+        <xs:complexType>
+          <xs:sequence>
+            <!-- Schema version this file was written against -->
+            <xs:element name="SchemaVersion" type="ms:SemVerType"/>
+            <!-- Tool that generated this file -->
+            <xs:element name="SourceTool" type="xs:string" minOccurs="0"/>
+            <!-- Human-readable library description -->
+            <xs:element name="Description" type="xs:string" minOccurs="0"/>
+            <!-- Library author/organization -->
+            <xs:element name="Author" type="xs:string" minOccurs="0"/>
+            <!-- Creation timestamp -->
+            <xs:element name="CreatedAt" type="xs:dateTime" minOccurs="0"/>
+            <!-- Last-modified timestamp -->
+            <xs:element name="UpdatedAt" type="xs:dateTime" minOccurs="0"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+
+      <!-- Behavior archetypes defined in this library (CAEX: RoleClassLib) -->
+      <xs:element name="BehaviorArchetypeLib" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="BehaviorArchetype" type="ms:BehaviorArchetypeType"
+                         minOccurs="0" maxOccurs="unbounded"/>
+          </xs:sequence>
+          <xs:attribute name="name" type="xs:string"/>
+        </xs:complexType>
+      </xs:element>
+
+      <!-- Symbol definitions (CAEX: SystemUnitClassLib) -->
+      <xs:element name="SymbolDefinitions">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="SymbolDefinition" type="ms:SymbolDefinitionType"
+                         minOccurs="0" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+
+    <!-- Unique library identifier (e.g., "modone-builtin", "mycompany-custom") -->
+    <xs:attribute name="id" type="xs:string" use="required"/>
+    <!-- Library display name -->
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <!-- Library scope for loading priority -->
+    <xs:attribute name="scope" type="ms:LibraryScopeType" use="required"/>
+  </xs:complexType>
+
+  <!-- ======================================================================
+       ROOT ELEMENT DECLARATIONS
+       Two valid root elements:
+       1. SymbolLibrary   — a collection of multiple symbols
+       2. SymbolDefinition — a single standalone symbol file
+       ====================================================================== -->
+
+  <xs:element name="SymbolLibrary" type="ms:SymbolLibraryType">
+    <xs:annotation>
+      <xs:documentation>
+        Root element for a ModOne symbol library XML file.
+        Contains multiple SymbolDefinition elements and optional archetypes.
+
+        Standards references:
+          IEC 62714:2014  — AutomationML (CAEX file format)
+          IEC 62714-4     — PCE RoleClass library
+          IEC 60617       — Graphical symbols for diagrams
+          IEC 60204-1     — Equipment identification
+      </xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="SymbolDefinition" type="ms:SymbolDefinitionType">
+    <xs:annotation>
+      <xs:documentation>
+        Root element for a standalone single-symbol XML file.
+        Useful for individual symbol distribution and import.
+      </xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+</xs:schema>

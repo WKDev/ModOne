@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { PanelBottom, PanelLeft } from 'lucide-react';
+
 import { commandRegistry } from '../CommandPalette/commandRegistry';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useScenarioStore } from '../../stores/scenarioStore';
@@ -48,13 +48,10 @@ function RibbonGroupView({ title, actions }: RibbonResolvedGroup) {
 
 export function Toolbar() {
   const [activeTab, setActiveTab] = useState<RibbonTabId>('canvas');
-  const { simulationStatus, sidebarVisible, panelVisible, toggleSidebar, togglePanel, opcuaRunning } = useLayoutStore();
+  const { simulationStatus, opcuaRunning } = useLayoutStore();
   const scenarioStatus = useScenarioStore((state) => state.executionState.status);
   const modbusStatus = useModbusStore((state) => state.status);
   const ribbonTabsConfig = useRibbonTabsConfig();
-
-  const isRunning = simulationStatus === 'running';
-  const isPaused = simulationStatus === 'paused';
 
   const ribbonTabs = useMemo(
     () =>
@@ -83,42 +80,6 @@ export function Toolbar() {
       data-testid="toolbar"
       className="border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]"
     >
-      <div className="h-8 px-2 border-b border-[var(--color-border)] flex items-center justify-between bg-[var(--color-surface-muted)]">
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            data-testid="toolbar-sidebar-toggle"
-            title="Toggle Sidebar"
-            onClick={toggleSidebar}
-            className={`h-6 px-2 rounded text-xs flex items-center gap-1 border transition-colors ${
-              sidebarVisible
-                ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-text-primary)]'
-                : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]'
-            }`}
-          >
-            <PanelLeft size={14} />
-            Sidebar
-          </button>
-          <button
-            type="button"
-            data-testid="toolbar-panel-toggle"
-            title="Toggle Panel"
-            onClick={togglePanel}
-            className={`h-6 px-2 rounded text-xs flex items-center gap-1 border transition-colors ${
-              panelVisible
-                ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-text-primary)]'
-                : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]'
-            }`}
-          >
-            <PanelBottom size={14} />
-            Panel
-          </button>
-        </div>
-        <div className="text-xs text-[var(--color-text-secondary)]">
-          Simulation: <span className="text-[var(--color-text-primary)]">{isRunning ? 'Running' : isPaused ? 'Paused' : 'Stopped'}</span>
-        </div>
-      </div>
-
       <div className="h-8 px-2 flex items-end gap-1 border-b border-[var(--color-border)]">
         {ribbonTabs.map((tab) => (
           <button

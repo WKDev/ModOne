@@ -5,7 +5,7 @@
  * This allows non-React code (like commands and menus) to trigger React dialogs.
  */
 
-export type FileType = 'canvas' | 'ladder' | 'scenario';
+export type FileType = 'canvas' | 'ladder' | 'scenario' | 'sheet';
 
 export interface NewFileRequest {
   fileType: FileType;
@@ -70,6 +70,13 @@ class FileDialogService {
    */
   requestNewScenario(targetDir?: string): void {
     this.requestNewFile('scenario', targetDir);
+  }
+
+  /**
+   * Request to create a new sheet file
+   */
+  requestNewSheet(targetDir?: string): void {
+    this.requestNewFile('sheet', targetDir);
   }
 }
 

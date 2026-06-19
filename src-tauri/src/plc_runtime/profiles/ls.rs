@@ -3,9 +3,9 @@ use crate::project::{PlcHardwareTopology, PlcIoDirection, PlcManufacturer};
 use super::super::{
     profile::{
         format_vendor_address, split_vendor_address, ModbusAddressSpace, ModbusMappingPolicy,
-        ModbusMappingRule, ModbusMappingSource, OpcUaAliasPolicy, VendorAddress, VendorAddressMetadata,
-        VendorAddressNumberBase, VendorDataKind, VendorProfile, VendorProfileError,
-        VendorProfileId,
+        ModbusMappingRule, ModbusMappingSource, OpcUaAliasPolicy, VendorAddress,
+        VendorAddressMetadata, VendorAddressNumberBase, VendorDataKind, VendorProfile,
+        VendorProfileError, VendorProfileId,
     },
     types::{CanonicalAddress, CanonicalAreaKind},
 };
@@ -86,7 +86,9 @@ impl LsProfile {
             }
             // XGT/XGI really need module-slot topology to do this correctly. Until the project
             // model stores that topology, preserve the legacy P behavior instead of guessing.
-            LsIoTopology::DynamicSlotP | LsIoTopology::LegacyUnifiedP => CanonicalAreaKind::InputBit,
+            LsIoTopology::DynamicSlotP | LsIoTopology::LegacyUnifiedP => {
+                CanonicalAreaKind::InputBit
+            }
         }
     }
 
@@ -522,7 +524,9 @@ mod tests {
     fn parses_and_formats_ls_addresses() {
         let profile = LsProfile::new("XGK".to_string(), PlcHardwareTopology::default());
 
-        let bit = profile.parse_address("M100").expect("M address should parse");
+        let bit = profile
+            .parse_address("M100")
+            .expect("M address should parse");
         assert_eq!(bit.family, "M");
         assert_eq!(profile.format_address(&bit).unwrap(), "M0100");
 
@@ -538,7 +542,9 @@ mod tests {
         assert_eq!(indexed.index_register, Some(3));
         assert_eq!(profile.format_address(&indexed).unwrap(), "D0100[Z3]");
 
-        let td = profile.parse_address("TD1").expect("TD address should parse");
+        let td = profile
+            .parse_address("TD1")
+            .expect("TD address should parse");
         assert_eq!(profile.format_address(&td).unwrap(), "TD0001");
     }
 
@@ -574,10 +580,8 @@ mod tests {
         let p = profile.to_canonical(&VendorAddress::new("P", 25)).unwrap();
         assert_eq!(p.area, CanonicalAreaKind::InputBit);
 
-        let aliases = profile.canonical_aliases(&CanonicalAddress::new(
-            CanonicalAreaKind::OutputBit,
-            25,
-        ));
+        let aliases =
+            profile.canonical_aliases(&CanonicalAddress::new(CanonicalAreaKind::OutputBit, 25));
         assert_eq!(aliases, vec![VendorAddress::new("P", 25)]);
     }
 

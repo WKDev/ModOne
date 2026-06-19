@@ -168,7 +168,8 @@ pub async fn canvas_list_circuits(dir: String) -> Result<Vec<String>, String> {
 
     let mut circuits = Vec::new();
 
-    let entries = fs::read_dir(&dir_path).map_err(|e| format!("Failed to read directory: {}", e))?;
+    let entries =
+        fs::read_dir(&dir_path).map_err(|e| format!("Failed to read directory: {}", e))?;
 
     for entry in entries.flatten() {
         let path = entry.path();
@@ -393,10 +394,7 @@ pub async fn scope_run_stop(
 /// # Arguments
 /// * `scope_id` - The scope identifier
 #[tauri::command]
-pub async fn scope_reset(
-    scope_id: String,
-    state: State<'_, ScopeState>,
-) -> Result<(), String> {
+pub async fn scope_reset(scope_id: String, state: State<'_, ScopeState>) -> Result<(), String> {
     let mut scopes = state
         .scopes
         .write()
@@ -439,10 +437,7 @@ pub async fn scope_arm_trigger(
 /// # Arguments
 /// * `scope_id` - The scope identifier
 #[tauri::command]
-pub async fn scope_delete(
-    scope_id: String,
-    state: State<'_, ScopeState>,
-) -> Result<(), String> {
+pub async fn scope_delete(scope_id: String, state: State<'_, ScopeState>) -> Result<(), String> {
     let mut scopes = state
         .scopes
         .write()
@@ -458,9 +453,7 @@ pub async fn scope_delete(
 
 /// List all active scope IDs.
 #[tauri::command]
-pub async fn scope_list(
-    state: State<'_, ScopeState>,
-) -> Result<Vec<String>, String> {
+pub async fn scope_list(state: State<'_, ScopeState>) -> Result<Vec<String>, String> {
     let scopes = state
         .scopes
         .read()
@@ -474,10 +467,7 @@ pub async fn scope_list(
 /// # Arguments
 /// * `scope_id` - The scope identifier
 #[tauri::command]
-pub async fn scope_exists(
-    scope_id: String,
-    state: State<'_, ScopeState>,
-) -> Result<bool, String> {
+pub async fn scope_exists(scope_id: String, state: State<'_, ScopeState>) -> Result<bool, String> {
     let scopes = state
         .scopes
         .read()
@@ -605,7 +595,11 @@ pub async fn scope_get_mappings(
         .map_err(|e| format!("Failed to acquire read lock: {}", e))?;
 
     match scope_id {
-        Some(id) => Ok(mappings.iter().filter(|m| m.scope_id == id).cloned().collect()),
+        Some(id) => Ok(mappings
+            .iter()
+            .filter(|m| m.scope_id == id)
+            .cloned()
+            .collect()),
         None => Ok(mappings.clone()),
     }
 }

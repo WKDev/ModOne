@@ -6,7 +6,7 @@ Tester: Sisyphus-Junior (Playwright + Code Review)
 ENVIRONMENT
 -----------
 - App: ModOne (Tauri + React + PixiJS)
-- Dev server: http://localhost:7017 (Vite)
+- Dev server: http://localhost:7049 (Vite)
 - Testing method: Code review + browser automation attempt
 
 BLOCKER: TAURI NATIVE CONTEXT REQUIRED

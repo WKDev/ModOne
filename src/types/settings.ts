@@ -45,9 +45,14 @@ export interface AppSettings {
   fontSize: number; // 12-20
   gridDisplay: boolean;
   animationEnabled: boolean;
+  canvasCrosshairEnabled: boolean;
 
   // Ladder settings
   ladderShortcutProfile: LadderShortcutProfile;
+
+  // Sheet settings
+  defaultSheet: string;     // built-in template name: 'A3-landscape' | 'A4-landscape' | etc.
+  sheetSnapGrid: number;    // snap grid in mm (5 or 10)
 
   // Keyboard shortcut overrides
   // Only stores user-modified bindings. Key: command ID, Value: key combo string.
@@ -86,9 +91,14 @@ export const defaultSettings: AppSettings = {
   fontSize: 14,
   gridDisplay: true,
   animationEnabled: true,
+  canvasCrosshairEnabled: false,
 
   // Ladder
   ladderShortcutProfile: 'default',
+
+  // Sheet
+  defaultSheet: 'A3-landscape',
+  sheetSnapGrid: 5,
 
   // Keyboard shortcut overrides (empty = all defaults)
   keybindingOverrides: {},

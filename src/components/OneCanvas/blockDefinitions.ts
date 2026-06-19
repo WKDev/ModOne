@@ -5,7 +5,7 @@
  */
 
 import type { BlockType, Port, Size, PowerPolarity } from './types';
-import { normalizeLegacyPortToMm, normalizeLegacySizeToMm } from './canvasUnits';
+import { normalizeSymbolPortToMm, normalizeSymbolSizeToMm } from './canvasUnits';
 
 // ============================================================================
 // Types
@@ -515,8 +515,8 @@ export function getBlockDefinition(type: BlockType): BlockDefinition {
   if (!def) throw new Error(`No block definition for type: ${type}`);
   return {
     ...def,
-    size: normalizeLegacySizeToMm(def.size),
-    defaultPorts: def.defaultPorts.map((port) => normalizeLegacyPortToMm(port)),
+    size: normalizeSymbolSizeToMm(def.size),
+    defaultPorts: def.defaultPorts.map((port) => normalizeSymbolPortToMm(port)),
   };
 }
 
@@ -526,7 +526,7 @@ export function getBlockDefinition(type: BlockType): BlockDefinition {
 export function getBlockSize(type: BlockType): Size {
   const def = BLOCK_DEFINITIONS[type];
   if (!def) throw new Error(`No block definition for type: ${type}`);
-  return normalizeLegacySizeToMm(def.size);
+  return normalizeSymbolSizeToMm(def.size);
 }
 
 /**
@@ -535,7 +535,7 @@ export function getBlockSize(type: BlockType): Size {
 export function getDefaultPorts(type: BlockType): Port[] {
   const def = BLOCK_DEFINITIONS[type];
   if (!def) return [];
-  return def.defaultPorts.map((port) => normalizeLegacyPortToMm(port));
+  return def.defaultPorts.map((port) => normalizeSymbolPortToMm(port));
 }
 
 /**

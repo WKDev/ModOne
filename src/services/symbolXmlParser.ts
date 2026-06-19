@@ -20,7 +20,7 @@ import type {
   SymbolAnimationSpec,
   SymbolVisualTransform,
 } from '../types/symbol';
-import type { SymbolBehaviorBinding, BehaviorVisualState } from '../types/behavior';
+import type { SymbolBehaviorBinding } from '../types/behavior';
 import type { BehaviorRule, BehaviorCondition, BehaviorAction } from '../types/behaviorRules';
 
 const NS = 'http://modone.io/schema/symbol/1.0';
@@ -325,14 +325,14 @@ function parseAction(el: Element): BehaviorAction {
 
 function parseVisualStates(
   vsEl: Element | null,
-): Partial<Record<BehaviorVisualState, SymbolVisualVariant>> | undefined {
+): Record<string, SymbolVisualVariant> | undefined {
   if (!vsEl) return undefined;
   const states = children(vsEl, 'VisualState');
   if (states.length === 0) return undefined;
 
-  const result: Partial<Record<BehaviorVisualState, SymbolVisualVariant>> = {};
+  const result: Record<string, SymbolVisualVariant> = {};
   for (const s of states) {
-    const name = attr(s, 'name') as BehaviorVisualState | undefined;
+    const name = attr(s, 'name');
     if (!name) continue;
 
     const graphicsEl = child(s, 'Graphics');
@@ -384,14 +384,14 @@ function parseVisualStates(
 
 function parseAnimations(
   animEl: Element | null,
-): Partial<Record<BehaviorVisualState, SymbolAnimationSpec[]>> | undefined {
+): Record<string, SymbolAnimationSpec[]> | undefined {
   if (!animEl) return undefined;
   const stateAnims = children(animEl, 'StateAnimations');
   if (stateAnims.length === 0) return undefined;
 
-  const result: Partial<Record<BehaviorVisualState, SymbolAnimationSpec[]>> = {};
+  const result: Record<string, SymbolAnimationSpec[]> = {};
   for (const sa of stateAnims) {
-    const state = attr(sa, 'state') as BehaviorVisualState | undefined;
+    const state = attr(sa, 'state');
     if (!state) continue;
     const anims = children(sa, 'Animation').map((a) => {
       const spec: SymbolAnimationSpec = {

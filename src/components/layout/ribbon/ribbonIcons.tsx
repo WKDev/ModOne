@@ -1,0 +1,71 @@
+import type { ReactNode } from 'react';
+import {
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Box,
+  Circle,
+  Database,
+  FileDown,
+  FilePlus,
+  FileUp,
+  FolderOpen,
+  GitBranch,
+  Grid3X3,
+  Lightbulb,
+  Magnet,
+  Network,
+  PanelLeft,
+  Play,
+  Pause,
+  Save,
+  Scissors,
+  Sigma,
+  Square,
+  Trash2,
+  Unplug,
+  Usb,
+  Workflow,
+  ZoomIn,
+  ZoomOut,
+  Table,
+  FileSpreadsheet,
+} from 'lucide-react';
+
+export const ribbonIconRegistry = {
+  filePlus: FilePlus,
+  folderOpen: FolderOpen,
+  save: Save,
+  sigma: Sigma,
+  circle: Circle,
+  lightbulb: Lightbulb,
+  workflow: Workflow,
+  zoomIn: ZoomIn,
+  zoomOut: ZoomOut,
+  grid3x3: Grid3X3,
+  magnet: Magnet,
+  square: Square,
+  unplug: Unplug,
+  arrowUpFromLine: ArrowUpFromLine,
+  arrowDownToLine: ArrowDownToLine,
+  gitBranch: GitBranch,
+  network: Network,
+  scissors: Scissors,
+  box: Box,
+  fileDown: FileDown,
+  trash2: Trash2,
+  play: Play,
+  pause: Pause,
+  fileUp: FileUp,
+  usb: Usb,
+  database: Database,
+  panelLeft: PanelLeft,
+  table: Table,
+  fileSpreadsheet: FileSpreadsheet,
+} as const;
+
+export type RibbonIconKey = keyof typeof ribbonIconRegistry;
+
+export function renderRibbonIcon(iconKey: RibbonIconKey, size = 18): ReactNode {
+  const Icon = ribbonIconRegistry[iconKey];
+  return <Icon size={size} />;
+}

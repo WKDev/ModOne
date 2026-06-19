@@ -39,6 +39,16 @@ pub enum PinOrientation {
     Down,
 }
 
+/// Edge of the symbol bounding box a port sits on (for routing hints / snap)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum EdgePosition {
+    Top,
+    Bottom,
+    Left,
+    Right,
+}
+
 /// 2D position used for pin positions and polyline points
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PinPosition {
@@ -70,6 +80,42 @@ pub struct SymbolPin {
     /// Whether pin is hidden from display
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hidden: Option<bool>,
+    /// PLC functional role
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub functional_role: Option<PinFunctionalRole>,
+    /// Sort index for deterministic ordering
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sort_order: Option<u32>,
+    /// Whether the pin name label is rendered
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name_visible: Option<bool>,
+    /// Whether the pin number label is rendered
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub number_visible: Option<bool>,
+    /// Maximum simultaneous wire connections (0 = unlimited)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_connections: Option<u32>,
+    /// Canvas edge this port is snapped to (for routing hints)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub edge_position: Option<EdgePosition>,
+    /// Fractional offset along the edge (0.0 = start, 1.0 = end)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub edge_offset: Option<f64>,
+    /// v3: Human-readable description / tooltip text
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// v3: Logical group label (e.g. "Power", "Data")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    /// v3: When true, port is locked (drag/delete/edit blocked)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub locked: Option<bool>,
+    /// v3: CSS fill color override (stroke retains default)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    /// v3: Label offset from default position { x, y } in pixels
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label_offset: Option<PinPosition>,
 }
 
 // ============================================================================
@@ -291,15 +337,17 @@ pub struct SymbolSummary {
 // V2 Pin Types (KiCad-compatible)
 // ============================================================================
 
-/// Electrical type of a pin — 12 KiCad-compatible variants (v2)
+/// Electrical type of a pin — 13 variants (KiCad-compatible + legacy power)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PinElectricalTypeV2 {
     Input,
     Output,
     Bidirectional,
-    TriState,
+    /// Generic power rail (legacy / simplified)
+    Power,
     Passive,
+    TriState,
     PowerIn,
     PowerOut,
     OpenCollector,
@@ -355,6 +403,30 @@ pub struct SymbolPinV2 {
     pub number_visible: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hidden: Option<bool>,
+    /// Maximum simultaneous wire connections (0 = unlimited)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_connections: Option<u32>,
+    /// Canvas edge this port is snapped to (for routing hints)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub edge_position: Option<EdgePosition>,
+    /// Fractional offset along the edge (0.0 = start, 1.0 = end)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub edge_offset: Option<f64>,
+    /// v3: Human-readable description / tooltip text
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// v3: Logical group label (e.g. "Power", "Data")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    /// v3: When true, port is locked (drag/delete/edit blocked)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub locked: Option<bool>,
+    /// v3: CSS fill color override (stroke retains default)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    /// v3: Label offset from default position { x, y } in pixels
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label_offset: Option<PinPosition>,
 }
 
 // ============================================================================

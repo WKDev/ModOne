@@ -71,6 +71,20 @@ export const explorerService = {
     }
   },
 
+  async writeFileContents(path: string, content: string): Promise<void> {
+    try {
+      await invoke('write_file_contents', { path, content });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      throw new ExplorerServiceError(
+        `Failed to write file: ${message}`,
+        'writeFileContents',
+        path,
+        error instanceof Error ? error : undefined
+      );
+    }
+  },
+
   /**
    * Check if a file or directory exists.
    *
@@ -116,7 +130,7 @@ export const explorerService = {
    * @throws ExplorerServiceError if creation fails
    */
   async createProjectFile(
-    fileType: 'canvas' | 'ladder' | 'scenario',
+    fileType: 'canvas' | 'ladder' | 'scenario' | 'sheet',
     fileName: string,
     targetDir?: string
   ): Promise<string> {

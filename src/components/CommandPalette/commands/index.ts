@@ -14,9 +14,11 @@ import { registerModbusCommands } from './modbusCommands';
 import { registerOpcUaCommands } from './opcuaCommands';
 import { registerLadderCommands } from './ladderCommands';
 import { registerSettingsCommands } from './settingsCommands';
+import { registerTagCommands } from './tagCommands';
 import { registerHelpCommands } from './helpCommands';
 import { registerCanvasCommands } from './canvasCommands';
 import { registerDebugCommands } from './debugCommands';
+import { registerLayoutCommands } from './layoutCommands';
 
 // Track whether commands have been registered
 let commandsRegistered = false;
@@ -41,7 +43,9 @@ export function registerAllCommands(): void {
   registerLadderCommands();
   registerCanvasCommands();
   registerDebugCommands();
+  registerLayoutCommands();
   registerSettingsCommands();
+  registerTagCommands();
   registerHelpCommands();
 
   commandsRegistered = true;
@@ -67,6 +71,8 @@ export {
   registerLadderCommands,
   registerCanvasCommands,
   registerDebugCommands,
+  registerLayoutCommands,
   registerSettingsCommands,
+  registerTagCommands,
   registerHelpCommands,
 };

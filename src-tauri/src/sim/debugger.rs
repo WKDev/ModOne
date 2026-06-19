@@ -14,7 +14,9 @@ use crate::plc_runtime::CanonicalValue;
 
 use super::memory::CanonicalRuntimeFacade;
 use super::tag_registry::SharedTagRegistry;
-use super::types::{Breakpoint, BreakpointType, RuntimeBinding, SimBitDeviceType, SimWordDeviceType, WatchVariable};
+use super::types::{
+    Breakpoint, BreakpointType, RuntimeBinding, SimBitDeviceType, SimWordDeviceType, WatchVariable,
+};
 
 // ============================================================================
 // Types
@@ -162,7 +164,10 @@ impl SimDebugger {
 
     /// Create a new debugger instance
     pub fn new(max_watch_history: usize) -> Self {
-        Self::with_tag_registry(max_watch_history, std::sync::Arc::new(super::tag_registry::TagRegistry::new()))
+        Self::with_tag_registry(
+            max_watch_history,
+            std::sync::Arc::new(super::tag_registry::TagRegistry::new()),
+        )
     }
 
     // ========================================================================

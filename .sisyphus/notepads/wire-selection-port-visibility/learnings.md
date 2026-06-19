@@ -73,7 +73,7 @@
 ## [2026-03-09] Visual QA Session Results
 
 ### Testing Approach
-- Attempted Playwright-based visual QA via Vite dev server (http://localhost:7017)
+- Attempted Playwright-based visual QA via Vite dev server (http://localhost:7051)
 - App requires Tauri native window context (`window.__TAURI_INTERNALS__`) — unavailable in plain browser
 - Mocking `__TAURI_INTERNALS__` partially worked but deep Tauri APIs (listen, event system, stateSync) still fail
 - React app fails to mount: `root` div remains empty, PixiJS canvas never initializes

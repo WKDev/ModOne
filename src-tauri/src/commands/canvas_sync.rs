@@ -12,7 +12,7 @@ use tauri::State;
 use crate::plc_runtime::{resolve_vendor_profile, VendorAddress};
 use crate::project::{PlcSettings, SharedProjectManager};
 use crate::sim::{
-    tag_registry::SharedTagRegistry, CanvasSync, CanonicalRuntimeFacade, PlcBlockMapping,
+    tag_registry::SharedTagRegistry, CanonicalRuntimeFacade, CanvasSync, PlcBlockMapping,
     PlcBlockType, PlcInputChange, RuntimeBinding,
 };
 
@@ -54,7 +54,10 @@ impl CanvasSyncState {
         sim_runtime: Arc<CanonicalRuntimeFacade>,
         tag_registry: SharedTagRegistry,
     ) -> Self {
-        let sync = Arc::new(CanvasSync::new(Arc::clone(&sim_runtime), Arc::clone(&tag_registry)));
+        let sync = Arc::new(CanvasSync::new(
+            Arc::clone(&sim_runtime),
+            Arc::clone(&tag_registry),
+        ));
         Self {
             sync,
             sim_runtime,
@@ -104,7 +107,9 @@ fn default_true() -> bool {
     true
 }
 
-fn active_plc_settings(project_state: &State<'_, SharedProjectManager>) -> Result<PlcSettings, String> {
+fn active_plc_settings(
+    project_state: &State<'_, SharedProjectManager>,
+) -> Result<PlcSettings, String> {
     let manager = project_state
         .lock()
         .map_err(|e| format!("Failed to acquire project manager lock: {}", e))?;
@@ -130,11 +135,14 @@ fn resolve_binding(
 
     let plc_settings = active_plc_settings(project_state)?;
     let profile = resolve_vendor_profile(&plc_settings).map_err(|e| e.to_string())?;
-    let vendor_address = VendorAddress::new(config.device_type.to_uppercase(), config.address as u32);
+    let vendor_address =
+        VendorAddress::new(config.device_type.to_uppercase(), config.address as u32);
     profile
         .validate_address(&vendor_address)
         .map_err(|e| e.to_string())?;
-    let canonical = profile.to_canonical(&vendor_address).map_err(|e| e.to_string())?;
+    let canonical = profile
+        .to_canonical(&vendor_address)
+        .map_err(|e| e.to_string())?;
     let display = profile
         .format_address(&vendor_address)
         .unwrap_or_else(|_| format!("{}{}", config.device_type.to_uppercase(), config.address));

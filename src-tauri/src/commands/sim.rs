@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::commands::canvas_sync::CanvasSyncState;
 use crate::commands::modbus::{
@@ -13,8 +13,10 @@ use crate::commands::modbus::{
 };
 use crate::commands::network::NetworkState;
 use crate::commands::opcua::{
-    opcua_start_project_simulation, opcua_stop_project_simulation, OpcUaState,
+    opcua_start_project_simulation, opcua_stop_project_simulation, CredentialCacheState,
+    OpcUaState, UserAccountStoreState,
 };
+use crate::opcua::AuditLoggerState;
 use crate::modbus::ModbusMemory;
 use crate::plc_runtime::{
     resolve_vendor_profile, CanonicalAddress, CanonicalValue, CanonicalWriteSource, VendorAddress,
@@ -164,6 +166,9 @@ pub async fn sim_run(
     modbus_state: State<'_, ModbusState>,
     network_state: State<'_, NetworkState>,
     opcua_state: State<'_, OpcUaState>,
+    opcua_account_store: State<'_, UserAccountStoreState>,
+    opcua_credential_cache: State<'_, CredentialCacheState>,
+    mapping_store_state: State<'_, crate::commands::tags::MappingStoreState>,
     project_state: State<'_, SharedProjectManager>,
     canvas_sync_state: State<'_, CanvasSyncState>,
     params: Option<SimRunParams>,
@@ -189,6 +194,7 @@ pub async fn sim_run(
         // Start OPC UA server if enabled
         if project_config.opcua.enabled {
             let canonical_memory_arc = state.runtime().handle();
+            let audit_logger_state = app.try_state::<AuditLoggerState>();
             let opcua_server = opcua_start_project_simulation(
                 &app,
                 &opcua_state,
@@ -196,6 +202,10 @@ pub async fn sim_run(
                 profile.as_ref(),
                 project_config,
                 &state.tag_registry(),
+                Some(&mapping_store_state.store),
+                Some(&opcua_account_store),
+                Some(&opcua_credential_cache),
+                audit_logger_state.as_deref(),
             )?;
 
             // Create OPC UA adapter and attach to protocol runtime
@@ -231,7 +241,8 @@ pub async fn sim_stop(
     opcua_state: State<'_, OpcUaState>,
 ) -> Result<(), String> {
     state.host().stop(&app)?;
-    opcua_stop_project_simulation(&app, &opcua_state)?;
+    let audit_logger_state = app.try_state::<AuditLoggerState>();
+    opcua_stop_project_simulation(&app, &opcua_state, audit_logger_state.as_deref())?;
     modbus_stop_project_simulation(&modbus_state, &network_state).await
 }
 
@@ -257,7 +268,8 @@ pub async fn sim_reset(
     opcua_state: State<'_, OpcUaState>,
 ) -> Result<(), String> {
     state.host().reset(&app);
-    opcua_stop_project_simulation(&app, &opcua_state)?;
+    let audit_logger_state = app.try_state::<AuditLoggerState>();
+    opcua_stop_project_simulation(&app, &opcua_state, audit_logger_state.as_deref())?;
     modbus_stop_project_simulation(&modbus_state, &network_state).await?;
     Ok(())
 }
@@ -615,6 +627,7 @@ mod tests {
                 private_key_path: "private/private.pem".into(),
                 username: Some("freeze-user".to_string()),
                 password: Some("freeze-pass".to_string()),
+                ..OpcUaConfig::default()
             },
             Arc::new(OpcUaMemory::new()),
         ));
@@ -624,6 +637,9 @@ mod tests {
                 profile.as_ref(),
                 &settings,
                 &tag_registry,
+                None,
+                None,
+                None,
             )
             .unwrap();
 
@@ -636,7 +652,7 @@ mod tests {
         let err = ensure_opcua_namespace_mutable(&opcua_state).unwrap_err();
         assert_eq!(err, "namespace frozen during active OPC UA session");
 
-        server.stop().unwrap();
+        server.stop(None).unwrap();
     }
 }
 
@@ -720,13 +736,17 @@ pub fn sim_list_tags(
 pub fn sim_remove_tag(
     state: State<'_, SimState>,
     opcua_state: State<'_, OpcUaState>,
+    mapping_store: State<'_, crate::commands::tags::MappingStoreState>,
     tag_id: String,
 ) -> Result<(), String> {
     ensure_opcua_namespace_mutable(&opcua_state)?;
     state
         .tag_registry()
         .remove(&tag_id)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    // Synchronized removal: clean up OpcUaMappingConfig entry for deleted tag
+    mapping_store.store.remove(&tag_id);
+    Ok(())
 }
 
 #[tauri::command]

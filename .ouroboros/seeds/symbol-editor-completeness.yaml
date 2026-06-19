@@ -1,0 +1,66 @@
+goal: >
+  PixiJS 기반 Symbol Editor의 미완성 기능 5개(PixiJS 전환 확인, Resize Handle,
+  Polyline 도구, 단축키, Pin Properties 패널)를 완성하여 실사용 가능한 수준으로 끌어올린다.
+
+constraints:
+  - "PixiJS 렌더링 기반 — 잔존 SVG 렌더링 코드가 있으면 제거하고 PixiJS로 대체"
+  - "Resize handle은 사각형, 원, 텍스트에만 적용 — Polyline은 점 편집, Pin은 이동만"
+  - "최소 크기 제한 10x10px"
+  - "회전 핸들은 선택 박스 상단 중앙 위에 위치"
+  - "단축키 레퍼런스는 KiCad Symbol Editor — 에디터에 대응 도구가 없는 KiCad 단축키는 무시"
+  - "이번 범위 외 기능(그룹 선택, 복사/붙여넣기, Undo/Redo 등) 구현 금지"
+  - "새로운 도구 추가 없음 — 기존 도구의 완성도 개선만 수행"
+
+acceptance_criteria:
+  - "기존 모든 기능(요소 생성, 선택, 이동, 렌더링)이 PixiJS 기반으로 정상 동작"
+  - "사각형/원/텍스트 선택 시 8개 핸들(모서리 4개 + 가장자리 중점 4개) 표시"
+  - "핸들 드래그로 크기 조절 동작"
+  - "Shift+드래그 시 비율 고정 리사이즈"
+  - "Alt+드래그 시 중심 기준 리사이즈"
+  - "회전 핸들로 자유 회전 + Shift+회전 시 45도 단위 스냅"
+  - "10x10px 미만으로 리사이즈 불가"
+  - "Polyline — 클릭으로 점 추가, 더블클릭 또는 Enter로 완료"
+  - "Polyline — 기존 polyline 재선택 후 점 편집(추가/삭제/이동) 가능"
+  - "Polyline — 닫힌 폴리라인(polygon) 지원, 마지막 점에서 첫 점으로 자동 연결"
+  - "KiCad Symbol Editor 기준 단축키가 대응하는 도구에서 정상 동작"
+  - "Pin 배치 후 클릭 시 우측 properties 패널에 핀 이름 표시 및 편집 가능"
+  - "Pin properties 패널에 방향(in/out) 드롭다운 표시 및 편집 가능"
+  - "Pin properties 패널에 위치 좌표 표시 및 편집 가능"
+  - "Pin properties 패널에서 값 수정 시 캔버스에 즉시 반영"
+
+ontology_schema:
+  name: SymbolEditorElements
+  description: "Symbol Editor canvas elements and interaction domain model"
+  fields:
+    - name: element_type
+      type: string
+      description: "element type: rect, circle, text, polyline, pin"
+    - name: position
+      type: object
+      description: "x, y coordinates"
+    - name: size
+      type: object
+      description: "width, height (min 10x10)"
+    - name: rotation
+      type: number
+      description: "rotation angle in degrees"
+    - name: resize_handles
+      type: array
+      description: "8 resize handles (4 corners + 4 edge midpoints)"
+    - name: polyline_points
+      type: array
+      description: "array of polyline points"
+    - name: is_closed
+      type: boolean
+      description: "whether polyline is closed polygon"
+    - name: pin_name
+      type: string
+      description: "pin name"
+    - name: pin_direction
+      type: string
+      description: "pin direction: in or out"
+
+metadata:
+  version: "1.0"
+  ambiguity_score: 0.19
+  interview_id: "interview_20260401_043538"

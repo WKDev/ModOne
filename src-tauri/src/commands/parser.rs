@@ -93,8 +93,7 @@ pub async fn parser_save_program(path: String, program: LadderProgram) -> Result
 #[tauri::command]
 pub async fn parser_load_program(path: String) -> Result<LadderProgram, ModOneError> {
     tokio::task::spawn_blocking(move || -> Result<LadderProgram, ModOneError> {
-        let content =
-            fs::read_to_string(&path).map_err(|e| ModOneError::IoError(e.to_string()))?;
+        let content = fs::read_to_string(&path).map_err(|e| ModOneError::IoError(e.to_string()))?;
         let program: LadderProgram =
             serde_json::from_str(&content).map_err(|e| ModOneError::Parse(e.to_string()))?;
         Ok(program)

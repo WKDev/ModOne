@@ -46,12 +46,7 @@ const EXCLUDED_DIRS: &[&str] = &[
 ];
 
 /// Files to exclude from the file tree
-const EXCLUDED_FILES: &[&str] = &[
-    ".DS_Store",
-    "Thumbs.db",
-    ".gitignore",
-    ".gitattributes",
-];
+const EXCLUDED_FILES: &[&str] = &[".DS_Store", "Thumbs.db", ".gitignore", ".gitattributes"];
 
 /// Check if a path should be excluded
 fn should_exclude(name: &str, is_dir: bool) -> bool {
@@ -110,12 +105,10 @@ fn scan_directory(dir: &Path, project_root: &Path, depth: usize) -> Result<Vec<F
     }
 
     // Sort: directories first, then alphabetically
-    nodes.sort_by(|a, b| {
-        match (a.is_dir, b.is_dir) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        }
+    nodes.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
     });
 
     Ok(nodes)
@@ -162,8 +155,22 @@ pub async fn read_file_contents(path: String) -> Result<String, String> {
         return Err(format!("Path is not a file: {}", path));
     }
 
-    fs::read_to_string(&file_path)
-        .map_err(|e| format!("Failed to read file {}: {}", path, e))
+    fs::read_to_string(&file_path).map_err(|e| format!("Failed to read file {}: {}", path, e))
+}
+
+#[tauri::command]
+pub async fn write_file_contents(path: String, content: String) -> Result<(), String> {
+    let file_path = PathBuf::from(&path);
+
+    if !file_path.exists() {
+        return Err(format!("File not found: {}", path));
+    }
+
+    if !file_path.is_file() {
+        return Err(format!("Path is not a file: {}", path));
+    }
+
+    fs::write(&file_path, content).map_err(|e| format!("Failed to write file {}: {}", path, e))
 }
 
 /// Check if a file or directory exists
@@ -223,6 +230,21 @@ const LADDER_TEMPLATE: &str = "Address,Symbol,Comment\n";
 /// Default template content for scenario CSV files
 const SCENARIO_TEMPLATE: &str = "Time,Address,Value,Comment\n";
 
+/// Default template content for sheet XML files
+const SHEET_TEMPLATE: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<sheet version="1.0" unit="mm">
+  <page width="297" height="210">
+    <margins top="10" right="10" bottom="10" left="20"/>
+  </page>
+  <elements>
+    <rect id="border" x="20" y="10" w="267" h="190" stroke="black" strokeWidth="0.7" fill="none"/>
+  </elements>
+  <templates>
+    <var key="title">Untitled</var>
+  </templates>
+</sheet>
+"#;
+
 /// Create a new project file (canvas, ladder, or scenario)
 ///
 /// # Arguments
@@ -245,7 +267,13 @@ pub async fn create_project_file(
         "canvas" => (".yaml", CANVAS_TEMPLATE, "canvas"),
         "ladder" => (".csv", LADDER_TEMPLATE, "ladder"),
         "scenario" => (".csv", SCENARIO_TEMPLATE, "scenario"),
-        _ => return Err(format!("Invalid file type: {}. Must be 'canvas', 'ladder', or 'scenario'", file_type)),
+        "sheet" => (".sheet.xml", SHEET_TEMPLATE, "sheets"),
+        _ => {
+            return Err(format!(
+                "Invalid file type: {}. Must be 'canvas', 'ladder', 'scenario', or 'sheet'",
+                file_type
+            ))
+        }
     };
 
     // Validate file name
@@ -256,14 +284,21 @@ pub async fn create_project_file(
     // Check for invalid characters in file name
     let invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
     if file_name.chars().any(|c| invalid_chars.contains(&c)) {
-        return Err(format!("File name contains invalid characters: {:?}", invalid_chars));
+        return Err(format!(
+            "File name contains invalid characters: {:?}",
+            invalid_chars
+        ));
     }
 
     // Get the project manager
-    let manager = state.lock().map_err(|e| format!("Failed to lock project manager: {}", e))?;
+    let manager = state
+        .lock()
+        .map_err(|e| format!("Failed to lock project manager: {}", e))?;
 
     // Get the current project
-    let project = manager.get_current_project().ok_or("No project is currently open")?;
+    let project = manager
+        .get_current_project()
+        .ok_or("No project is currently open")?;
 
     // Determine the target directory
     let target_path = if let Some(dir) = target_dir {
@@ -271,14 +306,13 @@ pub async fn create_project_file(
     } else {
         // Use the default directory based on project storage
         match &project.storage {
-            crate::project::ProjectStorage::Folder(folder_project) => {
-                match file_type.as_str() {
-                    "canvas" => folder_project.canvas_dir(),
-                    "ladder" => folder_project.ladder_dir(),
-                    "scenario" => folder_project.scenario_dir(),
-                    _ => unreachable!(),
-                }
-            }
+            crate::project::ProjectStorage::Folder(folder_project) => match file_type.as_str() {
+                "canvas" => folder_project.canvas_dir(),
+                "ladder" => folder_project.ladder_dir(),
+                "scenario" => folder_project.scenario_dir(),
+                "sheet" => folder_project.sheets_dir(),
+                _ => unreachable!(),
+            },
             crate::project::ProjectStorage::LegacyZip(mop_file) => {
                 // For legacy projects, use the root path + default dir name
                 mop_file.root_path().join(default_dir)
@@ -306,8 +340,7 @@ pub async fn create_project_file(
     }
 
     // Create the file with template content
-    let mut file = File::create(&file_path)
-        .map_err(|e| format!("Failed to create file: {}", e))?;
+    let mut file = File::create(&file_path).map_err(|e| format!("Failed to create file: {}", e))?;
 
     file.write_all(template.as_bytes())
         .map_err(|e| format!("Failed to write file content: {}", e))?;

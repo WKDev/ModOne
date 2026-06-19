@@ -148,11 +148,15 @@ impl ModbusAdapter {
         for rule in &policy.rules {
             match rule.address_space {
                 ModbusAddressSpace::Coil => self.publish_bit_rule_to_coils(rule)?,
-                ModbusAddressSpace::DiscreteInput => self.publish_bit_rule_to_discrete_inputs(rule)?,
+                ModbusAddressSpace::DiscreteInput => {
+                    self.publish_bit_rule_to_discrete_inputs(rule)?
+                }
                 ModbusAddressSpace::HoldingRegister => {
                     self.publish_word_rule_to_holding_registers(rule)?
                 }
-                ModbusAddressSpace::InputRegister => self.publish_word_rule_to_input_registers(rule)?,
+                ModbusAddressSpace::InputRegister => {
+                    self.publish_word_rule_to_input_registers(rule)?
+                }
             }
         }
 
@@ -170,17 +174,24 @@ impl ModbusAdapter {
 
         let policy = self.policy();
         for rule in &policy.rules {
-            if !dirty_windows.iter().any(|window| window.intersects_rule(rule)) {
+            if !dirty_windows
+                .iter()
+                .any(|window| window.intersects_rule(rule))
+            {
                 continue;
             }
 
             match rule.address_space {
                 ModbusAddressSpace::Coil => self.publish_bit_rule_to_coils(rule)?,
-                ModbusAddressSpace::DiscreteInput => self.publish_bit_rule_to_discrete_inputs(rule)?,
+                ModbusAddressSpace::DiscreteInput => {
+                    self.publish_bit_rule_to_discrete_inputs(rule)?
+                }
                 ModbusAddressSpace::HoldingRegister => {
                     self.publish_word_rule_to_holding_registers(rule)?
                 }
-                ModbusAddressSpace::InputRegister => self.publish_word_rule_to_input_registers(rule)?,
+                ModbusAddressSpace::InputRegister => {
+                    self.publish_word_rule_to_input_registers(rule)?
+                }
             }
         }
 
@@ -265,8 +276,11 @@ impl ModbusAdapter {
             return Ok(());
         };
         let values = self.read_canonical_bools(rule.canonical_area, count)?;
-        self.modbus_memory
-            .write_coils_with_source(modbus_start, &values, ChangeSource::Simulation)?;
+        self.modbus_memory.write_coils_with_source(
+            modbus_start,
+            &values,
+            ChangeSource::Simulation,
+        )?;
         Ok(())
     }
 
@@ -354,7 +368,9 @@ impl ModbusAdapter {
         let config = self.modbus_memory.config();
         let (start, space_count) = match rule.address_space {
             ModbusAddressSpace::Coil => (config.coil_start, config.coil_count),
-            ModbusAddressSpace::DiscreteInput => (config.discrete_input_start, config.discrete_input_count),
+            ModbusAddressSpace::DiscreteInput => {
+                (config.discrete_input_start, config.discrete_input_count)
+            }
             ModbusAddressSpace::HoldingRegister | ModbusAddressSpace::InputRegister => return None,
         };
 
@@ -372,7 +388,9 @@ impl ModbusAdapter {
             ModbusAddressSpace::HoldingRegister => {
                 (config.holding_register_start, config.holding_register_count)
             }
-            ModbusAddressSpace::InputRegister => (config.input_register_start, config.input_register_count),
+            ModbusAddressSpace::InputRegister => {
+                (config.input_register_start, config.input_register_count)
+            }
             ModbusAddressSpace::Coil | ModbusAddressSpace::DiscreteInput => return None,
         };
 
@@ -626,11 +644,8 @@ mod tests {
             ],
         };
 
-        let adapter = ModbusAdapter::new(
-            Arc::clone(&canonical),
-            Arc::clone(&modbus_memory),
-            policy,
-        );
+        let adapter =
+            ModbusAdapter::new(Arc::clone(&canonical), Arc::clone(&modbus_memory), policy);
 
         modbus_memory
             .write_coil_with_source(13, true, ChangeSource::External)
@@ -642,7 +657,10 @@ mod tests {
         adapter.full_sync().unwrap();
 
         assert!(modbus_memory.read_coils(12, 1).unwrap()[0]);
-        assert_eq!(modbus_memory.read_holding_registers(214, 1).unwrap()[0], 4444);
+        assert_eq!(
+            modbus_memory.read_holding_registers(214, 1).unwrap()[0],
+            4444
+        );
         assert_eq!(
             canonical
                 .read()
@@ -672,7 +690,11 @@ mod tests {
             .unwrap();
 
         let modbus_memory = Arc::new(ModbusMemory::new(&MemoryMapSettings::default()));
-        let adapter = ModbusAdapter::new(Arc::clone(&canonical), Arc::clone(&modbus_memory), test_policy());
+        let adapter = ModbusAdapter::new(
+            Arc::clone(&canonical),
+            Arc::clone(&modbus_memory),
+            test_policy(),
+        );
 
         adapter
             .publish_dirty_state(&[DirtyPublishWindow {

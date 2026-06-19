@@ -3,8 +3,12 @@
 //! The new manifest format is a YAML file that contains only metadata,
 //! while actual project data is stored in a folder structure alongside the manifest.
 
+use std::collections::HashMap;
+
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+
+use crate::opcua::OpcUaMappingConfig;
 
 use super::config::{
     AutoSaveSettings, MemoryMapSettings, ModbusSettings, NetworkSettings, OpcUaSettings,
@@ -18,6 +22,7 @@ pub const MANIFEST_VERSION: &str = "2.0";
 pub const DEFAULT_CANVAS_DIR: &str = "canvas";
 pub const DEFAULT_LADDER_DIR: &str = "ladder";
 pub const DEFAULT_SCENARIO_DIR: &str = "scenario";
+pub const DEFAULT_SHEETS_DIR: &str = "sheets";
 
 /// Project manifest file (v2.0)
 ///
@@ -58,6 +63,19 @@ pub struct ProjectManifest {
     /// OPC UA settings
     #[serde(default)]
     pub opcua: OpcUaSettings,
+
+    /// Active sheet file name (relative to sheets/ directory).
+    /// e.g., "A3-landscape.sheet.xml"
+    #[serde(default)]
+    pub sheet: String,
+
+    /// IDs of tags pinned to the watch list in the Tag Browser.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub watched_tag_ids: Vec<String>,
+
+    /// Per-tag OPC UA mapping configurations, keyed by tag ID.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub opcua_mappings: HashMap<String, OpcUaMappingConfig>,
 }
 
 impl ProjectManifest {
@@ -80,6 +98,9 @@ impl ProjectManifest {
             canvas: super::config::CanvasSettings::default(),
             network: NetworkSettings::default(),
             opcua: OpcUaSettings::default(),
+            sheet: String::new(),
+            watched_tag_ids: Vec::new(),
+            opcua_mappings: HashMap::new(),
         }
     }
 
@@ -96,6 +117,9 @@ impl ProjectManifest {
             canvas: config.canvas.clone(),
             network: config.network.clone(),
             opcua: config.opcua.clone(),
+            sheet: String::new(),
+            watched_tag_ids: config.watched_tag_ids.clone(),
+            opcua_mappings: config.opcua_mappings.clone(),
         }
     }
 
@@ -111,6 +135,8 @@ impl ProjectManifest {
             canvas: self.canvas.clone(),
             network: self.network.clone(),
             opcua: self.opcua.clone(),
+            watched_tag_ids: self.watched_tag_ids.clone(),
+            opcua_mappings: self.opcua_mappings.clone(),
         }
     }
 
@@ -142,6 +168,14 @@ pub struct DirectoryConfig {
 
     /// Scenario files directory name (relative to project root)
     pub scenario: String,
+
+    /// Sheets directory name (relative to project root)
+    #[serde(default = "default_sheets_dir")]
+    pub sheets: String,
+}
+
+fn default_sheets_dir() -> String {
+    DEFAULT_SHEETS_DIR.to_string()
 }
 
 impl Default for DirectoryConfig {
@@ -150,6 +184,7 @@ impl Default for DirectoryConfig {
             canvas: DEFAULT_CANVAS_DIR.to_string(),
             ladder: DEFAULT_LADDER_DIR.to_string(),
             scenario: DEFAULT_SCENARIO_DIR.to_string(),
+            sheets: DEFAULT_SHEETS_DIR.to_string(),
         }
     }
 }
@@ -161,6 +196,7 @@ impl DirectoryConfig {
             canvas: canvas.to_string(),
             ladder: ladder.to_string(),
             scenario: scenario.to_string(),
+            sheets: DEFAULT_SHEETS_DIR.to_string(),
         }
     }
 }

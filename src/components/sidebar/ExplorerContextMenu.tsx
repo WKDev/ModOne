@@ -15,6 +15,7 @@ import {
   Workflow,
   PlayCircle,
   Import,
+  FileSpreadsheet,
 } from 'lucide-react';
 import type { ProjectFileNode } from '../../types/fileTypes';
 
@@ -28,6 +29,7 @@ export type ExplorerContextAction =
   | 'newCanvas'
   | 'newLadder'
   | 'newScenario'
+  | 'newSheet'
   | 'importXG5000';
 
 interface ContextMenuItem {
@@ -63,6 +65,13 @@ const CONTEXT_MENU_ITEMS: ContextMenuItem[] = [
     icon: <PlayCircle size={14} />,
     showForFolder: true,
     folderFilter: ['scenario'],
+  },
+  {
+    action: 'newSheet',
+    label: 'New Sheet',
+    icon: <FileSpreadsheet size={14} />,
+    showForFolder: true,
+    folderFilter: ['sheets'],
   },
   // Import items (folder-specific)
   {
@@ -210,7 +219,7 @@ export function ExplorerContextMenu({
   });
 
   // Actions that should be grouped together at the top
-  const creationActions = ['newCanvas', 'newLadder', 'newScenario', 'importXG5000'];
+  const creationActions = ['newCanvas', 'newLadder', 'newScenario', 'newSheet', 'importXG5000'];
 
   // Check if we have any creation/import items to add a separator after them
   const hasCreationItems = filteredItems.some((item) =>

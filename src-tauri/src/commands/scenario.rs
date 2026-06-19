@@ -52,8 +52,7 @@ pub async fn scenario_save(path: String, scenario: Scenario) -> Result<(), Strin
         .map_err(|e| format!("Failed to serialize scenario: {}", e))?;
 
     // Write to file
-    std::fs::write(file_path, json)
-        .map_err(|e| format!("Failed to write scenario file: {}", e))?;
+    std::fs::write(file_path, json).map_err(|e| format!("Failed to write scenario file: {}", e))?;
 
     log::info!(
         "Saved scenario '{}' with {} events to {}",
@@ -86,9 +85,8 @@ pub async fn scenario_import_csv(path: String) -> Result<Vec<ScenarioEvent>, Str
 
     for result in reader.deserialize() {
         row_num += 1;
-        let row: CsvEventRow = result.map_err(|e| {
-            format!("Failed to parse CSV row {}: {}", row_num, e)
-        })?;
+        let row: CsvEventRow =
+            result.map_err(|e| format!("Failed to parse CSV row {}: {}", row_num, e))?;
 
         // Validate data
         if row.time < 0.0 {
@@ -121,11 +119,13 @@ pub async fn scenario_export_csv(path: String, events: Vec<ScenarioEvent>) -> Re
     // Write events
     for event in &events {
         let row = CsvEventRow::from(event);
-        writer.serialize(&row)
+        writer
+            .serialize(&row)
             .map_err(|e| format!("Failed to write CSV row: {}", e))?;
     }
 
-    writer.flush()
+    writer
+        .flush()
         .map_err(|e| format!("Failed to flush CSV file: {}", e))?;
 
     log::info!("Exported {} events to CSV: {}", events.len(), path);
@@ -178,8 +178,8 @@ pub async fn scenario_list(directory: String) -> Result<Vec<String>, String> {
 
     let mut scenarios = Vec::new();
 
-    let entries = std::fs::read_dir(dir_path)
-        .map_err(|e| format!("Failed to read directory: {}", e))?;
+    let entries =
+        std::fs::read_dir(dir_path).map_err(|e| format!("Failed to read directory: {}", e))?;
 
     for entry in entries {
         let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
@@ -459,7 +459,11 @@ mod tests {
     #[tokio::test]
     async fn test_scenario_save_and_load() {
         let temp_dir = TempDir::new().unwrap();
-        let path = temp_dir.path().join("test.json").to_string_lossy().to_string();
+        let path = temp_dir
+            .path()
+            .join("test.json")
+            .to_string_lossy()
+            .to_string();
 
         let scenario = create_test_scenario();
 
@@ -477,12 +481,18 @@ mod tests {
     #[tokio::test]
     async fn test_csv_export_and_import() {
         let temp_dir = TempDir::new().unwrap();
-        let path = temp_dir.path().join("events.csv").to_string_lossy().to_string();
+        let path = temp_dir
+            .path()
+            .join("events.csv")
+            .to_string_lossy()
+            .to_string();
 
         let scenario = create_test_scenario();
 
         // Export
-        scenario_export_csv(path.clone(), scenario.events.clone()).await.unwrap();
+        scenario_export_csv(path.clone(), scenario.events.clone())
+            .await
+            .unwrap();
 
         // Import
         let imported = scenario_import_csv(path).await.unwrap();
@@ -495,9 +505,15 @@ mod tests {
     #[tokio::test]
     async fn test_scenario_create() {
         let temp_dir = TempDir::new().unwrap();
-        let path = temp_dir.path().join("new.json").to_string_lossy().to_string();
+        let path = temp_dir
+            .path()
+            .join("new.json")
+            .to_string_lossy()
+            .to_string();
 
-        let scenario = scenario_create(path.clone(), "New Scenario".to_string()).await.unwrap();
+        let scenario = scenario_create(path.clone(), "New Scenario".to_string())
+            .await
+            .unwrap();
 
         assert_eq!(scenario.metadata.name, "New Scenario");
         assert!(scenario.events.is_empty());
@@ -513,14 +529,26 @@ mod tests {
 
         // Create some scenario files
         scenario_create(
-            temp_dir.path().join("scenario1.json").to_string_lossy().to_string(),
+            temp_dir
+                .path()
+                .join("scenario1.json")
+                .to_string_lossy()
+                .to_string(),
             "Scenario 1".to_string(),
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
 
         scenario_create(
-            temp_dir.path().join("scenario2.json").to_string_lossy().to_string(),
+            temp_dir
+                .path()
+                .join("scenario2.json")
+                .to_string_lossy()
+                .to_string(),
             "Scenario 2".to_string(),
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
 
         // List
         let list = scenario_list(dir).await.unwrap();
@@ -533,10 +561,16 @@ mod tests {
     #[tokio::test]
     async fn test_scenario_delete() {
         let temp_dir = TempDir::new().unwrap();
-        let path = temp_dir.path().join("delete.json").to_string_lossy().to_string();
+        let path = temp_dir
+            .path()
+            .join("delete.json")
+            .to_string_lossy()
+            .to_string();
 
         // Create
-        scenario_create(path.clone(), "To Delete".to_string()).await.unwrap();
+        scenario_create(path.clone(), "To Delete".to_string())
+            .await
+            .unwrap();
         assert!(scenario_exists(path.clone()).await.unwrap());
 
         // Delete

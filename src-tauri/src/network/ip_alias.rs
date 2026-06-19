@@ -200,7 +200,11 @@ impl SimulatorNetworkManager {
                 log::warn!("{}", msg);
                 warnings.push(msg);
             } else {
-                log::info!("IP alias {} removed from {}", alias.ip, alias.interface_name);
+                log::info!(
+                    "IP alias {} removed from {}",
+                    alias.ip,
+                    alias.interface_name
+                );
             }
         }
 
@@ -271,7 +275,11 @@ pub async fn is_ip_assigned(ip: &str) -> Result<bool, IpAliasError> {
 // ============================================================================
 
 #[cfg(target_os = "windows")]
-async fn add_ip_alias(ip: &str, interface_name: &str, subnet_mask: &str) -> Result<(), IpAliasError> {
+async fn add_ip_alias(
+    ip: &str,
+    interface_name: &str,
+    subnet_mask: &str,
+) -> Result<(), IpAliasError> {
     let output = Command::new("netsh")
         .args([
             "interface",
@@ -315,14 +323,7 @@ async fn add_ip_alias(ip: &str, interface_name: &str, subnet_mask: &str) -> Resu
 #[cfg(target_os = "windows")]
 async fn remove_ip_alias(ip: &str, interface_name: &str) -> Result<(), IpAliasError> {
     let output = Command::new("netsh")
-        .args([
-            "interface",
-            "ip",
-            "delete",
-            "address",
-            interface_name,
-            ip,
-        ])
+        .args(["interface", "ip", "delete", "address", interface_name, ip])
         .output()
         .await
         .map_err(|e| IpAliasError::RemoveFailed {
@@ -357,14 +358,7 @@ async fn remove_ip_alias(ip: &str, interface_name: &str) -> Result<(), IpAliasEr
 #[cfg(target_os = "windows")]
 fn remove_ip_alias_sync(ip: &str, interface_name: &str) {
     let _ = std::process::Command::new("netsh")
-        .args([
-            "interface",
-            "ip",
-            "delete",
-            "address",
-            interface_name,
-            ip,
-        ])
+        .args(["interface", "ip", "delete", "address", interface_name, ip])
         .output();
 }
 
@@ -410,10 +404,7 @@ async fn list_interfaces_windows() -> Result<Vec<NetworkInterfaceInfo>, IpAliasE
     // so we split on whitespace and rejoin from field 3 onward.
     for line in stdout.lines() {
         let trimmed = line.trim();
-        if trimmed.is_empty()
-            || trimmed.starts_with('-')
-            || trimmed.starts_with("Admin")
-        {
+        if trimmed.is_empty() || trimmed.starts_with('-') || trimmed.starts_with("Admin") {
             continue;
         }
 
@@ -457,7 +448,11 @@ async fn check_ip_assigned_windows(ip: &str) -> Result<bool, IpAliasError> {
 // ============================================================================
 
 #[cfg(not(target_os = "windows"))]
-async fn add_ip_alias(_ip: &str, _interface_name: &str, _subnet_mask: &str) -> Result<(), IpAliasError> {
+async fn add_ip_alias(
+    _ip: &str,
+    _interface_name: &str,
+    _subnet_mask: &str,
+) -> Result<(), IpAliasError> {
     Err(IpAliasError::UnsupportedPlatform)
 }
 
@@ -519,7 +514,9 @@ mod tests {
     #[tokio::test]
     async fn ensure_alias_rejects_loopback() {
         let mut mgr = SimulatorNetworkManager::new();
-        let result = mgr.ensure_alias(Some("127.0.0.1"), Some("eth0"), None).await;
+        let result = mgr
+            .ensure_alias(Some("127.0.0.1"), Some("eth0"), None)
+            .await;
         assert!(matches!(result, Err(IpAliasError::ForbiddenIp(_))));
     }
 
@@ -533,7 +530,9 @@ mod tests {
     #[tokio::test]
     async fn ensure_alias_rejects_multicast() {
         let mut mgr = SimulatorNetworkManager::new();
-        let result = mgr.ensure_alias(Some("224.0.0.1"), Some("eth0"), None).await;
+        let result = mgr
+            .ensure_alias(Some("224.0.0.1"), Some("eth0"), None)
+            .await;
         assert!(matches!(result, Err(IpAliasError::ForbiddenIp(_))));
     }
 

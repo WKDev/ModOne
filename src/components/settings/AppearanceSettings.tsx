@@ -141,6 +141,29 @@ export function AppearanceSettings({ searchFilter = '' }: AppearanceSettingsProp
           </div>
         </div>
       )}
+
+      {isVisible(['crosshair', '십자선', '크로스헤어', 'canvas', '캔버스']) && (
+        <div className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            id="canvasCrosshairEnabled"
+            checked={settings.canvasCrosshairEnabled}
+            onChange={(e) => updatePending('canvasCrosshairEnabled', e.target.checked)}
+            className="mt-1 w-4 h-4 text-[var(--accent-color)] bg-[var(--bg-secondary)] border-[var(--border-color)] rounded focus:ring-[var(--accent-color)]"
+          />
+          <div>
+            <label
+              htmlFor="canvasCrosshairEnabled"
+              className="block text-sm font-medium text-[var(--text-primary)] cursor-pointer"
+            >
+              캔버스 크로스헤어 표시
+            </label>
+            <p className="text-xs text-[var(--text-muted)]">
+              One Canvas에서 마우스 커서를 크로스헤어로 표시합니다.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

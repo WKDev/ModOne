@@ -30,6 +30,7 @@ dist/
 
 # Rust/Cargo
 src-tauri/target/
+src-tauri/target-test/
 
 # TypeScript
 *.tsbuildinfo
@@ -37,3 +38,14 @@ src-tauri/target/
 # Temporary files
 *.tmp
 nul
+~tmp*/
+*.bak
+
+# Python venv (asyncua tooling)
+.venv-asyncua/
+
+# Nested Rust tool build artifacts
+tools/**/target/
+
+# Local runtime locks
+.claude/scheduled_tasks.lock

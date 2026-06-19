@@ -151,10 +151,7 @@ pub enum VendorProfileError {
     #[error("unsupported PLC manufacturer for vendor profiles: {manufacturer}")]
     UnsupportedManufacturer { manufacturer: String },
     #[error("unsupported PLC model for manufacturer {manufacturer}: {model}")]
-    UnsupportedModel {
-        manufacturer: String,
-        model: String,
-    },
+    UnsupportedModel { manufacturer: String, model: String },
     #[error("malformed address `{input}`: {reason}")]
     MalformedAddress { input: String, reason: String },
     #[error("unsupported device family `{family}` for profile {profile_id:?}")]
@@ -195,10 +192,8 @@ pub trait VendorProfile: Send + Sync {
         &self,
         address: &VendorAddress,
     ) -> Result<VendorAddressMetadata, VendorProfileError>;
-    fn to_canonical(
-        &self,
-        address: &VendorAddress,
-    ) -> Result<CanonicalAddress, VendorProfileError>;
+    fn to_canonical(&self, address: &VendorAddress)
+        -> Result<CanonicalAddress, VendorProfileError>;
     fn canonical_aliases(&self, canonical: &CanonicalAddress) -> Vec<VendorAddress>;
     fn recommended_modbus_mapping_policy(&self) -> ModbusMappingPolicy;
     fn legacy_modbus_mapping_policy(&self) -> ModbusMappingPolicy;
@@ -292,18 +287,20 @@ pub(crate) fn split_vendor_address(
 
     let (without_index_register, index_register) = if let Some(start) = trimmed.rfind("[Z") {
         let suffix = &trimmed[start + 2..];
-        let suffix = suffix
-            .strip_suffix(']')
-            .ok_or_else(|| VendorProfileError::MalformedAddress {
-                input: input.to_string(),
-                reason: "invalid indexed-address suffix".to_string(),
-            })?;
-        let index_register = suffix
-            .parse::<u8>()
-            .map_err(|_| VendorProfileError::MalformedAddress {
-                input: input.to_string(),
-                reason: "invalid index-register value".to_string(),
-            })?;
+        let suffix =
+            suffix
+                .strip_suffix(']')
+                .ok_or_else(|| VendorProfileError::MalformedAddress {
+                    input: input.to_string(),
+                    reason: "invalid indexed-address suffix".to_string(),
+                })?;
+        let index_register =
+            suffix
+                .parse::<u8>()
+                .map_err(|_| VendorProfileError::MalformedAddress {
+                    input: input.to_string(),
+                    reason: "invalid index-register value".to_string(),
+                })?;
         (&trimmed[..start], Some(index_register))
     } else {
         (trimmed.as_str(), None)
@@ -338,7 +335,12 @@ pub(crate) fn split_vendor_address(
         });
     }
 
-    Ok(((*family).to_string(), number_part.to_string(), bit_index, index_register))
+    Ok((
+        (*family).to_string(),
+        number_part.to_string(),
+        bit_index,
+        index_register,
+    ))
 }
 
 pub(crate) fn format_vendor_address(
@@ -401,9 +403,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(
-            VendorProfileError::UnsupportedManufacturer { .. }
-            )
+            Err(VendorProfileError::UnsupportedManufacturer { .. })
         ));
     }
 

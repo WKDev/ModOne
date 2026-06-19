@@ -129,7 +129,12 @@ impl CanonicalRuntimeFacade {
         self.read_bool(bit_device_address(device, address))
     }
 
-    pub fn write_bit(&self, device: SimBitDeviceType, address: u16, value: bool) -> SimMemoryResult<()> {
+    pub fn write_bit(
+        &self,
+        device: SimBitDeviceType,
+        address: u16,
+        value: bool,
+    ) -> SimMemoryResult<()> {
         if device.is_readonly() {
             return Err(SimMemoryError::ReadOnlyDevice {
                 device: device.as_str().to_string(),
@@ -155,7 +160,11 @@ impl CanonicalRuntimeFacade {
         )
     }
 
-    pub fn read_word_device(&self, device: SimWordDeviceType, address: u16) -> SimMemoryResult<u16> {
+    pub fn read_word_device(
+        &self,
+        device: SimWordDeviceType,
+        address: u16,
+    ) -> SimMemoryResult<u16> {
         self.read_word_value(word_device_address(device, address))
     }
 
@@ -176,7 +185,12 @@ impl CanonicalRuntimeFacade {
         )
     }
 
-    pub fn write_word(&self, device: SimWordDeviceType, address: u16, value: u16) -> SimMemoryResult<()> {
+    pub fn write_word(
+        &self,
+        device: SimWordDeviceType,
+        address: u16,
+        value: u16,
+    ) -> SimMemoryResult<()> {
         self.write_word_device(device, address, value)
     }
 

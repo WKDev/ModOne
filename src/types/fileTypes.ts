@@ -16,6 +16,7 @@ export type FileCategory =
   | 'memory-map'  // Memory map CSV files (in plc_csv/)
   | 'config'      // Configuration files (config.yml)
   | 'csv'         // Generic CSV files
+  | 'sheet'       // Sheet data files (.sheet.json in sheets/)
   | 'unknown';    // Unrecognized file types
 
 /**

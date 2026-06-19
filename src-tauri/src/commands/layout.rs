@@ -13,7 +13,10 @@ pub async fn save_layout(app: AppHandle, config: LayoutConfig) -> Result<(), Str
         return Err("Layout name cannot be empty".to_string());
     }
 
-    if config.name.contains(|c: char| !c.is_alphanumeric() && c != ' ' && c != '-' && c != '_') {
+    if config
+        .name
+        .contains(|c: char| !c.is_alphanumeric() && c != ' ' && c != '-' && c != '_')
+    {
         return Err("Layout name contains invalid characters".to_string());
     }
 

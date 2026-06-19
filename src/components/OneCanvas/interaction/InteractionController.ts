@@ -90,7 +90,8 @@ export interface InteractionControllerConfig {
 // Constants
 // ============================================================================
 
-const GRID_SNAP_PX = 20;
+/** Default grid snap step in world-space mm (matches DEFAULT_GRID.size). */
+const DEFAULT_GRID_SNAP = 5;
 const DRAG_THRESHOLD_PX = 4;
 const WIRE_SNAP_STICKY_RADIUS_PX = 10;
 const PORT_DIRECTIONS: readonly PortPosition[] = [
@@ -687,7 +688,7 @@ export class InteractionController {
     const facade = this._facade;
     if (!facade) return;
 
-    const delta = snapDelta(subtract(worldPos, this._pointerStartWorld));
+    const delta = snapDelta(subtract(worldPos, this._pointerStartWorld), this._getGridSnap());
 
     for (const [id, { originalPos, isJunction }] of this._dragGroup) {
       const newPos = add(originalPos, delta);
@@ -730,7 +731,8 @@ export class InteractionController {
           subtract(
             this._lastMoveWorld ?? lastWorld,
             this._pointerStartWorld
-          )
+          ),
+          this._getGridSnap()
         );
 
         for (const [id, { originalPos, isJunction }] of this._dragGroup) {
@@ -991,10 +993,15 @@ export class InteractionController {
     this._onStateChange?.(this._state);
   }
 
+  private _getGridSnap(): number {
+    return this._facade?.gridSize ?? DEFAULT_GRID_SNAP;
+  }
+
   private _snapToGrid(pos: Position): Position {
+    const step = this._getGridSnap();
     return {
-      x: Math.round(pos.x / GRID_SNAP_PX) * GRID_SNAP_PX,
-      y: Math.round(pos.y / GRID_SNAP_PX) * GRID_SNAP_PX,
+      x: Math.round(pos.x / step) * step,
+      y: Math.round(pos.y / step) * step,
     };
   }
 
@@ -1043,7 +1050,7 @@ export class InteractionController {
     const facade = this._facade;
     if (!facade) return;
 
-    const snapped = snapDelta(subtract(worldPos, this._pointerStartWorld));
+    const snapped = snapDelta(subtract(worldPos, this._pointerStartWorld), this._getGridSnap());
     const constrained = constrainSegmentDelta(snapped, this._segmentOrientation);
 
     const incrementalDelta = {
@@ -1110,7 +1117,7 @@ export class InteractionController {
   ): void {
     if (button !== 0 || !this._placingBlockType) return;
 
-    const snappedPos = snapToGrid(worldPos);
+    const snappedPos = snapToGrid(worldPos, this._getGridSnap());
     this._onPlaceBlock?.(
       this._placingBlockType,
       snappedPos,
@@ -1121,7 +1128,7 @@ export class InteractionController {
   }
 
   private _handlePlacingMove(worldPos: Position): void {
-    this._placingPosition = snapToGrid(worldPos);
+    this._placingPosition = snapToGrid(worldPos, this._getGridSnap());
     this._updateGhostPreview();
   }
 
@@ -1195,17 +1202,17 @@ function add(a: Position, b: Position): Position {
   return { x: a.x + b.x, y: a.y + b.y };
 }
 
-function snapDelta(delta: Position): Position {
+function snapDelta(delta: Position, step: number = DEFAULT_GRID_SNAP): Position {
   return {
-    x: Math.round(delta.x / GRID_SNAP_PX) * GRID_SNAP_PX,
-    y: Math.round(delta.y / GRID_SNAP_PX) * GRID_SNAP_PX,
+    x: Math.round(delta.x / step) * step,
+    y: Math.round(delta.y / step) * step,
   };
 }
 
-function snapToGrid(pos: Position): Position {
+function snapToGrid(pos: Position, step: number = DEFAULT_GRID_SNAP): Position {
   return {
-    x: Math.round(pos.x / GRID_SNAP_PX) * GRID_SNAP_PX,
-    y: Math.round(pos.y / GRID_SNAP_PX) * GRID_SNAP_PX,
+    x: Math.round(pos.x / step) * step,
+    y: Math.round(pos.y / step) * step,
   };
 }
 
@@ -1231,4 +1238,3 @@ function rectFromTwoPoints(a: Position, b: Position) {
     height: Math.abs(a.y - b.y),
   };
 }
-

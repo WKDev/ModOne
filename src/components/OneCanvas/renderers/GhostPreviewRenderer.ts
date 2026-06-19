@@ -13,7 +13,7 @@
 
 import { Container, Graphics, Rectangle } from 'pixi.js';
 import type { BlockType } from '../types';
-import { LEGACY_MM_PER_PX } from '../canvasUnits';
+import { SYMBOL_PX_TO_MM } from '../canvasUnits';
 import { getBlockSize } from '../blockDefinitions';
 import { getSymbolContextForBlockType, getSymbolSizeForBlockType } from './symbols/symbolBridge';
 import { getSymbolContext, getSymbolSize } from './symbols';
@@ -136,7 +136,7 @@ export class GhostPreviewRenderer {
     const symbol = new Graphics(ctx);
     symbol.label = 'ghost-symbol';
     symbol.tint = GHOST_TINT;
-    symbol.scale.set(LEGACY_MM_PER_PX, LEGACY_MM_PER_PX);
+    symbol.scale.set(SYMBOL_PX_TO_MM, SYMBOL_PX_TO_MM);
     container.addChild(symbol);
 
     // Set cull area for performance
@@ -163,7 +163,7 @@ export class GhostPreviewRenderer {
     // Reset transform
     symbol.position.set(0, 0);
     symbol.rotation = 0;
-    symbol.scale.set(LEGACY_MM_PER_PX, LEGACY_MM_PER_PX);
+    symbol.scale.set(SYMBOL_PX_TO_MM, SYMBOL_PX_TO_MM);
     symbol.pivot.set(0, 0);
 
     // Apply rotation around center
@@ -175,16 +175,16 @@ export class GhostPreviewRenderer {
       symbol.rotation = (state.rotation * Math.PI) / 180;
     }
 
-    // Apply flip
+    // Apply flip (negate the scale factor, not just set to -1)
     if (state.flipH) {
-      symbol.scale.x = -1;
+      symbol.scale.x = -SYMBOL_PX_TO_MM;
       if (state.rotation === 0) {
         symbol.pivot.set(geometrySize.width, symbol.pivot.y);
         symbol.position.set(size.width, symbol.position.y);
       }
     }
     if (state.flipV) {
-      symbol.scale.y = -1;
+      symbol.scale.y = -SYMBOL_PX_TO_MM;
       if (state.rotation === 0) {
         symbol.pivot.set(symbol.pivot.x, geometrySize.height);
         symbol.position.set(symbol.position.x, size.height);

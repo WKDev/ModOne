@@ -302,8 +302,6 @@ type CanvasStore = CanvasState & CanvasActions;
 // ============================================================================
 
 const MAX_HISTORY_SIZE = 50;
-const MIN_ZOOM = 0.1;
-const MAX_ZOOM = 4.0;
 const MIN_GRID_SIZE = 5;
 const DEFAULT_GRID_SIZE = GRID_MODULE_MM;
 
@@ -1268,13 +1266,13 @@ export const useCanvasStore = create<CanvasStore>()(
       // ========================================================================
 
       setZoom: (zoom) => {
-        const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+        const nextZoom = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
         set(
           (state) => {
-            state.zoom = clampedZoom;
+            state.zoom = nextZoom;
           },
           false,
-          `setZoom/${clampedZoom.toFixed(2)}`
+          `setZoom/${nextZoom.toFixed(2)}`
         );
       },
 
@@ -1316,7 +1314,8 @@ export const useCanvasStore = create<CanvasStore>()(
         // Calculate zoom to fit
         const zoomX = viewportWidth / contentWidth;
         const zoomY = viewportHeight / contentHeight;
-        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.min(zoomX, zoomY)));
+        const fitZoom = Math.min(zoomX, zoomY);
+        const newZoom = Number.isFinite(fitZoom) && fitZoom > 0 ? fitZoom : 1;
 
         // Calculate pan to center content
         const centerX = (minX + maxX) / 2;

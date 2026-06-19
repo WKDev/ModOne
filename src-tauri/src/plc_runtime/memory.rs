@@ -49,9 +49,7 @@ pub enum CanonicalMemoryError {
         area: CanonicalAreaKind,
         write_source: CanonicalWriteSource,
     },
-    #[error(
-        "snapshot size mismatch for area {area:?}: expected={expected}, actual={actual}"
-    )]
+    #[error("snapshot size mismatch for area {area:?}: expected={expected}, actual={actual}")]
     SnapshotSizeMismatch {
         area: CanonicalAreaKind,
         expected: usize,
@@ -173,11 +171,12 @@ impl CanonicalMemory {
         }
 
         if !changes.is_empty() {
-            self.bus.emit(CanonicalMemoryEvent::Batch(CanonicalMemoryBatchChange {
-                batch_id,
-                changes,
-                timestamp,
-            }));
+            self.bus
+                .emit(CanonicalMemoryEvent::Batch(CanonicalMemoryBatchChange {
+                    batch_id,
+                    changes,
+                    timestamp,
+                }));
         }
 
         Ok(())
@@ -233,14 +232,15 @@ impl CanonicalMemory {
     ) -> Result<(), CanonicalMemoryError> {
         for area in CanonicalAreaKind::ALL {
             let descriptor = self.descriptor(area);
-            let values = snapshot
-                .areas
-                .get(&area)
-                .ok_or(CanonicalMemoryError::SnapshotSizeMismatch {
-                    area,
-                    expected: descriptor.size,
-                    actual: 0,
-                })?;
+            let values =
+                snapshot
+                    .areas
+                    .get(&area)
+                    .ok_or(CanonicalMemoryError::SnapshotSizeMismatch {
+                        area,
+                        expected: descriptor.size,
+                        actual: 0,
+                    })?;
 
             if values.len() != descriptor.size {
                 return Err(CanonicalMemoryError::SnapshotSizeMismatch {

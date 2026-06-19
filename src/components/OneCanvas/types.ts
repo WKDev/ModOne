@@ -1054,6 +1054,7 @@ export const DEFAULT_CANVAS_CONFIG: CanvasConfig = {
 
 export type LayerName =
   | 'grid'
+  | 'sheet'
   | 'wires'
   | 'junctions'
   | 'blocks'
@@ -1071,6 +1072,7 @@ export interface LayerConfig {
 
 export const DEFAULT_LAYERS: LayerConfig[] = [
   { name: 'grid', zIndex: 0 },
+  { name: 'sheet', zIndex: 5, interactive: false },
   { name: 'wires', zIndex: 10 },
   { name: 'junctions', zIndex: 20 },
   { name: 'blocks', zIndex: 30 },

@@ -192,14 +192,14 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
     pushHistoryAction(documentId, description);
     updateLadderData(documentId, (docData) => {
       mutator(docData);
-      rebuildLadderTopologyCache(docData);
+      docData.topologyCache = rebuildLadderTopologyCache(docData);
     });
   }, [data, documentId, pushHistoryAction, updateLadderData]);
 
   const rebuildTopology = useCallback(() => {
     if (!documentId || !data) return;
     updateLadderData(documentId, (docData) => {
-      rebuildLadderTopologyCache(docData);
+      docData.topologyCache = rebuildLadderTopologyCache(docData);
     });
   }, [data, documentId, updateLadderData]);
 
@@ -511,7 +511,7 @@ export function useLadderDocument(documentId: string | null): UseLadderDocumentR
       docData.horizontalEdges = new Map();
       docData.verticalEdges = new Map();
       docData.comment = ast.networks[0]?.comment;
-      rebuildLadderTopologyCache(docData);
+      docData.topologyCache = rebuildLadderTopologyCache(docData);
     });
   }, [documentId, updateLadderData]);
 

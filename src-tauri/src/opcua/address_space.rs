@@ -5,8 +5,9 @@ use crate::plc_runtime::{
 };
 use crate::project::{PlcAddressWindow, PlcHardwareTopology, PlcIoDirection, PlcSettings};
 use crate::sim::tag_registry::SharedTagRegistry;
-use crate::sim::types::{TagAccessLevel, TagClass};
+use crate::sim::types::{TagAccessLevel, TagClass, TagDefinition};
 
+use super::mapping::{MappingAccessLevel, OpcUaMappingStore};
 use super::memory::OpcUaNodeId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -32,6 +33,13 @@ pub struct OpcUaNodeSpec {
     pub is_bool: bool,
     pub path_segments: Vec<String>,
     pub kind: OpcUaNodeKind,
+    /// Optional engineering unit string (e.g. "°C", "bar", "RPM").
+    /// When present, exposed as an OPC UA `EngineeringUnits` property
+    /// (`EUInformation` extension object) on the Variable node.
+    pub engineering_unit: Option<String>,
+    /// Optional human-readable description for the OPC UA Variable node's
+    /// Description attribute. Sourced from [`OpcUaMappingConfig::description`].
+    pub description: Option<String>,
 }
 
 impl OpcUaNodeSpec {
@@ -65,7 +73,18 @@ fn access_level_from_tag(access: TagAccessLevel) -> OpcUaAccessLevel {
     }
 }
 
-fn is_bool_address(address: CanonicalAddress) -> bool {
+fn access_level_from_mapping(level: MappingAccessLevel) -> OpcUaAccessLevel {
+    match level {
+        MappingAccessLevel::ReadOnly => OpcUaAccessLevel::ReadOnly,
+        MappingAccessLevel::ReadWrite => OpcUaAccessLevel::ReadWrite,
+    }
+}
+
+/// Returns `true` when the canonical address refers to a boolean (bit) memory area.
+///
+/// This is the canonical `is_bool` detection used across the OPC UA module to
+/// decide whether a register should be presented as `Boolean` or `UInt16`.
+pub fn is_bool_address(address: CanonicalAddress) -> bool {
     address.bit_index.is_some()
         || matches!(
             address.area,
@@ -152,11 +171,70 @@ fn push_publish_node(
     publish_map.entry(address).or_default().push(node_id);
 }
 
+/// Build the OPC UA Address Space path segments for a tag definition.
+///
+/// If the tag has a `folder_path` (dot-separated, e.g. "Plant.Area1.Motors"),
+/// the segments are: `["ModOne", "Tags", "Plant", "Area1", "Motors"]`.
+///
+/// If `folder_path` is `None` or empty after trimming, the tag's `display_name`
+/// is checked for dot separators. A dot-separated display name like
+/// "Plant.Area1.Temperature" auto-generates the folder path from all segments
+/// except the last: `["ModOne", "Tags", "Plant", "Area1"]`.
+///
+/// If neither `folder_path` nor dot-separated `display_name` yields segments,
+/// falls back to the default flat classification: `["ModOne", "Tags", "Raw"]`
+/// or `["ModOne", "Tags", "Semantic"]`.
+///
+/// Empty segments from consecutive dots (e.g. "Plant..Motors") are filtered out.
+fn build_tag_path_segments(tag: &TagDefinition) -> Vec<String> {
+    let mut segments = vec!["ModOne".to_string(), "Tags".to_string()];
+
+    if let Some(ref folder_path) = tag.folder_path {
+        let trimmed = folder_path.trim();
+        if !trimmed.is_empty() {
+            // Parse dot-separated path into folder segments, filtering empty parts
+            for part in trimmed.split('.') {
+                let part = part.trim();
+                if !part.is_empty() {
+                    segments.push(part.to_string());
+                }
+            }
+            return segments;
+        }
+    }
+
+    // Auto-generate folder path from dot-separated display_name.
+    // All segments except the last become folder segments.
+    // e.g. "Plant.Area1.Temperature" -> folders: ["Plant", "Area1"]
+    let display_parts: Vec<&str> = tag
+        .display_name
+        .split('.')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+    if display_parts.len() > 1 {
+        // All parts except the last are folder segments
+        for part in &display_parts[..display_parts.len() - 1] {
+            segments.push(part.to_string());
+        }
+        return segments;
+    }
+
+    // Fallback: flat classification by tag class
+    let class_segment = match tag.class {
+        TagClass::RawBacked => "Raw",
+        TagClass::Semantic => "Semantic",
+    };
+    segments.push(class_segment.to_string());
+    segments
+}
+
 pub fn build_address_space_spec(
     _canonical_memory: &CanonicalMemory,
     vendor_profile: &dyn VendorProfile,
     plc_settings: &PlcSettings,
     tag_registry: &SharedTagRegistry,
+    mapping_store: Option<&OpcUaMappingStore>,
 ) -> AddressSpaceSpec {
     let mut nodes = Vec::new();
     let mut primary_node_map = HashMap::new();
@@ -202,6 +280,8 @@ pub fn build_address_space_spec(
                     area_name.clone(),
                 ],
                 kind: OpcUaNodeKind::RawPrimary,
+                engineering_unit: None,
+                description: None,
             });
 
             primary_node_map.insert(canonical_address, node_id.clone());
@@ -231,6 +311,8 @@ pub fn build_address_space_spec(
                             alias_policy.namespace_segment.clone(),
                         ],
                         kind: OpcUaNodeKind::VendorAlias,
+                        engineering_unit: None,
+                        description: None,
                     });
                     push_publish_node(&mut publish_map, canonical_address, alias_node_id);
                 }
@@ -239,12 +321,19 @@ pub fn build_address_space_spec(
     }
 
     for tag in tag_registry.list(true) {
-        let class_segment = match tag.class {
-            TagClass::RawBacked => "Raw",
-            TagClass::Semantic => "Semantic",
-        };
         let node_id = OpcUaNodeId::new(format!("tag/{}", tag.tag_id));
-        let access_level = access_level_from_tag(tag.access);
+        // If a mapping config exists for this tag, use its access_level and
+        // description; otherwise fall back to the tag's own access level.
+        let mapping_cfg = mapping_store.and_then(|store| store.get(&tag.tag_id));
+        let access_level = mapping_cfg
+            .as_ref()
+            .map(|cfg| access_level_from_mapping(cfg.access_level))
+            .unwrap_or_else(|| access_level_from_tag(tag.access));
+        let description = mapping_cfg.and_then(|cfg| cfg.description);
+
+        // Build path_segments from folderPath if present, otherwise fall back
+        // to the default "Raw" or "Semantic" flat classification.
+        let path_segments = build_tag_path_segments(&tag);
 
         nodes.push(OpcUaNodeSpec {
             node_id: node_id.clone(),
@@ -253,12 +342,10 @@ pub fn build_address_space_spec(
             canonical_address: tag.canonical_address,
             access_level,
             is_bool: is_bool_address(tag.canonical_address),
-            path_segments: vec![
-                "ModOne".to_string(),
-                "Tags".to_string(),
-                class_segment.to_string(),
-            ],
+            path_segments,
             kind: OpcUaNodeKind::Tag,
+            engineering_unit: tag.engineering_unit.clone(),
+            description,
         });
         push_publish_node(&mut publish_map, tag.canonical_address, node_id);
     }
@@ -293,7 +380,7 @@ mod tests {
         let settings = ls_settings();
         let profile = resolve_vendor_profile(&settings).unwrap();
         let tag_registry = std::sync::Arc::new(TagRegistry::new());
-        let spec = build_address_space_spec(&memory, profile.as_ref(), &settings, &tag_registry);
+        let spec = build_address_space_spec(&memory, profile.as_ref(), &settings, &tag_registry, None);
 
         assert!(spec.nodes.iter().any(|node| node.path_segments
             == vec![
@@ -324,10 +411,11 @@ mod tests {
                 description: None,
                 engineering_unit: None,
                 access: None,
+                folder_path: None,
             })
             .unwrap();
 
-        let spec = build_address_space_spec(&memory, profile.as_ref(), &settings, &tag_registry);
+        let spec = build_address_space_spec(&memory, profile.as_ref(), &settings, &tag_registry, None);
         assert!(spec.nodes.iter().any(|node| {
             node.kind == OpcUaNodeKind::Tag
                 && node.node_id.identifier == "tag/motor-run"
@@ -352,6 +440,8 @@ mod tests {
             is_bool: false,
             path_segments: vec!["ModOne".to_string()],
             kind: OpcUaNodeKind::RawPrimary,
+            engineering_unit: None,
+            description: None,
         };
 
         let raw_readonly = base.clone();
@@ -390,5 +480,806 @@ mod tests {
             ..base
         };
         assert!(tag_writable.requires_live_value_getter());
+    }
+
+    #[test]
+    fn tag_with_folder_path_creates_nested_hierarchy() {
+        let memory = CanonicalMemory::new();
+        let settings = ls_settings();
+        let profile = resolve_vendor_profile(&settings).unwrap();
+        let tag_registry = std::sync::Arc::new(TagRegistry::new());
+        tag_registry
+            .register_semantic(RegisterTagRequest {
+                tag_id: Some("pump-speed".to_string()),
+                display_name: "Pump Speed".to_string(),
+                binding: Some(crate::sim::types::RuntimeBinding::canonical(
+                    CanonicalAddress::new(CanonicalAreaKind::DataWord, 10),
+                )),
+                canonical_address: None,
+                vendor_aliases: Vec::new(),
+                description: None,
+                engineering_unit: None,
+                access: None,
+                folder_path: Some("Plant.Area1.Pumps".to_string()),
+            })
+            .unwrap();
+
+        let spec = build_address_space_spec(&memory, profile.as_ref(), &settings, &tag_registry, None);
+        let node = spec
+            .nodes
+            .iter()
+            .find(|n| n.node_id.identifier == "tag/pump-speed")
+            .expect("pump-speed tag node should exist");
+
+        assert_eq!(
+            node.path_segments,
+            vec![
+                "ModOne".to_string(),
+                "Tags".to_string(),
+                "Plant".to_string(),
+                "Area1".to_string(),
+                "Pumps".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn tag_without_folder_path_uses_class_fallback() {
+        let memory = CanonicalMemory::new();
+        let settings = ls_settings();
+        let profile = resolve_vendor_profile(&settings).unwrap();
+        let tag_registry = std::sync::Arc::new(TagRegistry::new());
+        tag_registry
+            .register_semantic(RegisterTagRequest {
+                tag_id: Some("no-folder".to_string()),
+                display_name: "No Folder".to_string(),
+                binding: Some(crate::sim::types::RuntimeBinding::canonical(
+                    CanonicalAddress::new(CanonicalAreaKind::DataWord, 20),
+                )),
+                canonical_address: None,
+                vendor_aliases: Vec::new(),
+                description: None,
+                engineering_unit: None,
+                access: None,
+                folder_path: None,
+            })
+            .unwrap();
+
+        let spec = build_address_space_spec(&memory, profile.as_ref(), &settings, &tag_registry, None);
+        let node = spec
+            .nodes
+            .iter()
+            .find(|n| n.node_id.identifier == "tag/no-folder")
+            .expect("no-folder tag node should exist");
+
+        assert_eq!(
+            node.path_segments,
+            vec![
+                "ModOne".to_string(),
+                "Tags".to_string(),
+                "Semantic".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn empty_folder_path_uses_class_fallback() {
+        let tag = TagDefinition {
+            tag_id: "test".to_string(),
+            class: TagClass::Semantic,
+            display_name: "Test".to_string(),
+            binding: crate::sim::types::RuntimeBinding::tag("test"),
+            canonical_address: CanonicalAddress::new(CanonicalAreaKind::DataWord, 0),
+            access: crate::sim::types::TagAccessLevel::ReadWrite,
+            vendor_aliases: Vec::new(),
+            description: None,
+            engineering_unit: None,
+            folder_path: Some("".to_string()),
+        };
+        assert_eq!(
+            build_tag_path_segments(&tag),
+            vec!["ModOne", "Tags", "Semantic"]
+        );
+    }
+
+    #[test]
+    fn whitespace_only_folder_path_uses_class_fallback() {
+        let tag = TagDefinition {
+            tag_id: "test".to_string(),
+            class: TagClass::RawBacked,
+            display_name: "Test".to_string(),
+            binding: crate::sim::types::RuntimeBinding::tag("test"),
+            canonical_address: CanonicalAddress::new(CanonicalAreaKind::DataWord, 0),
+            access: crate::sim::types::TagAccessLevel::ReadWrite,
+            vendor_aliases: Vec::new(),
+            description: None,
+            engineering_unit: None,
+            folder_path: Some("   ".to_string()),
+        };
+        assert_eq!(
+            build_tag_path_segments(&tag),
+            vec!["ModOne", "Tags", "Raw"]
+        );
+    }
+
+    #[test]
+    fn folder_path_filters_empty_segments_from_consecutive_dots() {
+        let tag = TagDefinition {
+            tag_id: "test".to_string(),
+            class: TagClass::Semantic,
+            display_name: "Test".to_string(),
+            binding: crate::sim::types::RuntimeBinding::tag("test"),
+            canonical_address: CanonicalAddress::new(CanonicalAreaKind::DataWord, 0),
+            access: crate::sim::types::TagAccessLevel::ReadWrite,
+            vendor_aliases: Vec::new(),
+            description: None,
+            engineering_unit: None,
+            folder_path: Some("Plant..Area1...Motors".to_string()),
+        };
+        assert_eq!(
+            build_tag_path_segments(&tag),
+            vec!["ModOne", "Tags", "Plant", "Area1", "Motors"]
+        );
+    }
+
+    #[test]
+    fn single_segment_folder_path() {
+        let tag = TagDefinition {
+            tag_id: "test".to_string(),
+            class: TagClass::Semantic,
+            display_name: "Test".to_string(),
+            binding: crate::sim::types::RuntimeBinding::tag("test"),
+            canonical_address: CanonicalAddress::new(CanonicalAreaKind::DataWord, 0),
+            access: crate::sim::types::TagAccessLevel::ReadWrite,
+            vendor_aliases: Vec::new(),
+            description: None,
+            engineering_unit: None,
+            folder_path: Some("Standalone".to_string()),
+        };
+        assert_eq!(
+            build_tag_path_segments(&tag),
+            vec!["ModOne", "Tags", "Standalone"]
+        );
+    }
+
+    #[test]
+    fn folder_path_segments_trimmed() {
+        let tag = TagDefinition {
+            tag_id: "test".to_string(),
+            class: TagClass::Semantic,
+            display_name: "Test".to_string(),
+            binding: crate::sim::types::RuntimeBinding::tag("test"),
+            canonical_address: CanonicalAddress::new(CanonicalAreaKind::DataWord, 0),
+            access: crate::sim::types::TagAccessLevel::ReadWrite,
+            vendor_aliases: Vec::new(),
+            description: None,
+            engineering_unit: None,
+            folder_path: Some(" Plant . Area1 . Motors ".to_string()),
+        };
+        assert_eq!(
+            build_tag_path_segments(&tag),
+            vec!["ModOne", "Tags", "Plant", "Area1", "Motors"]
+        );
+    }
+
+    #[test]
+    fn no_folder_path_dot_display_name_auto_generates_folders() {
+        let tag = TagDefinition {
+            tag_id: "auto-gen".to_string(),
+            class: TagClass::Semantic,
+            display_name: "Plant.Area1.Temperature".to_string(),
+            binding: crate::sim::types::RuntimeBinding::tag("auto-gen"),
+            canonical_address: CanonicalAddress::new(CanonicalAreaKind::DataWord, 0),
+            access: crate::sim::types::TagAccessLevel::ReadWrite,
+            vendor_aliases: Vec::new(),
+            description: None,
+            engineering_unit: None,
+            folder_path: None,
+        };
+        // All segments except the last ("Temperature") become folder segments
+        assert_eq!(
+            build_tag_path_segments(&tag),
+            vec!["ModOne", "Tags", "Plant", "Area1"]
+        );
+    }
+
+    #[test]
+    fn no_folder_path_single_dot_display_name() {
+        let tag = TagDefinition {
+            tag_id: "single-dot".to_string(),
+            class: TagClass::Semantic,
+            display_name: "Pumps.PumpA".to_string(),
+            binding: crate::sim::types::RuntimeBinding::tag("single-dot"),
+            canonical_address: CanonicalAddress::new(CanonicalAreaKind::DataWord, 0),
+            access: crate::sim::types::TagAccessLevel::ReadWrite,
+            vendor_aliases: Vec::new(),
+            description: None,
+            engineering_unit: None,
+            folder_path: None,
+        };
+        assert_eq!(
+            build_tag_path_segments(&tag),
+            vec!["ModOne", "Tags", "Pumps"]
+        );
+    }
+
+    #[test]
+    fn no_folder_path_no_dots_falls_back_to_class() {
+        let tag = TagDefinition {
+            tag_id: "plain".to_string(),
+            class: TagClass::Semantic,
+            display_name: "SimpleTag".to_string(),
+            binding: crate::sim::types::RuntimeBinding::tag("plain"),
+            canonical_address: CanonicalAddress::new(CanonicalAreaKind::DataWord, 0),
+            access: crate::sim::types::TagAccessLevel::ReadWrite,
+            vendor_aliases: Vec::new(),
+            description: None,
+            engineering_unit: None,
+            folder_path: None,
+        };
+        assert_eq!(
+            build_tag_path_segments(&tag),
+            vec!["ModOne", "Tags", "Semantic"]
+        );
+    }
+
+    #[test]
+    fn explicit_folder_path_overrides_dot_display_name() {
+        let tag = TagDefinition {
+            tag_id: "override".to_string(),
+            class: TagClass::Semantic,
+            display_name: "Plant.Area1.Temperature".to_string(),
+            binding: crate::sim::types::RuntimeBinding::tag("override"),
+            canonical_address: CanonicalAddress::new(CanonicalAreaKind::DataWord, 0),
+            access: crate::sim::types::TagAccessLevel::ReadWrite,
+            vendor_aliases: Vec::new(),
+            description: None,
+            engineering_unit: None,
+            folder_path: Some("Custom.Folder".to_string()),
+        };
+        // Explicit folderPath should take precedence over display_name parsing
+        assert_eq!(
+            build_tag_path_segments(&tag),
+            vec!["ModOne", "Tags", "Custom", "Folder"]
+        );
+    }
+
+    #[test]
+    fn no_folder_path_consecutive_dots_in_display_name() {
+        let tag = TagDefinition {
+            tag_id: "dots".to_string(),
+            class: TagClass::Semantic,
+            display_name: "Plant..Area1...Temperature".to_string(),
+            binding: crate::sim::types::RuntimeBinding::tag("dots"),
+            canonical_address: CanonicalAddress::new(CanonicalAreaKind::DataWord, 0),
+            access: crate::sim::types::TagAccessLevel::ReadWrite,
+            vendor_aliases: Vec::new(),
+            description: None,
+            engineering_unit: None,
+            folder_path: None,
+        };
+        // Empty segments from consecutive dots filtered out
+        assert_eq!(
+            build_tag_path_segments(&tag),
+            vec!["ModOne", "Tags", "Plant", "Area1"]
+        );
+    }
+
+    #[test]
+    fn multiple_tags_same_folder_share_path_prefix() {
+        let memory = CanonicalMemory::new();
+        let settings = ls_settings();
+        let profile = resolve_vendor_profile(&settings).unwrap();
+        let tag_registry = std::sync::Arc::new(TagRegistry::new());
+
+        tag_registry
+            .register_semantic(RegisterTagRequest {
+                tag_id: Some("pump-a".to_string()),
+                display_name: "Pump A".to_string(),
+                binding: Some(crate::sim::types::RuntimeBinding::canonical(
+                    CanonicalAddress::new(CanonicalAreaKind::DataWord, 30),
+                )),
+                canonical_address: None,
+                vendor_aliases: Vec::new(),
+                description: None,
+                engineering_unit: None,
+                access: None,
+                folder_path: Some("Plant.Pumps".to_string()),
+            })
+            .unwrap();
+
+        tag_registry
+            .register_semantic(RegisterTagRequest {
+                tag_id: Some("pump-b".to_string()),
+                display_name: "Pump B".to_string(),
+                binding: Some(crate::sim::types::RuntimeBinding::canonical(
+                    CanonicalAddress::new(CanonicalAreaKind::DataWord, 31),
+                )),
+                canonical_address: None,
+                vendor_aliases: Vec::new(),
+                description: None,
+                engineering_unit: None,
+                access: None,
+                folder_path: Some("Plant.Pumps".to_string()),
+            })
+            .unwrap();
+
+        let spec = build_address_space_spec(&memory, profile.as_ref(), &settings, &tag_registry, None);
+
+        let pump_a = spec
+            .nodes
+            .iter()
+            .find(|n| n.node_id.identifier == "tag/pump-a")
+            .unwrap();
+        let pump_b = spec
+            .nodes
+            .iter()
+            .find(|n| n.node_id.identifier == "tag/pump-b")
+            .unwrap();
+
+        // Both tags share the same path prefix
+        assert_eq!(pump_a.path_segments, pump_b.path_segments);
+        assert_eq!(
+            pump_a.path_segments,
+            vec![
+                "ModOne".to_string(),
+                "Tags".to_string(),
+                "Plant".to_string(),
+                "Pumps".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn mapping_config_access_level_overrides_tag_access_level() {
+        use super::super::mapping::{MappingAccessLevel, OpcUaMappingConfig, OpcUaMappingStore};
+
+        let memory = CanonicalMemory::new();
+        let settings = ls_settings();
+        let profile = resolve_vendor_profile(&settings).unwrap();
+        let tag_registry = std::sync::Arc::new(TagRegistry::new());
+
+        // Register a tag with ReadOnly access
+        tag_registry
+            .register_semantic(RegisterTagRequest {
+                tag_id: Some("override-test".to_string()),
+                display_name: "Override Test".to_string(),
+                binding: Some(crate::sim::types::RuntimeBinding::canonical(
+                    CanonicalAddress::new(CanonicalAreaKind::DataWord, 50),
+                )),
+                canonical_address: None,
+                vendor_aliases: Vec::new(),
+                description: None,
+                engineering_unit: None,
+                access: Some(TagAccessLevel::ReadOnly),
+                folder_path: None,
+            })
+            .unwrap();
+
+        // Create a mapping config with ReadWrite access level
+        let mapping_store = OpcUaMappingStore::new();
+        mapping_store.insert(
+            "override-test".to_string(),
+            OpcUaMappingConfig {
+                access_level: MappingAccessLevel::ReadWrite,
+                ..OpcUaMappingConfig::default_for_word()
+            },
+        );
+
+        let spec = build_address_space_spec(
+            &memory,
+            profile.as_ref(),
+            &settings,
+            &tag_registry,
+            Some(&mapping_store),
+        );
+
+        let node = spec
+            .nodes
+            .iter()
+            .find(|n| n.node_id.identifier == "tag/override-test")
+            .expect("override-test tag node should exist");
+
+        // The mapping config's ReadWrite should override the tag's ReadOnly
+        assert_eq!(node.access_level, OpcUaAccessLevel::ReadWrite);
+    }
+
+    #[test]
+    fn tag_without_mapping_config_uses_tag_access_level() {
+        let memory = CanonicalMemory::new();
+        let settings = ls_settings();
+        let profile = resolve_vendor_profile(&settings).unwrap();
+        let tag_registry = std::sync::Arc::new(TagRegistry::new());
+
+        tag_registry
+            .register_semantic(RegisterTagRequest {
+                tag_id: Some("no-mapping".to_string()),
+                display_name: "No Mapping".to_string(),
+                binding: Some(crate::sim::types::RuntimeBinding::canonical(
+                    CanonicalAddress::new(CanonicalAreaKind::DataWord, 60),
+                )),
+                canonical_address: None,
+                vendor_aliases: Vec::new(),
+                description: None,
+                engineering_unit: None,
+                access: Some(TagAccessLevel::ReadWrite),
+                folder_path: None,
+            })
+            .unwrap();
+
+        // Empty mapping store — no override for this tag
+        let mapping_store = super::super::mapping::OpcUaMappingStore::new();
+
+        let spec = build_address_space_spec(
+            &memory,
+            profile.as_ref(),
+            &settings,
+            &tag_registry,
+            Some(&mapping_store),
+        );
+
+        let node = spec
+            .nodes
+            .iter()
+            .find(|n| n.node_id.identifier == "tag/no-mapping")
+            .expect("no-mapping tag node should exist");
+
+        // Falls back to tag's own access level
+        assert_eq!(node.access_level, OpcUaAccessLevel::ReadWrite);
+    }
+
+    #[test]
+    fn mapping_config_readonly_overrides_tag_readwrite() {
+        use super::super::mapping::{MappingAccessLevel, OpcUaMappingConfig, OpcUaMappingStore};
+
+        let memory = CanonicalMemory::new();
+        let settings = ls_settings();
+        let profile = resolve_vendor_profile(&settings).unwrap();
+        let tag_registry = std::sync::Arc::new(TagRegistry::new());
+
+        tag_registry
+            .register_semantic(RegisterTagRequest {
+                tag_id: Some("restrict-test".to_string()),
+                display_name: "Restrict Test".to_string(),
+                binding: Some(crate::sim::types::RuntimeBinding::canonical(
+                    CanonicalAddress::new(CanonicalAreaKind::DataWord, 70),
+                )),
+                canonical_address: None,
+                vendor_aliases: Vec::new(),
+                description: None,
+                engineering_unit: None,
+                access: Some(TagAccessLevel::ReadWrite),
+                folder_path: None,
+            })
+            .unwrap();
+
+        // Mapping config restricts to ReadOnly
+        let mapping_store = OpcUaMappingStore::new();
+        mapping_store.insert(
+            "restrict-test".to_string(),
+            OpcUaMappingConfig {
+                access_level: MappingAccessLevel::ReadOnly,
+                ..OpcUaMappingConfig::default_for_word()
+            },
+        );
+
+        let spec = build_address_space_spec(
+            &memory,
+            profile.as_ref(),
+            &settings,
+            &tag_registry,
+            Some(&mapping_store),
+        );
+
+        let node = spec
+            .nodes
+            .iter()
+            .find(|n| n.node_id.identifier == "tag/restrict-test")
+            .expect("restrict-test tag node should exist");
+
+        // The mapping config's ReadOnly overrides the tag's ReadWrite
+        assert_eq!(node.access_level, OpcUaAccessLevel::ReadOnly);
+    }
+
+    #[test]
+    fn no_mapping_store_uses_tag_access_level() {
+        let memory = CanonicalMemory::new();
+        let settings = ls_settings();
+        let profile = resolve_vendor_profile(&settings).unwrap();
+        let tag_registry = std::sync::Arc::new(TagRegistry::new());
+
+        tag_registry
+            .register_semantic(RegisterTagRequest {
+                tag_id: Some("no-store".to_string()),
+                display_name: "No Store".to_string(),
+                binding: Some(crate::sim::types::RuntimeBinding::canonical(
+                    CanonicalAddress::new(CanonicalAreaKind::DataWord, 80),
+                )),
+                canonical_address: None,
+                vendor_aliases: Vec::new(),
+                description: None,
+                engineering_unit: None,
+                access: Some(TagAccessLevel::ReadWrite),
+                folder_path: None,
+            })
+            .unwrap();
+
+        // Pass None for mapping store
+        let spec = build_address_space_spec(
+            &memory,
+            profile.as_ref(),
+            &settings,
+            &tag_registry,
+            None,
+        );
+
+        let node = spec
+            .nodes
+            .iter()
+            .find(|n| n.node_id.identifier == "tag/no-store")
+            .expect("no-store tag node should exist");
+
+        // Falls back to tag's own access level
+        assert_eq!(node.access_level, OpcUaAccessLevel::ReadWrite);
+    }
+
+    #[test]
+    fn description_from_mapping_config_applied_to_node_spec() {
+        use super::super::mapping::{
+            ByteOrder, MappingAccessLevel, OpcUaDataType, OpcUaMappingConfig, OpcUaMappingStore,
+        };
+
+        let memory = CanonicalMemory::new();
+        let settings = ls_settings();
+        let profile = resolve_vendor_profile(&settings).unwrap();
+        let tag_registry = std::sync::Arc::new(TagRegistry::new());
+
+        tag_registry
+            .register_semantic(RegisterTagRequest {
+                tag_id: Some("temp-sensor".to_string()),
+                display_name: "Temperature Sensor".to_string(),
+                binding: Some(crate::sim::types::RuntimeBinding::canonical(
+                    CanonicalAddress::new(CanonicalAreaKind::DataWord, 50),
+                )),
+                canonical_address: None,
+                vendor_aliases: Vec::new(),
+                description: None,
+                engineering_unit: None,
+                access: None,
+                folder_path: None,
+            })
+            .unwrap();
+
+        let mapping_store = OpcUaMappingStore::new();
+        mapping_store.insert(
+            "temp-sensor".to_string(),
+            OpcUaMappingConfig {
+                opcua_data_type: OpcUaDataType::UInt16,
+                word_count: 1,
+                byte_order: ByteOrder::BigEndian,
+                access_level: MappingAccessLevel::ReadOnly,
+                description: Some("Ambient temperature reading".to_string()),
+                string_config: None,
+            },
+        );
+
+        let spec = build_address_space_spec(
+            &memory,
+            profile.as_ref(),
+            &settings,
+            &tag_registry,
+            Some(&mapping_store),
+        );
+
+        let node = spec
+            .nodes
+            .iter()
+            .find(|n| n.node_id.identifier == "tag/temp-sensor")
+            .expect("temp-sensor tag node should exist");
+
+        assert_eq!(
+            node.description.as_deref(),
+            Some("Ambient temperature reading")
+        );
+    }
+
+    #[test]
+    fn description_is_none_when_mapping_has_no_description() {
+        use super::super::mapping::{
+            ByteOrder, MappingAccessLevel, OpcUaDataType, OpcUaMappingConfig, OpcUaMappingStore,
+        };
+
+        let memory = CanonicalMemory::new();
+        let settings = ls_settings();
+        let profile = resolve_vendor_profile(&settings).unwrap();
+        let tag_registry = std::sync::Arc::new(TagRegistry::new());
+
+        tag_registry
+            .register_semantic(RegisterTagRequest {
+                tag_id: Some("valve-open".to_string()),
+                display_name: "Valve Open".to_string(),
+                binding: Some(crate::sim::types::RuntimeBinding::canonical(
+                    CanonicalAddress::new(CanonicalAreaKind::OutputBit, 10),
+                )),
+                canonical_address: None,
+                vendor_aliases: Vec::new(),
+                description: None,
+                engineering_unit: None,
+                access: None,
+                folder_path: None,
+            })
+            .unwrap();
+
+        let mapping_store = OpcUaMappingStore::new();
+        mapping_store.insert(
+            "valve-open".to_string(),
+            OpcUaMappingConfig {
+                opcua_data_type: OpcUaDataType::Boolean,
+                word_count: 1,
+                byte_order: ByteOrder::BigEndian,
+                access_level: MappingAccessLevel::ReadWrite,
+                description: None,
+                string_config: None,
+            },
+        );
+
+        let spec = build_address_space_spec(
+            &memory,
+            profile.as_ref(),
+            &settings,
+            &tag_registry,
+            Some(&mapping_store),
+        );
+
+        let node = spec
+            .nodes
+            .iter()
+            .find(|n| n.node_id.identifier == "tag/valve-open")
+            .expect("valve-open tag node should exist");
+
+        assert!(node.description.is_none());
+    }
+
+    #[test]
+    fn description_is_none_when_no_mapping_store() {
+        let memory = CanonicalMemory::new();
+        let settings = ls_settings();
+        let profile = resolve_vendor_profile(&settings).unwrap();
+        let tag_registry = std::sync::Arc::new(TagRegistry::new());
+
+        tag_registry
+            .register_semantic(RegisterTagRequest {
+                tag_id: Some("no-desc-mapping".to_string()),
+                display_name: "No Desc Mapping".to_string(),
+                binding: Some(crate::sim::types::RuntimeBinding::canonical(
+                    CanonicalAddress::new(CanonicalAreaKind::DataWord, 65),
+                )),
+                canonical_address: None,
+                vendor_aliases: Vec::new(),
+                description: None,
+                engineering_unit: None,
+                access: None,
+                folder_path: None,
+            })
+            .unwrap();
+
+        let spec = build_address_space_spec(
+            &memory,
+            profile.as_ref(),
+            &settings,
+            &tag_registry,
+            None,
+        );
+
+        let node = spec
+            .nodes
+            .iter()
+            .find(|n| n.node_id.identifier == "tag/no-desc-mapping")
+            .expect("no-desc-mapping tag node should exist");
+
+        assert!(node.description.is_none());
+    }
+
+    #[test]
+    fn raw_memory_nodes_have_no_description() {
+        let memory = CanonicalMemory::new();
+        let settings = ls_settings();
+        let profile = resolve_vendor_profile(&settings).unwrap();
+        let tag_registry = std::sync::Arc::new(TagRegistry::new());
+        let spec = build_address_space_spec(
+            &memory,
+            profile.as_ref(),
+            &settings,
+            &tag_registry,
+            None,
+        );
+
+        // All raw memory and alias nodes should have description = None
+        for node in &spec.nodes {
+            if node.kind == OpcUaNodeKind::RawPrimary || node.kind == OpcUaNodeKind::VendorAlias {
+                assert!(
+                    node.description.is_none(),
+                    "Raw/alias node {} should have no description",
+                    node.node_id.identifier
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn tag_engineering_unit_propagated_to_node_spec() {
+        let memory = CanonicalMemory::new();
+        let settings = ls_settings();
+        let profile = resolve_vendor_profile(&settings).unwrap();
+        let tag_registry = std::sync::Arc::new(TagRegistry::new());
+
+        // Register a tag WITH engineering unit
+        tag_registry
+            .register_semantic(RegisterTagRequest {
+                tag_id: Some("temp-sensor".to_string()),
+                display_name: "Temperature Sensor".to_string(),
+                binding: Some(crate::sim::types::RuntimeBinding::canonical(
+                    CanonicalAddress::new(CanonicalAreaKind::DataWord, 100),
+                )),
+                canonical_address: None,
+                vendor_aliases: Vec::new(),
+                description: None,
+                engineering_unit: Some("°C".to_string()),
+                access: None,
+                folder_path: None,
+            })
+            .unwrap();
+
+        // Register a tag WITHOUT engineering unit
+        tag_registry
+            .register_semantic(RegisterTagRequest {
+                tag_id: Some("flag-bit".to_string()),
+                display_name: "Flag Bit".to_string(),
+                binding: Some(crate::sim::types::RuntimeBinding::canonical(
+                    CanonicalAddress::new(CanonicalAreaKind::InternalBit, 0),
+                )),
+                canonical_address: None,
+                vendor_aliases: Vec::new(),
+                description: None,
+                engineering_unit: None,
+                access: None,
+                folder_path: None,
+            })
+            .unwrap();
+
+        let spec =
+            build_address_space_spec(&memory, profile.as_ref(), &settings, &tag_registry, None);
+
+        let temp_node = spec
+            .nodes
+            .iter()
+            .find(|n| n.node_id.identifier == "tag/temp-sensor")
+            .expect("temp-sensor tag node should exist");
+        assert_eq!(
+            temp_node.engineering_unit.as_deref(),
+            Some("°C"),
+            "Tag with engineering_unit should have it on the node spec"
+        );
+
+        let flag_node = spec
+            .nodes
+            .iter()
+            .find(|n| n.node_id.identifier == "tag/flag-bit")
+            .expect("flag-bit tag node should exist");
+        assert!(
+            flag_node.engineering_unit.is_none(),
+            "Tag without engineering_unit should have None on the node spec"
+        );
+
+        // All raw memory and alias nodes should have engineering_unit = None
+        for node in &spec.nodes {
+            if node.kind == OpcUaNodeKind::RawPrimary || node.kind == OpcUaNodeKind::VendorAlias {
+                assert!(
+                    node.engineering_unit.is_none(),
+                    "Raw/alias node {} should have no engineering_unit",
+                    node.node_id.identifier
+                );
+            }
+        }
     }
 }

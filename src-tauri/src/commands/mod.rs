@@ -162,6 +162,7 @@ pub use sim::{
 // Re-export explorer commands
 pub use explorer::{
     create_project_file, get_file_info, list_project_files, path_exists, read_file_contents,
+    write_file_contents,
 };
 
 // Re-export window commands and state
@@ -177,8 +178,20 @@ pub use schematic::{
     schematic_delete, schematic_exists, schematic_list, schematic_load, schematic_save,
 };
 
-// Re-export symbol commands
+// Re-export symbol commands (JSON-backed)
 pub use symbols::{symbol_delete, symbol_list, symbol_list_all, symbol_load, symbol_save};
+
+// Re-export project block loader commands (XML-backed)
+pub use symbols::{
+    project_block_delete,
+    project_block_ensure_dir,
+    project_block_import_xml,
+    project_block_list,
+    project_block_load,
+    project_block_load_all,
+    project_block_load_all_with_warnings,
+    project_block_symbols_dir,
+};
 
 // Re-export OPC UA commands and state
 pub use opcua::{

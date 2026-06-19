@@ -34,6 +34,7 @@ import { isPortEndpoint } from '../../OneCanvas/types';
 import { useCanvasKeyboardShortcuts, useSimulation } from '../../OneCanvas';
 import { useSchematicDocument } from '../../../stores/hooks/useSchematicDocument';
 import type { CanvasFacadeReturn } from '../../../types/canvasFacade';
+import { useSettingsStore } from '../../../stores/settingsStore';
 import { PropertiesPanel } from './PropertiesPanel';
 import { CanvasDialogs } from './canvas/CanvasDialogs';
 import { useCanvasFacade } from '../../../hooks/useCanvasFacade';
@@ -64,6 +65,11 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
 }: OneCanvasPanelContentProps) {
   const canvasRef = useRef<CanvasHostHandle>(null);
   const containerRectRef = useRef<DOMRect | null>(null);
+  const crosshairOverlayRef = useRef<HTMLDivElement | null>(null);
+  const crosshairHorizontalRef = useRef<HTMLDivElement | null>(null);
+  const crosshairVerticalRef = useRef<HTMLDivElement | null>(null);
+  const crosshairPointRef = useRef<{ x: number; y: number } | null>(null);
+  const crosshairRafRef = useRef<number | null>(null);
 
   const { documentId } = useDocumentContext();
 
@@ -110,6 +116,7 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
   const [wireContextMenu, setWireContextMenu] = useState<WireContextMenuState | null>(null);
   const [isWireMode, setIsWireMode] = useState(false);
   const [interactionMode, setInteractionMode] = useState<CanvasInteractionMode>('edit');
+  const canvasCrosshairEnabled = useSettingsStore((state) => state.getMergedSettings().canvasCrosshairEnabled);
 
 
   useEffect(() => {
@@ -440,6 +447,78 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
     );
   }, [interactionMode, simulationResult]);
 
+  const flushCrosshair = useCallback(() => {
+    crosshairRafRef.current = null;
+    const point = crosshairPointRef.current;
+    const overlay = crosshairOverlayRef.current;
+    const horizontal = crosshairHorizontalRef.current;
+    const vertical = crosshairVerticalRef.current;
+    if (!point || !overlay || !horizontal || !vertical) {
+      return;
+    }
+
+    horizontal.style.transform = `translate3d(0, ${point.y}px, 0)`;
+    vertical.style.transform = `translate3d(${point.x}px, 0, 0)`;
+    overlay.style.opacity = '1';
+  }, []);
+
+  const hideCrosshair = useCallback(() => {
+    crosshairPointRef.current = null;
+    if (crosshairRafRef.current !== null) {
+      cancelAnimationFrame(crosshairRafRef.current);
+      crosshairRafRef.current = null;
+    }
+    const overlay = crosshairOverlayRef.current;
+    if (overlay) {
+      overlay.style.opacity = '0';
+    }
+  }, []);
+
+  useEffect(() => {
+    const container = interactionRootRef.current;
+    if (!container) {
+      return;
+    }
+
+    if (!canvasCrosshairEnabled) {
+      hideCrosshair();
+      return;
+    }
+
+    const onPointerMove = (event: PointerEvent) => {
+      const rect = containerRectRef.current ?? container.getBoundingClientRect();
+      crosshairPointRef.current = {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      };
+
+      if (crosshairRafRef.current === null) {
+        crosshairRafRef.current = requestAnimationFrame(flushCrosshair);
+      }
+    };
+
+    const onPointerLeave = () => {
+      hideCrosshair();
+    };
+
+    container.addEventListener('pointermove', onPointerMove, { passive: true });
+    container.addEventListener('pointerleave', onPointerLeave, { passive: true });
+
+    return () => {
+      container.removeEventListener('pointermove', onPointerMove);
+      container.removeEventListener('pointerleave', onPointerLeave);
+    };
+  }, [canvasCrosshairEnabled, flushCrosshair, hideCrosshair, interactionRootRef]);
+
+  useEffect(() => {
+    return () => {
+      if (crosshairRafRef.current !== null) {
+        cancelAnimationFrame(crosshairRafRef.current);
+        crosshairRafRef.current = null;
+      }
+    };
+  }, []);
+
   return (
     <PanelErrorBoundary panelName="Canvas">
       <div className="h-full flex flex-col bg-neutral-950">
@@ -474,7 +553,7 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
             >
               <CanvasHost
                 ref={canvasRef}
-                className={`w-full h-full ${isWireMode ? 'cursor-crosshair' : ''}`}
+                className={`w-full h-full ${isWireMode || canvasCrosshairEnabled ? 'cursor-crosshair' : ''}`}
                 documentId={documentId}
                 facade={facade}
                 interactionMode={interactionMode}
@@ -494,6 +573,30 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
                 collapsed={minimapCollapsed}
                 onToggleCollapse={() => setMinimapCollapsed(!minimapCollapsed)}
               />
+
+              {canvasCrosshairEnabled && (
+                <div
+                  ref={crosshairOverlayRef}
+                  className="absolute inset-0 pointer-events-none z-20 opacity-0"
+                >
+                  <div
+                    ref={crosshairHorizontalRef}
+                    className="absolute left-0 right-0 h-px bg-neutral-400"
+                    style={{
+                      transform: 'translate3d(0, 0, 0)',
+                      willChange: 'transform',
+                    }}
+                  />
+                  <div
+                    ref={crosshairVerticalRef}
+                    className="absolute top-0 bottom-0 w-px bg-neutral-400"
+                    style={{
+                      transform: 'translate3d(0, 0, 0)',
+                      willChange: 'transform',
+                    }}
+                  />
+                </div>
+              )}
             </div>
 
             {schematicDoc && (

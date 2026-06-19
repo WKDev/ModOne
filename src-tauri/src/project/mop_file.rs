@@ -66,10 +66,7 @@ impl MopFile {
         fs::create_dir_all(root.join(ONE_CANVAS_DIR))?;
 
         // Create empty placeholder files with UTF-8 headers
-        Self::create_csv_with_header(
-            &root.join(MOD_SERVER_MEMORY_FILE),
-            "address,type,value",
-        )?;
+        Self::create_csv_with_header(&root.join(MOD_SERVER_MEMORY_FILE), "address,type,value")?;
         Self::create_csv_with_header(
             &root.join(SCENARIO_FILE),
             "step,action,address,value,delay_ms",
@@ -142,7 +139,12 @@ impl MopFile {
             .unix_permissions(0o644);
 
         // Recursively add all files and directories
-        Self::add_directory_to_zip(&mut zip, self.temp_dir.path(), self.temp_dir.path(), options)?;
+        Self::add_directory_to_zip(
+            &mut zip,
+            self.temp_dir.path(),
+            self.temp_dir.path(),
+            options,
+        )?;
 
         zip.finish()?;
 
@@ -228,9 +230,7 @@ impl MopFile {
                 .map_err(|_| MopFileError::InvalidStructure("Invalid path prefix".to_string()))?;
 
             // Convert to forward slashes for ZIP compatibility
-            let zip_path = relative_path
-                .to_string_lossy()
-                .replace('\\', "/");
+            let zip_path = relative_path.to_string_lossy().replace('\\', "/");
 
             if path.is_dir() {
                 // Add directory entry (with trailing slash)
@@ -273,7 +273,10 @@ mod tests {
     fn test_helper_paths() {
         let mop = MopFile::create_new().unwrap();
 
-        assert!(mop.config_path().ends_with("modone/config.yml") || mop.config_path().ends_with("modone\\config.yml"));
+        assert!(
+            mop.config_path().ends_with("modone/config.yml")
+                || mop.config_path().ends_with("modone\\config.yml")
+        );
         assert!(mop.plc_csv_dir().ends_with("plc_csv"));
         assert!(mop.one_canvas_dir().ends_with("one_canvas"));
     }

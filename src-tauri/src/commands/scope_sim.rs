@@ -64,7 +64,8 @@ pub async fn scope_tick(
         }
 
         // Get scope engine
-        let scope: &mut crate::canvas::scope::ScopeEngine = match scopes.get_mut(&mapping.scope_id) {
+        let scope: &mut crate::canvas::scope::ScopeEngine = match scopes.get_mut(&mapping.scope_id)
+        {
             Some(s) => s,
             None => {
                 result.channels_skipped += 1;
@@ -81,10 +82,9 @@ pub async fn scope_tick(
             Ok(v) => v,
             Err(e) => {
                 result.channels_skipped += 1;
-                result.errors.push(format!(
-                    "Error reading {}: {}",
-                    mapping.display_address, e
-                ));
+                result
+                    .errors
+                    .push(format!("Error reading {}: {}", mapping.display_address, e));
                 continue;
             }
         };
@@ -104,14 +104,23 @@ fn read_device_voltage(
     mapping: &crate::canvas::scope_sync::ScopeChannelMapping,
 ) -> Result<f32, String> {
     match &mapping.binding {
-        RuntimeBinding::Canonical { address } => match runtime.read(*address).map_err(|e| e.to_string())? {
-            CanonicalValue::Bool(value) => Ok(if value { mapping.scale } else { 0.0 } + mapping.offset),
-            CanonicalValue::U16(value) => Ok(value as f32 * mapping.scale + mapping.offset),
-        },
+        RuntimeBinding::Canonical { address } => {
+            match runtime.read(*address).map_err(|e| e.to_string())? {
+                CanonicalValue::Bool(value) => {
+                    Ok(if value { mapping.scale } else { 0.0 } + mapping.offset)
+                }
+                CanonicalValue::U16(value) => Ok(value as f32 * mapping.scale + mapping.offset),
+            }
+        }
         RuntimeBinding::Tag { tag_id } => {
             let tag = tag_registry.resolve(tag_id).map_err(|e| e.to_string())?;
-            match runtime.read(tag.canonical_address).map_err(|e| e.to_string())? {
-                CanonicalValue::Bool(value) => Ok(if value { mapping.scale } else { 0.0 } + mapping.offset),
+            match runtime
+                .read(tag.canonical_address)
+                .map_err(|e| e.to_string())?
+            {
+                CanonicalValue::Bool(value) => {
+                    Ok(if value { mapping.scale } else { 0.0 } + mapping.offset)
+                }
                 CanonicalValue::U16(value) => Ok(value as f32 * mapping.scale + mapping.offset),
             }
         }
@@ -137,14 +146,16 @@ pub async fn scope_read_device_voltage(
 ) -> Result<f32, String> {
     let engine_arc = sim_state.engine();
     let engine_guard = engine_arc.lock();
-    let engine = engine_guard
-        .as_ref()
-        .ok_or("Simulation is not running")?;
+    let engine = engine_guard.as_ref().ok_or("Simulation is not running")?;
 
     let runtime = engine.runtime();
     let offset_val = offset.unwrap_or(0.0);
     let scale_val = scale.unwrap_or(match &binding {
-        RuntimeBinding::Canonical { address } if address.area.is_bit_area() || address.bit_index.is_some() => 5.0,
+        RuntimeBinding::Canonical { address }
+            if address.area.is_bit_area() || address.bit_index.is_some() =>
+        {
+            5.0
+        }
         RuntimeBinding::Canonical { .. } => 0.001,
         RuntimeBinding::Tag { .. } => 1.0,
     });

@@ -126,7 +126,7 @@ export function FloatingWindowContent({
         onMaximize={handleMaximize}
         onClose={handleClose}
       />
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-hidden">
         {hasTabs ? (
           <TabContent tabs={panel.tabs!} activeTabId={panel.activeTabId ?? null} />
         ) : (

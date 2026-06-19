@@ -111,6 +111,13 @@ export class GhostRenderer {
           alpha: GHOST_ALPHA,
         });
 
+        // Draw small dots at each placed vertex (all but the last which is the cursor)
+        const vertexCount = pts.length - 1; // last point is cursor position
+        for (let i = 0; i < vertexCount; i++) {
+          this._graphics.circle(pts[i].x, pts[i].y, 3);
+          this._graphics.fill({ color: GHOST_COLOR, alpha: GHOST_ALPHA });
+        }
+
         // Show close indicator: small circle at first point when cursor is near it
         // (detected by PolylineTool adding the first point as the last preview point)
         if (pts.length >= 4) {

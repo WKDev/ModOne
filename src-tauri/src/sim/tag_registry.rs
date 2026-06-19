@@ -22,6 +22,8 @@ pub enum TagRegistryError {
     MissingCanonicalBinding,
     #[error("tag access cannot be less restrictive than canonical access")]
     AccessEscalation,
+    #[error("tagId is immutable after creation and cannot be changed (tag: {0})")]
+    TagIdImmutable(String),
 }
 
 pub type TagRegistryResult<T> = Result<T, TagRegistryError>;
@@ -79,6 +81,7 @@ impl TagRegistry {
             vendor_aliases,
             description: None,
             engineering_unit: None,
+            folder_path: None,
         }
     }
 
@@ -126,6 +129,7 @@ impl TagRegistry {
             vendor_aliases: request.vendor_aliases,
             description: request.description,
             engineering_unit: request.engineering_unit,
+            folder_path: request.folder_path,
         };
 
         let mut semantic_tags = self.semantic_tags.write();
@@ -157,6 +161,86 @@ impl TagRegistry {
             .or_default()
             .push(definition.tag_id.clone());
         definition
+    }
+
+    /// Update mutable fields of a semantic tag definition.
+    ///
+    /// The `canonical_address` can be changed; the reverse index is updated
+    /// accordingly. Duplicate-address validation is the caller's responsibility.
+    pub fn update_semantic(
+        &self,
+        tag_id: &str,
+        display_name: Option<String>,
+        canonical_address: Option<CanonicalAddress>,
+        access: Option<TagAccessLevel>,
+        description: Option<Option<String>>,
+        engineering_unit: Option<Option<String>>,
+        folder_path: Option<Option<String>>,
+    ) -> TagRegistryResult<TagDefinition> {
+        if tag_id.starts_with(RAW_TAG_PREFIX) {
+            return Err(TagRegistryError::TagNotFound(tag_id.to_string()));
+        }
+
+        let mut semantic_tags = self.semantic_tags.write();
+        let definition = semantic_tags
+            .get_mut(tag_id)
+            .ok_or_else(|| TagRegistryError::TagNotFound(tag_id.to_string()))?;
+
+        if let Some(name) = display_name {
+            definition.display_name = name;
+        }
+
+        if let Some(new_addr) = canonical_address {
+            let old_addr = definition.canonical_address;
+            if old_addr != new_addr {
+                // Validate access escalation against new address
+                let new_default = access_from_canonical(new_addr.area.default_access());
+                let effective_access = access.unwrap_or(definition.access);
+                if effective_access == TagAccessLevel::ReadWrite
+                    && new_default == TagAccessLevel::ReadOnly
+                {
+                    return Err(TagRegistryError::AccessEscalation);
+                }
+
+                // Update reverse index
+                let mut reverse = self.reverse_index.write();
+                if let Some(ids) = reverse.get_mut(&old_addr) {
+                    ids.retain(|id| id != tag_id);
+                    if ids.is_empty() {
+                        reverse.remove(&old_addr);
+                    }
+                }
+                reverse
+                    .entry(new_addr)
+                    .or_default()
+                    .push(tag_id.to_string());
+
+                definition.canonical_address = new_addr;
+            }
+        }
+
+        if let Some(new_access) = access {
+            let addr_default =
+                access_from_canonical(definition.canonical_address.area.default_access());
+            if new_access == TagAccessLevel::ReadWrite && addr_default == TagAccessLevel::ReadOnly {
+                return Err(TagRegistryError::AccessEscalation);
+            }
+            definition.access = new_access;
+        }
+
+        if let Some(desc) = description {
+            definition.description = desc;
+        }
+
+        if let Some(eu) = engineering_unit {
+            definition.engineering_unit = eu;
+        }
+
+        if let Some(fp) = folder_path {
+            definition.folder_path = fp;
+        }
+
+        Ok(definition.clone())
     }
 
     pub fn remove(&self, tag_id: &str) -> TagRegistryResult<()> {
@@ -320,6 +404,7 @@ mod tests {
                 description: Some("Main motor run command".to_string()),
                 engineering_unit: None,
                 access: None,
+                folder_path: None,
             })
             .expect("semantic");
 
@@ -328,6 +413,51 @@ mod tests {
             registry.resolve("motor-run").unwrap().canonical_address,
             tag.canonical_address
         );
+    }
+
+    #[test]
+    fn tag_id_immutable_after_creation() {
+        let registry = TagRegistry::new();
+        // Create a semantic tag
+        registry
+            .register_semantic(RegisterTagRequest {
+                tag_id: Some("pump-status".to_string()),
+                display_name: "Pump Status".to_string(),
+                binding: None,
+                canonical_address: Some(CanonicalAddress::new(
+                    CanonicalAreaKind::DataWord,
+                    10,
+                )),
+                vendor_aliases: Vec::new(),
+                description: None,
+                engineering_unit: None,
+                access: None,
+                folder_path: None,
+            })
+            .expect("should register");
+
+        // update_semantic does not accept a new tag_id — the tag_id parameter is
+        // lookup-only and the stored tag_id is never mutated.
+        let updated = registry
+            .update_semantic(
+                "pump-status",
+                Some("Pump Status Updated".to_string()),
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("should update");
+
+        // tag_id remains unchanged despite display_name change
+        assert_eq!(updated.tag_id, "pump-status");
+        assert_eq!(updated.display_name, "Pump Status Updated");
+
+        // TagIdImmutable error variant exists and formats correctly
+        let err = TagRegistryError::TagIdImmutable("pump-status".to_string());
+        assert!(err.to_string().contains("immutable"));
+        assert!(err.to_string().contains("pump-status"));
     }
 
     #[test]

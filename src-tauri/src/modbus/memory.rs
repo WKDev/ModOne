@@ -223,12 +223,7 @@ impl ModbusMemory {
                 if matches!(source, ChangeSource::External) {
                     self.external_coil_writes.write().insert(address);
                 }
-                self.emit_change(MemoryChangeEvent::coil(
-                    address,
-                    old,
-                    new,
-                    source.as_str(),
-                ));
+                self.emit_change(MemoryChangeEvent::coil(address, old, new, source.as_str()));
             }
         }
         self.end_batch();

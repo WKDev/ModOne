@@ -84,10 +84,19 @@ const FILE_TYPE_MAP: Record<string, FileTypeInfo> = {
   // CSV files
   '.csv': {
     category: 'csv',
-    panelType: 'csv-viewer',
+    panelType: 'sheet-editor',
     icon: 'Table',
     color: 'text-emerald-500',
-    description: 'CSV Data File',
+    description: 'Sheet Data File',
+  },
+
+  // Sheet files (.sheet.xml)
+  '.sheet.xml': {
+    category: 'sheet',
+    panelType: 'sheet-editor',
+    icon: 'FileSpreadsheet',
+    color: 'text-teal-500',
+    description: 'Sheet Document',
   },
 };
 
@@ -160,6 +169,15 @@ const CONTEXT_OVERRIDES: Record<string, Partial<FileTypeInfo>> = {
     color: 'text-violet-500',
     description: 'Memory Map Data',
   },
+
+  // Files in sheets directory
+  'sheets/.json': {
+    category: 'sheet',
+    panelType: 'sheet-editor',
+    icon: 'FileSpreadsheet',
+    color: 'text-teal-500',
+    description: 'Sheet Document',
+  },
 };
 
 /**
@@ -170,6 +188,7 @@ export const FOLDER_ICONS: Record<string, { icon: string; color: string }> = {
   canvas: { icon: 'CircuitBoard', color: 'text-cyan-500' },
   ladder: { icon: 'Workflow', color: 'text-blue-500' },
   scenario: { icon: 'PlayCircle', color: 'text-pink-500' },
+  sheets: { icon: 'FileSpreadsheet', color: 'text-teal-500' },
   // Legacy project directories
   one_canvas: { icon: 'CircuitBoard', color: 'text-cyan-500' },
   plc_csv: { icon: 'Database', color: 'text-violet-500' },
@@ -215,6 +234,19 @@ function getParentDir(path: string): string {
  * @param path - The file path (relative or absolute)
  * @returns File type information including category, panel type, icon, and color
  */
+/**
+ * Get compound extension (e.g., ".sheet.json" from "foo.sheet.json").
+ */
+function getCompoundExtension(path: string): string | null {
+  const normalized = normalizePath(path);
+  const filename = normalized.split('/').pop() || '';
+  const parts = filename.split('.');
+  if (parts.length >= 3) {
+    return '.' + parts.slice(-2).join('.').toLowerCase();
+  }
+  return null;
+}
+
 export function resolveFileType(path: string): FileTypeInfo {
   const normalized = normalizePath(path);
   const filename = getFilename(normalized).toLowerCase();
@@ -224,6 +256,12 @@ export function resolveFileType(path: string): FileTypeInfo {
   // Check for exact filename matches first (e.g., config.yml)
   if (FILE_TYPE_MAP[filename]) {
     return FILE_TYPE_MAP[filename];
+  }
+
+  // Check for compound extension (e.g., .sheet.json)
+  const compoundExt = getCompoundExtension(normalized);
+  if (compoundExt && FILE_TYPE_MAP[compoundExt]) {
+    return FILE_TYPE_MAP[compoundExt];
   }
 
   // Check for context-aware overrides

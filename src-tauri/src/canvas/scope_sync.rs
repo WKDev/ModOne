@@ -3,8 +3,8 @@
 //! Provides synchronization between scope engines and the circuit/PLC simulation.
 //! Routes device memory values to scope channels for oscilloscope-like visualization.
 
-use serde::{Deserialize, Serialize};
 use crate::sim::RuntimeBinding;
+use serde::{Deserialize, Serialize};
 
 // ============================================================================
 // Scope Channel Mapping
@@ -149,12 +149,7 @@ mod tests {
 
     #[test]
     fn test_bit_mapping_creation() {
-        let mapping = ScopeChannelMapping::new_bit(
-            "scope1",
-            0,
-            RuntimeBinding::tag("M10"),
-            "M10",
-        );
+        let mapping = ScopeChannelMapping::new_bit("scope1", 0, RuntimeBinding::tag("M10"), "M10");
 
         assert_eq!(mapping.scope_id, "scope1");
         assert_eq!(mapping.channel, 0);
@@ -165,15 +160,11 @@ mod tests {
 
     #[test]
     fn test_word_mapping_creation() {
-        let mapping = ScopeChannelMapping::new_word(
-            "scope1",
-            1,
-            RuntimeBinding::tag("D100"),
-            "D100",
-        )
-            .with_scale(0.01)
-            .with_offset(-10.0)
-            .with_label("Temperature");
+        let mapping =
+            ScopeChannelMapping::new_word("scope1", 1, RuntimeBinding::tag("D100"), "D100")
+                .with_scale(0.01)
+                .with_offset(-10.0)
+                .with_label("Temperature");
 
         assert_eq!(mapping.scope_id, "scope1");
         assert_eq!(mapping.channel, 1);
@@ -185,13 +176,8 @@ mod tests {
 
     #[test]
     fn test_mapping_disabled() {
-        let mapping = ScopeChannelMapping::new_bit(
-            "scope1",
-            0,
-            RuntimeBinding::tag("P0"),
-            "P0",
-        )
-        .with_enabled(false);
+        let mapping = ScopeChannelMapping::new_bit("scope1", 0, RuntimeBinding::tag("P0"), "P0")
+            .with_enabled(false);
 
         assert!(!mapping.enabled);
     }

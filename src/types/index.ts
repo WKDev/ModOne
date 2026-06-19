@@ -95,6 +95,66 @@ export { TAG_EVENTS } from './tags';
 // TagDefinition from tags.ts is the DTO variant; use as TagDefinitionDto if needed
 export type { TagDefinition as TagDefinitionDto } from './tags';
 
+// IFTTT Action Block Core Infrastructure
+// Trigger-action binding data model, execution engine interfaces,
+// and XML/CAEX schema types (IEC 62714 / AutomationML inspired)
+export type {
+  // Domain
+  BlockDomain,
+  // Conditions
+  ConditionType,
+  Condition,
+  // Actions
+  ActionType,
+  Action,
+  // Rules
+  ConditionLogic,
+  IftttRule,
+  // Terminal roles (CAEX MappingObject)
+  TerminalRoleMapping,
+  // Behavior binding (CAEX SupportedRoleClass)
+  BehaviorTemplateId,
+  InteractionMode,
+  BehaviorBinding,
+  // Action block (top-level IFTTT unit)
+  ActionBlock,
+  // Simulation context (read-only world snapshot)
+  SimulationContext,
+  // Mutation effects (collected side-effects)
+  StateMutation,
+  PropertyMutation,
+  PortMutation,
+  RegisterWrite,
+  BitWrite,
+  TimerCommand,
+  CounterCommand,
+  EmittedEvent,
+  MutationEffect,
+  // Evaluation results
+  RuleEvaluationResult,
+  BlockEvaluationResult,
+  // Engine interface
+  IIftttActionEngine,
+  // XML serialisation raw types
+  RawBehaviorXml,
+  RawRuleXml,
+  RawConditionXml,
+  RawActionXml,
+} from './ifttt';
+export {
+  // Domain validation sets
+  CIRCUIT_ONLY_CONDITIONS,
+  PLC_ONLY_CONDITIONS,
+  CIRCUIT_ONLY_ACTIONS,
+  PLC_ONLY_ACTIONS,
+  // Domain validation helpers
+  isConditionAllowedInDomain,
+  isActionAllowedInDomain,
+  // Factory helpers
+  createEmptyMutationEffect,
+  mergeMutationEffects,
+} from './ifttt';
+
 // Document types (Multi-Document Editing)
 export type {
   DocumentType,

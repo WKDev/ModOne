@@ -407,7 +407,10 @@ mod tests {
         manager.tick(500);
 
         let state = manager.get_state(0).unwrap();
-        assert!(!state.done, "Should not be done at 500ms with 1000ms preset");
+        assert!(
+            !state.done,
+            "Should not be done at 500ms with 1000ms preset"
+        );
 
         manager.tick(600);
         let state = manager.get_state(0).unwrap();

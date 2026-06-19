@@ -78,7 +78,8 @@ export interface ErcResult {
 export function runErc(
   components: Map<string, Block>,
   wires: Wire[],
-  junctions: Map<string, Junction>
+  junctions: Map<string, Junction>,
+  gridSize: number = 5,
 ): ErcResult {
   const violations: ErcViolation[] = [];
   let violationId = 0;
@@ -207,8 +208,7 @@ export function runErc(
   // ========================================================================
   // Check 5.5: Dangling wires (floating endpoints not at any port)
   // ========================================================================
-  const GRID_SNAP_PX = 20;
-  const snapToGrid = (v: number) => Math.round(v / GRID_SNAP_PX) * GRID_SNAP_PX;
+  const snapToGrid = (v: number) => Math.round(v / gridSize) * gridSize;
 
   // Build set of all port absolute positions (grid-snapped)
   const portPositionKeys = new Set<string>();

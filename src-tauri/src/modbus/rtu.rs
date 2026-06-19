@@ -126,16 +126,17 @@ impl RtuConfig {
     pub fn inter_frame_delay_us(&self) -> u64 {
         // Character time = (start bit + data bits + parity bit + stop bits) / baud rate
         // For 8N1: 10 bits per character
-        let bits_per_char = 1 + match self.data_bits {
-            RtuDataBits::Seven => 7,
-            RtuDataBits::Eight => 8,
-        } + match self.parity {
-            RtuParity::None => 0,
-            _ => 1,
-        } + match self.stop_bits {
-            RtuStopBits::One => 1,
-            RtuStopBits::Two => 2,
-        };
+        let bits_per_char =
+            1 + match self.data_bits {
+                RtuDataBits::Seven => 7,
+                RtuDataBits::Eight => 8,
+            } + match self.parity {
+                RtuParity::None => 0,
+                _ => 1,
+            } + match self.stop_bits {
+                RtuStopBits::One => 1,
+                RtuStopBits::Two => 2,
+            };
 
         // Inter-frame delay is 3.5 character times
         // But minimum is 1.75ms (1750us) for baud rates > 19200
@@ -177,7 +178,10 @@ impl ModbusRtuServer {
     }
 
     /// Emit a connection event
-    fn emit_connection_event(app_handle: &Arc<RwLock<Option<Arc<tauri::AppHandle>>>>, event: ConnectionEvent) {
+    fn emit_connection_event(
+        app_handle: &Arc<RwLock<Option<Arc<tauri::AppHandle>>>>,
+        event: ConnectionEvent,
+    ) {
         if let Some(handle) = app_handle.read().as_ref() {
             let _ = handle.emit(EVENT_CONNECTION, event);
         }
@@ -222,14 +226,18 @@ impl ModbusRtuServer {
         self.running.store(true, Ordering::SeqCst);
 
         // Emit connected event
-        Self::emit_connection_event(&self.app_handle, ConnectionEvent::rtu_connected(&self.config.com_port));
+        Self::emit_connection_event(
+            &self.app_handle,
+            ConnectionEvent::rtu_connected(&self.config.com_port),
+        );
 
         // Clone what we need for the RTU loop
         let memory = Arc::clone(&self.memory);
         let running = Arc::clone(&self.running);
         let port = Arc::clone(&self.port);
         let unit_id = self.config.unit_id;
-        let inter_frame_delay = std::time::Duration::from_micros(self.config.inter_frame_delay_us());
+        let inter_frame_delay =
+            std::time::Duration::from_micros(self.config.inter_frame_delay_us());
 
         // Spawn the RTU loop
         self.task_handle = Some(tokio::spawn(async move {
@@ -260,7 +268,10 @@ impl ModbusRtuServer {
         *self.port.lock().await = None;
 
         // Emit disconnected event
-        Self::emit_connection_event(&self.app_handle, ConnectionEvent::rtu_disconnected(&port_name));
+        Self::emit_connection_event(
+            &self.app_handle,
+            ConnectionEvent::rtu_disconnected(&port_name),
+        );
 
         log::info!("Modbus RTU server stopped");
         Ok(())
@@ -401,7 +412,8 @@ async fn rtu_loop(
                         let request_pdu = &frame_buffer[1..pdu_end];
 
                         // Process the request
-                        let response_pdu = pdu::process_request(&memory, function_code, request_pdu);
+                        let response_pdu =
+                            pdu::process_request(&memory, function_code, request_pdu);
 
                         // Build and send response (only if not broadcast)
                         if frame_buffer[0] != 0 {
@@ -434,7 +446,6 @@ async fn rtu_loop(
 
     log::info!("RTU loop exited");
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -514,5 +525,4 @@ mod tests {
 
         assert!(!server.is_running());
     }
-
 }

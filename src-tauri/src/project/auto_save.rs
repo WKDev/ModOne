@@ -73,11 +73,7 @@ impl AutoSaveManager {
     /// Start the auto-save loop
     ///
     /// If already running, stops the current loop first.
-    pub fn start(
-        &mut self,
-        project_manager: Arc<Mutex<ProjectManager>>,
-        app_handle: AppHandle,
-    ) {
+    pub fn start(&mut self, project_manager: Arc<Mutex<ProjectManager>>, app_handle: AppHandle) {
         // Stop if already running
         if self.is_running {
             self.stop();
@@ -102,8 +98,14 @@ impl AutoSaveManager {
         );
 
         tokio::spawn(async move {
-            Self::auto_save_loop(project_manager, interval_duration, rx, backup_count, app_handle)
-                .await;
+            Self::auto_save_loop(
+                project_manager,
+                interval_duration,
+                rx,
+                backup_count,
+                app_handle,
+            )
+            .await;
         });
     }
 

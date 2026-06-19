@@ -9,10 +9,12 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { toast } from 'sonner';
 import type {
+  CreateTagRequest,
   TagDefinition,
   TagTypedValue,
   TagValue,
   TagValueChangedEvent,
+  UpdateTagRequest,
 } from '../types/tags';
 import { TAG_EVENTS } from '../types/tags';
 
@@ -52,6 +54,72 @@ export const tagService = {
     }
   },
 
+  async createTag(request: CreateTagRequest): Promise<TagDefinition> {
+    try {
+      return await invoke<TagDefinition>('create_tag', { request });
+    } catch (error) {
+      toast.error('태그 생성 실패', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  },
+
+  async deleteTag(tagId: string): Promise<void> {
+    try {
+      await invoke('delete_tag', { tagId });
+    } catch (error) {
+      toast.error('태그 삭제 실패', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  },
+
+  /** Batch-delete multiple tags in a single IPC round-trip. Returns IDs that were successfully deleted. */
+  async deleteTags(tagIds: string[]): Promise<string[]> {
+    try {
+      return await invoke<string[]>('delete_tags', { tagIds });
+    } catch (error) {
+      toast.error('태그 일괄 삭제 실패', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  },
+
+  async updateTagDefinition(request: UpdateTagRequest): Promise<TagDefinition> {
+    try {
+      return await invoke<TagDefinition>('update_tag_definition', { request });
+    } catch (error) {
+      toast.error('태그 정의 업데이트 실패', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  },
+
+  async checkCanonicalAddressDuplicate(
+    area: string,
+    index: number,
+    bitIndex?: number,
+    excludeTagId?: string,
+  ): Promise<string[]> {
+    try {
+      return await invoke<string[]>('check_canonical_address_duplicate', {
+        area,
+        index,
+        bitIndex: bitIndex ?? null,
+        excludeTagId: excludeTagId ?? null,
+      });
+    } catch (error) {
+      toast.error('주소 중복 검사 실패', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  },
+
   async setWatchedTags(tagIds: string[]): Promise<void> {
     try {
       await invoke('set_watched_tags', { tagIds });
@@ -76,6 +144,7 @@ export const tagService = {
       cb();
     });
   },
+
 };
 
 export default tagService;

@@ -9,7 +9,7 @@ use tauri::State;
 use tokio::sync::Mutex;
 
 use crate::network::{
-    list_network_interfaces, is_ip_assigned, NetworkInterfaceInfo, SimulatorNetworkManager,
+    is_ip_assigned, list_network_interfaces, NetworkInterfaceInfo, SimulatorNetworkManager,
 };
 
 /// Managed state for network IP alias lifecycle.
@@ -28,9 +28,7 @@ impl Default for NetworkState {
 /// List available network interfaces on the host.
 #[tauri::command]
 pub async fn network_list_interfaces() -> Result<Vec<NetworkInterfaceInfo>, String> {
-    list_network_interfaces()
-        .await
-        .map_err(|e| e.to_string())
+    list_network_interfaces().await.map_err(|e| e.to_string())
 }
 
 /// Check whether an IP address is currently assigned to a local interface.
@@ -49,11 +47,7 @@ pub async fn network_add_alias(
 ) -> Result<String, String> {
     let mut mgr = state.manager.lock().await;
     let result = mgr
-        .ensure_alias(
-            Some(&ip),
-            interface_name.as_deref(),
-            subnet_mask.as_deref(),
-        )
+        .ensure_alias(Some(&ip), interface_name.as_deref(), subnet_mask.as_deref())
         .await
         .map_err(|e| e.to_string())?;
 

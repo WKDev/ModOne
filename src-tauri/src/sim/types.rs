@@ -4,9 +4,9 @@
 //! PLC simulation including device memory, timer/counter state,
 //! simulation configuration, and debugger interfaces.
 
+use crate::plc_runtime::CanonicalAddress;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::plc_runtime::CanonicalAddress;
 
 // ============================================================================
 // Device Memory Configuration Types
@@ -64,7 +64,10 @@ impl SimBitDeviceType {
 
     /// Check if this device is read-only
     pub fn is_readonly(&self) -> bool {
-        matches!(self, SimBitDeviceType::F | SimBitDeviceType::T | SimBitDeviceType::C)
+        matches!(
+            self,
+            SimBitDeviceType::F | SimBitDeviceType::T | SimBitDeviceType::C
+        )
     }
 }
 
@@ -392,12 +395,8 @@ pub struct ScanCycleInfo {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "kind")]
 pub enum RuntimeBinding {
-    Canonical {
-        address: CanonicalAddress,
-    },
-    Tag {
-        tag_id: String,
-    },
+    Canonical { address: CanonicalAddress },
+    Tag { tag_id: String },
 }
 
 impl RuntimeBinding {
@@ -457,6 +456,11 @@ pub struct TagDefinition {
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub engineering_unit: Option<String>,
+    /// Dot-separated folder path for OPC UA Address Space hierarchy.
+    /// Example: "Plant.Area1.Motors" creates nested folders Plant → Area1 → Motors.
+    /// When absent, tags fall back to the default "Raw" or "Semantic" flat classification.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folder_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -477,6 +481,9 @@ pub struct RegisterTagRequest {
     pub engineering_unit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub access: Option<TagAccessLevel>,
+    /// Dot-separated folder path for OPC UA Address Space hierarchy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folder_path: Option<String>,
 }
 
 /// Breakpoint types
@@ -614,10 +621,13 @@ impl WatchVariable {
             self.last_change_time = now;
 
             // Add to history (front)
-            self.history.insert(0, ValueHistoryEntry {
-                value: new_value,
-                timestamp: now,
-            });
+            self.history.insert(
+                0,
+                ValueHistoryEntry {
+                    value: new_value,
+                    timestamp: now,
+                },
+            );
 
             // Truncate history
             if self.history.len() > self.max_history {
@@ -740,7 +750,10 @@ mod tests {
     #[test]
     fn test_watch_variable_update() {
         let mut watch = WatchVariable::new(
-            RuntimeBinding::canonical(CanonicalAddress::new(crate::plc_runtime::CanonicalAreaKind::InternalBit, 0)),
+            RuntimeBinding::canonical(CanonicalAddress::new(
+                crate::plc_runtime::CanonicalAreaKind::InternalBit,
+                0,
+            )),
             "M0000".to_string(),
             serde_json::json!(false),
             10,

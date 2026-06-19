@@ -1,5 +1,4 @@
 #![cfg(feature = "opcua-server")]
-
 #![allow(dead_code)]
 
 use std::fs::{self, OpenOptions};
@@ -401,6 +400,7 @@ pub fn start_secure_test_server(trace_path: &Path) -> TestServerFixture {
             description: Some("Writable run command".to_string()),
             engineering_unit: None,
             access: None,
+            folder_path: None,
         })
         .unwrap();
     tag_registry
@@ -416,6 +416,7 @@ pub fn start_secure_test_server(trace_path: &Path) -> TestServerFixture {
             description: Some("Tag-level readonly enforcement".to_string()),
             engineering_unit: None,
             access: Some(TagAccessLevel::ReadOnly),
+            folder_path: None,
         })
         .unwrap();
     tag_registry
@@ -431,6 +432,7 @@ pub fn start_secure_test_server(trace_path: &Path) -> TestServerFixture {
             description: Some("Readonly status bit".to_string()),
             engineering_unit: None,
             access: None,
+            folder_path: None,
         })
         .unwrap();
     tag_registry.register_raw(
@@ -456,6 +458,7 @@ pub fn start_secure_test_server(trace_path: &Path) -> TestServerFixture {
         private_key_path: "private/private.pem".into(),
         username: Some(username.clone()),
         password: Some(password.clone()),
+        ..OpcUaConfig::default()
     };
 
     if let Ok(trusted_client_cert_path) = std::env::var("MODONE_OPCUA_TRUSTED_CLIENT_CERT_PATH") {
@@ -499,6 +502,9 @@ pub fn start_secure_test_server(trace_path: &Path) -> TestServerFixture {
                 profile.as_ref(),
                 &settings,
                 &tag_registry,
+                None,
+                None,
+                None,
             )
             .expect("server should start");
         trace_to(trace_path, "server start returned");

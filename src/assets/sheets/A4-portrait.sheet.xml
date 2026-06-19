@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sheet version="1.0" unit="mm">
+  <page width="210" height="297">
+    <margins top="10" right="10" bottom="10" left="20"/>
+  </page>
+  <elements>
+    <rect id="border-outer" x="20" y="10" w="180" h="277" stroke="black" strokeWidth="0.7" fill="none"/>
+    <rect id="border-inner" x="20" y="10" w="180" h="257" stroke="black" strokeWidth="0.35" fill="none"/>
+    <rect id="tb-frame" x="20" y="267" w="180" h="20" stroke="black" strokeWidth="0.7" fill="none"/>
+    <line id="tb-v1" x1="60" y1="267" x2="60" y2="287" stroke="black" strokeWidth="0.35"/>
+    <line id="tb-v2" x1="120" y1="267" x2="120" y2="287" stroke="black" strokeWidth="0.35"/>
+    <line id="tb-h1" x1="20" y1="277" x2="200" y2="277" stroke="black" strokeWidth="0.35"/>
+    <table id="tb-table" x="20" y="267" stroke="black" strokeWidth="0.35" fontSize="6" fontFamily="sans-serif">
+      <col key="label" label="" width="40"/>
+      <col key="value1" label="" width="60"/>
+      <col key="value2" label="" width="80"/>
+      <row height="10">
+        <cell col="label">Drawing No.</cell>
+        <cell col="value1">${project.name}</cell>
+        <cell col="value2">${title}</cell>
+      </row>
+      <row height="10">
+        <cell col="label">Drawn by</cell>
+        <cell col="value1">${author}</cell>
+        <cell col="value2">${company}</cell>
+      </row>
+    </table>
+    <text id="scale-label" x="25" y="292" size="5" fontFamily="sans-serif" align="left" color="black">Scale: ${scale}</text>
+  </elements>
+  <templates>
+    <var key="title">Untitled Drawing</var>
+    <var key="author"></var>
+    <var key="company"></var>
+    <var key="scale">1:1</var>
+    <var key="page_num">1</var>
+    <var key="page_total">1</var>
+  </templates>
+</sheet>

@@ -491,31 +491,28 @@ pub fn validate_opcua_settings(
         );
     }
 
+    // Legacy username/password validation: these are only required when no
+    // multi-account credentials are configured in the UserAccountStore.
+    // At validation time we don't have access to the account store, so we
+    // skip the "required" check — the server startup will reject if neither
+    // legacy credentials nor verified account store credentials are available.
     let username = settings
         .username
         .as_deref()
         .map(str::trim)
         .unwrap_or_default();
-    if username.is_empty() {
-        result.add_error(
-            "opcua.username",
-            "Username is required when OPC UA is enabled",
-        );
-    }
-
     let password = settings
         .password
         .as_deref()
         .map(str::trim)
         .unwrap_or_default();
-    if password.is_empty() {
-        result.add_error(
-            "opcua.password",
-            "Password is required when OPC UA is enabled",
-        );
-    }
 
-    if username.eq_ignore_ascii_case("modone") && password == "modone" {
+    // Still reject default credentials even if both are present.
+    if !username.is_empty()
+        && !password.is_empty()
+        && username.eq_ignore_ascii_case("modone")
+        && password == "modone"
+    {
         result.add_error(
             "opcua.password",
             "Default OPC UA credentials are not allowed; choose a project-specific username and password",
@@ -889,7 +886,11 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_opcua_requires_credentials_when_enabled() {
+    fn test_validate_opcua_allows_empty_credentials_when_enabled() {
+        // Empty legacy credentials are now allowed at validation time because
+        // the multi-account store may provide credentials at server startup.
+        // The server startup will reject if neither legacy credentials nor
+        // verified account store credentials are available.
         let settings = OpcUaSettings {
             enabled: true,
             username: None,
@@ -900,10 +901,8 @@ mod tests {
 
         validate_opcua_settings(&settings, &NetworkSettings::default(), &mut result);
 
-        assert!(!result.is_valid());
-        let errors = result.errors();
-        assert!(errors.iter().any(|(field, _)| field == "opcua.username"));
-        assert!(errors.iter().any(|(field, _)| field == "opcua.password"));
+        // No errors — the server start will validate credential availability
+        assert!(result.is_valid());
     }
 
     #[test]
