@@ -43,6 +43,7 @@ nul
 
 # Python venv (asyncua tooling)
 .venv-asyncua/
+.venv-test/
 
 # Nested Rust tool build artifacts
 tools/**/target/

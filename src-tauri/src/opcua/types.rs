@@ -5,7 +5,13 @@ use serde::{Deserialize, Serialize};
 use super::auth::VerifiedCredential;
 
 /// OPC UA server configuration for runtime use.
+///
+/// `#[serde(default)]` lets the frontend send a partial config (only the
+/// user-editable fields: credentials, security policies, anonymous access);
+/// infra fields (bind_address, port, server_name, PKI paths) fall back to the
+/// `Default` impl and are then resolved/overridden by `finalize_opcua_config`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct OpcUaConfig {
     /// Bind address ("127.0.0.1" or specific plc_ip)
     pub bind_address: String,
