@@ -36,6 +36,15 @@ export {
 } from '../components/OneCanvas/renderers/PageGuideRenderer';
 
 // --- Input pipeline ---
+// The unified tool/input contract — the first module that physically lives in
+// canvas-core (not a re-export). Editors drive interactions through this.
+export type {
+  CanvasTool,
+  CanvasPointerInput,
+  PointerInputHandlers,
+} from './input/Tool';
+export { ToolInputBinding, type ToolInputBindingOptions } from './input/ToolInputBinding';
+
 export { EventBridge, type EventBridgeOptions } from '../components/OneCanvas/interaction/EventBridge';
 export {
   KeyboardShortcuts,

@@ -22,7 +22,7 @@ import {
   forwardRef,
   type CSSProperties,
 } from 'react';
-import { Container, type FederatedPointerEvent } from 'pixi.js';
+import { Container } from 'pixi.js';
 
 import type { GraphicPrimitive, SymbolDefinition, SymbolPin } from '@/types/symbol';
 import type { EditorAction } from './SymbolEditor';
@@ -33,6 +33,7 @@ import { PixiApplication } from '@components/OneCanvas/core/PixiApplication';
 import { PixiViewport } from '@components/OneCanvas/core/PixiViewport';
 import { CoordinateSystem } from '@components/OneCanvas/core/CoordinateSystem';
 import { GridRenderer } from '@components/OneCanvas/renderers/GridRenderer';
+import { ToolInputBinding } from '@/canvas-core';
 
 import { PrimitiveRenderer } from './renderers/PrimitiveRenderer';
 import { PinRenderer } from './renderers/PinRenderer';
@@ -213,8 +214,8 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
     // Tool ref
     const toolRef = useRef<BaseTool>(new SelectTool());
 
-    // Pan drag tracking (middle-mouse)
-    const panDragRef = useRef({ active: false, x: 0, y: 0 });
+    // Shared canvas-core pointer-input pipeline (federated → normalized → tool).
+    const toolInputRef = useRef<ToolInputBinding | null>(null);
 
     // Cursor feedback
     const cursorRef = useRef<string>('crosshair');
@@ -371,37 +372,38 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
             overlay.getSelectedResizableBounds(ids, graphics);
         }
 
-        // 5c. Wire PIXI federated pointer events on the viewport — the same
-        // input source as OneCanvas's EventBridge. Left button drives the active
-        // tool; middle/right is left to pixi-viewport for native pan. Listeners
-        // are removed by viewport.destroy() (removeAllListeners) on cleanup.
-        const vp = viewport.viewport;
-        const onVpPointerDown = (e: FederatedPointerEvent) => {
-          if (e.button !== 0) {
-            // Middle/right → pixi-viewport pans natively; suppress tool dispatch.
-            panDragRef.current.active = true;
-            return;
-          }
-          const point = toWorldPoint(e.global.x, e.global.y, e.shiftKey, e.altKey);
-          if (point) runToolDown(point, e.client.x, e.client.y);
-        };
-        const onVpPointerMove = (e: FederatedPointerEvent) => {
-          if (panDragRef.current.active) return; // mid-pan: don't fight the camera
-          const point = toWorldPoint(e.global.x, e.global.y, e.shiftKey, e.altKey);
-          if (point) runToolMove(point, e.client.x, e.client.y);
-        };
-        const onVpPointerUp = (e: FederatedPointerEvent) => {
-          if (e.button !== 0) {
-            panDragRef.current.active = false;
-            return;
-          }
-          const point = toWorldPoint(e.global.x, e.global.y, e.shiftKey, e.altKey);
-          if (point) runToolUp(point, e.client.x, e.client.y);
-        };
-        vp.on('pointerdown', onVpPointerDown);
-        vp.on('pointermove', onVpPointerMove);
-        vp.on('pointerup', onVpPointerUp);
-        vp.on('pointerupoutside', onVpPointerUp);
+        // 5c. Bind pointer input through the shared canvas-core pipeline. The
+        // ToolInputBinding converts PIXI federated events into normalized world/
+        // snapped/client coordinates (the same source OneCanvas uses) and routes
+        // the primary button to the active tool; middle/right is left to
+        // pixi-viewport for native pan. The editor adapts its BaseTool model via
+        // these handlers — snapped world point + client coords for the popover.
+        const toolInput = new ToolInputBinding();
+        toolInput.init({
+          viewport: viewport.viewport,
+          coordSys,
+          handlers: {
+            onPointerDown: (p) =>
+              runToolDown(
+                { x: p.snapped.x, y: p.snapped.y, shiftKey: p.shiftKey, altKey: p.altKey },
+                p.client.x,
+                p.client.y,
+              ),
+            onPointerMove: (p) =>
+              runToolMove(
+                { x: p.snapped.x, y: p.snapped.y, shiftKey: p.shiftKey, altKey: p.altKey },
+                p.client.x,
+                p.client.y,
+              ),
+            onPointerUp: (p) =>
+              runToolUp(
+                { x: p.snapped.x, y: p.snapped.y, shiftKey: p.shiftKey, altKey: p.altKey },
+                p.client.x,
+                p.client.y,
+              ),
+          },
+        });
+        toolInputRef.current = toolInput;
 
         // 6. Initial grid render
         gridRendererRef.current.render(
@@ -433,7 +435,9 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
         activeApp?.stop();
         pixiAppRef.current?.stop();
 
-        // Destroy in reverse order
+        // Destroy in reverse order. Detach pointer input first so no federated
+        // event fires into half-destroyed renderers.
+        toolInputRef.current?.destroy();
         overlayRendererRef.current?.destroy();
         ghostRendererRef.current?.destroy();
         pinRendererRef.current?.destroy();
@@ -453,6 +457,7 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
         coordSysRef.current = null;
         viewportRef.current = null;
         pixiAppRef.current = null;
+        toolInputRef.current = null;
       };
     }, []); // Mount once
 
@@ -541,28 +546,9 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       return { x: world.x, y: world.y, shiftKey, altKey };
     };
 
-    /**
-     * Convert a PIXI federated pointer's canvas-relative `global` coordinates to
-     * a snapped world point. This is the same path OneCanvas's EventBridge uses
-     * (`viewport.toWorld(e.global)`), so the two editors share one coordinate
-     * pipeline — no manual getBoundingClientRect math, no offset-bug class.
-     */
-    const toWorldPoint = (
-      globalX: number,
-      globalY: number,
-      shiftKey = false,
-      altKey = false,
-    ): CanvasPoint | null => {
-      const coordSys = coordSysRef.current;
-      const viewport = viewportRef.current;
-      if (!coordSys || !viewport) return null;
-      const world = viewport.viewport.toWorld(globalX, globalY);
-      const snapped = coordSys.snapToGrid({ x: world.x, y: world.y });
-      return { x: snapped.x, y: snapped.y, shiftKey, altKey };
-    };
-
     // ========================================================================
-    // DOM Event Handlers
+    // Tool dispatch (driven by canvas-core ToolInputBinding; toCanvasPoint above
+    // still serves the DOM double-click handler).
     // ========================================================================
 
     const getToolCallbacks = (): ToolCallbacks => ({
