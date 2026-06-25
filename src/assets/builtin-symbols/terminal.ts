@@ -9,14 +9,14 @@ export const terminalSymbol: SymbolDefinition = {
   author: 'ModOne',
   createdAt: '2026-03-05T00:00:00Z',
   updatedAt: '2026-03-05T00:00:00Z',
-  width: 40,
-  height: 40,
+  width: 20,
+  height: 20,
   graphics: [
-    { kind: 'rect', x: 10, y: 7, width: 20, height: 26, stroke: '#888', fill: 'transparent', strokeWidth: 2 },
-    { kind: 'circle', cx: 20, cy: 20, r: 2, stroke: '#888', fill: 'transparent', strokeWidth: 2 },
+    { kind: 'rect', x: 5, y: 3.5, width: 10, height: 13, stroke: '#888', fill: 'transparent', strokeWidth: 1 },
+    { kind: 'circle', cx: 10, cy: 10, r: 1, stroke: '#888', fill: 'transparent', strokeWidth: 1 },
   ],
   pins: [
-    { id: 'conn', name: 'T', number: '1', type: 'bidirectional', electricalType: 'bidirectional', functionalRole: 'general', shape: 'line', position: { x: 0, y: 20 }, orientation: 'left', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
+    { id: 'conn', name: 'T', number: '1', type: 'bidirectional', electricalType: 'bidirectional', functionalRole: 'general', shape: 'line', position: { x: 0, y: 10 }, orientation: 'left', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
   ],
   properties: [
     { key: 'designation', value: 'X1', type: 'string', visible: true, editorType: 'text' },

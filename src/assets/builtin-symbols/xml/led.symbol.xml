@@ -15,47 +15,47 @@
   <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
   <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
 
-  <ms:Layout width="40" height="60" unit="px"/>
+  <ms:Layout width="20" height="30" unit="mm"/>
 
   <ms:Ports>
     <ms:Port id="anode" name="+" number="A"
       electricalType="input" functionalRole="general"
       shape="line" orientation="up"
-      x="20" y="0" length="0" sortOrder="1"
+      x="10" y="0" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="cathode" name="-" number="K"
       electricalType="output" functionalRole="general"
       shape="line" orientation="down"
-      x="20" y="60" length="0" sortOrder="2"
+      x="10" y="30" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
   </ms:Ports>
 
   <ms:Graphics>
-    <ms:Polyline id="lead-top" stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="20" y="0"/>
-      <ms:Point x="20" y="10"/>
+    <ms:Polyline id="lead-top" stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="10" y="0"/>
+      <ms:Point x="10" y="5"/>
     </ms:Polyline>
-    <ms:Polyline id="diode-body" stroke="#888" fill="transparent" strokeWidth="2">
-      <ms:Point x="10" y="20"/>
-      <ms:Point x="30" y="20"/>
-      <ms:Point x="20" y="34"/>
-      <ms:Point x="10" y="20"/>
+    <ms:Polyline id="diode-body" stroke="#888" fill="transparent" strokeWidth="1">
+      <ms:Point x="5" y="10"/>
+      <ms:Point x="15" y="10"/>
+      <ms:Point x="10" y="17"/>
+      <ms:Point x="5" y="10"/>
     </ms:Polyline>
-    <ms:Polyline id="cathode-bar" stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="10" y="38"/>
-      <ms:Point x="30" y="38"/>
+    <ms:Polyline id="cathode-bar" stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="5" y="19"/>
+      <ms:Point x="15" y="19"/>
     </ms:Polyline>
-    <ms:Polyline id="ray-1" stroke="#888" fill="none" strokeWidth="1.5">
-      <ms:Point x="24" y="15"/>
-      <ms:Point x="30" y="9"/>
+    <ms:Polyline id="ray-1" stroke="#888" fill="none" strokeWidth="0.75">
+      <ms:Point x="12" y="7.5"/>
+      <ms:Point x="15" y="4.5"/>
     </ms:Polyline>
-    <ms:Polyline id="ray-2" stroke="#888" fill="none" strokeWidth="1.5">
-      <ms:Point x="28" y="19"/>
-      <ms:Point x="34" y="13"/>
+    <ms:Polyline id="ray-2" stroke="#888" fill="none" strokeWidth="0.75">
+      <ms:Point x="14" y="9.5"/>
+      <ms:Point x="17" y="6.5"/>
     </ms:Polyline>
-    <ms:Polyline id="lead-bottom" stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="20" y="38"/>
-      <ms:Point x="20" y="60"/>
+    <ms:Polyline id="lead-bottom" stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="10" y="19"/>
+      <ms:Point x="10" y="30"/>
     </ms:Polyline>
   </ms:Graphics>
 

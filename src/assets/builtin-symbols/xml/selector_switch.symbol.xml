@@ -15,43 +15,43 @@
   <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
   <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
 
-  <ms:Layout width="80" height="80" unit="px"/>
+  <ms:Layout width="40" height="40" unit="mm"/>
 
   <ms:Ports>
     <ms:Port id="com" name="COM" number="C"
       electricalType="input" functionalRole="general"
       shape="line" orientation="left"
-      x="0" y="20" length="0" sortOrder="1"
+      x="0" y="10" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="pos1" name="1" number="1"
       electricalType="output" functionalRole="general"
       shape="line" orientation="right"
-      x="80" y="20" length="0" sortOrder="2"
+      x="40" y="10" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="pos2" name="2" number="2"
       electricalType="output" functionalRole="general"
       shape="line" orientation="right"
-      x="80" y="40" length="0" sortOrder="3"
+      x="40" y="20" length="0" sortOrder="3"
       nameVisible="true" numberVisible="true"/>
   </ms:Ports>
 
   <ms:Graphics>
-    <ms:Polyline id="lead-in" stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="0" y="20"/>
-      <ms:Point x="20" y="20"/>
+    <ms:Polyline id="lead-in" stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="0" y="10"/>
+      <ms:Point x="10" y="10"/>
     </ms:Polyline>
-    <ms:Circle id="selector-body" cx="32" cy="20" r="10" stroke="#888" fill="transparent" strokeWidth="2"/>
-    <ms:Polyline id="selector-arm" stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="32" y="20"/>
-      <ms:Point x="56" y="12"/>
+    <ms:Circle id="selector-body" cx="16" cy="10" r="5" stroke="#888" fill="transparent" strokeWidth="1"/>
+    <ms:Polyline id="selector-arm" stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="16" y="10"/>
+      <ms:Point x="28" y="6"/>
     </ms:Polyline>
-    <ms:Polyline id="pos1-lead" stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="56" y="20"/>
-      <ms:Point x="80" y="20"/>
+    <ms:Polyline id="pos1-lead" stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="28" y="10"/>
+      <ms:Point x="40" y="10"/>
     </ms:Polyline>
-    <ms:Polyline id="pos2-lead" stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="56" y="40"/>
-      <ms:Point x="80" y="40"/>
+    <ms:Polyline id="pos2-lead" stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="28" y="20"/>
+      <ms:Point x="40" y="20"/>
     </ms:Polyline>
   </ms:Graphics>
 

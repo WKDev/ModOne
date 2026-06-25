@@ -15,45 +15,45 @@
   <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
   <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
 
-  <ms:Layout width="80" height="80" unit="px"/>
+  <ms:Layout width="40" height="40" unit="mm"/>
 
   <ms:Ports>
     <ms:Port id="com" name="COM" number="1"
       electricalType="input" functionalRole="general"
       shape="line" orientation="left"
-      x="0" y="40" length="0" sortOrder="1"
+      x="0" y="20" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="pos1" name="NO" number="2"
       electricalType="output" functionalRole="general"
       shape="line" orientation="right"
-      x="80" y="20" length="0" sortOrder="2"
+      x="40" y="10" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="pos2" name="NC" number="3"
       electricalType="output" functionalRole="general"
       shape="line" orientation="right"
-      x="80" y="40" length="0" sortOrder="3"
+      x="40" y="20" length="0" sortOrder="3"
       nameVisible="true" numberVisible="true"/>
   </ms:Ports>
 
   <ms:Graphics>
-    <ms:Polyline id="lead-com" stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="4" y="40"/>
-      <ms:Point x="24" y="40"/>
+    <ms:Polyline id="lead-com" stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="2" y="20"/>
+      <ms:Point x="12" y="20"/>
     </ms:Polyline>
-    <ms:Polyline id="lead-pos1" stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="56" y="20"/>
-      <ms:Point x="76" y="20"/>
+    <ms:Polyline id="lead-pos1" stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="28" y="10"/>
+      <ms:Point x="38" y="10"/>
     </ms:Polyline>
-    <ms:Polyline id="lead-pos2" stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="56" y="40"/>
-      <ms:Point x="76" y="40"/>
+    <ms:Polyline id="lead-pos2" stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="28" y="20"/>
+      <ms:Point x="38" y="20"/>
     </ms:Polyline>
-    <ms:Circle id="terminal-com" cx="24" cy="40" r="2" stroke="#888" fill="#888" strokeWidth="2"/>
-    <ms:Circle id="terminal-pos1" cx="56" cy="20" r="2" stroke="#888" fill="#888" strokeWidth="2"/>
-    <ms:Circle id="terminal-pos2" cx="56" cy="40" r="2" stroke="#888" fill="#888" strokeWidth="2"/>
-    <ms:Polyline id="switch-arm" stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="24" y="40"/>
-      <ms:Point x="54" y="22"/>
+    <ms:Circle id="terminal-com" cx="12" cy="20" r="1" stroke="#888" fill="#888" strokeWidth="1"/>
+    <ms:Circle id="terminal-pos1" cx="28" cy="10" r="1" stroke="#888" fill="#888" strokeWidth="1"/>
+    <ms:Circle id="terminal-pos2" cx="28" cy="20" r="1" stroke="#888" fill="#888" strokeWidth="1"/>
+    <ms:Polyline id="switch-arm" stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="12" y="20"/>
+      <ms:Point x="27" y="11"/>
     </ms:Polyline>
   </ms:Graphics>
 

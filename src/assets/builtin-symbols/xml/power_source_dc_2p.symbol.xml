@@ -15,37 +15,37 @@
   <ms:CreatedAt>2026-03-10T00:00:00Z</ms:CreatedAt>
   <ms:UpdatedAt>2026-03-10T00:00:00Z</ms:UpdatedAt>
 
-  <ms:Layout width="40" height="60" unit="px"/>
+  <ms:Layout width="20" height="30" unit="mm"/>
 
   <ms:Ports>
     <ms:Port id="pos" name="+" number="1"
       electricalType="power_out" functionalRole="general"
       shape="line" orientation="up"
-      x="20" y="0" length="0" sortOrder="1"
+      x="10" y="0" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="neg" name="-" number="2"
       electricalType="power_out" functionalRole="general"
       shape="line" orientation="down"
-      x="20" y="60" length="0" sortOrder="2"
+      x="10" y="30" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
   </ms:Ports>
 
   <ms:Graphics>
-    <ms:Polyline stroke="#ef4444" fill="none" strokeWidth="2">
-      <ms:Point x="8" y="26"/>
-      <ms:Point x="32" y="26"/>
-    </ms:Polyline>
-    <ms:Polyline stroke="#888" fill="none" strokeWidth="4">
-      <ms:Point x="14" y="34"/>
-      <ms:Point x="26" y="34"/>
-    </ms:Polyline>
-    <ms:Polyline stroke="#ef4444" fill="none" strokeWidth="2">
-      <ms:Point x="20" y="26"/>
-      <ms:Point x="20" y="0"/>
+    <ms:Polyline stroke="#ef4444" fill="none" strokeWidth="1">
+      <ms:Point x="4" y="13"/>
+      <ms:Point x="16" y="13"/>
     </ms:Polyline>
     <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="20" y="34"/>
-      <ms:Point x="20" y="60"/>
+      <ms:Point x="7" y="17"/>
+      <ms:Point x="13" y="17"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#ef4444" fill="none" strokeWidth="1">
+      <ms:Point x="10" y="13"/>
+      <ms:Point x="10" y="0"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="10" y="17"/>
+      <ms:Point x="10" y="30"/>
     </ms:Polyline>
   </ms:Graphics>
 

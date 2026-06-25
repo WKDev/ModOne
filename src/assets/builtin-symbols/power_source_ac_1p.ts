@@ -9,15 +9,15 @@ export const powerSourceAc1pSymbol: SymbolDefinition = {
   author: 'ModOne',
   createdAt: '2026-03-10T00:00:00Z',
   updatedAt: '2026-03-10T00:00:00Z',
-  width: 40,
-  height: 40,
+  width: 20,
+  height: 20,
   graphics: [
-    { kind: 'circle', cx: 20, cy: 16, r: 10, stroke: '#888', fill: 'transparent', strokeWidth: 2 },
-    { kind: 'polyline', points: [{ x: 14, y: 16 }, { x: 17, y: 13 }, { x: 23, y: 19 }, { x: 26, y: 16 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
-    { kind: 'polyline', points: [{ x: 20, y: 26 }, { x: 20, y: 40 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { kind: 'circle', cx: 10, cy: 8, r: 5, stroke: '#888', fill: 'transparent', strokeWidth: 1 },
+    { kind: 'polyline', points: [{ x: 7, y: 8 }, { x: 8.5, y: 6.5 }, { x: 11.5, y: 9.5 }, { x: 13, y: 8 }], stroke: '#888', fill: 'none', strokeWidth: 0.75 },
+    { kind: 'polyline', points: [{ x: 10, y: 13 }, { x: 10, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 1 },
   ],
   pins: [
-    { id: 'out', name: 'L', number: '1', type: 'output', electricalType: 'power_out', functionalRole: 'general', shape: 'line', position: { x: 20, y: 40 }, orientation: 'down', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
+    { id: 'out', name: 'L', number: '1', type: 'output', electricalType: 'power_out', functionalRole: 'general', shape: 'line', position: { x: 10, y: 20 }, orientation: 'down', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
   ],
   properties: [
     { key: 'designation', value: 'L1', type: 'string', visible: true, editorType: 'text' },

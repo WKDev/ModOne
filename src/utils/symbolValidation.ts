@@ -1,4 +1,5 @@
 import type { SymbolDefinition, GraphicPrimitive } from '../types/symbol';
+import { GRID_MODULE_MM } from '../components/OneCanvas/canvasUnits';
 
 export interface ValidationError {
   rule: string;
@@ -12,7 +13,8 @@ export interface ValidationResult {
 
 const BOUNDS_MIN = -500;
 const BOUNDS_MAX = 1500;
-const GRID = 20;
+// Symbols are authored in mm on the shared 5mm grid (GRID_MODULE_MM).
+const GRID = GRID_MODULE_MM;
 const DIM_MIN = 1;
 const DIM_MAX = 1000;
 

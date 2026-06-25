@@ -9,17 +9,17 @@ export const buttonSymbol: SymbolDefinition = {
   author: 'ModOne',
   createdAt: '2026-03-05T00:00:00Z',
   updatedAt: '2026-03-05T00:00:00Z',
-  width: 40,
-  height: 40,
+  width: 20,
+  height: 20,
   graphics: [
-    { id: 'lead-in', kind: 'polyline', points: [{ x: 0, y: 20 }, { x: 14, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { id: 'contact-arm', kind: 'polyline', points: [{ x: 14, y: 24 }, { x: 26, y: 16 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { id: 'lead-out', kind: 'polyline', points: [{ x: 26, y: 20 }, { x: 40, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { id: 'plunger-head', kind: 'polyline', points: [{ x: 14, y: 10 }, { x: 26, y: 10 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
+    { id: 'lead-in', kind: 'polyline', points: [{ x: 0, y: 10 }, { x: 7, y: 10 }], stroke: '#888', fill: 'none', strokeWidth: 1 },
+    { id: 'contact-arm', kind: 'polyline', points: [{ x: 7, y: 12 }, { x: 13, y: 8 }], stroke: '#888', fill: 'none', strokeWidth: 1 },
+    { id: 'lead-out', kind: 'polyline', points: [{ x: 13, y: 10 }, { x: 20, y: 10 }], stroke: '#888', fill: 'none', strokeWidth: 1 },
+    { id: 'plunger-head', kind: 'polyline', points: [{ x: 7, y: 5 }, { x: 13, y: 5 }], stroke: '#888', fill: 'none', strokeWidth: 0.75 },
   ],
   pins: [
-    { id: 'in', name: 'IN', number: '1', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 0, y: 20 }, orientation: 'left', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
-    { id: 'out', name: 'OUT', number: '2', type: 'output', electricalType: 'output', functionalRole: 'general', shape: 'line', position: { x: 40, y: 20 }, orientation: 'right', length: 0, sortOrder: 2, nameVisible: true, numberVisible: true },
+    { id: 'in', name: 'IN', number: '1', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 0, y: 10 }, orientation: 'left', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
+    { id: 'out', name: 'OUT', number: '2', type: 'output', electricalType: 'output', functionalRole: 'general', shape: 'line', position: { x: 20, y: 10 }, orientation: 'right', length: 0, sortOrder: 2, nameVisible: true, numberVisible: true },
   ],
   behavior: {
     templateId: 'archetype:switch',
@@ -31,10 +31,10 @@ export const buttonSymbol: SymbolDefinition = {
   visualStates: {
     pressed: {
       graphics: [
-        { id: 'lead-in', kind: 'polyline', points: [{ x: 0, y: 20 }, { x: 14, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-        { id: 'contact-arm', kind: 'polyline', points: [{ x: 14, y: 20 }, { x: 26, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-        { id: 'lead-out', kind: 'polyline', points: [{ x: 26, y: 20 }, { x: 40, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-        { id: 'plunger-head', kind: 'polyline', points: [{ x: 14, y: 12 }, { x: 26, y: 12 }], stroke: '#888', fill: 'none', strokeWidth: 1.5 },
+        { id: 'lead-in', kind: 'polyline', points: [{ x: 0, y: 10 }, { x: 7, y: 10 }], stroke: '#888', fill: 'none', strokeWidth: 1 },
+        { id: 'contact-arm', kind: 'polyline', points: [{ x: 7, y: 10 }, { x: 13, y: 10 }], stroke: '#888', fill: 'none', strokeWidth: 1 },
+        { id: 'lead-out', kind: 'polyline', points: [{ x: 13, y: 10 }, { x: 20, y: 10 }], stroke: '#888', fill: 'none', strokeWidth: 1 },
+        { id: 'plunger-head', kind: 'polyline', points: [{ x: 7, y: 6 }, { x: 13, y: 6 }], stroke: '#888', fill: 'none', strokeWidth: 0.75 },
       ],
     },
   },

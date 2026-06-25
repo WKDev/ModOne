@@ -20,13 +20,14 @@ export const GRID_MODULE_MM = 5;
 export const SCREEN_PX_PER_MM = 96 / 25.4;
 
 /**
- * Scale factor for converting symbol pixel definitions to mm world coordinates.
- * Symbol graphics are authored in pixel units; this factor controls how large
- * they appear on the canvas relative to the grid (GRID_MODULE_MM = 5mm).
+ * Symbol→world scale factor. Symbols are now authored mm-natively in the Symbol
+ * Editor (and the builtin .symbol.xml library was converted from px to mm), so
+ * placing a symbol as a block needs no rescaling — this is the identity.
  *
- * 0.5 → a 40px symbol spans 20mm (4 grid cells).
+ * (Previously 0.5, when symbols were authored in pixels. Kept as a named
+ * constant so the symbol-rendering scale remains a single point of truth.)
  */
-export const SYMBOL_PX_TO_MM = 0.5;
+export const SYMBOL_PX_TO_MM = 1;
 
 function roundToPrecision(value: number, digits: number = 4): number {
   const factor = 10 ** digits;

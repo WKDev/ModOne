@@ -15,39 +15,39 @@
   <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
   <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
 
-  <ms:Layout width="40" height="40" unit="px"/>
+  <ms:Layout width="20" height="20" unit="mm"/>
 
   <ms:Ports>
     <ms:Port id="anode" name="A" number="1"
       electricalType="input" functionalRole="general"
       shape="line" orientation="up"
-      x="20" y="0" length="0" sortOrder="1"
+      x="10" y="0" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="cathode" name="K" number="2"
       electricalType="output" functionalRole="general"
       shape="line" orientation="down"
-      x="20" y="40" length="0" sortOrder="2"
+      x="10" y="20" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
   </ms:Ports>
 
   <ms:Graphics>
-    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="20" y="4"/>
-      <ms:Point x="20" y="14"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="10" y="2"/>
+      <ms:Point x="10" y="7"/>
     </ms:Polyline>
-    <ms:Polyline stroke="#888" fill="#1a1d23" strokeWidth="2">
-      <ms:Point x="10" y="14"/>
-      <ms:Point x="30" y="14"/>
-      <ms:Point x="20" y="26"/>
-      <ms:Point x="10" y="14"/>
+    <ms:Polyline stroke="#888" fill="#1a1d23" strokeWidth="1">
+      <ms:Point x="5" y="7"/>
+      <ms:Point x="15" y="7"/>
+      <ms:Point x="10" y="13"/>
+      <ms:Point x="5" y="7"/>
     </ms:Polyline>
-    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="10" y="26"/>
-      <ms:Point x="30" y="26"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="5" y="13"/>
+      <ms:Point x="15" y="13"/>
     </ms:Polyline>
-    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="20" y="26"/>
-      <ms:Point x="20" y="36"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="10" y="13"/>
+      <ms:Point x="10" y="18"/>
     </ms:Polyline>
   </ms:Graphics>
 

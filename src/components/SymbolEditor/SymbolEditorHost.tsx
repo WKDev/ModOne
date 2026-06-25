@@ -33,7 +33,7 @@ import { PixiApplication } from '@components/OneCanvas/core/PixiApplication';
 import { PixiViewport } from '@components/OneCanvas/core/PixiViewport';
 import { CoordinateSystem } from '@components/OneCanvas/core/CoordinateSystem';
 import { GridRenderer } from '@components/OneCanvas/renderers/GridRenderer';
-import { ToolInputBinding } from '@/canvas-core';
+import { ToolInputBinding, GRID_MODULE_MM } from '@/canvas-core';
 
 import { PrimitiveRenderer } from './renderers/PrimitiveRenderer';
 import { PinRenderer } from './renderers/PinRenderer';
@@ -114,7 +114,13 @@ const HANDLE_CURSOR_MAP: Record<string, string> = {
   'rotate': 'grab',
 };
 
-const GRID_SIZE = 20;
+// The symbol editor works in mm, matching OneCanvas and the now-mm symbol
+// library. 5mm grid module = the same grid the schematic editor uses.
+const GRID_SIZE = GRID_MODULE_MM;
+// Default zoom. Symbols are mm-valued (half their former px magnitude), so a 2×
+// zoom renders them at roughly their previous on-screen size for comfortable
+// editing while staying unit-consistent with the schematic.
+const DEFAULT_SYMBOL_ZOOM = 2;
 
 // ============================================================================
 // Layer Manager (lightweight — no need for the full LayerManager class)
@@ -418,7 +424,7 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
         }
 
         // 8. Center viewport on origin
-        viewport.centerOn(0, 0, 1);
+        viewport.centerOn(0, 0, DEFAULT_SYMBOL_ZOOM);
 
         // Scene graph is fully built — resume the render loop.
         if (!destroyed) pixiApp.start();

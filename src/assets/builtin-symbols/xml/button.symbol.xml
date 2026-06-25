@@ -15,37 +15,37 @@
   <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
   <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
 
-  <ms:Layout width="40" height="40" unit="px"/>
+  <ms:Layout width="20" height="20" unit="mm"/>
 
   <ms:Ports>
     <ms:Port id="in" name="IN" number="1"
       electricalType="input" functionalRole="general"
       shape="line" orientation="left"
-      x="0" y="20" length="0" sortOrder="1"
+      x="0" y="10" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="out" name="OUT" number="2"
       electricalType="output" functionalRole="general"
       shape="line" orientation="right"
-      x="40" y="20" length="0" sortOrder="2"
+      x="20" y="10" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
   </ms:Ports>
 
   <ms:Graphics>
-    <ms:Polyline id="lead-in" stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="0" y="20"/>
-      <ms:Point x="14" y="20"/>
+    <ms:Polyline id="lead-in" stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="0" y="10"/>
+      <ms:Point x="7" y="10"/>
     </ms:Polyline>
-    <ms:Polyline id="contact-arm" stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="14" y="24"/>
-      <ms:Point x="26" y="16"/>
+    <ms:Polyline id="contact-arm" stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="7" y="12"/>
+      <ms:Point x="13" y="8"/>
     </ms:Polyline>
-    <ms:Polyline id="lead-out" stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="26" y="20"/>
-      <ms:Point x="40" y="20"/>
+    <ms:Polyline id="lead-out" stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="13" y="10"/>
+      <ms:Point x="20" y="10"/>
     </ms:Polyline>
-    <ms:Polyline id="plunger-head" stroke="#888" fill="none" strokeWidth="1.5">
-      <ms:Point x="14" y="10"/>
-      <ms:Point x="26" y="10"/>
+    <ms:Polyline id="plunger-head" stroke="#888" fill="none" strokeWidth="0.75">
+      <ms:Point x="7" y="5"/>
+      <ms:Point x="13" y="5"/>
     </ms:Polyline>
   </ms:Graphics>
 

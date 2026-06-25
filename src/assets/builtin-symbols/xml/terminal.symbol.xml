@@ -15,19 +15,19 @@
   <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
   <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
 
-  <ms:Layout width="40" height="40" unit="px"/>
+  <ms:Layout width="20" height="20" unit="mm"/>
 
   <ms:Ports>
     <ms:Port id="conn" name="T" number="1"
       electricalType="bidirectional" functionalRole="general"
       shape="line" orientation="left"
-      x="0" y="20" length="0" sortOrder="1"
+      x="0" y="10" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
   </ms:Ports>
 
   <ms:Graphics>
-    <ms:Rect x="10" y="7" width="20" height="26" stroke="#888" fill="transparent" strokeWidth="2"/>
-    <ms:Circle cx="20" cy="20" r="2" stroke="#888" fill="transparent" strokeWidth="2"/>
+    <ms:Rect x="5" y="3.5" width="10" height="13" stroke="#888" fill="transparent" strokeWidth="1"/>
+    <ms:Circle cx="10" cy="10" r="1" stroke="#888" fill="transparent" strokeWidth="1"/>
   </ms:Graphics>
 
   <ms:Properties>

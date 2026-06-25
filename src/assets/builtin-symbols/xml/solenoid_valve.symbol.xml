@@ -15,35 +15,35 @@
   <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
   <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
 
-  <ms:Layout width="40" height="60" unit="px"/>
+  <ms:Layout width="20" height="30" unit="mm"/>
 
   <ms:Ports>
     <ms:Port id="coil_in" name="A1" number="A1"
       electricalType="input" functionalRole="general"
       shape="line" orientation="up"
-      x="20" y="0" length="0" sortOrder="1"
+      x="10" y="0" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="coil_out" name="A2" number="A2"
       electricalType="output" functionalRole="general"
       shape="line" orientation="down"
-      x="20" y="60" length="0" sortOrder="2"
+      x="10" y="30" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
   </ms:Ports>
 
   <ms:Graphics>
-    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="20" y="0"/>
-      <ms:Point x="20" y="12"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="10" y="0"/>
+      <ms:Point x="10" y="6"/>
     </ms:Polyline>
-    <ms:Rect x="4" y="12" width="32" height="24" stroke="#888" fill="transparent" strokeWidth="2"/>
-    <ms:Text x="20" y="28" fontSize="10" fontFamily="Arial" fill="#888" anchor="middle">Y</ms:Text>
-    <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
-      <ms:Point x="4" y="42"/>
-      <ms:Point x="36" y="42"/>
+    <ms:Rect x="2" y="6" width="16" height="12" stroke="#888" fill="transparent" strokeWidth="1"/>
+    <ms:Text x="10" y="14" fontSize="5" fontFamily="Arial" fill="#888" anchor="middle">Y</ms:Text>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="0.75">
+      <ms:Point x="2" y="21"/>
+      <ms:Point x="18" y="21"/>
     </ms:Polyline>
-    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="20" y="36"/>
-      <ms:Point x="20" y="60"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="10" y="18"/>
+      <ms:Point x="10" y="30"/>
     </ms:Polyline>
   </ms:Graphics>
 

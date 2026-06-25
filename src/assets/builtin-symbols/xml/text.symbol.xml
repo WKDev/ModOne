@@ -15,14 +15,14 @@
   <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
   <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
 
-  <ms:Layout width="160" height="40" unit="px"/>
+  <ms:Layout width="80" height="20" unit="mm"/>
 
   <ms:Ports>
   </ms:Ports>
 
   <ms:Graphics>
-    <ms:Rect x="2" y="2" width="156" height="36" stroke="#888" fill="transparent" strokeWidth="1.5"/>
-    <ms:Text x="80" y="24" fontSize="14" fontFamily="Arial" fill="#888" anchor="middle">Text</ms:Text>
+    <ms:Rect x="1" y="1" width="78" height="18" stroke="#888" fill="transparent" strokeWidth="0.75"/>
+    <ms:Text x="40" y="12" fontSize="7" fontFamily="Arial" fill="#888" anchor="middle">Text</ms:Text>
   </ms:Graphics>
 
   <ms:Properties>

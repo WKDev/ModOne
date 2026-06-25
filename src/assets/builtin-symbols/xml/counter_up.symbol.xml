@@ -15,48 +15,48 @@
   <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
   <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
 
-  <ms:Layout width="80" height="80" unit="px"/>
+  <ms:Layout width="40" height="40" unit="mm"/>
 
   <ms:Ports>
     <ms:Port id="count_in" name="CU" number="1"
       electricalType="input" functionalRole="general"
       shape="line" orientation="left"
-      x="0" y="40" length="0" sortOrder="1"
+      x="0" y="20" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="out" name="OUT" number="2"
       electricalType="output" functionalRole="general"
       shape="line" orientation="right"
-      x="80" y="40" length="0" sortOrder="2"
+      x="40" y="20" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="reset" name="RST" number="3"
       electricalType="input" functionalRole="general"
       shape="line" orientation="down"
-      x="40" y="80" length="0" sortOrder="3"
+      x="20" y="40" length="0" sortOrder="3"
       nameVisible="true" numberVisible="true"/>
   </ms:Ports>
 
   <ms:Graphics>
-    <ms:Rect x="4" y="4" width="72" height="72" stroke="#888" fill="transparent" strokeWidth="2"/>
-    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="18" y="50"/>
-      <ms:Point x="18" y="30"/>
+    <ms:Rect x="2" y="2" width="36" height="36" stroke="#888" fill="transparent" strokeWidth="1"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="9" y="25"/>
+      <ms:Point x="9" y="15"/>
     </ms:Polyline>
-    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="18" y="30"/>
-      <ms:Point x="22" y="38"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="9" y="15"/>
+      <ms:Point x="11" y="19"/>
     </ms:Polyline>
-    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="18" y="30"/>
-      <ms:Point x="14" y="38"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="9" y="15"/>
+      <ms:Point x="7" y="19"/>
     </ms:Polyline>
-    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="34" y="52"/>
-      <ms:Point x="42" y="28"/>
-      <ms:Point x="50" y="52"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="17" y="26"/>
+      <ms:Point x="21" y="14"/>
+      <ms:Point x="25" y="26"/>
     </ms:Polyline>
-    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="50" y="28"/>
-      <ms:Point x="50" y="52"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="25" y="14"/>
+      <ms:Point x="25" y="26"/>
     </ms:Polyline>
   </ms:Graphics>
 

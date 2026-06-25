@@ -15,28 +15,28 @@
   <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
   <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
 
-  <ms:Layout width="60" height="40" unit="px"/>
+  <ms:Layout width="30" height="20" unit="mm"/>
 
   <ms:Ports>
     <ms:Port id="left" name="L" number="1"
       electricalType="input" functionalRole="general"
       shape="line" orientation="left"
-      x="0" y="20" length="0" sortOrder="1"
+      x="0" y="10" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="right" name="R" number="2"
       electricalType="output" functionalRole="general"
       shape="line" orientation="right"
-      x="60" y="20" length="0" sortOrder="2"
+      x="30" y="10" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
   </ms:Ports>
 
   <ms:Graphics>
-    <ms:Rect x="4" y="4" width="52" height="32" stroke="#888" fill="transparent" strokeWidth="2"/>
-    <ms:Circle cx="18" cy="20" r="3" stroke="#888" fill="transparent" strokeWidth="2"/>
-    <ms:Circle cx="42" cy="20" r="3" stroke="#888" fill="transparent" strokeWidth="2"/>
-    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="24" y="20"/>
-      <ms:Point x="36" y="20"/>
+    <ms:Rect x="2" y="2" width="26" height="16" stroke="#888" fill="transparent" strokeWidth="1"/>
+    <ms:Circle cx="9" cy="10" r="1.5" stroke="#888" fill="transparent" strokeWidth="1"/>
+    <ms:Circle cx="21" cy="10" r="1.5" stroke="#888" fill="transparent" strokeWidth="1"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="12" y="10"/>
+      <ms:Point x="18" y="10"/>
     </ms:Polyline>
   </ms:Graphics>
 

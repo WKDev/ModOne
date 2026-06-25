@@ -274,15 +274,15 @@ describe('Fuse XML vs TypeScript parity', () => {
   it('has "in" pin at top (y=0)', () => {
     const pin = xmlSymbol.pins.find((p) => p.id === 'in');
     expect(pin).toBeDefined();
-    expect(pin?.position).toEqual({ x: 20, y: 0 });
+    expect(pin?.position).toEqual({ x: 10, y: 0 });
     expect(pin?.electricalType).toBe('input');
     expect(pin?.orientation).toBe('up');
   });
 
-  it('has "out" pin at bottom (y=60)', () => {
+  it('has "out" pin at bottom (y=30)', () => {
     const pin = xmlSymbol.pins.find((p) => p.id === 'out');
     expect(pin).toBeDefined();
-    expect(pin?.position).toEqual({ x: 20, y: 60 });
+    expect(pin?.position).toEqual({ x: 10, y: 30 });
     expect(pin?.electricalType).toBe('output');
     expect(pin?.orientation).toBe('down');
   });
@@ -301,10 +301,10 @@ describe('Fuse XML vs TypeScript parity', () => {
     const rect = xmlSymbol.graphics.find((g) => g.kind === 'rect');
     expect(rect).toBeDefined();
     if (rect?.kind === 'rect') {
-      expect(rect.x).toBe(12);
-      expect(rect.y).toBe(15);
-      expect(rect.width).toBe(16);
-      expect(rect.height).toBe(30);
+      expect(rect.x).toBe(6);
+      expect(rect.y).toBe(7.5);
+      expect(rect.width).toBe(8);
+      expect(rect.height).toBe(15);
     }
   });
 
@@ -440,10 +440,10 @@ describe('Motor XML vs TypeScript parity', () => {
   });
 
   it.each([
-    ['l1', { x: 20, y: 0 }],
-    ['l2', { x: 40, y: 0 }],
-    ['l3', { x: 60, y: 0 }],
-    ['pe', { x: 40, y: 80 }],
+    ['l1', { x: 10, y: 0 }],
+    ['l2', { x: 20, y: 0 }],
+    ['l3', { x: 30, y: 0 }],
+    ['pe', { x: 20, y: 40 }],
   ])('pin "%s" has position %j', (pinId, expectedPos) => {
     const pin = xmlSymbol.pins.find((p) => p.id === pinId);
     expect(pin?.position).toEqual(expectedPos);
@@ -674,9 +674,9 @@ describe('XML symbols — blockDefinitions.ts port parity', () => {
    * Verifies that XML-loaded symbols have ports whose IDs match the
    * defaultPorts in blockDefinitions.ts (before unit conversion).
    *
-   * Note: blockDefinitions.ts stores positions in px; SymbolPin stores
-   * positions in px too (without mm conversion). The mm conversion is
-   * applied by getBlockDefinition(). This test checks structural parity only.
+   * Note: symbols are now authored mm-natively (builtin library converted from
+   * px to mm), so SymbolPin positions are already in mm and getBlockDefinition()
+   * applies no rescaling. This test checks structural pin-ID parity only.
    */
 
   const testCases: Array<{

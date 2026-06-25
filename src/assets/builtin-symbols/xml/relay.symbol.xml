@@ -15,105 +15,105 @@
   <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
   <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
 
-  <ms:Layout width="80" height="80" unit="px"/>
+  <ms:Layout width="40" height="40" unit="mm"/>
 
   <ms:Ports>
     <ms:Port id="coil_in" name="A1" number="A1"
       electricalType="input" functionalRole="general"
       shape="line" orientation="up"
-      x="40" y="0" length="0" sortOrder="1"
+      x="20" y="0" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="coil_out" name="A2" number="A2"
       electricalType="output" functionalRole="general"
       shape="line" orientation="down"
-      x="40" y="80" length="0" sortOrder="2"
+      x="20" y="40" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="com" name="COM" number="11"
       electricalType="input" functionalRole="general"
       shape="line" orientation="left"
-      x="0" y="40" length="0" sortOrder="3"
+      x="0" y="20" length="0" sortOrder="3"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="no" name="NO" number="14"
       electricalType="output" functionalRole="general"
       shape="line" orientation="right"
-      x="80" y="20" length="0" sortOrder="4"
+      x="40" y="10" length="0" sortOrder="4"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="nc" name="NC" number="12"
       electricalType="output" functionalRole="general"
       shape="line" orientation="right"
-      x="80" y="60" length="0" sortOrder="5"
+      x="40" y="30" length="0" sortOrder="5"
       nameVisible="true" numberVisible="true"/>
   </ms:Ports>
 
   <ms:Graphics>
-    <ms:Rect id="coil-body" x="30" y="16" width="20" height="48" stroke="#888" fill="transparent" strokeWidth="2"/>
-    <ms:Text id="coil-label" x="40" y="40" fontSize="12" fontFamily="Arial" fill="#888" anchor="middle">K</ms:Text>
+    <ms:Rect id="coil-body" x="15" y="8" width="10" height="24" stroke="#888" fill="transparent" strokeWidth="1"/>
+    <ms:Text id="coil-label" x="20" y="20" fontSize="6" fontFamily="Arial" fill="#888" anchor="middle">K</ms:Text>
   </ms:Graphics>
 
   <ms:Units>
     <ms:Unit unitId="1" name="Coil">
       <ms:Graphics>
-        <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
-          <ms:Point x="40" y="0"/>
-          <ms:Point x="40" y="16"/>
+        <ms:Polyline stroke="#888" fill="none" strokeWidth="1">
+          <ms:Point x="20" y="0"/>
+          <ms:Point x="20" y="8"/>
         </ms:Polyline>
-        <ms:Rect x="30" y="16" width="20" height="48" stroke="#888" fill="transparent" strokeWidth="2"/>
-        <ms:Text x="40" y="40" fontSize="12" fontFamily="Arial" fill="#888" anchor="middle">K</ms:Text>
-        <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
-          <ms:Point x="40" y="64"/>
-          <ms:Point x="40" y="80"/>
+        <ms:Rect x="15" y="8" width="10" height="24" stroke="#888" fill="transparent" strokeWidth="1"/>
+        <ms:Text x="20" y="20" fontSize="6" fontFamily="Arial" fill="#888" anchor="middle">K</ms:Text>
+        <ms:Polyline stroke="#888" fill="none" strokeWidth="1">
+          <ms:Point x="20" y="32"/>
+          <ms:Point x="20" y="40"/>
         </ms:Polyline>
       </ms:Graphics>
       <ms:Ports>
         <ms:Port id="coil_in" name="A1" number="A1"
           electricalType="input" functionalRole="general"
           shape="line" orientation="up"
-          x="40" y="0" length="0" sortOrder="1"
+          x="20" y="0" length="0" sortOrder="1"
           nameVisible="true" numberVisible="true"/>
         <ms:Port id="coil_out" name="A2" number="A2"
           electricalType="output" functionalRole="general"
           shape="line" orientation="down"
-          x="40" y="80" length="0" sortOrder="2"
+          x="20" y="40" length="0" sortOrder="2"
           nameVisible="true" numberVisible="true"/>
       </ms:Ports>
     </ms:Unit>
     <ms:Unit unitId="2" name="Contact">
       <ms:Graphics>
-        <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
-          <ms:Point x="0" y="40"/>
-          <ms:Point x="24" y="40"/>
+        <ms:Polyline stroke="#888" fill="none" strokeWidth="1">
+          <ms:Point x="0" y="20"/>
+          <ms:Point x="12" y="20"/>
         </ms:Polyline>
-        <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
-          <ms:Point x="56" y="20"/>
-          <ms:Point x="80" y="20"/>
+        <ms:Polyline stroke="#888" fill="none" strokeWidth="1">
+          <ms:Point x="28" y="10"/>
+          <ms:Point x="40" y="10"/>
         </ms:Polyline>
-        <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
-          <ms:Point x="56" y="60"/>
-          <ms:Point x="80" y="60"/>
+        <ms:Polyline stroke="#888" fill="none" strokeWidth="1">
+          <ms:Point x="28" y="30"/>
+          <ms:Point x="40" y="30"/>
         </ms:Polyline>
-        <ms:Circle cx="24" cy="40" r="2" stroke="#888" fill="#888" strokeWidth="2"/>
-        <ms:Circle cx="56" cy="20" r="2" stroke="#888" fill="#888" strokeWidth="2"/>
-        <ms:Circle cx="56" cy="60" r="2" stroke="#888" fill="#888" strokeWidth="2"/>
-        <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
-          <ms:Point x="24" y="40"/>
-          <ms:Point x="54" y="22"/>
+        <ms:Circle cx="12" cy="20" r="1" stroke="#888" fill="#888" strokeWidth="1"/>
+        <ms:Circle cx="28" cy="10" r="1" stroke="#888" fill="#888" strokeWidth="1"/>
+        <ms:Circle cx="28" cy="30" r="1" stroke="#888" fill="#888" strokeWidth="1"/>
+        <ms:Polyline stroke="#888" fill="none" strokeWidth="1">
+          <ms:Point x="12" y="20"/>
+          <ms:Point x="27" y="11"/>
         </ms:Polyline>
       </ms:Graphics>
       <ms:Ports>
         <ms:Port id="com" name="COM" number="11"
           electricalType="input" functionalRole="general"
           shape="line" orientation="left"
-          x="0" y="40" length="0" sortOrder="1"
+          x="0" y="20" length="0" sortOrder="1"
           nameVisible="true" numberVisible="true"/>
         <ms:Port id="no" name="NO" number="14"
           electricalType="output" functionalRole="general"
           shape="line" orientation="right"
-          x="80" y="20" length="0" sortOrder="2"
+          x="40" y="10" length="0" sortOrder="2"
           nameVisible="true" numberVisible="true"/>
         <ms:Port id="nc" name="NC" number="12"
           electricalType="output" functionalRole="general"
           shape="line" orientation="right"
-          x="80" y="60" length="0" sortOrder="3"
+          x="40" y="30" length="0" sortOrder="3"
           nameVisible="true" numberVisible="true"/>
       </ms:Ports>
     </ms:Unit>

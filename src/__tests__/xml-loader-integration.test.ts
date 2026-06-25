@@ -51,94 +51,94 @@ const RELAY_XML = `<?xml version="1.0" encoding="UTF-8"?>
   <ms:Author>ModOne</ms:Author>
   <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
   <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
-  <ms:Layout width="80" height="80" unit="px"/>
+  <ms:Layout width="40" height="40" unit="mm"/>
   <ms:Ports>
     <ms:Port id="coil_in" name="A1" number="A1"
              electricalType="input" functionalRole="general"
              shape="line" orientation="up"
-             x="40" y="0" length="0" sortOrder="1"
+             x="20" y="0" length="0" sortOrder="1"
              nameVisible="true" numberVisible="true"
              edgePosition="top" edgeOffset="0.5"/>
     <ms:Port id="coil_out" name="A2" number="A2"
              electricalType="output" functionalRole="general"
              shape="line" orientation="down"
-             x="40" y="80" length="0" sortOrder="2"
+             x="20" y="40" length="0" sortOrder="2"
              nameVisible="true" numberVisible="true"
              edgePosition="bottom" edgeOffset="0.5"/>
     <ms:Port id="com" name="COM" number="11"
              electricalType="input" functionalRole="general"
              shape="line" orientation="left"
-             x="0" y="40" length="0" sortOrder="3"
+             x="0" y="20" length="0" sortOrder="3"
              nameVisible="true" numberVisible="true"
              edgePosition="left" edgeOffset="0.5"/>
     <ms:Port id="no" name="NO" number="14"
              electricalType="output" functionalRole="general"
              shape="line" orientation="right"
-             x="80" y="20" length="0" sortOrder="4"
+             x="40" y="10" length="0" sortOrder="4"
              nameVisible="true" numberVisible="true"
              edgePosition="right" edgeOffset="0.25"/>
     <ms:Port id="nc" name="NC" number="12"
              electricalType="output" functionalRole="general"
              shape="line" orientation="right"
-             x="80" y="60" length="0" sortOrder="5"
+             x="40" y="30" length="0" sortOrder="5"
              nameVisible="true" numberVisible="true"
              edgePosition="right" edgeOffset="0.75"/>
   </ms:Ports>
   <ms:Graphics>
-    <ms:Rect id="coil-body" x="30" y="16" width="20" height="48"
-             stroke="#888888" fill="transparent" strokeWidth="2"/>
-    <ms:Text id="coil-label" x="40" y="44" fontSize="12" fontFamily="Arial"
+    <ms:Rect id="coil-body" x="15" y="8" width="10" height="24"
+             stroke="#888888" fill="transparent" strokeWidth="1"/>
+    <ms:Text id="coil-label" x="20" y="22" fontSize="6" fontFamily="Arial"
              fill="#888888" anchor="middle">K</ms:Text>
-    <ms:Polyline id="wire-com" stroke="#888888" fill="none" strokeWidth="2">
-      <ms:Point x="0" y="40"/>
-      <ms:Point x="24" y="40"/>
+    <ms:Polyline id="wire-com" stroke="#888888" fill="none" strokeWidth="1">
+      <ms:Point x="0" y="20"/>
+      <ms:Point x="12" y="20"/>
     </ms:Polyline>
   </ms:Graphics>
   <ms:Units>
     <ms:Unit unitId="1" name="Coil">
       <ms:Graphics>
-        <ms:Rect id="coil-body" x="30" y="16" width="20" height="48"
-                 stroke="#888888" fill="transparent" strokeWidth="2"/>
+        <ms:Rect id="coil-body" x="15" y="8" width="10" height="24"
+                 stroke="#888888" fill="transparent" strokeWidth="1"/>
       </ms:Graphics>
       <ms:Ports>
         <ms:Port id="coil_in" name="A1" number="A1"
                  electricalType="input" functionalRole="general"
                  shape="line" orientation="up"
-                 x="40" y="0" length="0" sortOrder="1"
+                 x="20" y="0" length="0" sortOrder="1"
                  nameVisible="true" numberVisible="true"
                  edgePosition="top" edgeOffset="0.5"/>
         <ms:Port id="coil_out" name="A2" number="A2"
                  electricalType="output" functionalRole="general"
                  shape="line" orientation="down"
-                 x="40" y="80" length="0" sortOrder="2"
+                 x="20" y="40" length="0" sortOrder="2"
                  nameVisible="true" numberVisible="true"
                  edgePosition="bottom" edgeOffset="0.5"/>
       </ms:Ports>
     </ms:Unit>
     <ms:Unit unitId="2" name="Contact">
       <ms:Graphics>
-        <ms:Polyline stroke="#888888" fill="none" strokeWidth="2">
-          <ms:Point x="0" y="40"/>
-          <ms:Point x="24" y="40"/>
+        <ms:Polyline stroke="#888888" fill="none" strokeWidth="1">
+          <ms:Point x="0" y="20"/>
+          <ms:Point x="12" y="20"/>
         </ms:Polyline>
       </ms:Graphics>
       <ms:Ports>
         <ms:Port id="com" name="COM" number="11"
                  electricalType="input" functionalRole="general"
                  shape="line" orientation="left"
-                 x="0" y="40" length="0" sortOrder="1"
+                 x="0" y="20" length="0" sortOrder="1"
                  nameVisible="true" numberVisible="true"
                  edgePosition="left" edgeOffset="0.5"/>
         <ms:Port id="no" name="NO" number="14"
                  electricalType="output" functionalRole="general"
                  shape="line" orientation="right"
-                 x="80" y="20" length="0" sortOrder="2"
+                 x="40" y="10" length="0" sortOrder="2"
                  nameVisible="true" numberVisible="true"
                  edgePosition="right" edgeOffset="0.25"/>
         <ms:Port id="nc" name="NC" number="12"
                  electricalType="output" functionalRole="general"
                  shape="line" orientation="right"
-                 x="80" y="60" length="0" sortOrder="3"
+                 x="40" y="30" length="0" sortOrder="3"
                  nameVisible="true" numberVisible="true"
                  edgePosition="right" edgeOffset="0.75"/>
       </ms:Ports>
@@ -191,21 +191,21 @@ const MINIMAL_VALID_XML = `<?xml version="1.0" encoding="UTF-8"?>
   <ms:Category>test</ms:Category>
   <ms:CreatedAt>2026-03-31T00:00:00Z</ms:CreatedAt>
   <ms:UpdatedAt>2026-03-31T00:00:00Z</ms:UpdatedAt>
-  <ms:Layout width="60" height="40" unit="px"/>
+  <ms:Layout width="30" height="20" unit="mm"/>
   <ms:Ports>
     <ms:Port id="in" name="IN" number="1"
              electricalType="input" functionalRole="general"
              shape="line" orientation="left"
-             x="0" y="20" length="0"
+             x="0" y="10" length="0"
              nameVisible="true" numberVisible="true"/>
     <ms:Port id="out" name="OUT" number="2"
              electricalType="output" functionalRole="general"
              shape="line" orientation="right"
-             x="60" y="20" length="0"
+             x="30" y="10" length="0"
              nameVisible="true" numberVisible="true"/>
   </ms:Ports>
   <ms:Graphics>
-    <ms:Rect x="5" y="5" width="50" height="30" stroke="#888" fill="none" strokeWidth="1"/>
+    <ms:Rect x="2.5" y="2.5" width="25" height="15" stroke="#888" fill="none" strokeWidth="0.5"/>
   </ms:Graphics>
   <ms:Properties/>
 </ms:SymbolDefinition>`;
@@ -233,8 +233,8 @@ describe('XML Symbol Loader — parseSymbolXml()', () => {
 
     it('parses layout dimensions correctly', () => {
       const { symbol } = parseSymbolXml(RELAY_XML);
-      expect(symbol!.width).toBe(80);
-      expect(symbol!.height).toBe(80);
+      expect(symbol!.width).toBe(40);
+      expect(symbol!.height).toBe(40);
     });
 
     it('parses all 5 ports correctly', () => {
@@ -252,12 +252,12 @@ describe('XML Symbol Loader — parseSymbolXml()', () => {
     it('parses pin positions and orientations correctly', () => {
       const { symbol } = parseSymbolXml(RELAY_XML);
       const no = symbol!.pins.find((p) => p.id === 'no')!;
-      expect(no.position).toEqual({ x: 80, y: 20 });
+      expect(no.position).toEqual({ x: 40, y: 10 });
       expect(no.orientation).toBe('right');
       expect(no.type).toBe('output');
 
       const coilIn = symbol!.pins.find((p) => p.id === 'coil_in')!;
-      expect(coilIn.position).toEqual({ x: 40, y: 0 });
+      expect(coilIn.position).toEqual({ x: 20, y: 0 });
       expect(coilIn.orientation).toBe('up');
       expect(coilIn.type).toBe('input');
     });
@@ -271,10 +271,10 @@ describe('XML Symbol Loader — parseSymbolXml()', () => {
       expect(rect!.kind).toBe('rect');
       if (rect && rect.kind === 'rect') {
         expect(rect.id).toBe('coil-body');
-        expect(rect.x).toBe(30);
-        expect(rect.y).toBe(16);
-        expect(rect.width).toBe(20);
-        expect(rect.height).toBe(48);
+        expect(rect.x).toBe(15);
+        expect(rect.y).toBe(8);
+        expect(rect.width).toBe(10);
+        expect(rect.height).toBe(24);
       }
 
       const text = symbol!.graphics.find((g) => g.kind === 'text');
@@ -282,7 +282,7 @@ describe('XML Symbol Loader — parseSymbolXml()', () => {
       if (text && text.kind === 'text') {
         expect(text.id).toBe('coil-label');
         expect(text.text).toBe('K');
-        expect(text.fontSize).toBe(12);
+        expect(text.fontSize).toBe(6);
         expect(text.anchor).toBe('middle');
       }
 
@@ -290,8 +290,8 @@ describe('XML Symbol Loader — parseSymbolXml()', () => {
       expect(polyline).toBeDefined();
       if (polyline && polyline.kind === 'polyline') {
         expect(polyline.points).toHaveLength(2);
-        expect(polyline.points[0]).toEqual({ x: 0, y: 40 });
-        expect(polyline.points[1]).toEqual({ x: 24, y: 40 });
+        expect(polyline.points[0]).toEqual({ x: 0, y: 20 });
+        expect(polyline.points[1]).toEqual({ x: 12, y: 20 });
       }
     });
 
@@ -379,8 +379,8 @@ describe('XML Symbol Loader — parseSymbolXml()', () => {
       expect(errors).toHaveLength(0);
       expect(symbol).toBeDefined();
       expect(symbol!.id).toBe('custom:minimal');
-      expect(symbol!.width).toBe(60);
-      expect(symbol!.height).toBe(40);
+      expect(symbol!.width).toBe(30);
+      expect(symbol!.height).toBe(20);
       expect(symbol!.pins).toHaveLength(2);
     });
 
@@ -390,17 +390,17 @@ describe('XML Symbol Loader — parseSymbolXml()', () => {
       const rect = symbol!.graphics[0];
       expect(rect.kind).toBe('rect');
       if (rect.kind === 'rect') {
-        expect(rect.x).toBe(5);
-        expect(rect.y).toBe(5);
-        expect(rect.width).toBe(50);
-        expect(rect.height).toBe(30);
+        expect(rect.x).toBe(2.5);
+        expect(rect.y).toBe(2.5);
+        expect(rect.width).toBe(25);
+        expect(rect.height).toBe(15);
       }
     });
 
     it('parses port IN at (0, 20) with left orientation', () => {
       const { symbol } = parseSymbolXml(MINIMAL_VALID_XML);
       const inPin = symbol!.pins.find((p) => p.id === 'in')!;
-      expect(inPin.position).toEqual({ x: 0, y: 20 });
+      expect(inPin.position).toEqual({ x: 0, y: 10 });
       expect(inPin.orientation).toBe('left');
       expect(inPin.type).toBe('input');
     });
@@ -413,22 +413,22 @@ describe('XML Symbol Loader — parseSymbolXml()', () => {
   <ms:Category>test</ms:Category>
   <ms:CreatedAt>2026-03-31T00:00:00Z</ms:CreatedAt>
   <ms:UpdatedAt>2026-03-31T00:00:00Z</ms:UpdatedAt>
-  <ms:Layout width="80" height="80" unit="px"/>
+  <ms:Layout width="40" height="40" unit="mm"/>
   <ms:Ports>
     <ms:Port id="p1" name="P1" number="1"
              electricalType="passive" shape="line" orientation="left"
-             x="0" y="40" length="0"
+             x="0" y="20" length="0"
              nameVisible="true" numberVisible="true"/>
   </ms:Ports>
   <ms:Graphics>
-    <ms:Rect x="10" y="10" width="60" height="60" stroke="#000" fill="none" strokeWidth="2"/>
-    <ms:Circle cx="40" cy="40" r="20" stroke="#000" fill="none" strokeWidth="1"/>
-    <ms:Polyline stroke="#000" fill="none" strokeWidth="1">
-      <ms:Point x="0" y="40"/>
-      <ms:Point x="80" y="40"/>
+    <ms:Rect x="5" y="5" width="30" height="30" stroke="#000" fill="none" strokeWidth="1"/>
+    <ms:Circle cx="20" cy="20" r="10" stroke="#000" fill="none" strokeWidth="0.5"/>
+    <ms:Polyline stroke="#000" fill="none" strokeWidth="0.5">
+      <ms:Point x="0" y="20"/>
+      <ms:Point x="40" y="20"/>
     </ms:Polyline>
-    <ms:Arc cx="40" cy="40" r="15" startAngle="0" endAngle="180" stroke="#000" fill="none" strokeWidth="1"/>
-    <ms:Text x="40" y="20" fontSize="10" fontFamily="Arial" fill="#000" anchor="middle">T</ms:Text>
+    <ms:Arc cx="20" cy="20" r="7.5" startAngle="0" endAngle="180" stroke="#000" fill="none" strokeWidth="0.5"/>
+    <ms:Text x="20" y="10" fontSize="5" fontFamily="Arial" fill="#000" anchor="middle">T</ms:Text>
   </ms:Graphics>
   <ms:Properties/>
 </ms:SymbolDefinition>`;
@@ -449,9 +449,9 @@ describe('XML Symbol Loader — parseSymbolXml()', () => {
       const circle = symbol!.graphics.find((g) => g.kind === 'circle');
       expect(circle!.kind).toBe('circle');
       if (circle && circle.kind === 'circle') {
-        expect(circle.cx).toBe(40);
-        expect(circle.cy).toBe(40);
-        expect(circle.r).toBe(20);
+        expect(circle.cx).toBe(20);
+        expect(circle.cy).toBe(20);
+        expect(circle.r).toBe(10);
       }
     });
 
@@ -1084,10 +1084,10 @@ describe('XML Property Parsing — type fidelity', () => {
   <ms:Category>test</ms:Category>
   <ms:CreatedAt>2026-03-31T00:00:00Z</ms:CreatedAt>
   <ms:UpdatedAt>2026-03-31T00:00:00Z</ms:UpdatedAt>
-  <ms:Layout width="40" height="40" unit="px"/>
+  <ms:Layout width="20" height="20" unit="mm"/>
   <ms:Ports>
     <ms:Port id="p" name="P" number="1" electricalType="passive" shape="line"
-             orientation="left" x="0" y="20" length="0"
+             orientation="left" x="0" y="10" length="0"
              nameVisible="true" numberVisible="true"/>
   </ms:Ports>
   <ms:Graphics/>

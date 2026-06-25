@@ -9,16 +9,16 @@ export const relayContactNoSymbol: SymbolDefinition = {
   author: 'ModOne',
   createdAt: '2026-03-05T00:00:00Z',
   updatedAt: '2026-03-05T00:00:00Z',
-  width: 60,
-  height: 40,
+  width: 30,
+  height: 20,
   graphics: [
-    { id: 'lead-in', kind: 'polyline', points: [{ x: 4, y: 20 }, { x: 20, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { id: 'lead-out', kind: 'polyline', points: [{ x: 40, y: 20 }, { x: 56, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-    { id: 'contact-arm', kind: 'polyline', points: [{ x: 20, y: 28 }, { x: 40, y: 12 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+    { id: 'lead-in', kind: 'polyline', points: [{ x: 2, y: 10 }, { x: 10, y: 10 }], stroke: '#888', fill: 'none', strokeWidth: 1 },
+    { id: 'lead-out', kind: 'polyline', points: [{ x: 20, y: 10 }, { x: 28, y: 10 }], stroke: '#888', fill: 'none', strokeWidth: 1 },
+    { id: 'contact-arm', kind: 'polyline', points: [{ x: 10, y: 14 }, { x: 20, y: 6 }], stroke: '#888', fill: 'none', strokeWidth: 1 },
   ],
   pins: [
-    { id: 'in', name: 'IN', number: '1', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 0, y: 20 }, orientation: 'left', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
-    { id: 'out', name: 'OUT', number: '2', type: 'output', electricalType: 'output', functionalRole: 'general', shape: 'line', position: { x: 60, y: 20 }, orientation: 'right', length: 0, sortOrder: 2, nameVisible: true, numberVisible: true },
+    { id: 'in', name: 'IN', number: '1', type: 'input', electricalType: 'input', functionalRole: 'general', shape: 'line', position: { x: 0, y: 10 }, orientation: 'left', length: 0, sortOrder: 1, nameVisible: true, numberVisible: true },
+    { id: 'out', name: 'OUT', number: '2', type: 'output', electricalType: 'output', functionalRole: 'general', shape: 'line', position: { x: 30, y: 10 }, orientation: 'right', length: 0, sortOrder: 2, nameVisible: true, numberVisible: true },
   ],
   behavior: {
     templateId: 'archetype:relay',
@@ -30,9 +30,9 @@ export const relayContactNoSymbol: SymbolDefinition = {
   visualStates: {
     closed: {
       graphics: [
-        { id: 'lead-in', kind: 'polyline', points: [{ x: 4, y: 20 }, { x: 20, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-        { id: 'lead-out', kind: 'polyline', points: [{ x: 40, y: 20 }, { x: 56, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
-        { id: 'contact-arm', kind: 'polyline', points: [{ x: 20, y: 20 }, { x: 40, y: 20 }], stroke: '#888', fill: 'none', strokeWidth: 2 },
+        { id: 'lead-in', kind: 'polyline', points: [{ x: 2, y: 10 }, { x: 10, y: 10 }], stroke: '#888', fill: 'none', strokeWidth: 1 },
+        { id: 'lead-out', kind: 'polyline', points: [{ x: 20, y: 10 }, { x: 28, y: 10 }], stroke: '#888', fill: 'none', strokeWidth: 1 },
+        { id: 'contact-arm', kind: 'polyline', points: [{ x: 10, y: 10 }, { x: 20, y: 10 }], stroke: '#888', fill: 'none', strokeWidth: 1 },
       ],
     },
   },

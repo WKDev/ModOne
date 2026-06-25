@@ -15,28 +15,28 @@
   <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
   <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
 
-  <ms:Layout width="80" height="40" unit="px"/>
+  <ms:Layout width="40" height="20" unit="mm"/>
 
   <ms:Ports>
     <ms:Port id="conn" name="CONN" number="1"
       electricalType="input" functionalRole="general"
       shape="line" orientation="left"
-      x="0" y="20" length="0" sortOrder="1"
+      x="0" y="10" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
   </ms:Ports>
 
   <ms:Graphics>
-    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="0" y="20"/>
-      <ms:Point x="14" y="20"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="0" y="10"/>
+      <ms:Point x="7" y="10"/>
     </ms:Polyline>
-    <ms:Rect x="14" y="8" width="50" height="24" stroke="#888" fill="transparent" strokeWidth="1.5"/>
-    <ms:Polyline stroke="#888" fill="transparent" strokeWidth="1.5">
-      <ms:Point x="64" y="8"/>
-      <ms:Point x="80" y="20"/>
-      <ms:Point x="64" y="32"/>
+    <ms:Rect x="7" y="4" width="25" height="12" stroke="#888" fill="transparent" strokeWidth="0.75"/>
+    <ms:Polyline stroke="#888" fill="transparent" strokeWidth="0.75">
+      <ms:Point x="32" y="4"/>
+      <ms:Point x="40" y="10"/>
+      <ms:Point x="32" y="16"/>
     </ms:Polyline>
-    <ms:Text x="38" y="24" fontSize="10" fontFamily="Arial" fill="#888" anchor="middle">NET</ms:Text>
+    <ms:Text x="19" y="12" fontSize="5" fontFamily="Arial" fill="#888" anchor="middle">NET</ms:Text>
   </ms:Graphics>
 
   <ms:Properties>

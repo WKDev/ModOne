@@ -15,69 +15,69 @@
   <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
   <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
 
-  <ms:Layout width="80" height="80" unit="px"/>
+  <ms:Layout width="40" height="40" unit="mm"/>
 
   <ms:Ports>
     <ms:Port id="l1_in" name="1" number="1"
       electricalType="input" functionalRole="general"
       shape="line" orientation="up"
-      x="20" y="0" length="0" sortOrder="1"
+      x="10" y="0" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="l2_in" name="3" number="3"
       electricalType="input" functionalRole="general"
       shape="line" orientation="up"
-      x="40" y="0" length="0" sortOrder="2"
+      x="20" y="0" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="l3_in" name="5" number="5"
       electricalType="input" functionalRole="general"
       shape="line" orientation="up"
-      x="60" y="0" length="0" sortOrder="3"
+      x="30" y="0" length="0" sortOrder="3"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="l1_out" name="2" number="2"
       electricalType="output" functionalRole="general"
       shape="line" orientation="down"
-      x="20" y="80" length="0" sortOrder="4"
+      x="10" y="40" length="0" sortOrder="4"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="l2_out" name="4" number="4"
       electricalType="output" functionalRole="general"
       shape="line" orientation="down"
-      x="40" y="80" length="0" sortOrder="5"
+      x="20" y="40" length="0" sortOrder="5"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="l3_out" name="6" number="6"
       electricalType="output" functionalRole="general"
       shape="line" orientation="down"
-      x="60" y="80" length="0" sortOrder="6"
+      x="30" y="40" length="0" sortOrder="6"
       nameVisible="true" numberVisible="true"/>
   </ms:Ports>
 
   <ms:Graphics>
-    <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="0.75">
+      <ms:Point x="10" y="0"/>
+      <ms:Point x="10" y="14"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="0.75">
+      <ms:Point x="10" y="15"/>
+      <ms:Point x="10" y="40"/>
+    </ms:Polyline>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="0.75">
       <ms:Point x="20" y="0"/>
-      <ms:Point x="20" y="28"/>
+      <ms:Point x="20" y="14"/>
     </ms:Polyline>
-    <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
-      <ms:Point x="20" y="30"/>
-      <ms:Point x="20" y="80"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="0.75">
+      <ms:Point x="20" y="15"/>
+      <ms:Point x="20" y="40"/>
     </ms:Polyline>
-    <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
-      <ms:Point x="40" y="0"/>
-      <ms:Point x="40" y="28"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="0.75">
+      <ms:Point x="30" y="0"/>
+      <ms:Point x="30" y="14"/>
     </ms:Polyline>
-    <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
-      <ms:Point x="40" y="30"/>
-      <ms:Point x="40" y="80"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="0.75">
+      <ms:Point x="30" y="15"/>
+      <ms:Point x="30" y="40"/>
     </ms:Polyline>
-    <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
-      <ms:Point x="60" y="0"/>
-      <ms:Point x="60" y="28"/>
-    </ms:Polyline>
-    <ms:Polyline stroke="#888" fill="none" strokeWidth="1.5">
-      <ms:Point x="60" y="30"/>
-      <ms:Point x="60" y="80"/>
-    </ms:Polyline>
-    <ms:Polyline stroke="#888" fill="none" strokeWidth="2">
-      <ms:Point x="14" y="28"/>
-      <ms:Point x="66" y="28"/>
+    <ms:Polyline stroke="#888" fill="none" strokeWidth="1">
+      <ms:Point x="7" y="14"/>
+      <ms:Point x="33" y="14"/>
     </ms:Polyline>
   </ms:Graphics>
 

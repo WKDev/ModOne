@@ -9,11 +9,11 @@ export const textSymbol: SymbolDefinition = {
   author: 'ModOne',
   createdAt: '2026-03-05T00:00:00Z',
   updatedAt: '2026-03-05T00:00:00Z',
-  width: 160,
-  height: 40,
+  width: 80,
+  height: 20,
   graphics: [
-    { kind: 'rect', x: 2, y: 2, width: 156, height: 36, stroke: '#888', fill: 'transparent', strokeWidth: 1.5 },
-    { kind: 'text', x: 80, y: 24, text: 'Text', fontSize: 14, fontFamily: 'Arial', fill: '#888', anchor: 'middle' },
+    { kind: 'rect', x: 1, y: 1, width: 78, height: 18, stroke: '#888', fill: 'transparent', strokeWidth: 0.75 },
+    { kind: 'text', x: 40, y: 12, text: 'Text', fontSize: 7, fontFamily: 'Arial', fill: '#888', anchor: 'middle' },
   ],
   pins: [],
   properties: [

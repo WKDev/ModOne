@@ -15,55 +15,55 @@
   <ms:CreatedAt>2026-03-05T00:00:00Z</ms:CreatedAt>
   <ms:UpdatedAt>2026-03-05T00:00:00Z</ms:UpdatedAt>
 
-  <ms:Layout width="80" height="80" unit="px"/>
+  <ms:Layout width="40" height="40" unit="mm"/>
 
   <ms:Ports>
     <ms:Port id="l1" name="U" number="U"
       electricalType="input" functionalRole="general"
       shape="line" orientation="up"
-      x="20" y="0" length="0" sortOrder="1"
+      x="10" y="0" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="l2" name="V" number="V"
       electricalType="input" functionalRole="general"
       shape="line" orientation="up"
-      x="40" y="0" length="0" sortOrder="2"
+      x="20" y="0" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="l3" name="W" number="W"
       electricalType="input" functionalRole="general"
       shape="line" orientation="up"
-      x="60" y="0" length="0" sortOrder="3"
+      x="30" y="0" length="0" sortOrder="3"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="pe" name="PE" number="PE"
       electricalType="input" functionalRole="general"
       shape="line" orientation="down"
-      x="40" y="80" length="0" sortOrder="4"
+      x="20" y="40" length="0" sortOrder="4"
       nameVisible="true" numberVisible="true"/>
   </ms:Ports>
 
   <ms:Graphics>
-    <ms:Polyline id="lead-u" stroke="#888" fill="none" strokeWidth="1.5">
+    <ms:Polyline id="lead-u" stroke="#888" fill="none" strokeWidth="0.75">
+      <ms:Point x="10" y="0"/>
+      <ms:Point x="10" y="6"/>
+    </ms:Polyline>
+    <ms:Polyline id="lead-v" stroke="#888" fill="none" strokeWidth="0.75">
       <ms:Point x="20" y="0"/>
-      <ms:Point x="20" y="12"/>
+      <ms:Point x="20" y="6"/>
     </ms:Polyline>
-    <ms:Polyline id="lead-v" stroke="#888" fill="none" strokeWidth="1.5">
-      <ms:Point x="40" y="0"/>
-      <ms:Point x="40" y="12"/>
+    <ms:Polyline id="lead-w" stroke="#888" fill="none" strokeWidth="0.75">
+      <ms:Point x="30" y="0"/>
+      <ms:Point x="30" y="6"/>
     </ms:Polyline>
-    <ms:Polyline id="lead-w" stroke="#888" fill="none" strokeWidth="1.5">
-      <ms:Point x="60" y="0"/>
-      <ms:Point x="60" y="12"/>
+    <ms:Circle id="motor-body" cx="20" cy="20" r="12" stroke="#888" fill="transparent" strokeWidth="1"/>
+    <ms:Text id="motor-label" x="20" y="22.5" fontSize="8" fontFamily="Arial" fill="#888" anchor="middle">M</ms:Text>
+    <ms:Polyline id="rotor" stroke="#888" fill="none" strokeWidth="0.75">
+      <ms:Point x="17" y="25"/>
+      <ms:Point x="18.5" y="24"/>
+      <ms:Point x="21.5" y="26"/>
+      <ms:Point x="23" y="25"/>
     </ms:Polyline>
-    <ms:Circle id="motor-body" cx="40" cy="40" r="24" stroke="#888" fill="transparent" strokeWidth="2"/>
-    <ms:Text id="motor-label" x="40" y="45" fontSize="16" fontFamily="Arial" fill="#888" anchor="middle">M</ms:Text>
-    <ms:Polyline id="rotor" stroke="#888" fill="none" strokeWidth="1.5">
-      <ms:Point x="34" y="50"/>
-      <ms:Point x="37" y="48"/>
-      <ms:Point x="43" y="52"/>
-      <ms:Point x="46" y="50"/>
-    </ms:Polyline>
-    <ms:Polyline id="lead-pe" stroke="#888" fill="none" strokeWidth="1.5">
-      <ms:Point x="40" y="64"/>
-      <ms:Point x="40" y="80"/>
+    <ms:Polyline id="lead-pe" stroke="#888" fill="none" strokeWidth="0.75">
+      <ms:Point x="20" y="32"/>
+      <ms:Point x="20" y="40"/>
     </ms:Polyline>
   </ms:Graphics>
 
