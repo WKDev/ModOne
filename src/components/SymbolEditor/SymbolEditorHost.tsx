@@ -22,7 +22,7 @@ import {
   forwardRef,
   type CSSProperties,
 } from 'react';
-import { Container } from 'pixi.js';
+import { Container, type FederatedPointerEvent } from 'pixi.js';
 
 import type { GraphicPrimitive, SymbolDefinition, SymbolPin } from '@/types/symbol';
 import type { EditorAction } from './SymbolEditor';
@@ -368,6 +368,38 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
             overlay.getSelectedResizableBounds(ids, graphics);
         }
 
+        // 5c. Wire PIXI federated pointer events on the viewport — the same
+        // input source as OneCanvas's EventBridge. Left button drives the active
+        // tool; middle/right is left to pixi-viewport for native pan. Listeners
+        // are removed by viewport.destroy() (removeAllListeners) on cleanup.
+        const vp = viewport.viewport;
+        const onVpPointerDown = (e: FederatedPointerEvent) => {
+          if (e.button !== 0) {
+            // Middle/right → pixi-viewport pans natively; suppress tool dispatch.
+            panDragRef.current.active = true;
+            return;
+          }
+          const point = toWorldPoint(e.global.x, e.global.y, e.shiftKey, e.altKey);
+          if (point) runToolDown(point, e.client.x, e.client.y);
+        };
+        const onVpPointerMove = (e: FederatedPointerEvent) => {
+          if (panDragRef.current.active) return; // mid-pan: don't fight the camera
+          const point = toWorldPoint(e.global.x, e.global.y, e.shiftKey, e.altKey);
+          if (point) runToolMove(point, e.client.x, e.client.y);
+        };
+        const onVpPointerUp = (e: FederatedPointerEvent) => {
+          if (e.button !== 0) {
+            panDragRef.current.active = false;
+            return;
+          }
+          const point = toWorldPoint(e.global.x, e.global.y, e.shiftKey, e.altKey);
+          if (point) runToolUp(point, e.client.x, e.client.y);
+        };
+        vp.on('pointerdown', onVpPointerDown);
+        vp.on('pointermove', onVpPointerMove);
+        vp.on('pointerup', onVpPointerUp);
+        vp.on('pointerupoutside', onVpPointerUp);
+
         // 6. Initial grid render
         gridRendererRef.current.render(
           viewport.visibleBounds,
@@ -506,6 +538,26 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       return { x: world.x, y: world.y, shiftKey, altKey };
     };
 
+    /**
+     * Convert a PIXI federated pointer's canvas-relative `global` coordinates to
+     * a snapped world point. This is the same path OneCanvas's EventBridge uses
+     * (`viewport.toWorld(e.global)`), so the two editors share one coordinate
+     * pipeline — no manual getBoundingClientRect math, no offset-bug class.
+     */
+    const toWorldPoint = (
+      globalX: number,
+      globalY: number,
+      shiftKey = false,
+      altKey = false,
+    ): CanvasPoint | null => {
+      const coordSys = coordSysRef.current;
+      const viewport = viewportRef.current;
+      if (!coordSys || !viewport) return null;
+      const world = viewport.viewport.toWorld(globalX, globalY);
+      const snapped = coordSys.snapToGrid({ x: world.x, y: world.y });
+      return { x: snapped.x, y: snapped.y, shiftKey, altKey };
+    };
+
     // ========================================================================
     // DOM Event Handlers
     // ========================================================================
@@ -529,51 +581,33 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       onOpenPinPopover: onOpenPinPopoverRef.current ?? (() => {}),
     });
 
-    const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-      // Middle-click pan
-      if (e.button === 1) {
-        e.preventDefault();
-        panDragRef.current = { active: true, x: e.clientX, y: e.clientY };
-        return;
-      }
+    // ── Tool dispatch (coordinate-source agnostic) ──
+    // These run the active tool for a pointer event. `clientX/clientY` are the
+    // window-relative coords used only to position the pin popover (DOM overlay);
+    // `point` is the snapped world point. Fed by PIXI federated events below.
 
-      if (e.button !== 0) return;
-
-      const point = toCanvasPoint(e.clientX, e.clientY, e.shiftKey, e.altKey);
-      if (!point) return;
-
+    const runToolDown = (point: CanvasPoint, clientX: number, clientY: number) => {
       const tool = toolRef.current;
-      // Update modifier keys for resize/rotate
       if (tool instanceof SelectTool) {
-        tool.updateModifiers(e.shiftKey, e.altKey);
+        tool.updateModifiers(point.shiftKey ?? false, point.altKey ?? false);
       }
       if (tool instanceof PinTool) {
-        tool.setLastScreen(e.clientX, e.clientY);
+        tool.setLastScreen(clientX, clientY);
         tool.onMouseDown(point, getPinToolCallbacks());
       } else {
         tool.onMouseDown(point, getToolCallbacks());
       }
     };
 
-    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-      if (panDragRef.current.active) {
-        // Middle-click pan is handled by pixi-viewport natively
-        // But we track it to avoid tool interference
-        return;
-      }
-
-      const point = toCanvasPoint(e.clientX, e.clientY, e.shiftKey, e.altKey);
-      if (!point) return;
-
+    const runToolMove = (point: CanvasPoint, clientX: number, clientY: number) => {
       const tool = toolRef.current;
       let ghost: GhostShape | null = null;
 
-      // Update modifier keys for resize/rotate
       if (tool instanceof SelectTool) {
-        tool.updateModifiers(e.shiftKey, e.altKey);
+        tool.updateModifiers(point.shiftKey ?? false, point.altKey ?? false);
       }
       if (tool instanceof PinTool) {
-        tool.setLastScreen(e.clientX, e.clientY);
+        tool.setLastScreen(clientX, clientY);
         ghost = tool.onMouseMove(point, getPinToolCallbacks());
       } else {
         ghost = tool.onMouseMove(point, getToolCallbacks());
@@ -621,24 +655,13 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       }
     };
 
-    const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
-      if (e.button === 1) {
-        panDragRef.current.active = false;
-        return;
-      }
-
-      if (e.button !== 0) return;
-
-      const point = toCanvasPoint(e.clientX, e.clientY, e.shiftKey, e.altKey);
-      if (!point) return;
-
+    const runToolUp = (point: CanvasPoint, clientX: number, clientY: number) => {
       const tool = toolRef.current;
-      // Update modifier keys for resize/rotate commit
       if (tool instanceof SelectTool) {
-        tool.updateModifiers(e.shiftKey, e.altKey);
+        tool.updateModifiers(point.shiftKey ?? false, point.altKey ?? false);
       }
       if (tool instanceof PinTool) {
-        tool.setLastScreen(e.clientX, e.clientY);
+        tool.setLastScreen(clientX, clientY);
         tool.onMouseUp(point, getPinToolCallbacks());
       } else {
         tool.onMouseUp(point, getToolCallbacks());
@@ -776,10 +799,6 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
         className={className}
         style={{ ...CONTAINER_STYLE, ...style }}
         data-testid="symbol-editor-pixi-host"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
         onDoubleClick={handleDoubleClick}
       />
     );
