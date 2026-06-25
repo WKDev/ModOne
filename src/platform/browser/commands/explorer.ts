@@ -9,6 +9,8 @@
  * File *contents* live elsewhere: canvas circuits in the `circuits` store
  * (see canvas.ts), everything else (e.g. sheet XML) in `kv` under `file:<path>`.
  */
+import { createEmptySheet } from '../../../types/sheet';
+import { serializeSheetXml } from '../../../services/sheetXmlService';
 import type { CommandMap, CommandContext } from '../types';
 
 interface VfsEntry {
@@ -109,6 +111,11 @@ export const explorerCommands: CommandMap = {
     const name = `${fileName}${layout.ext}`;
     const path = joinPath(baseDir, name);
     await addVfsEntry(ctx, { name, path });
+    // Seed a valid default for formats that fail to parse when empty.
+    // (Canvas circuits get their default from canvas_load_circuit instead.)
+    if (fileType === 'sheet') {
+      await ctx.storage.put('kv', fileKey(path), serializeSheetXml(createEmptySheet()));
+    }
     return path;
   },
 
