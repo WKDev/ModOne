@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { isTauri } from '@tauri-apps/api/core';
 import type { SymbolDefinition, SymbolSummary, LibraryScope } from '../types/symbol';
 import * as symbolService from '../services/symbolService';
 
@@ -90,6 +91,18 @@ export const useSymbolStore = create<SymbolStoreState>((set) => ({
   clearError: () => set({ error: null }),
 
   openEditor: async (symbol: SymbolDefinition | null = null) => {
+    // In the browser there are no native detached windows, so open the editor
+    // as a docked tab in the editor area (SymbolEditorPanel already supports
+    // reading its symbol from the editor-area tab data).
+    if (!isTauri()) {
+      const { useEditorAreaStore } = await import('./editorAreaStore');
+      useEditorAreaStore
+        .getState()
+        .addTab('symbol-editor', symbol?.name || 'New Symbol', { symbol });
+      return;
+    }
+
+    // Desktop: open the editor in a floating window.
     // Dynamically import to avoid circular dependency if any
     const { usePanelStore } = await import('./panelStore');
     const panelStore = usePanelStore.getState();

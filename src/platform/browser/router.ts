@@ -8,6 +8,8 @@ import { projectCommands } from './commands/project';
 import { explorerCommands } from './commands/explorer';
 import { miscCommands } from './commands/misc';
 import { pluginCommands } from './commands/plugins';
+import { symbolCommands } from './commands/symbol';
+import { canvasCommands } from './commands/canvas';
 import { stubCommands } from './commands/stubs';
 
 /** Commands handled directly inside installBrowserRuntime (need the event registry). */
@@ -17,6 +19,8 @@ export function buildCommandMap(extra: ExtraCommands = {}): CommandMap {
   return {
     // stubs first so the real handlers below override any overlap
     ...stubCommands,
+    ...symbolCommands,
+    ...canvasCommands,
     ...projectCommands,
     ...explorerCommands,
     ...miscCommands,
