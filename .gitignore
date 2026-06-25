@@ -50,3 +50,8 @@ tools/**/target/
 
 # Local runtime locks
 .claude/scheduled_tasks.lock
+
+# QA harness screenshot output
+tests/qa/__output__/
+playwright-report/
+test-results/
