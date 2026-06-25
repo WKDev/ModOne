@@ -29,8 +29,10 @@ const TOLERANCE = 5;
 // Handle visual constants
 const HANDLE_SIZE = 6;
 const HANDLE_HALF = HANDLE_SIZE / 2;
-const HANDLE_FILL = 0xffffff;
-const HANDLE_STROKE = 0x4dabf7;
+// Handle palette matches OneCanvas's SelectionRenderer convention so the two
+// editors share one selection look: blue square handles with a white border.
+const HANDLE_FILL = 0x4dabf7;
+const HANDLE_STROKE = 0xffffff;
 const HANDLE_STROKE_WIDTH = 1.5;
 const HANDLE_HIT_RADIUS = 8;
 const ROTATION_HANDLE_DISTANCE = 20;
@@ -249,22 +251,23 @@ export class OverlayRenderer {
 
     this._handlePositions = handles;
 
-    // Draw connection line from top-center to rotation handle
+    // Draw connection line from top-center to rotation handle (selection blue,
+    // matching the selection outline).
     h.moveTo(bx + bw / 2, by);
     h.lineTo(rotateX, rotateY);
-    h.stroke({ color: HANDLE_STROKE, width: 1, pixelLine: true });
+    h.stroke({ color: SELECTION_COLOR, width: 1, pixelLine: true });
 
-    // Draw rotation handle (circle)
+    // Draw rotation handle (circle) — blue fill, white border, crisp at any zoom.
     h.circle(rotateX, rotateY, ROTATION_HANDLE_RADIUS);
     h.fill({ color: HANDLE_FILL });
-    h.stroke({ color: HANDLE_STROKE, width: HANDLE_STROKE_WIDTH });
+    h.stroke({ color: HANDLE_STROKE, width: HANDLE_STROKE_WIDTH, pixelLine: true });
 
-    // Draw 8 resize handles (squares)
+    // Draw 8 resize handles (squares) — blue fill, white border.
     for (const hp of handles) {
       if (hp.type === 'rotate') continue;
       h.rect(hp.x - HANDLE_HALF, hp.y - HANDLE_HALF, HANDLE_SIZE, HANDLE_SIZE);
       h.fill({ color: HANDLE_FILL });
-      h.stroke({ color: HANDLE_STROKE, width: HANDLE_STROKE_WIDTH });
+      h.stroke({ color: HANDLE_STROKE, width: HANDLE_STROKE_WIDTH, pixelLine: true });
     }
   }
 
