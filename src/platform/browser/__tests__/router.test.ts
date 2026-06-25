@@ -109,7 +109,7 @@ describe('browser runtime router', () => {
       fileType: 'canvas',
       fileName: 'main',
     })) as string;
-    expect(canvasPath).toBe('/modone/Demo/canvas/main.yaml');
+    expect(canvasPath).toBe('/modone/Demo/canvas/main.circuit.xml');
     expect(await invoke('path_exists', { path: canvasPath })).toBe(true);
 
     const tree = (await invoke('list_project_files', { projectRoot: '/modone/Demo' })) as Array<{
@@ -118,7 +118,7 @@ describe('browser runtime router', () => {
       children?: Array<{ name: string }>;
     }>;
     const canvasDir = tree.find((n) => n.name === 'canvas' && n.is_dir);
-    expect(canvasDir?.children?.map((c) => c.name)).toContain('main.yaml');
+    expect(canvasDir?.children?.map((c) => c.name)).toContain('main.circuit.xml');
 
     // Sheet file content round-trips through read/write_file_contents.
     const sheetPath = (await invoke('create_project_file', {

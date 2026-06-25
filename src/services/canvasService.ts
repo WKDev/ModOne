@@ -8,8 +8,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { CircuitState } from '../components/OneCanvas/types';
 import {
-  circuitToYaml,
-  yamlToCircuit,
+  circuitToXml,
+  xmlToCircuit,
   createDefaultCircuit,
   CircuitValidationError,
 } from '../components/OneCanvas/utils/serialization';
@@ -51,11 +51,11 @@ export const canvasService = {
    */
   async saveCircuit(path: string, state: CircuitState): Promise<void> {
     try {
-      // Serialize to YAML
-      const yamlContent = circuitToYaml(state);
+      // Serialize to XML (canonical circuit storage format)
+      const xmlContent = circuitToXml(state);
 
       // Call Tauri command
-      await invoke('canvas_save_circuit', { path, content: yamlContent });
+      await invoke('canvas_save_circuit', { path, content: xmlContent });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       throw new CanvasServiceError(
@@ -78,10 +78,10 @@ export const canvasService = {
   async loadCircuit(path: string): Promise<CircuitState> {
     try {
       // Call Tauri command
-      const yamlContent = await invoke<string>('canvas_load_circuit', { path });
+      const xmlContent = await invoke<string>('canvas_load_circuit', { path });
 
-      // Parse YAML to circuit state
-      return yamlToCircuit(yamlContent);
+      // Parse XML to circuit state
+      return xmlToCircuit(xmlContent);
     } catch (error) {
       // Re-throw validation errors as-is
       if (error instanceof CircuitValidationError) {

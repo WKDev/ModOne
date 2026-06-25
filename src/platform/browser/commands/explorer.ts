@@ -23,7 +23,7 @@ const KEY_CURRENT_PATH = 'currentProjectPath';
 const fileKey = (path: string) => `file:${path}`;
 
 const FILE_LAYOUT: Record<string, { dir: string; ext: string }> = {
-  canvas: { dir: 'canvas', ext: '.yaml' },
+  canvas: { dir: 'canvas', ext: '.circuit.xml' },
   ladder: { dir: 'ladder', ext: '.lad' },
   scenario: { dir: 'scenario', ext: '.json' },
   sheet: { dir: 'sheets', ext: '.sheet.xml' },

@@ -98,6 +98,15 @@ const FILE_TYPE_MAP: Record<string, FileTypeInfo> = {
     color: 'text-teal-500',
     description: 'Sheet Document',
   },
+
+  // Circuit canvas files (.circuit.xml) — canonical schematic storage format
+  '.circuit.xml': {
+    category: 'canvas',
+    panelType: 'one-canvas',
+    icon: 'CircuitBoard',
+    color: 'text-cyan-500',
+    description: 'Circuit Canvas',
+  },
 };
 
 /**

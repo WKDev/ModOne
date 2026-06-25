@@ -81,12 +81,12 @@ async function main() {
   console.log('  explorer shows:', JSON.stringify(explorerText.split('\n').filter(Boolean).slice(0, 12)));
 
   // Open the canvas file: expand the "canvas" folder (single click) then
-  // double-click main.yaml.
+  // double-click main.circuit.xml.
   console.log('→ Open canvas file');
   await page.getByText('canvas', { exact: true }).first().click().catch(() => {});
   await page.waitForTimeout(500);
-  await page.getByText('main.yaml', { exact: true }).first().dblclick({ timeout: 5000 }).catch(async () => {
-    await page.getByText('main.yaml', { exact: false }).first().dblclick().catch(() => {});
+  await page.getByText('main.circuit.xml', { exact: true }).first().dblclick({ timeout: 5000 }).catch(async () => {
+    await page.getByText('main.circuit.xml', { exact: false }).first().dblclick().catch(() => {});
   });
   await page.waitForTimeout(2500);
   await shot(page, '2-canvas-open');
@@ -109,12 +109,12 @@ async function main() {
 
   // The Explorer restores with the canvas folder already expanded, so the file
   // is visible without toggling. (Clicking the folder would collapse it.)
-  if ((await page.getByText('main.yaml', { exact: false }).count()) === 0) {
+  if ((await page.getByText('main.circuit.xml', { exact: false }).count()) === 0) {
     await page.getByText('canvas', { exact: true }).first().click().catch(() => {});
     await page.waitForTimeout(400);
   }
-  const fileStillThere = (await page.getByText('main.yaml', { exact: false }).count()) > 0;
-  await page.getByText('main.yaml', { exact: false }).first().dblclick().catch(() => {});
+  const fileStillThere = (await page.getByText('main.circuit.xml', { exact: false }).count()) > 0;
+  await page.getByText('main.circuit.xml', { exact: false }).first().dblclick().catch(() => {});
   await page.waitForTimeout(2000);
   const reopened = await page.evaluate(() => !!document.querySelector('canvas'));
   await shot(page, '3-after-reload');

@@ -431,6 +431,14 @@ export function yamlToCircuit(yamlString: string): CircuitState {
     throw new CircuitValidationError(`Failed to parse YAML: ${message}`);
   }
 
+  return schemaToCircuitState(data);
+}
+
+/**
+ * Build a CircuitState from a parsed circuit schema object (format-agnostic:
+ * shared by the XML and legacy YAML deserializers).
+ */
+function schemaToCircuitState(data: unknown): CircuitState {
   // Validate structure
   const validatedData = validateCircuitYaml(data);
 
@@ -517,4 +525,217 @@ export function createDefaultCircuit(name: string): CircuitState {
 export function createDefaultCircuitYaml(name: string): string {
   const state = createDefaultCircuit(name);
   return circuitToYaml(state);
+}
+
+// ============================================================================
+// XML Serialization (the canonical circuit storage format)
+// ============================================================================
+
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** Encode an arbitrary property value as a (type, text) pair for XML. */
+function encodePropertyValue(value: unknown): { type: string; text: string } {
+  if (typeof value === 'number') return { type: 'number', text: String(value) };
+  if (typeof value === 'boolean') return { type: 'boolean', text: String(value) };
+  if (typeof value === 'string') return { type: 'string', text: value };
+  return { type: 'json', text: JSON.stringify(value) };
+}
+
+/** Decode a property value from its XML (type, text) pair. */
+function decodePropertyValue(type: string | null, text: string): unknown {
+  switch (type) {
+    case 'number':
+      return Number(text);
+    case 'boolean':
+      return text === 'true';
+    case 'json':
+      return text ? JSON.parse(text) : null;
+    default:
+      return text;
+  }
+}
+
+/** Serialize a circuit schema object to the canonical XML string. */
+export function circuitSchemaToXml(schema: YamlCircuitSchema): string {
+  const lines: string[] = [];
+  lines.push('<?xml version="1.0" encoding="UTF-8"?>');
+  lines.push(`<circuit version="${escapeXml(schema.version)}">`);
+
+  const m = schema.metadata;
+  const metaAttrs = [
+    `name="${escapeXml(m.name)}"`,
+    `description="${escapeXml(m.description ?? '')}"`,
+    ...(m.created ? [`created="${escapeXml(m.created)}"`] : []),
+    ...(m.modified ? [`modified="${escapeXml(m.modified)}"`] : []),
+  ].join(' ');
+  lines.push(`  <metadata ${metaAttrs}>`);
+  for (const tag of m.tags ?? []) lines.push(`    <tag>${escapeXml(tag)}</tag>`);
+  lines.push('  </metadata>');
+
+  lines.push('  <components>');
+  for (const c of schema.components) {
+    const compAttrs = [
+      `id="${escapeXml(c.id)}"`,
+      `type="${escapeXml(String(c.type))}"`,
+      ...(c.label !== undefined ? [`label="${escapeXml(c.label)}"`] : []),
+    ].join(' ');
+    lines.push(`    <component ${compAttrs}>`);
+    lines.push(`      <position x="${c.position.x}" y="${c.position.y}"/>`);
+
+    if (c.properties && Object.keys(c.properties).length > 0) {
+      lines.push('      <properties>');
+      for (const [key, value] of Object.entries(c.properties)) {
+        const { type, text } = encodePropertyValue(value);
+        lines.push(
+          `        <property key="${escapeXml(key)}" type="${type}">${escapeXml(text)}</property>`
+        );
+      }
+      lines.push('      </properties>');
+    }
+
+    if (c.ports && c.ports.length > 0) {
+      lines.push('      <ports>');
+      for (const p of c.ports as Array<Record<string, unknown>>) {
+        const portAttrs = [
+          `id="${escapeXml(String(p.id))}"`,
+          `type="${escapeXml(String(p.type))}"`,
+          `label="${escapeXml(String(p.label ?? ''))}"`,
+          `position="${escapeXml(String(p.position))}"`,
+          ...(p.offset !== undefined ? [`offset="${p.offset}"`] : []),
+        ].join(' ');
+        const abs = p.absolutePosition as { x: number; y: number } | undefined;
+        if (abs) {
+          lines.push(`        <port ${portAttrs}><absolutePosition x="${abs.x}" y="${abs.y}"/></port>`);
+        } else {
+          lines.push(`        <port ${portAttrs}/>`);
+        }
+      }
+      lines.push('      </ports>');
+    }
+
+    lines.push('    </component>');
+  }
+  lines.push('  </components>');
+
+  lines.push('  <wires>');
+  for (const w of schema.wires) {
+    const wireAttrs = [`id="${escapeXml(w.id)}"`, ...(w.color ? [`color="${escapeXml(w.color)}"`] : [])].join(' ');
+    lines.push(`    <wire ${wireAttrs}>`);
+    lines.push(`      ${endpointToXml('from', w.from)}`);
+    lines.push(`      ${endpointToXml('to', w.to)}`);
+    lines.push('    </wire>');
+  }
+  lines.push('  </wires>');
+
+  lines.push('</circuit>');
+  return lines.join('\n');
+}
+
+function endpointToXml(tag: 'from' | 'to', ep: YamlWireEndpoint): string {
+  if (ep.component !== undefined) {
+    return `<${tag} component="${escapeXml(ep.component)}" port="${escapeXml(ep.port ?? '')}"/>`;
+  }
+  if (ep.junction !== undefined) {
+    return `<${tag} junction="${escapeXml(ep.junction)}"/>`;
+  }
+  if (ep.position) {
+    return `<${tag} x="${ep.position.x}" y="${ep.position.y}"/>`;
+  }
+  return `<${tag}/>`;
+}
+
+function parseEndpointXml(el: Element | null): YamlWireEndpoint {
+  if (!el) return {};
+  const component = el.getAttribute('component');
+  const junction = el.getAttribute('junction');
+  const x = el.getAttribute('x');
+  const y = el.getAttribute('y');
+  if (component !== null) return { component, port: el.getAttribute('port') ?? '' };
+  if (junction !== null) return { junction };
+  if (x !== null && y !== null) return { position: { x: Number(x), y: Number(y) } };
+  return {};
+}
+
+/** Parse the canonical circuit XML into a schema object (validated downstream). */
+export function xmlToCircuitSchema(xml: string): YamlCircuitSchema {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'application/xml');
+  const root = doc.documentElement;
+  if (!root || root.tagName !== 'circuit') {
+    throw new CircuitValidationError('Invalid circuit XML: root element must be <circuit>');
+  }
+
+  const metaEl = root.querySelector(':scope > metadata');
+  const metadata = {
+    name: metaEl?.getAttribute('name') ?? '',
+    description: metaEl?.getAttribute('description') ?? '',
+    tags: metaEl ? [...metaEl.querySelectorAll(':scope > tag')].map((t) => t.textContent ?? '') : [],
+    created: metaEl?.getAttribute('created') ?? undefined,
+    modified: metaEl?.getAttribute('modified') ?? undefined,
+  };
+
+  const components: YamlBlockDefinition[] = [];
+  for (const compEl of root.querySelectorAll(':scope > components > component')) {
+    const posEl = compEl.querySelector(':scope > position');
+    const properties: Record<string, unknown> = {};
+    for (const propEl of compEl.querySelectorAll(':scope > properties > property')) {
+      const key = propEl.getAttribute('key');
+      if (key) properties[key] = decodePropertyValue(propEl.getAttribute('type'), propEl.textContent ?? '');
+    }
+    const ports = [...compEl.querySelectorAll(':scope > ports > port')].map((portEl) => {
+      const absEl = portEl.querySelector(':scope > absolutePosition');
+      const offset = portEl.getAttribute('offset');
+      return {
+        id: portEl.getAttribute('id') ?? '',
+        type: portEl.getAttribute('type') ?? '',
+        label: portEl.getAttribute('label') ?? '',
+        position: portEl.getAttribute('position') ?? '',
+        ...(offset !== null ? { offset: Number(offset) } : {}),
+        ...(absEl
+          ? { absolutePosition: { x: Number(absEl.getAttribute('x')), y: Number(absEl.getAttribute('y')) } }
+          : {}),
+      };
+    });
+    components.push({
+      id: compEl.getAttribute('id') ?? '',
+      type: (compEl.getAttribute('type') ?? '') as YamlBlockDefinition['type'],
+      position: { x: Number(posEl?.getAttribute('x')), y: Number(posEl?.getAttribute('y')) },
+      label: compEl.getAttribute('label') ?? undefined,
+      properties: Object.keys(properties).length > 0 ? properties : undefined,
+      ports: ports.length > 0 ? ports : undefined,
+    });
+  }
+
+  const wires: YamlWireDefinition[] = [];
+  for (const wireEl of root.querySelectorAll(':scope > wires > wire')) {
+    wires.push({
+      id: wireEl.getAttribute('id') ?? '',
+      from: parseEndpointXml(wireEl.querySelector(':scope > from')),
+      to: parseEndpointXml(wireEl.querySelector(':scope > to')),
+      ...(wireEl.getAttribute('color') ? { color: wireEl.getAttribute('color')! } : {}),
+    });
+  }
+
+  return { version: root.getAttribute('version') ?? GRID_VERSION, metadata, components, wires };
+}
+
+/** Serialize CircuitState to the canonical XML string. */
+export function circuitToXml(state: CircuitState): string {
+  return circuitSchemaToXml(circuitToYamlSchema(state));
+}
+
+/** Deserialize the canonical circuit XML string to CircuitState. */
+export function xmlToCircuit(xml: string): CircuitState {
+  return schemaToCircuitState(xmlToCircuitSchema(xml));
+}
+
+/** Create default circuit XML string. */
+export function createDefaultCircuitXml(name: string): string {
+  return circuitToXml(createDefaultCircuit(name));
 }

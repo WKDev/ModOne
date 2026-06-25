@@ -6,11 +6,11 @@
  * frontend serializes. Loading an unknown path returns a fresh default circuit
  * so newly-created canvas files open as an empty editor instead of throwing.
  */
-import { createDefaultCircuitYaml } from '../../../components/OneCanvas/utils/serialization';
+import { createDefaultCircuitXml } from '../../../components/OneCanvas/utils/serialization';
 import type { CommandMap, CommandContext } from '../types';
 
 function nameFromPath(path: string): string {
-  return path.split('/').pop()?.replace(/\.(canvas|ya?ml)$/i, '') ?? 'circuit';
+  return path.split('/').pop()?.replace(/\.(circuit\.xml|canvas|ya?ml|xml)$/i, '') ?? 'circuit';
 }
 
 async function circuitKeys(ctx: CommandContext): Promise<string[]> {
@@ -28,14 +28,14 @@ export const canvasCommands: CommandMap = {
   async canvas_load_circuit(args, ctx): Promise<string> {
     const path = String(args.path ?? '');
     const stored = await ctx.storage.get<string>('circuits', path);
-    return stored ?? createDefaultCircuitYaml(nameFromPath(path));
+    return stored ?? createDefaultCircuitXml(nameFromPath(path));
   },
 
   async canvas_create_circuit(args, ctx): Promise<null> {
     const path = String(args.path ?? '');
     const name = String(args.name ?? nameFromPath(path));
     if (path && !(await ctx.storage.get('circuits', path))) {
-      await ctx.storage.put('circuits', path, createDefaultCircuitYaml(name));
+      await ctx.storage.put('circuits', path, createDefaultCircuitXml(name));
     }
     return null;
   },

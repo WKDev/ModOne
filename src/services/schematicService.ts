@@ -10,7 +10,7 @@ import type { MultiPageSchematic, SchematicPage } from '../components/OneCanvas/
 import type { SerializableCircuitState } from '../components/OneCanvas/types';
 import { createSelectionState } from '../components/OneCanvas/types';
 import { GRID_MODULE_MM, GRID_VERSION, normalizeSerializableCircuitState } from '../components/OneCanvas/canvasUnits';
-import { circuitToYaml, yamlToCircuit } from '../components/OneCanvas/utils/serialization';
+import { circuitToXml, xmlToCircuit } from '../components/OneCanvas/utils/serialization';
 
 // ============================================================================
 // Error Types
@@ -52,8 +52,8 @@ interface SchematicLoadResult {
 // ============================================================================
 
 /**
- * Convert a SchematicPage's circuit to YAML string.
- * Uses existing circuitToYaml() for the circuit body.
+ * Convert a SchematicPage's circuit to an XML string.
+ * Uses circuitToXml() for the circuit body.
  */
 function serializePageCircuit(circuit: SerializableCircuitState): string {
   const circuitState = {
@@ -64,15 +64,15 @@ function serializePageCircuit(circuit: SerializableCircuitState): string {
     selection: createSelectionState([]),
   };
 
-  return circuitToYaml(circuitState);
+  return circuitToXml(circuitState);
 }
 
 /**
- * Convert a YAML string back to SerializableCircuitState.
- * Uses existing yamlToCircuit() for parsing.
+ * Convert an XML string back to SerializableCircuitState.
+ * Uses xmlToCircuit() for parsing.
  */
-function deserializePageCircuit(yamlStr: string): SerializableCircuitState {
-  const circuitState = yamlToCircuit(yamlStr);
+function deserializePageCircuit(xmlStr: string): SerializableCircuitState {
+  const circuitState = xmlToCircuit(xmlStr);
   return normalizeSerializableCircuitState({
     components: Object.fromEntries(circuitState.components),
     junctions: circuitState.junctions.size > 0 ? Object.fromEntries(circuitState.junctions) : undefined,
@@ -96,7 +96,7 @@ function serializeManifest(schematic: MultiPageSchematic): string {
     active_page_id: schematic.activePageId,
     page_count: schematic.pages.length,
     pages: schematic.pages.map((page, index) => ({
-      file: `page_${index + 1}.yaml`,
+      file: `page_${index + 1}.circuit.xml`,
       id: page.id,
       number: page.number,
       name: page.name,
@@ -148,7 +148,7 @@ function serializePage(page: SchematicPage, index: number): PageSaveData {
   const content = JSON.stringify({ ...pageHeader, circuit: circuitYaml }, null, 2);
 
   return {
-    filename: `page_${index + 1}.yaml`,
+    filename: `page_${index + 1}.circuit.xml`,
     content,
   };
 }
