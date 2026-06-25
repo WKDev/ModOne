@@ -139,9 +139,30 @@ export class PixiApplication {
    * Clean up all resources.
    * After calling this, the instance cannot be reused.
    */
+  /**
+   * Halt the render loop (ticker) without tearing down the application.
+   *
+   * Use this to (a) pause rendering while the scene is being built so a frame
+   * can't render a half-built scene graph, and (b) at the very start of teardown
+   * so a queued render pass can't touch a renderable whose geometry has already
+   * been destroyed. PIXI throws "Cannot read properties of null (reading
+   * 'geometry')" from the BatcherPipe in both cases otherwise.
+   */
+  stop(): void {
+    this._app?.ticker?.stop();
+  }
+
+  /** Resume the render loop once the scene graph is fully built. */
+  start(): void {
+    this._app?.ticker?.start();
+  }
+
   destroy(): void {
     if (this._destroyed) return;
     this._destroyed = true;
+
+    // Stop the render loop before destroying anything (see stop()).
+    this._app?.ticker?.stop();
 
     // Stop observing resize
     if (this._resizeObserver) {
@@ -157,9 +178,15 @@ export class PixiApplication {
       }
     }
 
-    // Destroy Pixi application and all children
+    // Destroy the Pixi application and its scene graph (removes the canvas +
+    // tears down the renderer, which frees all GPU resources via context loss).
+    // texture is intentionally NOT destroyed: under React StrictMode two apps
+    // briefly coexist in the same container, and explicitly freeing shared
+    // GPU textures from the discarded instance nulls geometry still referenced
+    // by the live instance's render loop ("Cannot read properties of null
+    // (reading 'geometry')"). The context teardown reclaims texture memory anyway.
     if (this._app) {
-      this._app.destroy(true, { children: true, texture: true });
+      this._app.destroy(true, { children: true, texture: false });
       this._app = null;
     }
 

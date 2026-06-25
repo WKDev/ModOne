@@ -333,10 +333,15 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
       if (!container) return;
 
       let destroyed = false;
+      // Captured so cleanup can halt this app's render loop even while init() is
+      // still awaiting (StrictMode mounts→unmounts→remounts; the discarded
+      // instance must not keep rendering — pixiAppRef isn't assigned yet then).
+      let activeApp: PixiApplication | null = null;
 
       const init = async () => {
         // 1. Create Pixi Application
         const pixiApp = new PixiApplication();
+        activeApp = pixiApp;
         await pixiApp.init({
           container,
           config: canvasConfig,
@@ -357,6 +362,11 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
           pixiApp.destroy();
           return;
         }
+
+        // Pause rendering while the scene graph is built; resumed once every
+        // renderer is in place (see start() below). Prevents a frame from
+        // rendering a half-built scene (null geometry in PIXI's batcher).
+        pixiApp.stop();
 
         pixiAppRef.current = pixiApp;
 
@@ -605,6 +615,9 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
           viewport.state.zoom,
         );
 
+        // Scene graph is fully built — resume the render loop.
+        if (!destroyed) pixiApp.start();
+
         // DEV: Startup diagnostic — fires 500ms after init to let rAF complete
         if (import.meta.env.DEV) {
           setTimeout(() => {
@@ -641,6 +654,12 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
 
       return () => {
         destroyed = true;
+
+        // Halt the render loop before tearing down renderers so a queued frame
+        // can't render a renderable whose geometry is mid-destroy. activeApp
+        // covers the case where init() is still in-flight (pixiAppRef unset).
+        activeApp?.stop();
+        pixiAppRef.current?.stop();
 
         // Destroy in reverse order
         simulationOverlayRef.current?.destroy();

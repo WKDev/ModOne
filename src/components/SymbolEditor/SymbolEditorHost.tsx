@@ -258,10 +258,14 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       if (!container) return;
 
       let destroyed = false;
+      // Captured so cleanup can halt this app's render loop even while init() is
+      // still awaiting (StrictMode discarded instance must stop rendering).
+      let activeApp: PixiApplication | null = null;
 
       const init = async () => {
         // 1. Create Pixi Application
         const pixiApp = new PixiApplication();
+        activeApp = pixiApp;
         await pixiApp.init({
           container,
           config: {
@@ -282,6 +286,9 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
           pixiApp.destroy();
           return;
         }
+        // Pause rendering while the scene graph is built (resumed after the
+        // initial render below) to avoid rendering a half-built scene.
+        pixiApp.stop();
         pixiAppRef.current = pixiApp;
 
         // 2. Create Viewport
@@ -375,12 +382,21 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
 
         // 8. Center viewport on origin
         viewport.centerOn(0, 0, 1);
+
+        // Scene graph is fully built — resume the render loop.
+        if (!destroyed) pixiApp.start();
       };
 
       init();
 
       return () => {
         destroyed = true;
+
+        // Halt the render loop before tearing down renderers so a queued frame
+        // can't render a renderable whose geometry is mid-destroy. activeApp
+        // covers the case where init() is still in-flight (pixiAppRef unset).
+        activeApp?.stop();
+        pixiAppRef.current?.stop();
 
         // Destroy in reverse order
         overlayRendererRef.current?.destroy();
