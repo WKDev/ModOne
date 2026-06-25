@@ -21,27 +21,25 @@ function RibbonActionButton({ label, commandId, icon, disabled, active, dataTest
       disabled={disabled}
       title={label}
       onClick={() => { commandRegistry.execute(commandId).catch((err) => console.error(`Ribbon command failed: ${commandId}`, err)); }}
-      className={`group min-w-[82px] h-[74px] px-2 py-1.5 rounded-md border text-xs flex flex-col items-center justify-center gap-1 transition-colors ${
+      className={`min-w-[58px] h-[52px] px-1.5 rounded-md text-[11px] flex flex-col items-center justify-center gap-1 transition-colors ${
         disabled
-          ? 'cursor-not-allowed opacity-45 border-[var(--color-border)] text-[var(--color-text-muted)]'
+          ? 'cursor-not-allowed opacity-40 text-[var(--color-text-muted)]'
           : active
-            ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-text-primary)]'
-            : 'border-transparent text-[var(--color-text-secondary)] hover:border-[var(--color-border)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]'
+            ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
+            : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]'
       }`}
     >
-      <span className="flex items-center justify-center">{renderRibbonIcon(icon)}</span>
-      <span className="leading-tight text-center">{label}</span>
+      <span className="flex items-center justify-center">{renderRibbonIcon(icon, 20)}</span>
+      <span className="leading-none text-center">{label}</span>
     </button>
   );
 }
 
 function RibbonGroupView({ title, actions }: RibbonResolvedGroup) {
   return (
-    <div className="flex h-[86px] shrink-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
-      <div className="flex items-start gap-1 px-2 py-1.5">{actions.map((action) => <RibbonActionButton key={action.id} {...action} />)}</div>
-      <div className="w-7 border-l border-[var(--color-border)] flex items-end justify-center pb-1">
-        <span className="text-[10px] tracking-wide [writing-mode:vertical-rl] rotate-180 text-[var(--color-text-muted)]">{title}</span>
-      </div>
+    <div className="flex shrink-0 flex-col px-1.5">
+      <div className="flex flex-1 items-center gap-0.5">{actions.map((action) => <RibbonActionButton key={action.id} {...action} />)}</div>
+      <div className="pt-0.5 text-center text-[10px] tracking-wide text-[var(--color-text-muted)]">{title}</div>
     </div>
   );
 }
@@ -98,8 +96,8 @@ export function Toolbar() {
         ))}
       </div>
 
-      <div className="h-[92px] px-2 py-1 overflow-x-auto scrollbar-hide bg-[var(--color-bg-primary)]">
-        <div className="flex items-stretch gap-2 min-w-max animate-tab-fade-in">
+      <div className="h-[68px] px-2 py-1.5 overflow-x-auto scrollbar-hide bg-[var(--color-bg-primary)]">
+        <div className="flex h-full items-stretch min-w-max animate-tab-fade-in divide-x divide-[var(--color-border)]">
           {activeGroups.map((group) => (
             <RibbonGroupView key={group.id} {...group} />
           ))}
