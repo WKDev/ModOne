@@ -1,16 +1,11 @@
 /**
- * CanvasTool — the domain-agnostic tool/input contract for the shared canvas engine.
+ * The domain-agnostic pointer-input contract for the shared canvas engine.
  *
- * Every editor (Symbol, Schematic, Sheet) drives its interactions through tools
- * that receive ONE normalized pointer event, regardless of how the raw event was
- * produced. `ToolInputBinding` is the single source that converts PIXI federated
- * events into `CanvasPointerInput` and dispatches them — so all editors share one
- * coordinate/snap/pan pipeline.
- *
- * This is intentionally minimal: editor-specific state (selection, the document
- * model, undo, ghost previews) stays in the editor. A tool either implements
- * `CanvasTool` directly or an editor adapts its own tool model behind
- * `PointerInputHandlers`.
+ * `ToolInputBinding` is the single source that converts PIXI federated events into
+ * one normalized `CanvasPointerInput` and dispatches it to an editor's
+ * `PointerInputHandlers`, so every editor shares one coordinate/snap/pan pipeline.
+ * Editor-specific state (selection, the document model, undo, ghost previews) and
+ * the editor's own tool objects stay in the editor.
  */
 
 /**
@@ -51,22 +46,4 @@ export interface PointerInputHandlers {
   onPointerDown?(input: CanvasPointerInput): void;
   onPointerMove?(input: CanvasPointerInput): void;
   onPointerUp?(input: CanvasPointerInput): void;
-}
-
-/**
- * The target tool interface the engine is organized around. Editors are
- * migrating toward implementing this directly; until then they adapt their
- * existing tool model behind `PointerInputHandlers`.
- */
-export interface CanvasTool {
-  onPointerDown(input: CanvasPointerInput): void;
-  onPointerMove(input: CanvasPointerInput): void;
-  onPointerUp(input: CanvasPointerInput): void;
-  /** Cancel any in-progress operation (e.g. on tool switch or Escape). */
-  cancel?(): void;
-  /**
-   * Whether the tool is mid multi-step operation (e.g. polyline placement), so
-   * the host can keep a preview alive between clicks.
-   */
-  isDrawing?(): boolean;
 }

@@ -38,11 +38,7 @@ export {
 // --- Input pipeline ---
 // The unified tool/input contract — the first module that physically lives in
 // canvas-core (not a re-export). Editors drive interactions through this.
-export type {
-  CanvasTool,
-  CanvasPointerInput,
-  PointerInputHandlers,
-} from './input/Tool';
+export type { CanvasPointerInput, PointerInputHandlers } from './input/Tool';
 export { ToolInputBinding, type ToolInputBindingOptions } from './input/ToolInputBinding';
 export { normalizePointer } from './input/normalizePointer';
 
