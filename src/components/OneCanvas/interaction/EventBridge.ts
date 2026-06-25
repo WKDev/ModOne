@@ -17,8 +17,9 @@
 
 import type { FederatedPointerEvent } from 'pixi.js';
 import type { Viewport } from 'pixi-viewport';
-import type { Position } from '../types';
 import type { InteractionController, Modifiers } from './InteractionController';
+import { normalizePointer } from '@/canvas-core/input/normalizePointer';
+import type { CanvasPointerInput } from '@/canvas-core/input/Tool';
 
 // ============================================================================
 // Types
@@ -138,16 +139,14 @@ export class EventBridge {
   private _handlePointerDown(e: FederatedPointerEvent): void {
     if (this._destroyed || !this._viewport || !this._controller) return;
 
-    const button = e.button;
-    const worldPos = this._toWorld(e);
-    const screenPos = this._toScreen(e);
-    const modifiers = this._extractModifiers(e);
+    const n = normalizePointer(this._viewport, null, e);
+    const modifiers = this._modifiersFrom(n);
 
     if (import.meta.env.DEV) {
-      console.debug('[EventBridge] pointerdown', { button, worldPos, screenPos });
+      console.debug('[EventBridge] pointerdown', { button: n.button, worldPos: n.world, screenPos: n.screen });
     }
 
-    this._controller.handlePointerDown(worldPos, screenPos, button, modifiers);
+    this._controller.handlePointerDown(n.world, n.screen, n.button, modifiers);
   }
 
   private _handlePointerMove(e: FederatedPointerEvent): void {
@@ -156,21 +155,15 @@ export class EventBridge {
     // We no longer guard with _isPointerActive so that lastMoveWorld is always up-to-date
     // in the controller, enabling immediate 'w' key wire drawing.
 
-    const worldPos = this._toWorld(e);
-    const screenPos = this._toScreen(e);
-    const modifiers = this._extractModifiers(e);
-
-    this._controller.handlePointerMove(worldPos, screenPos, modifiers);
+    const n = normalizePointer(this._viewport, null, e);
+    this._controller.handlePointerMove(n.world, n.screen, this._modifiersFrom(n));
   }
 
   private _handlePointerUp(e: FederatedPointerEvent): void {
     if (this._destroyed || !this._viewport || !this._controller) return;
 
-    const worldPos = this._toWorld(e);
-    const screenPos = this._toScreen(e);
-    const modifiers = this._extractModifiers(e);
-
-    this._controller.handlePointerUp(worldPos, screenPos, e.button, modifiers);
+    const n = normalizePointer(this._viewport, null, e);
+    this._controller.handlePointerUp(n.world, n.screen, n.button, this._modifiersFrom(n));
   }
 
   // --------------------------------------------------------------------------
@@ -208,29 +201,16 @@ export class EventBridge {
   }
 
   // --------------------------------------------------------------------------
-  // Coordinate Conversion
-  // --------------------------------------------------------------------------
-
-  private _toWorld(e: FederatedPointerEvent): Position {
-    if (!this._viewport) return { x: 0, y: 0 };
-    const worldPoint = this._viewport.toWorld(e.global.x, e.global.y);
-    return { x: worldPoint.x, y: worldPoint.y };
-  }
-
-  private _toScreen(e: FederatedPointerEvent): Position {
-    return { x: e.global.x, y: e.global.y };
-  }
-
-  // --------------------------------------------------------------------------
   // Modifier Extraction
   // --------------------------------------------------------------------------
 
-  private _extractModifiers(e: FederatedPointerEvent): Modifiers {
+  /** Map a normalized pointer's modifier flags to the controller's Modifiers. */
+  private _modifiersFrom(n: CanvasPointerInput): Modifiers {
     return {
-      ctrl: e.ctrlKey || e.metaKey,
-      shift: e.shiftKey,
-      alt: e.altKey,
-      meta: e.metaKey,
+      ctrl: n.ctrlKey || n.metaKey,
+      shift: n.shiftKey,
+      alt: n.altKey,
+      meta: n.metaKey,
       space: false, // Space held state is tracked by the controller itself
     };
   }

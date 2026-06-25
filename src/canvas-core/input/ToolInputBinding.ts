@@ -15,7 +15,8 @@
 import type { Viewport } from 'pixi-viewport';
 import type { FederatedPointerEvent } from 'pixi.js';
 import type { CoordinateSystem } from '../../components/OneCanvas/core/CoordinateSystem';
-import type { CanvasPointerInput, PointerInputHandlers } from './Tool';
+import type { PointerInputHandlers } from './Tool';
+import { normalizePointer } from './normalizePointer';
 
 export interface ToolInputBindingOptions {
   /** The pixi-viewport Viewport that receives federated pointer events. */
@@ -53,18 +54,18 @@ export class ToolInputBinding {
         this._panning = true;
         return;
       }
-      this._handlers.onPointerDown?.(this._normalize(e));
+      this._handlers.onPointerDown?.(normalizePointer(this._viewport!, this._coordSys, e));
     };
     this._onMove = (e) => {
       if (this._panning) return; // mid-pan: don't fight the camera
-      this._handlers.onPointerMove?.(this._normalize(e));
+      this._handlers.onPointerMove?.(normalizePointer(this._viewport!, this._coordSys, e));
     };
     this._onUp = (e) => {
       if (e.button !== 0) {
         this._panning = false;
         return;
       }
-      this._handlers.onPointerUp?.(this._normalize(e));
+      this._handlers.onPointerUp?.(normalizePointer(this._viewport!, this._coordSys, e));
     };
 
     const vp = this._viewport;
@@ -94,23 +95,5 @@ export class ToolInputBinding {
     this._onDown = null;
     this._onMove = null;
     this._onUp = null;
-  }
-
-  private _normalize(e: FederatedPointerEvent): CanvasPointerInput {
-    const vp = this._viewport!;
-    // `e.global` is canvas-relative (what toWorld expects); `e.client` is
-    // window-relative (for DOM overlays). No getBoundingClientRect math needed.
-    const world = vp.toWorld(e.global.x, e.global.y);
-    const snapped = this._coordSys
-      ? this._coordSys.snapToGrid({ x: world.x, y: world.y })
-      : { x: world.x, y: world.y };
-    return {
-      world: { x: world.x, y: world.y },
-      snapped: { x: snapped.x, y: snapped.y },
-      client: { x: e.client.x, y: e.client.y },
-      button: e.button,
-      shiftKey: e.shiftKey,
-      altKey: e.altKey,
-    };
   }
 }

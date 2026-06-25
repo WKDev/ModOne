@@ -44,6 +44,8 @@ function fed(o: {
     button: o.button ?? 0,
     shiftKey: !!o.shift,
     altKey: !!o.alt,
+    ctrlKey: false,
+    metaKey: false,
   } as unknown as FederatedPointerEvent;
 }
 
@@ -76,6 +78,7 @@ describe('ToolInputBinding', () => {
     const { input } = events[0];
     expect(input.world).toEqual({ x: 16, y: 16 });
     expect(input.snapped).toEqual({ x: 20, y: 20 });
+    expect(input.screen).toEqual({ x: 8, y: 8 }); // canvas-relative (e.global)
     expect(input.client).toEqual({ x: 100, y: 200 }); // window coords, not toWorld'd
     expect(input.shiftKey).toBe(true);
     expect(input.button).toBe(0);

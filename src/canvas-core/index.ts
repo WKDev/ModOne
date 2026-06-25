@@ -44,6 +44,7 @@ export type {
   PointerInputHandlers,
 } from './input/Tool';
 export { ToolInputBinding, type ToolInputBindingOptions } from './input/ToolInputBinding';
+export { normalizePointer } from './input/normalizePointer';
 
 export { EventBridge, type EventBridgeOptions } from '../components/OneCanvas/interaction/EventBridge';
 export {
