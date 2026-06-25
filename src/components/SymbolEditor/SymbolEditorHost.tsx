@@ -495,7 +495,14 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
     ): CanvasPoint | null => {
       const coordSys = coordSysRef.current;
       if (!coordSys) return null;
-      const world = coordSys.screenToWorldSnapped(screenX, screenY);
+      // DOM mouse events report window-relative coords (clientX/clientY), but the
+      // viewport's screen->world transform expects coords relative to the canvas
+      // (0,0 = canvas top-left). Subtract the host element's screen position, or
+      // the cursor is off by the canvas offset (sidebar/header) when docked.
+      const rect = containerRef.current?.getBoundingClientRect();
+      const localX = rect ? screenX - rect.left : screenX;
+      const localY = rect ? screenY - rect.top : screenY;
+      const world = coordSys.screenToWorldSnapped(localX, localY);
       return { x: world.x, y: world.y, shiftKey, altKey };
     };
 
