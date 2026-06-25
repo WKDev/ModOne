@@ -101,6 +101,35 @@ describe('browser runtime router', () => {
     expect(list).toContain(path);
   });
 
+  it('virtual FS: created files appear in the project tree and survive', async () => {
+    const { invoke } = makeInvoke();
+    await invoke('create_project', { name: 'Demo', projectDir: '/modone/Demo' });
+
+    const canvasPath = (await invoke('create_project_file', {
+      fileType: 'canvas',
+      fileName: 'main',
+    })) as string;
+    expect(canvasPath).toBe('/modone/Demo/canvas/main.yaml');
+    expect(await invoke('path_exists', { path: canvasPath })).toBe(true);
+
+    const tree = (await invoke('list_project_files', { projectRoot: '/modone/Demo' })) as Array<{
+      name: string;
+      is_dir: boolean;
+      children?: Array<{ name: string }>;
+    }>;
+    const canvasDir = tree.find((n) => n.name === 'canvas' && n.is_dir);
+    expect(canvasDir?.children?.map((c) => c.name)).toContain('main.yaml');
+
+    // Sheet file content round-trips through read/write_file_contents.
+    const sheetPath = (await invoke('create_project_file', {
+      fileType: 'sheet',
+      fileName: 'cover',
+    })) as string;
+    expect(sheetPath).toBe('/modone/Demo/sheets/cover.sheet.xml');
+    await invoke('write_file_contents', { path: sheetPath, content: '<sheet/>' });
+    expect(await invoke('read_file_contents', { path: sheetPath })).toBe('<sheet/>');
+  });
+
   it('returns null for unknown commands instead of throwing', async () => {
     const { invoke } = makeInvoke();
     await expect(invoke('totally_unknown_command', {})).resolves.toBeNull();
