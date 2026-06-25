@@ -19,7 +19,7 @@ const PIN_COLOR = 0xff8844;
 const PIN_RADIUS = 4;
 const PIN_LINE_WIDTH = 1.5;
 const PIN_LABEL_SIZE = 9;
-const PIN_LABEL_COLOR = 0xbbbbbb;
+const PIN_LABEL_COLOR = 0x555555;
 
 export class PinRenderer {
   private _layer: Container;

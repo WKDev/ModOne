@@ -31,7 +31,7 @@ export class ArcTool extends BaseTool {
         r: this.radius,
         startAngle: this.startAngle,
         endAngle: endAngle,
-        stroke: '#cccccc',
+        stroke: '#333333',
         fill: 'none',
         strokeWidth: 1,
       };

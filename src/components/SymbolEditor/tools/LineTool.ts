@@ -42,7 +42,7 @@ export class LineTool extends BaseTool {
           { x: this.startPoint.x, y: this.startPoint.y },
           { x: pt.x, y: pt.y },
         ],
-        stroke: '#cccccc',
+        stroke: '#333333',
         fill: 'none',
         strokeWidth: 1,
       };

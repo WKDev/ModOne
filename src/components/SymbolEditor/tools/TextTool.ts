@@ -18,7 +18,7 @@ export class TextTool extends BaseTool {
         text,
         fontSize: 12,
         fontFamily: 'monospace',
-        fill: '#cccccc',
+        fill: '#333333',
         anchor: 'start',
       };
       callbacks.onAddPrimitive(textPrim);

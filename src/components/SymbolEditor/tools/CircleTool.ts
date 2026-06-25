@@ -43,7 +43,7 @@ export class CircleTool extends BaseTool {
         cx: this.centerPoint.x,
         cy: this.centerPoint.y,
         r,
-        stroke: '#cccccc',
+        stroke: '#333333',
         fill: 'none',
         strokeWidth: 1,
       };

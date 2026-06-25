@@ -45,7 +45,7 @@ export class RectTool extends BaseTool {
         y,
         width,
         height,
-        stroke: '#cccccc',
+        stroke: '#333333',
         fill: 'none',
         strokeWidth: 1,
       };

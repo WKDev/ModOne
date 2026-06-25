@@ -16,7 +16,7 @@ export interface GhostRendererOptions {
   layer: Container;
 }
 
-const GHOST_COLOR = 0xcccccc;
+const GHOST_COLOR = 0x888888;
 const GHOST_WIDTH = 1;
 const GHOST_ALPHA = 0.8;
 const MARQUEE_STROKE = 0x0066ff;

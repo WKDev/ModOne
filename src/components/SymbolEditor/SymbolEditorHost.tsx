@@ -269,12 +269,12 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
         await pixiApp.init({
           container,
           config: {
-            backgroundColor: 0x1a1a1a,
+            backgroundColor: 0xffffff,
             grid: {
               size: GRID_SIZE,
               visible: true,
-              color: '#333333',
-              majorColor: '#444444',
+              color: '#cccccc',
+              majorColor: '#999999',
               subdivisions: 5,
             },
             minZoom: 0.1,
@@ -296,12 +296,12 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
         const vpContainer = viewport.init({
           app: pixiApp.app,
           config: {
-            backgroundColor: 0x1a1a1a,
+            backgroundColor: 0xffffff,
             grid: {
               size: GRID_SIZE,
               visible: true,
-              color: '#333333',
-              majorColor: '#444444',
+              color: '#cccccc',
+              majorColor: '#999999',
               subdivisions: 5,
             },
             minZoom: 0.1,
@@ -336,8 +336,11 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
           config: {
             size: GRID_SIZE,
             visible: true,
-            color: '#333333',
-            majorColor: '#444444',
+            color: '#cccccc',
+            majorColor: '#999999',
+            alpha: 0.3,
+            majorAlpha: 0.5,
+            style: 'dots',
             subdivisions: 5,
           },
         });

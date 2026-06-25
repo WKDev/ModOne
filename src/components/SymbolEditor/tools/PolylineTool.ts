@@ -118,7 +118,7 @@ export class PolylineTool extends BaseTool {
       const polyline: PolylinePrimitive = {
         kind: 'polyline',
         points: uniquePoints,
-        stroke: '#cccccc',
+        stroke: '#333333',
         fill: 'none',
         strokeWidth: 1,
         closed: true,
@@ -143,7 +143,7 @@ export class PolylineTool extends BaseTool {
       const polyline: PolylinePrimitive = {
         kind: 'polyline',
         points: uniquePoints,
-        stroke: '#cccccc',
+        stroke: '#333333',
         fill: 'none',
         strokeWidth: 1,
       };
