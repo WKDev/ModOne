@@ -36,6 +36,51 @@ suite each time:
 - A util barrel that `export *`s its own modules must NOT be imported by those
   modules (cycle) — import siblings directly.
 
+## Verifying a behavior-preserving move (tooling)
+
+For pure/util splits `tsc` + the test suite is enough. For **risky stateful
+splits** (a god-class → context-object handlers, a store `create()` → action
+factories) the real risk is a **transcription slip during the mechanical move** —
+and the two classes of slip need two different checks:
+
+- **Type-mismatched slip** (wrong-typed field/arg, dropped call) → caught by
+  `tsc --noEmit` (every reference must resolve and type-check).
+- **Same-type slip** (`_segmentHandleA` ↔ `_segmentHandleB`, two assignments
+  reordered) → `tsc` is blind. Catch it with a **per-function sequence diff
+  against the git baseline**: prove each moved body is line-for-line identical to
+  the original, modulo the intended rewrites (`this.`→`self.`, `_priv`→pub,
+  `m()`→`fn(self)`).
+
+Tool: `scripts/verify-equivalent-move.mjs <config.json>` does exactly this —
+enumerates functions on both sides, auto-pairs by normalized name, and compares
+canonicalized body lines in order (exit 1 + line-level diff on mismatch). Example
+config (the InteractionController FSM split):
+
+```json
+{
+  "baselineRef": "3d2d581^",
+  "originalPath": "src/components/OneCanvas/interaction/InteractionController.ts",
+  "newPaths": ["src/.../InteractionController.ts", "src/.../interactionPointerHandlers.ts", "…"],
+  "contextNames": ["self", "this", "ctx"],
+  "stripUnderscores": true,
+  "dropSuffixes": ["Ctx"]
+}
+```
+
+**Always run a negative control** before trusting a green: tamper one line
+(swap two same-type assignments) and confirm the tool FAILs on it — otherwise a
+silently-broken extractor reads as "all equivalent." (That actually happened:
+an early extractor matched call-sites instead of definitions and "passed" garbage.)
+
+**Gotchas:**
+- Node `execSync` on Windows uses **cmd.exe, where `^` is the escape char** — a
+  ref like `3d2d581^` silently becomes `3d2d581` (the wrong, post-split commit).
+  Use `execFileSync('git', [...])` (no shell) so `^`/`~` reach git intact.
+- The tool **warns about unmatched originals** (functions with no new
+  counterpart) instead of silently dropping them — a verifier that hides
+  under-coverage is worse than none. Interface method signatures show up here
+  (no body) and are expected.
+
 ## Done (commits on `feature/web-runtime-shim`)
 
 | File | Was | Now | Modules (largest) |
@@ -44,27 +89,114 @@ suite each time:
 | `LadderEditor/utils/gridConverter.ts` | 1353 | 35 barrel | astFactories/astToGrid/nodeUtils/gridGrouping/gridToAst (431) |
 | `LadderEditor/utils/wireGenerator.ts` | 1263 | 34 barrel | wireGeneration/wireDirections/wireTypeResolution/parallelBranches/wireMerge (441) |
 | `lib/symbolXmlParser.ts` | 1512 | 22 barrel | symbolXmlTypes/xmlDomUtils/xmlElementParsers/symbolXmlParse/symbolXmlSerialize/symbolXmlUtils (514) |
+| `components/SymbolEditor/SymbolEditor.tsx` | 1243 | 409 component | hooks/useSymbolGeometry (434) /useSymbolClipboard/useSymbolHistory/useSymbolMultiUnit/useSymbolVisualState + editorModel/Reducer/Helpers |
+| `stores/documentRegistry.ts` | 1031 | 119 store | documentHistoryActions (257) /documentDataActions/documentLifecycleActions + documentRegistryTypes/Helpers |
+| `OneCanvas/interaction/InteractionController.ts` | 1240 | 440 FSM shell | interactionPointerHandlers (352) /WireHandlers/SegmentHandlers/PlacingHandlers + interactionHelpers/Types/Geometry |
 
-## In progress
+### documentRegistry — the action-factory pattern (Zustand state core)
 
-- `components/SymbolEditor/SymbolEditor.tsx` — **partial** (1243 → 999).
-  Extracted `editorModel.ts` / `editorReducer.ts` / `editorHelpers.ts` (pure
-  parts) and re-export via `export *`. **Stage 2 remaining:** the component body
-  is still ~999 lines (handlers + effects + JSX). Extract handler groups into
-  custom hooks (`useSymbolClipboard` / `useSymbolHistory` / `useSymbolMultiUnit`)
-  — higher-risk because it threads shared state (localSymbol/setLocalSymbol/
-  dispatch/historyRef), so it was deferred from the pure-util splits.
+The state-core redesign (after the pure-helper Stage 1). Rather than the finicky
+`StateCreator` per-slice generics, the single `create()` closure's actions were
+split into **action-factory modules** that each take the store's `(set, get)` and
+return their slice of actions, spread together in one `create()`:
+
+```
+immer((set, get) => ({
+  ...initialState,
+  ...createLifecycleActions(set, get),
+  ...createDataActions(set, get),
+  ...createHistoryActions(set, get),
+  reset: () => { ... },   // stays inline (uses the replacement-form set)
+}))
+```
+
+- `set` is typed once in `documentRegistryTypes` as `DocRegistrySet`
+  (`(recipe, replace?: false, action?) => void`). **`replace` must be `false`,
+  not `boolean`** — newer zustand+immer constrains the replace flag to `false`
+  so actions can't be replaced away; `boolean` fails contravariance.
+- Action bodies are **byte-for-byte identical**; the same `set`/`get` references
+  flow in, devtools action-name strings are preserved → immer/devtools behavior
+  unchanged. No cross-factory action calls (only `get().documents`), so ordering
+  is irrelevant.
+- Verified: tsc clean, full vitest green (1684), QA `web-flow`/`web-sheet`/
+  `web-schematic` pass (create/edit/save/reload+reopen).
+
+### SymbolEditor — the custom-hook pattern (React state-threading)
+
+Stage 1 pulled the pure parts (`editorModel` / `editorReducer` / `editorHelpers`)
+out and re-exported via `export *`. **Stage 2 (done)** extracted the handler
+groups — which thread shared state (`localSymbol`/`setLocalSymbol`/`dispatch`/
+`historyRef`/`bumpHistory`) — into custom hooks under `hooks/`:
+
+- `useSymbolHistory(dispatch)` owns `historyRef` + `historyVersion`/`bumpHistory`
+  and returns `handleUndo`/`handleRedo`/`canUndo`/`canRedo`.
+- `useSymbolGeometry({...})` — all primitive/pin mutation handlers + `getActiveGeometry`.
+- `useSymbolClipboard({...})` — copy/paste/cut/duplicate/select-all **and owns the
+  Ctrl/Cmd keyboard `useEffect`**; the component calls it purely for that effect.
+- `useSymbolMultiUnit({...})` / `useSymbolVisualState({...})` — unit + visual-state lifecycle.
+
+**Pattern rules that kept it behavior-neutral:**
+- Handler bodies copied **byte-for-byte**; only `state.selectedIds` /
+  `state.activeVisualState` became plain `selectedIds` / `activeVisualState`
+  params (same value).
+- Hooks are called **unconditionally, in fixed order, with no early return before
+  them** — Rules of Hooks satisfied.
+- Stable values now passed as params (`dispatch`, `getActiveGeometry`) were added
+  to the relevant `useCallback`/`useEffect` deps — referentially stable, so a
+  runtime no-op that just silences `exhaustive-deps`.
+- `useRef` typed `RefObject<HistoryManager>` (not the deprecated `MutableRefObject`).
+- Verified: `tsc --noEmit` clean, full vitest suite green (1684 pass), **and** the
+  runtime QA harnesses `tests/qa/web-symbol.mjs` + `web-symbol-clipboard.mjs`
+  (Ctrl+A→Ctrl+D duplicate → 2 graphics + 2 pins, symbol persisted) — unit tests
+  don't mount the component, so the web harness is the real check.
+
+## Stage 1 (pure-helper) extractions done for the state-core files
+
+Before redesigning the stateful cores, the **pure, state-independent** helper
+blocks were lifted out first (low-risk byte-move + import-back, the proven
+pattern). This shrinks each file without touching its shared-mutable-state core:
+
+| File | Was | Now | Extracted module |
+|---|---|---|---|
+| `stores/documentRegistry` | 1031 | 864 | `documentRegistryHelpers.ts` — 8 helpers (history snapshot create/restore, canvas serialize/deserialize, scenario snapshot, path basename) |
+| `OneCanvas/interaction/InteractionController` | 1240 | 1188 | `interactionGeometry.ts` — 8 pure geometry fns + DEFAULT_GRID_SNAP / PORT_DIRECTIONS |
+
+The remaining bulk in both is the **state core** (the `create()` closure / the
+FSM class body) — that is the redesign step below, which carries real runtime
+risk and must be verified with the `tests/qa/web-*.mjs` harness.
+
+### InteractionController — the context-object handler pattern (stateful class)
+
+State-core redesign for a mutable FSM class (the hardest kind — ~40 `this._*`
+fields shared across ~45 methods). The class keeps **only** the state fields and
+the public command/event dispatch methods; every handler becomes a **free
+function taking the controller as its context** (`self: InteractionController`)
+and mutating its fields. Grouped by concern into `interaction*Handlers` modules.
+
+- Fields are made **public** (dropped `private`, kept the `_` prefix as the
+  "internal — handlers only" signal) so the sibling modules can read/write them.
+- Handlers call each other by **direct import** passing `self`; the handler
+  modules `import type { InteractionController }` only, so the value-import graph
+  is one-directional (controller → handlers) with **no runtime cycle**.
+- Transform was mechanical and contained: `this.field` → `self.field`,
+  `this._method(...)` → `methodFreeFn(self, ...)`. Bodies otherwise byte-identical.
+- Verified: tsc clean, full vitest green (1684) + interaction unit tests (18),
+  QA `web-sheet` (the drag step exercises idle→item_pending→dragging_items→up).
 
 ## Remaining backlog (live files, 1000+ lines)
 
-Run `find src -name '*.ts*' | xargs wc -l | sort -rn` for the current list. As of
-this writing:
+Run `find src -name '*.ts*' | xargs wc -l | sort -rn` for the current list. The
+two big stateful cores (documentRegistry, InteractionController) are **done**
+(see Done table); ladderStore is **delete-track** (below). Next candidates are
+the 700–1000 line tier: `components/SymbolEditor/PropertiesPanel` (990),
+`SymbolEditor/tools/SelectTool` (926), `SymbolEditor/SymbolEditorHost` (796), …
+plus ~15 more over 700 lines.
 
-- `OneCanvas/interaction/InteractionController` (~1240) — interaction FSM
-  (runtime/state; **not** a pure split — needs care).
-- `stores/ladderStore` (~1095) — Zustand store (slice pattern; runtime risk).
-- `stores/documentRegistry` (~1031) — store (runtime risk).
-- … plus ~18 more files over 700 lines.
+**Do NOT split `stores/ladderStore` (1095)** — it is `@deprecated` (header says
+"No component should import from this file … will be deleted"), and has **zero
+non-test consumers** (only `__tests__/ladderStore.undo-redo.test.ts` imports it).
+Like `canvasStore`, it is doomed code → splitting is wasted effort. It belongs on
+the *deletion* track, not the *split* track.
 
 **Do NOT split `stores/canvasStore` (1754)** — it is `@deprecated`, has a single
 non-test consumer (`stores/adapters/globalCanvasAdapter`), and is scheduled for
