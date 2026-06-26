@@ -23,6 +23,7 @@ import {
   translatePrimitive,
 } from './history';
 import { SymbolEditorHost } from './SymbolEditorHost';
+import { GRID_MODULE_MM, isEditableTarget } from '@/canvas-core';
 
 // ============================================================================
 // Predefined visual states (expandable via free-text)
@@ -305,6 +306,9 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
   const historyRef = useRef(new HistoryManager());
   const [historyVersion, setHistoryVersion] = useState(0);
   const bumpHistory = useCallback(() => setHistoryVersion((v) => v + 1), []);
+  // Preview mode gates editing shortcuts (declared early so the keyboard
+  // handler below can reference it without a temporal-dead-zone error).
+  const [previewMode, setPreviewMode] = useState(false);
 
   const isMultiUnit = localSymbol.units !== undefined && localSymbol.units.length > 0;
 
@@ -684,22 +688,135 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
     dispatch({ type: 'MARK_DIRTY' });
   }, [bumpHistory]);
 
+  // ── Clipboard (copy / paste / cut / duplicate) ──────────────────────────────
+
+  /** In-editor clipboard (per session). Holds deep copies so later edits to the
+   *  source don't mutate the clipboard. */
+  const clipboardRef = useRef<{ graphics: GraphicPrimitive[]; pins: SymbolPin[] }>({
+    graphics: [],
+    pins: [],
+  });
+
+  /** Graphics + pins of the surface currently being edited (active unit, or the
+   *  symbol root in single-unit mode). */
+  const getActiveGeometry = useCallback((): {
+    graphics: GraphicPrimitive[];
+    pins: SymbolPin[];
+  } => {
+    if (isMultiUnit && activeUnit !== null) {
+      const unit = localSymbol.units?.[activeUnit];
+      return { graphics: unit?.graphics ?? [], pins: unit?.pins ?? [] };
+    }
+    return { graphics: localSymbol.graphics ?? [], pins: localSymbol.pins ?? [] };
+  }, [isMultiUnit, activeUnit, localSymbol]);
+
+  const handleCopySelected = useCallback(() => {
+    if (state.selectedIds.size === 0) return;
+    const { graphics, pins } = getActiveGeometry();
+    const copiedGraphics = graphics.filter((_, i) => state.selectedIds.has(`g-${i}`));
+    const copiedPins = pins.filter((p) => state.selectedIds.has(p.id));
+    if (copiedGraphics.length === 0 && copiedPins.length === 0) return;
+    clipboardRef.current = {
+      graphics: copiedGraphics.map((g) => structuredClone(g)),
+      pins: copiedPins.map((p) => structuredClone(p)),
+    };
+  }, [state.selectedIds, getActiveGeometry]);
+
+  const handlePaste = useCallback(() => {
+    const { graphics, pins } = clipboardRef.current;
+    if (graphics.length === 0 && pins.length === 0) return;
+    // Offset the paste so it doesn't sit exactly on the source, staying grid-aligned.
+    const offset = GRID_MODULE_MM * 2;
+    graphics.forEach((g) => {
+      const moved = translatePrimitive(structuredClone(g), offset, offset);
+      // Strip the id so handleAddPrimitive assigns a fresh one.
+      const { id: _id, ...rest } = moved as GraphicPrimitive & { id?: string };
+      handleAddPrimitive(rest as GraphicPrimitive);
+    });
+    pins.forEach((p) => {
+      const newPin: SymbolPin = {
+        ...structuredClone(p),
+        id: crypto.randomUUID(),
+        position: { x: p.position.x + offset, y: p.position.y + offset },
+        locked: false,
+      };
+      handleAddPin(newPin);
+    });
+  }, [handleAddPrimitive, handleAddPin]);
+
+  const handleCutSelected = useCallback(() => {
+    handleCopySelected();
+    handleDeleteSelected();
+  }, [handleCopySelected, handleDeleteSelected]);
+
+  const handleDuplicateSelected = useCallback(() => {
+    handleCopySelected();
+    handlePaste();
+  }, [handleCopySelected, handlePaste]);
+
+  const handleSelectAll = useCallback(() => {
+    const { graphics, pins } = getActiveGeometry();
+    const ids = [...graphics.map((_, i) => `g-${i}`), ...pins.map((p) => p.id)];
+    if (ids.length > 0) dispatch({ type: 'SELECT', ids });
+  }, [getActiveGeometry]);
+
+  // ── Command keyboard shortcuts (undo/redo/clipboard/select-all) ─────────────
+  // Tool-switch + delete + per-tool keys live in SymbolEditorHost; this handles
+  // the Ctrl/Cmd command set so it matches OneCanvas. Skips text-entry fields
+  // via the shared isEditableTarget guard.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        handleUndo();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
-        e.preventDefault();
-        handleRedo();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'y' && !e.shiftKey) {
-        e.preventDefault();
-        handleRedo();
+      if (isEditableTarget(e.target)) return;
+      const ctrl = e.ctrlKey || e.metaKey;
+      if (!ctrl) return;
+
+      switch (e.key.toLowerCase()) {
+        case 'z':
+          e.preventDefault();
+          if (e.shiftKey) handleRedo();
+          else handleUndo();
+          break;
+        case 'y':
+          e.preventDefault();
+          handleRedo();
+          break;
+        case 'a':
+          e.preventDefault();
+          handleSelectAll();
+          break;
+        case 'c':
+          e.preventDefault();
+          handleCopySelected();
+          break;
+        case 'v':
+          if (previewMode) break;
+          e.preventDefault();
+          handlePaste();
+          break;
+        case 'x':
+          if (previewMode) break;
+          e.preventDefault();
+          handleCutSelected();
+          break;
+        case 'd':
+          if (previewMode) break;
+          e.preventDefault();
+          handleDuplicateSelected();
+          break;
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleUndo, handleRedo]);
+  }, [
+    previewMode,
+    handleUndo,
+    handleRedo,
+    handleSelectAll,
+    handleCopySelected,
+    handlePaste,
+    handleCutSelected,
+    handleDuplicateSelected,
+  ]);
 
   // ── Multi-unit management ──────────────────────────────────────────────────
 
@@ -884,8 +1001,8 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
   }, [localSymbol]);
 
   // ── Preview mode ───────────────────────────────────────────────────────────
+  // (`previewMode` state is declared up top, beside the other editor state.)
 
-  const [previewMode, setPreviewMode] = useState(false);
   const [previewPoweredPorts, setPreviewPoweredPorts] = useState<Set<string>>(new Set());
   void previewPoweredPorts; // used by future Preview sub-AC
 
