@@ -1,5 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FileWarning,
   Plus,
@@ -12,16 +11,13 @@ import {
   Minus as LineIcon,
   Table2,
   Image,
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
   X,
   Trash2,
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { explorerService } from '../../../services/explorerService';
 import { useEditorAreaStore } from '../../../stores/editorAreaStore';
-import { parseSheetXml, serializeSheetXml, resolveTemplateString } from '../../../services/sheetXmlService';
+import { parseSheetXml, serializeSheetXml } from '../../../services/sheetXmlService';
 import type {
   SheetDocument,
   SheetElement,
@@ -29,7 +25,8 @@ import type {
   SheetPage,
   PageSizeKey,
 } from '../../../types/sheet';
-import { MM_TO_PX, PAGE_SIZES } from '../../../types/sheet';
+import { PAGE_SIZES } from '../../../types/sheet';
+import { SheetCanvasHost } from './SheetCanvasHost';
 
 // ---------------------------------------------------------------------------
 // Types & Helpers
@@ -62,347 +59,7 @@ function createDefaultElement(type: SheetElementType, id: string, cx: number, cy
 let _elCtr = 0;
 function nextId(): string { return `el-${Date.now()}-${++_elCtr}`; }
 
-/** Get bounding box of an element in mm */
-function getElBounds(el: SheetElement): { x: number; y: number; w: number; h: number } {
-  switch (el.type) {
-    case 'rect': case 'image': return { x: el.x, y: el.y, w: el.w, h: el.h };
-    case 'line': return { x: Math.min(el.x1, el.x2), y: Math.min(el.y1, el.y2), w: Math.abs(el.x2 - el.x1) || 2, h: Math.abs(el.y2 - el.y1) || 2 };
-    case 'text': return { x: el.x, y: el.y - el.fontSize * 0.4, w: el.content.length * el.fontSize * 0.6 + 2, h: el.fontSize * 1.2 };
-    case 'table': return { x: el.x, y: el.y, w: el.columns.reduce((s, c) => s + c.width, 0), h: el.rows.reduce((s, r) => s + r.height, 0) };
-  }
-}
 
-type HandlePos = 'nw' | 'ne' | 'sw' | 'se';
-const HANDLE_SIZE = 2.5; // mm — resize handle size
-const PAGE_OVERFLOW = 50; // mm — extra space around page for overflow elements
-const SNAP_GRID = 5; // mm — snap grid size
-
-// ===========================================================================
-// SheetCanvas — SVG with zoom/pan/drag/resize
-// ===========================================================================
-
-interface CanvasProps {
-  doc: SheetDocument;
-  selectedId: string | null;
-  onSelectElement: (id: string | null) => void;
-  onUpdateElement: (id: string, updates: Partial<SheetElement>) => void;
-  onModified: () => void;
-}
-
-function SheetCanvas({ doc, selectedId, onSelectElement, onUpdateElement, onModified }: CanvasProps) {
-  const { page, elements, templates } = doc;
-  const OVF = PAGE_OVERFLOW;
-
-  // Viewbox includes overflow area around the page
-  const vbX = -OVF;
-  const vbY = -OVF;
-  const vbW = page.width + OVF * 2;
-  const vbH = page.height + OVF * 2;
-
-  // Zoom & pan
-  const [zoom, setZoom] = useState(1);
-  const [panX, setPanX] = useState(0);
-  const [panY, setPanY] = useState(0);
-  const [isPanning, setIsPanning] = useState(false);
-  const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
-
-  // Drag
-  const [isDragging, setIsDragging] = useState(false);
-  const didDrag = useRef(false);
-  const dragStart = useRef({ elX: 0, elY: 0, elX2: 0, elY2: 0, mx: 0, my: 0 });
-
-  // Resize
-  const [isResizing, setIsResizing] = useState(false);
-  const resizeInfo = useRef({ handle: '' as HandlePos, startBounds: { x: 0, y: 0, w: 0, h: 0 }, mx: 0, my: 0 });
-
-  // Crosshair
-  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
-
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const templateMap = useMemo(() => { const m: Record<string, string> = {}; for (const t of templates) m[t.key] = t.value; return m; }, [templates]);
-  const resolve = useCallback((s: string) => resolveTemplateString(s, templateMap), [templateMap]);
-
-  // Screen → mm (accounting for overflow offset in viewBox)
-  const screenToMm = useCallback((clientX: number, clientY: number): { x: number; y: number } => {
-    const c = containerRef.current;
-    if (!c) return { x: 0, y: 0 };
-    const r = c.getBoundingClientRect();
-    const sx = clientX - r.left;
-    const sy = clientY - r.top;
-    return {
-      x: (sx - panX) / (zoom * MM_TO_PX) + vbX,
-      y: (sy - panY) / (zoom * MM_TO_PX) + vbY,
-    };
-  }, [zoom, panX, panY, vbX, vbY]);
-
-  const snapToGrid = useCallback((v: number) => Math.round(v / SNAP_GRID) * SNAP_GRID, []);
-
-  // Zoom
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const c = containerRef.current;
-    if (!c) return;
-    const r = c.getBoundingClientRect();
-    const mx = e.clientX - r.left;
-    const my = e.clientY - r.top;
-    const factor = e.deltaY < 0 ? 1.1 : 0.9;
-    setZoom(z => {
-      const newZoom = Math.max(0.1, Math.min(10, z * factor));
-      const ratio = newZoom / z;
-      setPanX(px => mx - ratio * (mx - px));
-      setPanY(py => my - ratio * (my - py));
-      return newZoom;
-    });
-  }, []);
-  const zoomIn = useCallback(() => setZoom(z => Math.min(10, z * 1.25)), []);
-  const zoomOut = useCallback(() => setZoom(z => Math.max(0.1, z / 1.25)), []);
-  const zoomFit = useCallback(() => {
-    const c = containerRef.current;
-    if (!c || c.clientWidth === 0 || c.clientHeight === 0) return;
-    // Fit to page size (not overflow), with some padding
-    const pagePxW = page.width * MM_TO_PX;
-    const pagePxH = page.height * MM_TO_PX;
-    const z = Math.min(c.clientWidth / pagePxW, c.clientHeight / pagePxH) * 0.85;
-    setZoom(z);
-    // Center the page (offset by overflow in viewBox)
-    const pageOffsetX = OVF * MM_TO_PX * z; // page starts at OVF inside the SVG
-    const pageOffsetY = OVF * MM_TO_PX * z;
-    setPanX((c.clientWidth - pagePxW * z) / 2 - pageOffsetX);
-    setPanY((c.clientHeight - pagePxH * z) / 2 - pageOffsetY);
-  }, [page.width, page.height, vbW, vbH, OVF]);
-
-  // Fit on mount and when container resizes
-  useEffect(() => {
-    const c = containerRef.current;
-    if (!c) return;
-    const t = setTimeout(zoomFit, 50);
-    const ro = new ResizeObserver(() => zoomFit());
-    ro.observe(c);
-    return () => { clearTimeout(t); ro.disconnect(); };
-  }, [zoomFit]);
-
-  // Pan (middle mouse or Alt+left)
-  const handleContainerMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button === 1 || (e.button === 0 && e.altKey)) {
-      e.preventDefault();
-      setIsPanning(true);
-      panStart.current = { x: e.clientX, y: e.clientY, panX, panY };
-    }
-  }, [panX, panY]);
-
-  const handleContainerMouseMove = useCallback((e: React.MouseEvent) => {
-    // Update crosshair
-    const mm = screenToMm(e.clientX, e.clientY);
-    setMousePos(mm);
-
-    if (isPanning) {
-      setPanX(panStart.current.panX + e.clientX - panStart.current.x);
-      setPanY(panStart.current.panY + e.clientY - panStart.current.y);
-      return;
-    }
-    if (isDragging && selectedId) {
-      didDrag.current = true;
-      const mm2 = screenToMm(e.clientX, e.clientY);
-      const startMm = screenToMm(dragStart.current.mx, dragStart.current.my);
-      const dx = snapToGrid(mm2.x - startMm.x + dragStart.current.elX) - dragStart.current.elX;
-      const dy = snapToGrid(mm2.y - startMm.y + dragStart.current.elY) - dragStart.current.elY;
-      const el = elements.find(el => el.id === selectedId);
-      if (!el) return;
-      if (el.type === 'line') {
-        onUpdateElement(selectedId, { x1: dragStart.current.elX + dx, y1: dragStart.current.elY + dy, x2: dragStart.current.elX2 + dx, y2: dragStart.current.elY2 + dy } as any);
-      } else {
-        onUpdateElement(selectedId, { x: dragStart.current.elX + dx, y: dragStart.current.elY + dy } as any);
-      }
-      onModified();
-      return;
-    }
-    if (isResizing && selectedId) {
-      didDrag.current = true;
-      const mm2 = screenToMm(e.clientX, e.clientY);
-      const startMm = screenToMm(resizeInfo.current.mx, resizeInfo.current.my);
-      const dx = mm2.x - startMm.x;
-      const dy = mm2.y - startMm.y;
-      const b = resizeInfo.current.startBounds;
-      const h = resizeInfo.current.handle;
-      const el = elements.find(el => el.id === selectedId);
-      if (!el) return;
-      if (el.type === 'rect' || el.type === 'image') {
-        let nx = b.x, ny = b.y, nw = b.w, nh = b.h;
-        if (h.includes('w')) { nx = b.x + dx; nw = pos(b.w - dx, 1); }
-        if (h.includes('e')) { nw = pos(b.w + dx, 1); }
-        if (h.includes('n')) { ny = b.y + dy; nh = pos(b.h - dy, 1); }
-        if (h.includes('s')) { nh = pos(b.h + dy, 1); }
-        onUpdateElement(selectedId, { x: nx, y: ny, w: nw, h: nh } as any);
-      } else if (el.type === 'line') {
-        if (h === 'nw') onUpdateElement(selectedId, { x1: b.x + dx, y1: b.y + dy } as any);
-        if (h === 'se') onUpdateElement(selectedId, { x2: b.x + b.w + dx, y2: b.y + b.h + dy } as any);
-      }
-      onModified();
-      return;
-    }
-  }, [isPanning, isDragging, isResizing, selectedId, elements, screenToMm, snapToGrid, onUpdateElement, onModified]);
-
-  const handleContainerMouseUp = useCallback(() => {
-    setIsPanning(false);
-    setIsDragging(false);
-    setIsResizing(false);
-  }, []);
-
-  const handleContainerMouseLeave = useCallback(() => {
-    setIsPanning(false);
-    setIsDragging(false);
-    setIsResizing(false);
-    setMousePos(null);
-  }, []);
-
-  // Deselect when clicking SVG background (only if no drag occurred)
-  const handleSvgClick = useCallback((e: React.MouseEvent) => {
-    if (e.target === e.currentTarget && !didDrag.current) {
-      onSelectElement(null);
-    }
-  }, [onSelectElement]);
-
-  // Element drag start
-  const startDrag = useCallback((e: React.MouseEvent, el: SheetElement) => {
-    if (e.button !== 0 || e.altKey) return;
-    e.stopPropagation();
-    e.preventDefault();
-    onSelectElement(el.id);
-    setIsDragging(true);
-    didDrag.current = false;
-    if (el.type === 'line') {
-      dragStart.current = { elX: el.x1, elY: el.y1, elX2: el.x2, elY2: el.y2, mx: e.clientX, my: e.clientY };
-    } else if ('x' in el) {
-      dragStart.current = { elX: (el as any).x, elY: (el as any).y, elX2: 0, elY2: 0, mx: e.clientX, my: e.clientY };
-    }
-  }, [onSelectElement]);
-
-  // Resize handle start
-  const startResize = useCallback((e: React.MouseEvent, handle: HandlePos) => {
-    e.stopPropagation();
-    e.preventDefault();
-    setIsResizing(true);
-    didDrag.current = false;
-    const el = elements.find(el => el.id === selectedId);
-    if (el) resizeInfo.current = { handle, startBounds: getElBounds(el), mx: e.clientX, my: e.clientY };
-  }, [selectedId, elements]);
-
-  // Selected element bounds & handles
-  const selectedEl = elements.find(e => e.id === selectedId);
-  const selBounds = selectedEl ? getElBounds(selectedEl) : null;
-  const handles: { pos: HandlePos; cx: number; cy: number }[] = selBounds ? [
-    { pos: 'nw', cx: selBounds.x, cy: selBounds.y },
-    { pos: 'ne', cx: selBounds.x + selBounds.w, cy: selBounds.y },
-    { pos: 'sw', cx: selBounds.x, cy: selBounds.y + selBounds.h },
-    { pos: 'se', cx: selBounds.x + selBounds.w, cy: selBounds.y + selBounds.h },
-  ] : [];
-
-  const svgW = vbW * MM_TO_PX * zoom;
-  const svgH = vbH * MM_TO_PX * zoom;
-
-  // Snap crosshair position to grid
-  const crosshair = mousePos ? { x: snapToGrid(mousePos.x), y: snapToGrid(mousePos.y) } : null;
-
-  return (
-    <div
-      ref={containerRef}
-      className="flex-1 overflow-hidden relative"
-      onWheel={handleWheel}
-      onMouseDown={handleContainerMouseDown}
-      onMouseMove={handleContainerMouseMove}
-      onMouseUp={handleContainerMouseUp}
-      onMouseLeave={handleContainerMouseLeave}
-      style={{ backgroundColor: '#f3f4f6', cursor: isPanning ? 'grabbing' : isDragging ? 'move' : isResizing ? 'nwse-resize' : 'crosshair' }}
-    >
-      {/* Zoom controls */}
-      <div className="absolute top-2 right-2 z-10 flex items-center gap-1 bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded px-1 py-0.5 shadow-sm">
-        <button type="button" onClick={zoomOut} className="p-0.5 hover:bg-[var(--color-bg-secondary)] rounded"><ZoomOut size={14} /></button>
-        <span className="text-[10px] text-[var(--color-text-muted)] w-10 text-center">{Math.round(zoom * 100)}%</span>
-        <button type="button" onClick={zoomIn} className="p-0.5 hover:bg-[var(--color-bg-secondary)] rounded"><ZoomIn size={14} /></button>
-        <button type="button" onClick={zoomFit} className="p-0.5 hover:bg-[var(--color-bg-secondary)] rounded"><Maximize2 size={14} /></button>
-      </div>
-
-      {/* Coordinate display */}
-      {mousePos && (
-        <div className="absolute bottom-2 left-2 z-10 text-[10px] text-[var(--color-text-muted)] bg-[var(--color-bg-primary)]/80 border border-[var(--color-border)] rounded px-1.5 py-0.5 font-mono">
-          {mousePos.x.toFixed(1)}, {mousePos.y.toFixed(1)} mm
-        </div>
-      )}
-
-      <svg
-        viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}
-        width={svgW}
-        height={svgH}
-        style={{ position: 'absolute', left: panX, top: panY }}
-        onClick={handleSvgClick}
-      >
-        {/* Background: light gray overflow, white page, grid on page */}
-        <defs>
-          <pattern id="sg5" width="5" height="5" patternUnits="userSpaceOnUse">
-            <circle cx="0.3" cy="0.3" r="0.15" fill="#ddd" />
-          </pattern>
-          <pattern id="sg25" width="25" height="25" patternUnits="userSpaceOnUse">
-            <rect width="25" height="25" fill="url(#sg5)" />
-            <circle cx="0.3" cy="0.3" r="0.25" fill="#bbb" />
-          </pattern>
-          {/* Clip path so grid only shows on page */}
-          <clipPath id="page-clip">
-            <rect x="0" y="0" width={page.width} height={page.height} />
-          </clipPath>
-        </defs>
-        {/* Overflow area - just a subtle color behind everything */}
-        <rect x={vbX} y={vbY} width={vbW} height={vbH} fill="#f3f4f6" />
-        {/* Page white background */}
-        <rect x="0" y="0" width={page.width} height={page.height} fill="white" />
-        {/* Grid dots only on page */}
-        <rect x="0" y="0" width={page.width} height={page.height} fill="url(#sg25)" clipPath="url(#page-clip)" />
-        {/* Page border */}
-        <rect x="0" y="0" width={page.width} height={page.height} fill="none" stroke="#bbb" strokeWidth="0.3" />
-
-        {/* Crosshair guide lines */}
-        {crosshair && !isDragging && !isResizing && (
-          <g opacity="0.4" pointerEvents="none">
-            <line x1={crosshair.x} y1={vbY} x2={crosshair.x} y2={vbY + vbH} stroke="#2563eb" strokeWidth="0.2" strokeDasharray="2 2" />
-            <line x1={vbX} y1={crosshair.y} x2={vbX + vbW} y2={crosshair.y} stroke="#2563eb" strokeWidth="0.2" strokeDasharray="2 2" />
-          </g>
-        )}
-
-        {/* Snap guide lines for dragging/resizing */}
-        {(isDragging || isResizing) && selBounds && (
-          <g opacity="0.5" pointerEvents="none">
-            <line x1={selBounds.x} y1={vbY} x2={selBounds.x} y2={vbY + vbH} stroke="#f59e0b" strokeWidth="0.15" strokeDasharray="1 1" />
-            <line x1={selBounds.x + selBounds.w} y1={vbY} x2={selBounds.x + selBounds.w} y2={vbY + vbH} stroke="#f59e0b" strokeWidth="0.15" strokeDasharray="1 1" />
-            <line x1={vbX} y1={selBounds.y} x2={vbX + vbW} y2={selBounds.y} stroke="#f59e0b" strokeWidth="0.15" strokeDasharray="1 1" />
-            <line x1={vbX} y1={selBounds.y + selBounds.h} x2={vbX + vbW} y2={selBounds.y + selBounds.h} stroke="#f59e0b" strokeWidth="0.15" strokeDasharray="1 1" />
-          </g>
-        )}
-
-        {/* Elements */}
-        {elements.map((el) => {
-          const isSel = el.id === selectedId;
-          switch (el.type) {
-            case 'rect':
-              return (<g key={el.id} onMouseDown={(e) => startDrag(e, el)} onClick={(e) => e.stopPropagation()}><rect x={el.x} y={el.y} width={el.w} height={el.h} stroke={el.stroke} strokeWidth={el.strokeWidth} fill={el.fill === 'none' ? 'transparent' : el.fill} className="cursor-move" />{isSel && <rect x={el.x - 0.5} y={el.y - 0.5} width={el.w + 1} height={el.h + 1} stroke="#2563eb" strokeWidth="0.4" fill="none" strokeDasharray="2 1" />}</g>);
-            case 'line':
-              return (<g key={el.id} onMouseDown={(e) => startDrag(e, el)} onClick={(e) => e.stopPropagation()}><line x1={el.x1} y1={el.y1} x2={el.x2} y2={el.y2} stroke={el.stroke} strokeWidth={el.strokeWidth} className="cursor-move" /><line x1={el.x1} y1={el.y1} x2={el.x2} y2={el.y2} stroke="transparent" strokeWidth="3" className="cursor-move" />{isSel && <line x1={el.x1} y1={el.y1} x2={el.x2} y2={el.y2} stroke="#2563eb" strokeWidth="0.8" strokeDasharray="2 1" />}</g>);
-            case 'text':
-              return (<g key={el.id} onMouseDown={(e) => startDrag(e, el)} onClick={(e) => e.stopPropagation()}><text x={el.x} y={el.y + el.fontSize * 0.35} fontSize={el.fontSize} fontFamily={el.fontFamily} textAnchor={el.align === 'center' ? 'middle' : el.align === 'right' ? 'end' : 'start'} fill={el.color} className="cursor-move select-none" dominantBaseline="middle">{resolve(el.content)}</text>{isSel && (() => { const b = getElBounds(el); return <rect x={b.x} y={b.y} width={b.w} height={b.h} stroke="#2563eb" strokeWidth="0.4" fill="none" strokeDasharray="2 1" />; })()}</g>);
-            case 'table': { const tw = el.columns.reduce((s, c) => s + c.width, 0); const th = el.rows.reduce((s, r) => s + r.height, 0); return (<g key={el.id} onMouseDown={(e) => startDrag(e, el)} onClick={(e) => e.stopPropagation()}><rect x={el.x} y={el.y} width={tw} height={th} stroke={el.stroke} strokeWidth={el.strokeWidth} fill="none" className="cursor-move" />{(() => { let cx = el.x; return el.columns.slice(0, -1).map((c, i) => { cx += c.width; return <line key={`c${i}`} x1={cx} y1={el.y} x2={cx} y2={el.y + th} stroke={el.stroke} strokeWidth={el.strokeWidth} />; }); })()}{(() => { let ry = el.y; return el.rows.slice(0, -1).map((r, i) => { ry += r.height; return <line key={`r${i}`} x1={el.x} y1={ry} x2={el.x + tw} y2={ry} stroke={el.stroke} strokeWidth={el.strokeWidth} />; }); })()}{(() => { let ry = el.y; const items: ReactNode[] = []; for (let ri = 0; ri < el.rows.length; ri++) { let cx = el.x; for (const col of el.columns) { const v = el.rows[ri].cells[col.key]; if (v) items.push(<text key={`${ri}-${col.key}`} x={cx + 1.5} y={ry + el.rows[ri].height * 0.6} fontSize={el.fontSize} fontFamily={el.fontFamily} fill="black" className="select-none">{resolve(v)}</text>); cx += col.width; } ry += el.rows[ri].height; } return items; })()}{isSel && <rect x={el.x - 0.5} y={el.y - 0.5} width={tw + 1} height={th + 1} stroke="#2563eb" strokeWidth="0.4" fill="none" strokeDasharray="2 1" />}</g>); }
-            case 'image':
-              return (<g key={el.id} onMouseDown={(e) => startDrag(e, el)} onClick={(e) => e.stopPropagation()}>{el.data ? <image x={el.x} y={el.y} width={el.w} height={el.h} href={`data:${el.mimeType};base64,${el.data}`} className="cursor-move" /> : <rect x={el.x} y={el.y} width={el.w} height={el.h} stroke="#999" strokeWidth="0.3" fill="#f0f0f0" strokeDasharray="1 1" className="cursor-move" />}{isSel && <rect x={el.x - 0.5} y={el.y - 0.5} width={el.w + 1} height={el.h + 1} stroke="#2563eb" strokeWidth="0.4" fill="none" strokeDasharray="2 1" />}</g>);
-            default: return null;
-          }
-        })}
-
-        {/* Resize handles */}
-        {selBounds && handles.map(h => (
-          <rect key={h.pos} x={h.cx - HANDLE_SIZE / 2} y={h.cy - HANDLE_SIZE / 2} width={HANDLE_SIZE} height={HANDLE_SIZE} fill="#2563eb" stroke="white" strokeWidth="0.3" rx="0.3" className="cursor-nwse-resize" onMouseDown={(e) => startResize(e, h.pos)} />
-        ))}
-      </svg>
-    </div>
-  );
-}
 
 // ===========================================================================
 // Page Properties Editor (when no element selected)
@@ -679,7 +336,7 @@ export const SheetEditorPanel = memo(function SheetEditorPanel({ data }: SheetEd
 
         {/* Main area */}
         <div className="flex-1 flex overflow-hidden">
-          <SheetCanvas doc={sheetDoc} selectedId={selectedElementId} onSelectElement={setSelectedElementId} onUpdateElement={updateElement} onModified={markModified} />
+          <SheetCanvasHost doc={sheetDoc} selectedId={selectedElementId} onSelectElement={setSelectedElementId} onUpdateElement={updateElement} onModified={markModified} />
 
           {/* Properties panel */}
           <div className="w-56 border-l border-[var(--color-border)] overflow-y-auto bg-[var(--color-bg-primary)] flex flex-col">

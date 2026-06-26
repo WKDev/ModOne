@@ -30,9 +30,10 @@ async function shot(page, name) {
 async function sheetRendered(page) {
   return page.evaluate(() => {
     const root = document.getElementById('root');
-    const hasSvg = !!root?.querySelector('main svg, [data-testid="panel-container"] svg');
+    // The sheet editor now renders on a PIXI <canvas> (was SVG).
+    const hasCanvas = !!root?.querySelector('[data-testid="panel-container"] canvas, main canvas');
     const failed = /Failed to load/i.test(root?.innerText ?? '');
-    return { hasSvg, failed };
+    return { hasSvg: hasCanvas, failed };
   });
 }
 
@@ -83,8 +84,37 @@ async function main() {
   await page.waitForTimeout(1500);
   await shot(page, '2-sheet-open');
   const open = await sheetRendered(page);
-  console.log(`  sheet SVG rendered: ${open.hasSvg}; load error: ${open.failed}`);
+  console.log(`  sheet PIXI canvas rendered: ${open.hasSvg}; load error: ${open.failed}`);
   if (!open.hasSvg || open.failed) errors.push('sheet editor did not render');
+
+  // Add a rectangle (placed at page center, auto-selected) and verify it
+  // renders + selects, then drag it to smoke-test the PIXI interaction.
+  console.log('→ Add rectangle + drag');
+  await page.click('[title="Add Rectangle"]');
+  await page.waitForTimeout(500);
+  const elCount1 = await page.evaluate(() => /(\d+) el\b/.exec(document.getElementById('root')?.innerText ?? '')?.[1] ?? '?');
+  const hasDelete = await page.locator('[title="Delete"]').count();
+  console.log(`  elements after add: ${elCount1}; delete-button (selected): ${hasDelete > 0}`);
+  await shot(page, '2b-rect-added');
+  if (elCount1 !== '1') errors.push(`expected 1 element after add, got ${elCount1}`);
+  if (hasDelete === 0) errors.push('rect not auto-selected (no Delete button)');
+
+  // Drag from the page centre (the rect's centre) to move it.
+  const canvas = page.locator('[data-testid="panel-container"] canvas, main canvas').first();
+  const box = await canvas.boundingBox();
+  if (box) {
+    const cxp = box.x + box.width / 2;
+    const cyp = box.y + box.height / 2;
+    await page.mouse.move(cxp, cyp);
+    await page.mouse.down();
+    await page.mouse.move(cxp + 60, cyp + 40, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForTimeout(400);
+    await shot(page, '2c-after-drag');
+  }
+  const elCount2 = await page.evaluate(() => /(\d+) el\b/.exec(document.getElementById('root')?.innerText ?? '')?.[1] ?? '?');
+  console.log(`  elements after drag: ${elCount2}`);
+  if (elCount2 !== '1') errors.push(`element count changed during drag: ${elCount2}`);
 
   console.log('→ Reload + reopen from Explorer');
   await page.reload({ waitUntil: 'networkidle' });
