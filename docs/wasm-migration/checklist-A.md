@@ -64,6 +64,14 @@
       M0=0+scan→P0=0. 브라우저/Node wasm에서 PLC 스캔 → canonical memory 관찰.
 - [x] README(빌드/실행/ABI).
 
-## Phase 5 — 트레이트 분할 (B·C 합의 후, 별도 PR)
-- [ ] ModbusPolicyProfile(B)/OpcUaAliasProfile(C) 확장 트레이트 분리
-- [ ] B·C 호출부 조정, 3자 합의
+## Phase 5 — main reconcile (C 완료 후 한 번에) — 계획: 05-RECONCILE-PLAN.md
+B(modbus-codec)·C(opcua-codec)가 이미 main 병합 → 충돌 면 발생. C 진행 중이라
+**C 안정 후 한 번에 reconcile**(사용자 결정 2026-06-27).
+- [ ] main fetch + rebase
+- [ ] contract: main `clock.rs` 채택, 내 `runtime_env.rs` 폐기, 호출부 교체
+- [ ] plc-model: Modbus 정책 타입을 `modbus-codec`에서 import(중복 정의 제거),
+      main 수정본 profile.rs 기준 재추출. modbus/opcua-codec 의존 추가(무순환).
+- [ ] sim-engine/sim-wasm 경로 점검, P→OutputBit ls.rs 수동 병합
+- [ ] 검증 게이트 전부 + sim-wasm 데모 PASS
+- [~] 트레이트 분할(ModbusPolicyProfile/OpcUaAliasProfile)은 **불필요**해짐
+      (plc-model이 codec 타입 import로 해결). 깔끔한 분할은 선택적 후속.
