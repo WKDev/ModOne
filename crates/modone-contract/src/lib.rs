@@ -6,6 +6,7 @@
 //! docs/wasm-migration/00-CONTRACT.md 참조.
 
 pub mod adapter;
+pub mod clock;
 pub mod event_bus;
 pub mod memory;
 pub mod types;

@@ -4,10 +4,17 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.77.2"
 
+[features]
+default = ["std-clock"]
+# native: chrono/uuid로 타임스탬프·batch_id 생성(§3). 끄면(wasm 등) 호스트가
+# clock::set_clock/set_id_source 로 주입한다. 코어 크레이트(opcua-codec 등)는
+# default-features=false 로 의존해 wasm에서 chrono/uuid 컴파일을 피한다.
+std-clock = ["dep:chrono", "dep:uuid"]
+
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-chrono = { version = "0.4", features = ["serde", "wasmbind"] }
-uuid = { version = "1", features = ["v4", "js"] }
+chrono = { version = "0.4", features = ["serde"], optional = true }
+uuid = { version = "1", features = ["v4"], optional = true }
 thiserror = "1"
 tokio = { version = "1", default-features = false, features = ["sync"] }
 
