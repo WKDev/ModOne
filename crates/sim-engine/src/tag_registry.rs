@@ -4,7 +4,7 @@ use std::sync::Arc;
 use parking_lot::RwLock;
 use thiserror::Error;
 
-use crate::plc_runtime::{CanonicalAccess, CanonicalAddress, CanonicalAreaKind};
+use modone_contract::{CanonicalAccess, CanonicalAddress, CanonicalAreaKind};
 
 use super::types::{RegisterTagRequest, RuntimeBinding, TagAccessLevel, TagClass, TagDefinition};
 

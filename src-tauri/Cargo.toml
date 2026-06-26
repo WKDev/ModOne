@@ -28,6 +28,8 @@ tauri-build = { version = "2", features = [] }
 modone-contract = { path = "../crates/modone-contract" }
 # vendor-neutral PLC 모델 (하드웨어 타입 + VendorProfile)
 plc-model = { path = "../crates/plc-model" }
+# PLC 사이클 실행기 코어 (전송/tokio 없는 순수 시뮬레이션)
+sim-engine = { path = "../crates/sim-engine" }
 
 # Tauri core
 tauri = { version = "2", features = ["devtools"] }

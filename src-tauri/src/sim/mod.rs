@@ -2,19 +2,17 @@
 //!
 //! PLC simulation engine for LS Electric PLCs.
 
+// 순수 코어(메모리/타이머/카운터/태그/디버거/래더 실행기)는 sim-engine 크레이트로
+// 이전됨. 기존 `crate::sim::<module>::...` 경로 호환을 위해 모듈째 재노출한다.
+pub use sim_engine::{counter, debugger, executor, memory, tag_registry, timer, types};
+
+// native 셸 — 전송/Tauri/tokio 비동기 드라이버는 여기 잔류.
 pub mod canvas_sync;
-pub mod counter;
-pub mod debugger;
 pub mod engine;
-pub mod executor;
-pub mod memory;
 pub mod monitoring;
 pub mod protocol_runtime;
 pub mod runtime_host;
 pub mod tag_events;
-pub mod tag_registry;
-pub mod timer;
-pub mod types;
 
 pub use canvas_sync::{
     CanvasSync, CanvasSyncError, CanvasSyncResult, PlcBlockMapping, PlcBlockType, PlcInputChange,

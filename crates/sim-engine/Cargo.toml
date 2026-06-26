@@ -1,0 +1,20 @@
+[package]
+name = "sim-engine"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77.2"
+
+[dependencies]
+modone-contract = { path = "../modone-contract" }
+plc-model = { path = "../plc-model" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4"] }
+parking_lot = "0.12"
+thiserror = "1"
+
+# wasm 타깃에서만 시간/난수 백엔드 활성화 (계약 §3 wasm-purity). 네이티브 무영향.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+chrono = { version = "0.4", features = ["wasmbind"] }
+uuid = { version = "1", features = ["js"] }

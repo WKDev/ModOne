@@ -2664,6 +2664,7 @@ dependencies = [
  "serde_yaml",
  "serialport",
  "sha2",
+ "sim-engine",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -4472,6 +4473,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77549399552de45a898a580c1b41d445bf730df867cc44e6c0233bbc4b8329de"
 dependencies = [
  "rand_core",
+]
+
+[[package]]
+name = "sim-engine"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "modone-contract",
+ "parking_lot",
+ "plc-model",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "uuid",
 ]
 
 [[package]]

@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 
-use crate::plc_runtime::{
+use modone_contract::{
     CanonicalAddress, CanonicalAreaKind, CanonicalMemory, CanonicalMemoryError,
     CanonicalMemorySnapshot, CanonicalValue, CanonicalWriteSource,
 };

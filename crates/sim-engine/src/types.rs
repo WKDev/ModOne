@@ -4,7 +4,7 @@
 //! PLC simulation including device memory, timer/counter state,
 //! simulation configuration, and debugger interfaces.
 
-use crate::plc_runtime::CanonicalAddress;
+use modone_contract::CanonicalAddress;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -751,7 +751,7 @@ mod tests {
     fn test_watch_variable_update() {
         let mut watch = WatchVariable::new(
             RuntimeBinding::canonical(CanonicalAddress::new(
-                crate::plc_runtime::CanonicalAreaKind::InternalBit,
+                modone_contract::CanonicalAreaKind::InternalBit,
                 0,
             )),
             "M0000".to_string(),

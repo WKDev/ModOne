@@ -10,7 +10,8 @@ use std::sync::Arc;
 use std::time::Instant;
 use thiserror::Error;
 
-use crate::plc_runtime::{CanonicalAddress, VendorProfile};
+use modone_contract::CanonicalAddress;
+use plc_model::VendorProfile;
 
 use super::counter::CounterManager;
 use super::memory::{CanonicalRuntimeFacade, SimMemoryError};
@@ -815,7 +816,7 @@ impl ProgramExecutor {
             // Timers - read done bit
             NodeType::TimerTon | NodeType::TimerTof | NodeType::TimerTmr => {
                 let addr = self.require_address(node.address)?;
-                if addr.area == crate::plc_runtime::CanonicalAreaKind::TimerDoneBit {
+                if addr.area == modone_contract::CanonicalAreaKind::TimerDoneBit {
                     if let Some(state) = self.timer_mgr.get_state(addr.index as u16) {
                         return Ok(state.done);
                     }
@@ -826,7 +827,7 @@ impl ProgramExecutor {
             // Counters - read done bit
             NodeType::CounterCtu | NodeType::CounterCtd | NodeType::CounterCtud => {
                 let addr = self.require_address(node.address)?;
-                if addr.area == crate::plc_runtime::CanonicalAreaKind::CounterDoneBit {
+                if addr.area == modone_contract::CanonicalAreaKind::CounterDoneBit {
                     if let Some(state) = self.counter_mgr.get_state(addr.index as u16) {
                         return Ok(state.done);
                     }
@@ -963,13 +964,13 @@ impl ProgramExecutor {
             Ok(self.runtime.write_bool(
                 addr,
                 value,
-                crate::plc_runtime::CanonicalWriteSource::Simulation,
+                modone_contract::CanonicalWriteSource::Simulation,
             )?)
         } else {
             Ok(self.runtime.write_word_value(
                 addr,
                 if value { 1 } else { 0 },
-                crate::plc_runtime::CanonicalWriteSource::Simulation,
+                modone_contract::CanonicalWriteSource::Simulation,
             )?)
         }
     }
@@ -1019,7 +1020,7 @@ impl ProgramExecutor {
         timer_type: SimTimerType,
     ) -> ExecutionResult<()> {
         let addr = self.require_address(node.address)?;
-        if addr.area != crate::plc_runtime::CanonicalAreaKind::TimerDoneBit {
+        if addr.area != modone_contract::CanonicalAreaKind::TimerDoneBit {
             return Err(ExecutionError::InvalidAddress(format!(
                 "Timer must use TimerDoneBit, got {:?}",
                 addr.area
@@ -1037,15 +1038,15 @@ impl ProgramExecutor {
         let _ = self.runtime.write_bool(
             addr,
             done,
-            crate::plc_runtime::CanonicalWriteSource::InternalRuntime,
+            modone_contract::CanonicalWriteSource::InternalRuntime,
         );
         self.runtime.write_word_value(
             CanonicalAddress::new(
-                crate::plc_runtime::CanonicalAreaKind::TimerValueWord,
+                modone_contract::CanonicalAreaKind::TimerValueWord,
                 addr.index,
             ),
             _elapsed as u16,
-            crate::plc_runtime::CanonicalWriteSource::InternalRuntime,
+            modone_contract::CanonicalWriteSource::InternalRuntime,
         )?;
 
         Ok(())
@@ -1059,7 +1060,7 @@ impl ProgramExecutor {
         counter_type: SimCounterType,
     ) -> ExecutionResult<()> {
         let addr = self.require_address(node.address)?;
-        if addr.area != crate::plc_runtime::CanonicalAreaKind::CounterDoneBit {
+        if addr.area != modone_contract::CanonicalAreaKind::CounterDoneBit {
             return Err(ExecutionError::InvalidAddress(format!(
                 "Counter must use CounterDoneBit, got {:?}",
                 addr.area
@@ -1080,16 +1081,16 @@ impl ProgramExecutor {
         let _ = self.runtime.write_bool(
             addr,
             done,
-            crate::plc_runtime::CanonicalWriteSource::InternalRuntime,
+            modone_contract::CanonicalWriteSource::InternalRuntime,
         )?;
         if let Some(state) = self.counter_mgr.get_state(addr.index as u16) {
             self.runtime.write_word_value(
                 CanonicalAddress::new(
-                    crate::plc_runtime::CanonicalAreaKind::CounterValueWord,
+                    modone_contract::CanonicalAreaKind::CounterValueWord,
                     addr.index,
                 ),
                 state.current_value.clamp(0, u16::MAX as i32) as u16,
-                crate::plc_runtime::CanonicalWriteSource::InternalRuntime,
+                modone_contract::CanonicalWriteSource::InternalRuntime,
             )?;
         }
 
@@ -1121,7 +1122,7 @@ impl ProgramExecutor {
             self.runtime.write_word_value(
                 dest,
                 result as u16,
-                crate::plc_runtime::CanonicalWriteSource::Simulation,
+                modone_contract::CanonicalWriteSource::Simulation,
             )?;
         }
 
@@ -1156,7 +1157,7 @@ impl ProgramExecutor {
             self.runtime.write_word_value(
                 *dest,
                 result as u16,
-                crate::plc_runtime::CanonicalWriteSource::Simulation,
+                modone_contract::CanonicalWriteSource::Simulation,
             )?;
         }
 
@@ -1190,7 +1191,7 @@ impl ProgramExecutor {
             self.runtime.write_word_value(
                 *dest,
                 result as u16,
-                crate::plc_runtime::CanonicalWriteSource::Simulation,
+                modone_contract::CanonicalWriteSource::Simulation,
             )?;
         }
 
@@ -1213,7 +1214,7 @@ impl ProgramExecutor {
             self.runtime.write_word_value(
                 *dest,
                 value as u16,
-                crate::plc_runtime::CanonicalWriteSource::Simulation,
+                modone_contract::CanonicalWriteSource::Simulation,
             )?;
         }
 
@@ -1248,8 +1249,8 @@ impl Default for ProgramExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plc_runtime::profiles::LsProfile;
-    use crate::project::PlcHardwareTopology;
+    use plc_model::LsProfile;
+    use plc_model::PlcHardwareTopology;
 
     fn create_executor() -> (
         ProgramExecutor,

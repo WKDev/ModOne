@@ -24,14 +24,25 @@
       — 내 변경과 무관(HEAD와 동일). 별도 수정 필요. modbus_policy 이전 테스트는
       이 버그로 실행 차단됨(로직은 plc-model 11개 테스트가 커버).
 
-## Phase 2 — sim-engine 크레이트
-- [ ] `crates/sim-engine` 생성
-- [ ] types/counter/timer/memory/debugger/tag_registry/executor/engine 이전
-      (plc-model + contract 만 의존)
-- [ ] src-tauri sim/* 는 native 셸(runtime_host/monitoring/protocol_runtime/
-      canvas_sync/tag_events)만 잔류, sim-engine 소비
-- [ ] `cargo check -p sim-engine --target wasm32-unknown-unknown` green
-- [ ] `cargo test -p sim-engine` 통과
+## Phase 2 — sim-engine 크레이트 ✅ 구조 완료
+- [x] `crates/sim-engine` 생성 (deps: modone-contract, plc-model, serde,
+      serde_json, chrono, uuid, parking_lot, thiserror + wasm32 타깃 feature)
+- [x] **7개 순수 파일** 이전: types/counter/timer/tag_registry/memory/debugger/
+      executor (tokio 무사용). 외부 import만 재작성, 내부 super:: 경로 유지.
+- [x] **engine.rs는 src-tauri 잔류** — tokio::time::interval/select! 사용하는
+      native 비동기 드라이버라 wasm 부적합(계약 §5). 순수 스캔 로직은 executor가
+      이미 보유. wasm tier 동기 펌프는 Phase 4 신규 작성.
+- [x] src-tauri sim/mod.rs: `pub use sim_engine::{모듈들}` 재노출 → 기존
+      `crate::sim::<module>::...` 경로·native 파일 super:: 전부 무변경 동작
+- [x] `cargo check --workspace`·`--tests` green
+- [x] `cargo check -p sim-engine --target wasm32-unknown-unknown` green
+- [~] `cargo test -p sim-engine`: **71 통과 / 6 실패** — 6개는 **기존 버그**
+      (내 이전은 순수 경로 재작성이라 동작 불변; create_executor는 profile 미사용).
+      그동안 symbols 컴파일 버그+Tauri 테스트 DLL 0xC0000139로 실행 불가라 잠복.
+      ⚠ 별도 처리 필요:
+        · executor P-bit coil 4종(P0 write 후 read 불일치)
+        · debugger 직렬화 1종(networkId camelCase 미포함)
+        · debugger 에러포맷 1종(Display가 Debug처럼 출력)
 
 ## Phase 3 — 계약 wasm-purity (00-CONTRACT §3 부채)
 - [ ] memory.rs `chrono::Utc::now()` → 시간 주입/wasmbind feature
