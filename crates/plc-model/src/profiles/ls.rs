@@ -81,10 +81,11 @@ impl LsProfile {
                     CanonicalAreaKind::InputBit
                 }
             }
-            // XGT/XGI really need module-slot topology to do this correctly. Until the project
-            // model stores that topology, preserve the legacy P behavior instead of guessing.
+            // topology 정보가 없으면 P를 출력(OutputBit)으로 기본 처리한다. 래더 코일이
+            // P를 출력으로 구동하는 일반 사용에 맞춘 도메인 결정(2026-06-26). module
+            // topology의 io_direction이 있으면 위 분기에서 우선 적용된다.
             LsIoTopology::DynamicSlotP | LsIoTopology::LegacyUnifiedP => {
-                CanonicalAreaKind::InputBit
+                CanonicalAreaKind::OutputBit
             }
         }
     }
@@ -447,7 +448,10 @@ impl VendorProfile for LsProfile {
                 },
                 ModbusMappingRule {
                     family: "P".to_string(),
-                    canonical_area: CanonicalAreaKind::InputBit,
+                    // P는 OutputBit로 정렬됨(canonical_area_for_p 참조). 데이터 위치
+                    // 일관성 위해 OutputBit에서 읽는다. ※ address_space(DiscreteInput
+                    // vs Coil)는 B(modbus-codec) 도메인 — 노출 정책은 B와 합의해 조정.
+                    canonical_area: CanonicalAreaKind::OutputBit,
                     address_space: ModbusAddressSpace::DiscreteInput,
                     offset: 0,
                     count: 2048,
@@ -550,7 +554,7 @@ mod tests {
         let profile = LsProfile::new(String::new(), PlcHardwareTopology::default());
 
         let p = profile.to_canonical(&VendorAddress::new("P", 7)).unwrap();
-        assert_eq!(p.area, CanonicalAreaKind::InputBit);
+        assert_eq!(p.area, CanonicalAreaKind::OutputBit);
 
         let n = profile.to_canonical(&VendorAddress::new("N", 12)).unwrap();
         assert_eq!(n.area, CanonicalAreaKind::SystemWord);
@@ -571,11 +575,12 @@ mod tests {
     }
 
     #[test]
-    fn preserves_legacy_p_projection_for_slot_based_ls_models() {
+    fn defaults_slot_based_ls_p_to_output_without_topology() {
         let profile = LsProfile::new("XGT-CPUH".to_string(), PlcHardwareTopology::default());
 
+        // topology가 없으면 P는 출력(OutputBit)으로 기본 처리(2026-06-26 결정).
         let p = profile.to_canonical(&VendorAddress::new("P", 25)).unwrap();
-        assert_eq!(p.area, CanonicalAreaKind::InputBit);
+        assert_eq!(p.area, CanonicalAreaKind::OutputBit);
 
         let aliases =
             profile.canonical_aliases(&CanonicalAddress::new(CanonicalAreaKind::OutputBit, 25));
