@@ -44,28 +44,29 @@ describe('rotatePointAroundOrigin', () => {
 describe('isPointInRotatedBlock (OBB hit test)', () => {
   it('hits inside the rotated footprint, misses the un-rotated one', () => {
     const block = makeBlock(90);
-    // 90° around (100,100): footprint x∈[60,100], y∈[100,120]
-    expect(isPointInRotatedBlock({ x: 80, y: 110 }, block)).toBe(true);
-    // inside the original AABB (x∈[100,120]) but outside the rotated one
-    expect(isPointInRotatedBlock({ x: 110, y: 110 }, block)).toBe(false);
+    // 20×40 block at (100,100), rotated 90° about center (110,120):
+    // footprint x∈[90,130], y∈[110,130]
+    expect(isPointInRotatedBlock({ x: 110, y: 120 }, block)).toBe(true); // center
+    // inside the original AABB (y∈[100,140]) but outside the rotated one
+    expect(isPointInRotatedBlock({ x: 105, y: 135 }, block)).toBe(false);
   });
 
   it('rotated AABB encloses the rotated footprint', () => {
     const aabb = getRotatedBlockAABB(makeBlock(90));
-    expect(aabb).toEqual({ minX: 60, minY: 100, maxX: 100, maxY: 120 });
+    expect(aabb).toEqual({ minX: 90, minY: 110, maxX: 130, maxY: 130 });
   });
 });
 
-describe('getPortWorldPosition (rotation-aware)', () => {
+describe('getPortWorldPosition (rotation-aware, about block center)', () => {
   it('matches block.position + offset at rotation 0', () => {
     const block = makeBlock(0);
     expect(getPortWorldPosition(block, block.ports[0])).toEqual({ x: 110, y: 100 });
   });
 
-  it('rotates the port around the block origin', () => {
+  it('rotates the port around the block center', () => {
     const block = makeBlock(90);
-    // local (10,0) -> (0,10) -> world (100,110)
-    expect(getPortWorldPosition(block, block.ports[0])).toEqual({ x: 100, y: 110 });
+    // center (10,20); local (10,0)-c=(0,-20) -> rot90 (20,0) -> +c (30,20) -> world (130,120)
+    expect(getPortWorldPosition(block, block.ports[0])).toEqual({ x: 130, y: 120 });
   });
 
   it('4×90° returns ports to the exact original positions', () => {

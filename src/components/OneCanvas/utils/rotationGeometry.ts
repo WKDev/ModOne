@@ -1,7 +1,7 @@
-// 블록 회전(0,0 원점 기준) 좌표 변환 유틸 — 히트테스트/포트/선택박스 공용
+// 블록 회전(중심 기준) 좌표 변환 유틸 — 히트테스트/포트/선택박스 공용
 //
 // 렌더러(BlockRenderer._applyTransform)와 동일한 변환을 수학적으로 재현한다:
-// 블록 로컬 원점(= block.position, 좌상단)을 중심으로 회전하며, Pixi의 양수 회전
+// 블록의 중심(block.size/2)을 기준으로 제자리 회전하며, Pixi의 양수 회전
 // (화면 y-down 기준 시계방향)과 부호가 일치한다. 90/180/270도는 정확값을 쓰므로
 // 4×90° 회전 시 rotation 값이 0으로 정규화되어 좌표가 초기와 완전히 동일해진다.
 
@@ -25,6 +25,21 @@ export function rotatePointAroundOrigin(p: Position, degrees: number): Position 
   return { x: p.x * cos - p.y * sin, y: p.x * sin + p.y * cos };
 }
 
+/**
+ * 블록 로컬 좌표 점을 블록 중심(size/2) 기준으로 회전.
+ * 결과도 블록 로컬 좌표(= block.position 기준 오프셋)다.
+ */
+export function rotateLocalAroundCenter(
+  p: Position,
+  size: { width: number; height: number },
+  degrees: number
+): Position {
+  const cx = size.width / 2;
+  const cy = size.height / 2;
+  const r = rotatePointAroundOrigin({ x: p.x - cx, y: p.y - cy }, degrees);
+  return { x: r.x + cx, y: r.y + cy };
+}
+
 /** 회전이 반영된 블록의 4개 모서리 월드 좌표 [TL, TR, BR, BL]. */
 export function getRotatedBlockCorners(
   block: Block
@@ -39,7 +54,7 @@ export function getRotatedBlockCorners(
     { x: 0, y: h },
   ];
   return locals.map((l) => {
-    const r = rotatePointAroundOrigin(l, rot);
+    const r = rotateLocalAroundCenter(l, block.size, rot);
     return { x: x + r.x, y: y + r.y };
   }) as [Position, Position, Position, Position];
 }
@@ -65,9 +80,10 @@ export function getRotatedBlockAABB(
 /** 월드 좌표 점이 회전된 블록 내부에 있는지(OBB 정밀 판정). */
 export function isPointInRotatedBlock(point: Position, block: Block): boolean {
   const rot = block.rotation ?? 0;
-  // 클릭점을 블록 로컬 좌표계로 역회전시켜 축정렬 사각형과 비교
-  const local = rotatePointAroundOrigin(
+  // 클릭점을 블록 로컬 좌표계로 (중심 기준) 역회전시켜 축정렬 사각형과 비교
+  const local = rotateLocalAroundCenter(
     { x: point.x - block.position.x, y: point.y - block.position.y },
+    block.size,
     -rot
   );
   return (

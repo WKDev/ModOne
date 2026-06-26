@@ -11,7 +11,7 @@
 
 import { Graphics, type Container } from 'pixi.js';
 import { LEGACY_MM_PER_PX } from '../canvasUnits';
-import { rotatePointAroundOrigin } from '../utils/rotationGeometry';
+import { rotateLocalAroundCenter } from '../utils/rotationGeometry';
 // Direct module import (not the @/canvas-core barrel) — this file IS re-exported
 // by that barrel, so importing the barrel here would be circular.
 import { SELECTION_COLOR } from '@/canvas-core/selectionStyle';
@@ -208,7 +208,7 @@ export class SelectionRenderer {
 
   /**
    * Four corners of a block's padded outline in world space, rotated around the
-   * block's 0,0 origin so highlights/handles track the rotated symbol.
+   * block center so highlights/handles track the rotated symbol.
    */
   private _paddedBlockCorners(block: Block, pad: number): Position[] {
     const rot = block.rotation ?? 0;
@@ -220,7 +220,7 @@ export class SelectionRenderer {
       { x: -pad, y: block.size.height + pad },
     ];
     return locals.map((l) => {
-      const r = rotatePointAroundOrigin(l, rot);
+      const r = rotateLocalAroundCenter(l, block.size, rot);
       return { x: x + r.x, y: y + r.y };
     });
   }

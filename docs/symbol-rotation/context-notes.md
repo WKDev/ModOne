@@ -36,6 +36,14 @@
   (이는 기존 center 회전에서도 있던 한계지만, 0,0 회전은 이동 폭이 커서 더 두드러질 수 있음.)
 - 완전한 히트영역 회전은 별도 작업(상호작용 레이어 전반 수정) → 이번 범위에서 제외.
 
+## 변경: 회전 기준점 0,0 → 중심(center)
+- 처음엔 "0,0 기준" 지시대로 좌상단(로컬 0,0) 기준으로 회전했으나, 사용자 확인 결과
+  **중심(block.size/2) 기준 제자리 회전**으로 변경.
+- 공용 헬퍼 `rotateLocalAroundCenter(localPoint, size, deg)`를 추가하고 포트좌표/
+  히트영역(OBB)/선택박스/모서리 계산이 전부 이걸 사용. 렌더러는 center pivot으로 환원
+  (BlockRenderer._applyTransform: geometrySize 중심 pivot + size/2 position — flip 규약과 동일).
+- 4×90° 동일성은 그대로 유지(rotation 0 정규화 시 변환은 항등).
+
 ## 작업 위치
 - worktree: `.claude/worktrees/feat+symbol-rotation` (branch worktree-feat+symbol-rotation)
 - 로컬 main(c730adc) 기준으로 reset 함 (origin/main은 뒤처져 있었음).

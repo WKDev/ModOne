@@ -6,7 +6,7 @@
 
 import type { Block, Port, Position, PortPosition, HandleConstraint } from '../types';
 import { normalizeLegacyValueToMm } from '../canvasUnits';
-import { rotatePointAroundOrigin } from './rotationGeometry';
+import { rotateLocalAroundCenter } from './rotationGeometry';
 
 // ============================================================================
 // Position Calculations
@@ -49,14 +49,14 @@ export function getPortLocalOffset(block: Block, port: Port): Position {
 }
 
 /**
- * World position of a port, accounting for the block's rotation (around 0,0).
- * Single source of truth used by rendering, hit-testing, and wire routing so
- * they stay consistent. At rotation 0 (incl. 4×90°) this equals the unrotated
- * position exactly.
+ * World position of a port, accounting for the block's rotation (around the
+ * block center). Single source of truth used by rendering, hit-testing, and
+ * wire routing so they stay consistent. At rotation 0 (incl. 4×90°) this equals
+ * the unrotated position exactly.
  */
 export function getPortWorldPosition(block: Block, port: Port): Position {
   const local = getPortLocalOffset(block, port);
-  const rotated = rotatePointAroundOrigin(local, block.rotation ?? 0);
+  const rotated = rotateLocalAroundCenter(local, block.size, block.rotation ?? 0);
   return {
     x: block.position.x + rotated.x,
     y: block.position.y + rotated.y,
