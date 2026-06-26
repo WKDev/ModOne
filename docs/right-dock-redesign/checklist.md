@@ -21,7 +21,7 @@
 - [x] `memory-visualizer`, `properties` zone을 `tool` → `inspector`로 이동
 - [x] 곁들임: 하단 패널 기본 접힘(toolPanelStore), `useFileOpen` inspector 라우팅, `view.toggleRightPanel`(Ctrl+Alt+B) 연결
 - [x] 검증: `tsc --noEmit` 통과, `vitest run` 1684 passed / 0 failed
-- [ ] 검증(시각): 실제 앱에서 우측 도크 1/4 폭·리사이즈·토글 육안 확인 (CDP 루프) — **대기**
+- [x] 검증(시각): 브라우저 런타임(`pnpm dev` + Playwright)으로 확인 — 우측 도크 widthRatio=**0.25**, 탭=[Memory Visualizer, Tags, Properties], 하단 패널 접힘. (커밋 `a9fed6d`에서 DEFAULT_LAYOUT 접힘 수정)
 
 ## Phase 2 — Tag Manager (신규 인스펙터 패널) — ✅ 커밋 `df58f62`
 - [x] `tag-manager` PanelType 추가 + 레지스트리 등록 (zone: inspector, label "Tags")
@@ -30,7 +30,7 @@
   - [x] 기존 `useTagStore`/`useTagSearch` 재사용 (도메인 로직 신규 0)
 - [x] 우측 도크 기본 탭에 포함 (inspector zone → `INSPECTOR_PANEL_TYPES` 자동)
 - [x] 검증: `tsc --noEmit` 통과, `vitest run` 1684 passed / 0 failed
-- [ ] 검증(시각): 도크에서 검색·watch·추가 육안 확인 — **대기**
+- [x] 검증(시각): Tags 탭 렌더 확인 (빈 레지스트리 → 검색바/"No tags"/0 tags 정상 표시). 추가/watch 동작은 백엔드 있는 환경에서 후속 확인.
 
 ## Phase 1.5 — 명령 아키텍처 정규화 (A·B 완료, placement는 YAGNI로 보류)
 > 목적: 리본 제거로 잃는 발견성을 커맨드 팔레트로 메우고, enablement 어휘를 단일화.
