@@ -27,6 +27,7 @@ import type {
 } from '../../../types/sheet';
 import { PAGE_SIZES } from '../../../types/sheet';
 import { SheetCanvasHost } from './SheetCanvasHost';
+import { isEditableTarget } from '@/canvas-core';
 
 // ---------------------------------------------------------------------------
 // Types & Helpers
@@ -302,6 +303,25 @@ export const SheetEditorPanel = memo(function SheetEditorPanel({ data }: SheetEd
   const updateTemplate = useCallback((key: string, value: string) => { setSheetDoc(prev => prev ? { ...prev, templates: prev.templates.map(t => t.key === key ? { ...t, value } : t) } : prev); setIsModified(true); }, []);
   const addTemplate = useCallback(() => { setSheetDoc(prev => { if (!prev) return prev; let i = prev.templates.length + 1; let k = `var${i}`; while (prev.templates.some(t => t.key === k)) { i++; k = `var${i}`; } return { ...prev, templates: [...prev.templates, { key: k, value: '' }] }; }); setIsModified(true); }, []);
   const removeTemplate = useCallback((key: string) => { setSheetDoc(prev => prev ? { ...prev, templates: prev.templates.filter(t => t.key !== key) } : prev); setIsModified(true); }, []);
+
+  // Keyboard shortcuts (Delete = remove selected, Escape = deselect) — matches
+  // the Symbol/Schematic editors. The shared isEditableTarget guard skips these
+  // while typing in a properties field or the inline cell editor.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (isEditableTarget(e.target)) return;
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedElementId) {
+          e.preventDefault();
+          removeSelected();
+        }
+      } else if (e.key === 'Escape') {
+        setSelectedElementId(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedElementId, removeSelected]);
 
   // Loading/Error/Empty states
   if (isLoading) return <div className="h-full flex flex-col items-center justify-center text-[var(--color-text-muted)] p-4"><RefreshCw size={48} className="mb-4 animate-spin" /><p className="text-sm">Loading sheet...</p></div>;

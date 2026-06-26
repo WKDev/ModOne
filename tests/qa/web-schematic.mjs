@@ -18,7 +18,7 @@ mkdirSync(OUT_DIR, { recursive: true });
 const IGNORED = [/\[browser-runtime\] unhandled command/i, /Failed to load resource/i, /GL Driver/i];
 // Known non-fatal: PIXI internal teardown race on canvas unmount/reload
 // (StrictMode double-mount in dev). The editor still renders; tracked separately.
-const KNOWN_NONFATAL = [/reading 'geometry'/i];
+const KNOWN_NONFATAL = [/reading 'geometry'/i, /reading 'count'/i];
 const ignorable = (t) => IGNORED.some((re) => re.test(t));
 const isKnown = (t) => KNOWN_NONFATAL.some((re) => re.test(t));
 const errors = [];

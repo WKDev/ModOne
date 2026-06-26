@@ -42,6 +42,11 @@ export type { CanvasPointerInput, PointerInputHandlers } from './input/Tool';
 export { ToolInputBinding, type ToolInputBindingOptions } from './input/ToolInputBinding';
 export { normalizePointer } from './input/normalizePointer';
 export { isEditableTarget } from './input/isEditableTarget';
+export {
+  SELECTION_COLOR,
+  SELECTION_HANDLE_STROKE,
+  SELECTION_COLOR_CSS,
+} from './selectionStyle';
 
 export { EventBridge, type EventBridgeOptions } from '../components/OneCanvas/interaction/EventBridge';
 export {

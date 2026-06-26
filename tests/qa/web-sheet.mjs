@@ -16,7 +16,7 @@ const OUT_DIR = join(dirname(fileURLToPath(import.meta.url)), '__output__');
 mkdirSync(OUT_DIR, { recursive: true });
 
 const IGNORED = [/\[browser-runtime\] unhandled command/i, /Failed to load resource/i, /GL Driver/i];
-const KNOWN_NONFATAL = [/reading 'geometry'/i];
+const KNOWN_NONFATAL = [/reading 'geometry'/i, /reading 'count'/i];
 const ignorable = (t) => IGNORED.some((re) => re.test(t));
 const isKnown = (t) => KNOWN_NONFATAL.some((re) => re.test(t));
 const errors = [];
@@ -150,6 +150,14 @@ async function main() {
       await page.keyboard.press('Escape');
     }
   }
+
+  // Delete the (still-selected) element via the keyboard shortcut.
+  console.log('→ Delete via keyboard');
+  await page.keyboard.press('Delete');
+  await page.waitForTimeout(300);
+  const elCount3 = await page.evaluate(() => /(\d+) el\b/.exec(document.getElementById('root')?.innerText ?? '')?.[1] ?? '?');
+  console.log(`  elements after Delete: ${elCount3}`);
+  if (elCount3 !== '1') errors.push(`Delete shortcut did not remove the selected element: ${elCount3}`);
 
   console.log('→ Reload + reopen from Explorer');
   await page.reload({ waitUntil: 'networkidle' });

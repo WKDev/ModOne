@@ -25,13 +25,16 @@ import {
   GridRenderer,
   ToolInputBinding,
   GRID_MODULE_MM,
+  SELECTION_COLOR,
+  SELECTION_HANDLE_STROKE,
+  SELECTION_COLOR_CSS,
 } from '@/canvas-core';
 import { SheetOverlayRenderer } from '../../OneCanvas/renderers/SheetOverlayRenderer';
 
 const SNAP = GRID_MODULE_MM; // 5mm
 const HANDLE = 2.5; // mm — resize handle box
 const HANDLE_HIT = 2.0; // mm — handle grab radius
-const SEL_COLOR = 0x2563eb;
+const SEL_COLOR = SELECTION_COLOR;
 
 type HandlePos = 'nw' | 'ne' | 'sw' | 'se';
 type Bounds = { x: number; y: number; w: number; h: number };
@@ -166,7 +169,7 @@ export function SheetCanvasHost({
     ]) {
       g.rect(hx - HANDLE / 2, hy - HANDLE / 2, HANDLE, HANDLE);
       g.fill({ color: SEL_COLOR });
-      g.stroke({ width: 0.3, color: 0xffffff });
+      g.stroke({ width: 0.3, color: SELECTION_HANDLE_STROKE });
     }
   };
 
@@ -592,7 +595,7 @@ export function SheetCanvasHost({
             lineHeight: `${editor.height}px`,
             padding: '0 2px',
             margin: 0,
-            border: `1px solid ${'#2563eb'}`,
+            border: `1px solid ${SELECTION_COLOR_CSS}`,
             outline: 'none',
             background: 'white',
             color: 'black',

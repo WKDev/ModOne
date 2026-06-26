@@ -11,6 +11,9 @@
 
 import { Graphics, type Container } from 'pixi.js';
 import { LEGACY_MM_PER_PX } from '../canvasUnits';
+// Direct module import (not the @/canvas-core barrel) — this file IS re-exported
+// by that barrel, so importing the barrel here would be circular.
+import { SELECTION_COLOR } from '@/canvas-core/selectionStyle';
 import type {
   Position,
   Rect,
@@ -43,14 +46,14 @@ export interface SelectionStyle {
 }
 
 const DEFAULT_SELECTION_STYLE: SelectionStyle = {
-  marqueeStroke: 0x4dabf7,
-  marqueeFill: 0x4dabf7,
+  marqueeStroke: SELECTION_COLOR,
+  marqueeFill: SELECTION_COLOR,
   marqueeFillAlpha: 0.1,
   marqueeStrokeWidth: 1,
-  highlightColor: 0x4dabf7,
+  highlightColor: SELECTION_COLOR,
   highlightWidth: 1.5 * LEGACY_MM_PER_PX,
   handleSize: 6 * LEGACY_MM_PER_PX,
-  handleFill: 0x4dabf7,
+  handleFill: SELECTION_COLOR,
   highlightPadding: 4 * LEGACY_MM_PER_PX,
 };
 

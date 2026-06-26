@@ -9,6 +9,7 @@
 
 import { Graphics, type Container } from 'pixi.js';
 import type { GraphicPrimitive, SymbolPin, PolylinePrimitive } from '@/types/symbol';
+import { SELECTION_COLOR, SELECTION_HANDLE_STROKE } from '@/canvas-core';
 
 export interface OverlayRendererOptions {
   /** The selection layer container */
@@ -21,7 +22,6 @@ const ORIGIN_COLOR = 0x444444;
 const ORIGIN_LENGTH = 20;
 const ORIGIN_ALPHA = 0.8;
 
-const SELECTION_COLOR = 0x4dabf7;
 const SELECTION_WIDTH = 1.5;
 const SELECTION_PADDING = 4;
 const TOLERANCE = 5;
@@ -29,10 +29,10 @@ const TOLERANCE = 5;
 // Handle visual constants
 const HANDLE_SIZE = 6;
 const HANDLE_HALF = HANDLE_SIZE / 2;
-// Handle palette matches OneCanvas's SelectionRenderer convention so the two
-// editors share one selection look: blue square handles with a white border.
-const HANDLE_FILL = 0x4dabf7;
-const HANDLE_STROKE = 0xffffff;
+// Selection chrome comes from the shared canvas-core convention (SELECTION_COLOR)
+// so Symbol, Schematic and Sheet all highlight identically.
+const HANDLE_FILL = SELECTION_COLOR;
+const HANDLE_STROKE = SELECTION_HANDLE_STROKE;
 const HANDLE_STROKE_WIDTH = 1.5;
 const HANDLE_HIT_RADIUS = 8;
 const ROTATION_HANDLE_DISTANCE = 20;
