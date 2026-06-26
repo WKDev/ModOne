@@ -367,7 +367,7 @@ fn semantic_tag_id(display_name: &str) -> String {
         .collect::<Vec<_>>()
         .join("-");
     if slug.is_empty() {
-        format!("tag-{}", uuid::Uuid::new_v4())
+        format!("tag-{}", modone_contract::runtime_env::new_id())
     } else {
         slug
     }

@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
-use chrono::Utc;
 use thiserror::Error;
-use uuid::Uuid;
+
+use crate::runtime_env;
 
 use super::{
     event_bus::CanonicalMemoryBus,
@@ -158,7 +158,7 @@ impl CanonicalMemory {
         source: CanonicalWriteSource,
     ) -> Result<(), CanonicalMemoryError> {
         let timestamp = Self::timestamp();
-        let batch_id = Uuid::new_v4().to_string();
+        let batch_id = runtime_env::new_id();
         let mut changes = Vec::new();
 
         for (address, value) in writes {
@@ -429,7 +429,7 @@ impl CanonicalMemory {
     }
 
     fn timestamp() -> String {
-        Utc::now().to_rfc3339()
+        runtime_env::now_rfc3339()
     }
 }
 

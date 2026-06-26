@@ -4479,14 +4479,21 @@ dependencies = [
 name = "sim-engine"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "modone-contract",
  "parking_lot",
  "plc-model",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
- "uuid",
+]
+
+[[package]]
+name = "sim-wasm"
+version = "0.1.0"
+dependencies = [
+ "modone-contract",
+ "plc-model",
+ "sim-engine",
 ]
 
 [[package]]

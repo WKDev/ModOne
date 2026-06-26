@@ -6,16 +6,14 @@ rust-version = "1.77.2"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-chrono = { version = "0.4", features = ["serde"] }
-uuid = { version = "1", features = ["v4"] }
 thiserror = "1"
 tokio = { version = "1", default-features = false, features = ["sync"] }
 
-# wasm 타깃에서만 시간/난수 백엔드를 활성화 (계약 §3 wasm-purity 부채).
-# 네이티브 빌드는 영향 없음 — 기능 합집합으로 추가만 된다.
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-chrono = { version = "0.4", features = ["wasmbind"] }
-uuid = { version = "1", features = ["js"] }
+# 시간/ID는 runtime_env가 공급. native만 chrono/uuid 사용 — wasm tier는 JS 환경
+# 의존 없는 자기완결 카운터(계약 §3). 따라서 wasm 빌드엔 두 크레이트가 없다.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }

@@ -1,0 +1,13 @@
+[package]
+name = "sim-wasm"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+modone-contract = { path = "../modone-contract" }
+plc-model = { path = "../plc-model" }
+sim-engine = { path = "../sim-engine" }

@@ -90,6 +90,22 @@ VendorProfile조차 안 쓰므로 plc-model 경로와 무관 → **기존 잠복
   프로그램 구조 오류). 실 컴파일러(gridConverter)의 네트워크 구조 확인 필요 →
   사용자 판단 대기.
 
+## Phase 3+4 구현 결과 (2026-06-27)
+- **wasm-purity 완성(주입 방식)**: 처음엔 contract Cargo.toml에 wasmbind/js feature로
+  땜빵했으나, 그러면 wasm이 JS 환경(Date/crypto) import를 요구해 자기완결 로드가
+  불가했다. → `modone-contract::runtime_env`로 시간/ID를 중앙화하고 cfg 분기:
+  native=chrono/uuid, wasm=단조 카운터. chrono/uuid는 `cfg(not(wasm32))` 의존으로
+  내려 wasm 빌드에서 완전 제거. sim-engine의 chrono/uuid 호출부도 전부 헬퍼로 대체.
+  → wasm 모듈 import 0개(자기완결).
+- **executor Instant 트랩**: `std::time::Instant::now()`가 wasm32-unknown-unknown에서
+  런타임 트랩(unreachable). cfg 분기 StopWatch로 wasm은 0 반환(성능지표라 무해).
+  ※ cargo check는 통과하나 런타임에 터지는 류 — wasm은 반드시 실제 실행 검증 필요.
+- **sim-wasm 하니스**: cdylib + raw `extern "C"` ABI(sim_init/set_bit/scan/read_bit).
+  wasm-bindgen/wasm-pack 미설치 환경이라 raw ABI 선택 — 추가 툴체인 0. Node가
+  `WebAssembly.instantiate`로 직접 로드. demo/run.mjs로 M0→P0 스캔 검증 PASS.
+- engine.rs(native 셸)는 여전히 Instant/tokio 사용(정상). wasm tier의 "동기 펌프"는
+  sim-wasm이 execute_program을 동기 호출하는 것으로 충족.
+
 ## 열린 질문
 - `plc-model` 위치를 신규 크레이트로 할지, modone-contract 안 모듈로 할지 —
   현재 신규 크레이트 권장(책임 분리/벤더 확장 명확). 합의 대기.

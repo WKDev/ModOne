@@ -45,15 +45,24 @@
           파워플로우 AND에 포함(코일=false)해 코일이 절대 구동 안 됨. 출력 노드를
           파워플로우 평가에서 제외 + 블록 입력 파워로 출력 구동하도록 수정.
 
-## Phase 3 — 계약 wasm-purity (00-CONTRACT §3 부채)
-- [ ] memory.rs `chrono::Utc::now()` → 시간 주입/wasmbind feature
-- [ ] event_bus `uuid::v4` → js feature/ID 주입
-- [ ] wasm용 동기 루프백 펌프 (protocol_runtime 대체)
-- [ ] `cargo check -p modone-contract --target wasm32-unknown-unknown` green
+## Phase 3 — 계약 wasm-purity (00-CONTRACT §3 부채) ✅ 완료
+- [x] 시간/ID를 `modone-contract::runtime_env`로 중앙화 + cfg 분기:
+      native=chrono/uuid, wasm=자기완결 카운터(JS 환경 의존 0). chrono/uuid를
+      wasm에서 제거(`cfg(not(wasm32))` 의존). wasmbind/js feature 폐기.
+- [x] memory.rs `Utc::now()`/`Uuid::new_v4()` + sim-engine 호출부 전부 헬퍼로 대체,
+      직접 chrono/uuid 의존 제거.
+- [x] executor `std::time::Instant`(wasm 트랩) → cfg 분기 StopWatch(wasm=0).
+- [x] `cargo check -p modone-contract -p sim-engine --target wasm32-unknown-unknown` green.
+- [~] 동기 루프백 펌프: sim-wasm이 execute_program을 동기 호출로 구동(스캔 펌프).
+      protocol_runtime 비동기 루프는 여전히 native 전용.
 
-## Phase 4 — wasm 하니스
-- [ ] wasm-bindgen/wasm-pack 빌드 하니스
-- [ ] JS 루프백 stub: 브라우저에서 sim 실행 → canonical memory 관찰 최소 데모
+## Phase 4 — wasm 하니스 ✅ 완료
+- [x] `crates/sim-wasm` (cdylib) — raw `extern "C"` ABI 하니스. wasm-bindgen 불필요.
+- [x] `cargo build -p sim-wasm --target wasm32-unknown-unknown --release` → 자기완결
+      .wasm(import 0개).
+- [x] Node 루프백 데모(`demo/run.mjs`): **PASS** — 초기 P0=0, M0=1+scan→P0=1,
+      M0=0+scan→P0=0. 브라우저/Node wasm에서 PLC 스캔 → canonical memory 관찰.
+- [x] README(빌드/실행/ABI).
 
 ## Phase 5 — 트레이트 분할 (B·C 합의 후, 별도 PR)
 - [ ] ModbusPolicyProfile(B)/OpcUaAliasProfile(C) 확장 트레이트 분리

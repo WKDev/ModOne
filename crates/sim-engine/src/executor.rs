@@ -7,7 +7,6 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Instant;
 use thiserror::Error;
 
 use modone_contract::CanonicalAddress;
@@ -118,6 +117,33 @@ fn is_output_node(node_type: NodeType) -> bool {
             | NodeType::MathMod
             | NodeType::MathMov
     )
+}
+
+/// 스캔 소요시간 측정용 스톱워치. native는 monotonic Instant, wasm은 시계가 없어
+/// (Instant::now()가 트랩) 0을 반환한다 — 성능 지표일 뿐 로직과 무관.
+#[cfg(not(target_arch = "wasm32"))]
+struct StopWatch(std::time::Instant);
+#[cfg(target_arch = "wasm32")]
+struct StopWatch;
+
+impl StopWatch {
+    #[cfg(not(target_arch = "wasm32"))]
+    fn start() -> Self {
+        Self(std::time::Instant::now())
+    }
+    #[cfg(target_arch = "wasm32")]
+    fn start() -> Self {
+        Self
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn elapsed_us(&self) -> u64 {
+        self.0.elapsed().as_micros() as u64
+    }
+    #[cfg(target_arch = "wasm32")]
+    fn elapsed_us(&self) -> u64 {
+        0
+    }
 }
 
 /// Device address parsed from string
@@ -715,7 +741,7 @@ impl ProgramExecutor {
 
     /// Execute a full ladder program
     pub fn execute_program(&self, program: &CompiledProgram) -> ProgramExecutionResult {
-        let start = Instant::now();
+        let watch = StopWatch::start();
         let mut network_results = Vec::with_capacity(program.networks.len());
         let mut all_success = true;
         let mut first_error: Option<String> = None;
@@ -734,7 +760,7 @@ impl ProgramExecutor {
 
         ProgramExecutionResult {
             network_results,
-            total_time_us: start.elapsed().as_micros() as u64,
+            total_time_us: watch.elapsed_us(),
             success: all_success,
             error: first_error,
         }
@@ -742,7 +768,7 @@ impl ProgramExecutor {
 
     /// Execute a single network
     pub fn execute_network(&self, network: &CompiledNetwork) -> NetworkExecutionResult {
-        let start = Instant::now();
+        let watch = StopWatch::start();
 
         for node in &network.nodes {
             // Evaluate input condition
@@ -751,7 +777,7 @@ impl ProgramExecutor {
                 Err(e) => {
                     return NetworkExecutionResult {
                         network_id: network.id,
-                        execution_time_us: start.elapsed().as_micros() as u64,
+                        execution_time_us: watch.elapsed_us(),
                         success: false,
                         error: Some(e.to_string()),
                     };
@@ -762,7 +788,7 @@ impl ProgramExecutor {
             if let Err(e) = self.execute_output(node, power_flow) {
                 return NetworkExecutionResult {
                     network_id: network.id,
-                    execution_time_us: start.elapsed().as_micros() as u64,
+                    execution_time_us: watch.elapsed_us(),
                     success: false,
                     error: Some(e.to_string()),
                 };
@@ -771,7 +797,7 @@ impl ProgramExecutor {
 
         NetworkExecutionResult {
             network_id: network.id,
-            execution_time_us: start.elapsed().as_micros() as u64,
+            execution_time_us: watch.elapsed_us(),
             success: true,
             error: None,
         }
