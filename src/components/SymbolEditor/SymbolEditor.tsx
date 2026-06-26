@@ -170,6 +170,13 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
     return deriveVisualStateFromRules(result, 'idle');
   }, [previewMode, previewPoweredPorts, localSymbol.behavior, localSymbol.properties, localSymbol.id]);
 
+  // Animations to play in preview = the active state's rotate specs. In edit
+  // mode nothing spins (designers see static geometry).
+  const previewAnimations = useMemo(() => {
+    if (!previewMode || !previewActiveState) return [];
+    return localSymbol.animations?.[previewActiveState] ?? [];
+  }, [previewMode, previewActiveState, localSymbol.animations]);
+
   // ── Canvas symbol (current unit + visual state overrides applied) ──────────
 
   const canvasSymbol: SymbolDefinition | null = useMemo(() => {
@@ -485,6 +492,7 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
             activeVisualState={state.activeVisualState}
             previewMode={previewMode}
             poweredPins={previewPoweredPorts}
+            activeAnimations={previewAnimations}
             onTogglePoweredPin={(pinId) =>
               setPreviewPoweredPorts((prev) => {
                 const next = new Set(prev);

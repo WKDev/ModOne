@@ -6,8 +6,9 @@
  *
  * Uses Pixi.js v8 Graphics API with `pixelLine: true` for crisp lines.
  *
- * Primitives with a `rotation` value are rendered inside individual
- * Containers so that per-primitive rotation transforms can be applied.
+ * Primitives with a `rotation` value — or whose id is listed as an animation
+ * target — are rendered inside individual Containers so that per-primitive
+ * rotation transforms can be applied (static rotation or live ticker spin).
  */
 
 import { Container, Graphics, Text as PixiText, type TextStyleOptions } from 'pixi.js';
@@ -63,6 +64,8 @@ export class PrimitiveRenderer {
   private _textObjects: PixiText[] = [];
   /** Individual containers for rotated primitives */
   private _rotatedContainers: Container[] = [];
+  /** Animation targets addressable by primitive id (for live ticker spin). */
+  private _animationTargets = new Map<string, { container: Container; baseRotation: number }>();
   private _destroyed = false;
 
   constructor(options: PrimitiveRendererOptions) {
@@ -74,8 +77,12 @@ export class PrimitiveRenderer {
 
   /**
    * Render all graphic primitives. Clears previous output.
+   *
+   * @param animatedIds primitive ids that should be wrapped in their own
+   *   container (in addition to any with a static `rotation`) so a ticker can
+   *   spin them. Retrieve the container via {@link getAnimationTarget}.
    */
-  renderAll(primitives: GraphicPrimitive[]): void {
+  renderAll(primitives: GraphicPrimitive[], animatedIds?: ReadonlySet<string>): void {
     if (this._destroyed) return;
 
     // Clear previous render
@@ -88,10 +95,12 @@ export class PrimitiveRenderer {
       c.destroy({ children: true });
     }
     this._rotatedContainers = [];
+    this._animationTargets.clear();
 
     for (const prim of primitives) {
-      if (prim.rotation) {
-        this._renderRotatedPrimitive(prim);
+      const animated = !!prim.id && !!animatedIds?.has(prim.id);
+      if (prim.rotation || animated) {
+        this._renderRotatedPrimitive(prim, animated);
       } else {
         this._renderPrimitive(prim, this._graphics);
       }
@@ -99,16 +108,25 @@ export class PrimitiveRenderer {
   }
 
   /**
+   * Get the container + base rotation for an animation target by primitive id.
+   * Returns undefined if the id was not rendered as an animatable container.
+   */
+  getAnimationTarget(id: string): { container: Container; baseRotation: number } | undefined {
+    return this._animationTargets.get(id);
+  }
+
+  /**
    * Render a primitive with rotation applied via a wrapping Container.
    * The primitive is drawn at the origin of a local Graphics, and the
    * container is positioned + rotated around the primitive's visual center.
    */
-  private _renderRotatedPrimitive(prim: GraphicPrimitive): void {
+  private _renderRotatedPrimitive(prim: GraphicPrimitive, register: boolean): void {
     const center = getPrimitiveCenter(prim);
     const container = new Container();
     container.label = 'rotated-primitive';
     container.position.set(center.x, center.y);
-    container.rotation = (prim.rotation! * Math.PI) / 180;
+    const baseRotation = ((prim.rotation ?? 0) * Math.PI) / 180;
+    container.rotation = baseRotation;
 
     if (prim.kind === 'text') {
       // Text is a separate Pixi object; offset by -center so it rotates around center
@@ -126,6 +144,9 @@ export class PrimitiveRenderer {
 
     this._layer.addChild(container);
     this._rotatedContainers.push(container);
+    if (register && prim.id) {
+      this._animationTargets.set(prim.id, { container, baseRotation });
+    }
   }
 
   /**
@@ -321,6 +342,7 @@ export class PrimitiveRenderer {
       c.destroy({ children: true });
     }
     this._rotatedContainers = [];
+    this._animationTargets.clear();
     this._graphics.destroy();
   }
 }

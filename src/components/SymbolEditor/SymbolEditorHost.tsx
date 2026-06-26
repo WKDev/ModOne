@@ -22,9 +22,9 @@ import {
   forwardRef,
   type CSSProperties,
 } from 'react';
-import { Container } from 'pixi.js';
+import { Container, type Ticker } from 'pixi.js';
 
-import type { GraphicPrimitive, SymbolDefinition } from '@/types/symbol';
+import type { GraphicPrimitive, SymbolAnimationSpec, SymbolDefinition } from '@/types/symbol';
 import type { EditorAction } from './SymbolEditor';
 import type { GhostShape, SymbolEditorHostHandle, SymbolEditorLayerConfig, SymbolEditorLayerName } from './types';
 import { SYMBOL_EDITOR_LAYERS } from './types';
@@ -90,6 +90,8 @@ export interface SymbolEditorHostProps {
   onTogglePoweredPin?: (pinId: string) => void;
   /** Active visual state context (null = base/default). Overrides applied upstream. */
   activeVisualState?: string | null;
+  /** Animation specs to play right now (e.g. the active state's rotations). */
+  activeAnimations?: SymbolAnimationSpec[];
   /** Container CSS class */
   className?: string;
   /** Container CSS style overrides */
@@ -209,6 +211,7 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       previewMode,
       poweredPins,
       onTogglePoweredPin,
+      activeAnimations,
       className,
       style,
     } = props;
@@ -270,6 +273,22 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
     poweredPinsRef.current = poweredPins;
     const onTogglePoweredPinRef = useRef(onTogglePoweredPin);
     onTogglePoweredPinRef.current = onTogglePoweredPin;
+    const activeAnimationsRef = useRef(activeAnimations);
+    activeAnimationsRef.current = activeAnimations;
+
+    // ── Live preview animation (ticker spin) state ──
+    // The list of currently-spinning targets, rebuilt on every render of the
+    // symbol (PrimitiveRenderer recreates its containers each renderAll).
+    const runningAnimationsRef = useRef<Array<{ container: Container; speed: number }>>([]);
+    const tickerActiveRef = useRef(false);
+    // Stable tick fn (created once) so ticker.add/remove stay symmetric.
+    const tickAnimationsRef = useRef((ticker: Ticker) => {
+      const dt = ticker.deltaMS / 1000;
+      if (dt <= 0) return;
+      for (const a of runningAnimationsRef.current) {
+        a.container.rotation += ((a.speed * Math.PI) / 180) * dt;
+      }
+    });
     const selectedIdsRef = useRef(selectedIds);
     selectedIdsRef.current = selectedIds;
     const currentToolRef = useRef(currentTool);
@@ -445,8 +464,9 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
 
         // 7. Initial symbol render
         if (symbolRef.current) {
-          primitiveRendererRef.current.renderAll(symbolRef.current.graphics);
+          primitiveRendererRef.current.renderAll(symbolRef.current.graphics, animatedIds());
           pinRendererRef.current.renderAll(symbolRef.current.pins, poweredPinsRef.current);
+          syncAnimations();
         }
 
         // 8. Center viewport on origin
@@ -487,6 +507,13 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
 
         // Destroy in reverse order. Detach pointer input first so no federated
         // event fires into half-destroyed renderers.
+        safeDestroy(() => {
+          if (tickerActiveRef.current) {
+            pixiAppRef.current?.app.ticker.remove(tickAnimationsRef.current);
+            tickerActiveRef.current = false;
+          }
+          runningAnimationsRef.current = [];
+        });
         safeDestroy(() => toolInputRef.current?.destroy());
         safeDestroy(() => overlayRendererRef.current?.destroy());
         safeDestroy(() => ghostRendererRef.current?.destroy());
@@ -512,19 +539,59 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
     }, []); // Mount once
 
     // ========================================================================
+    // Preview animation sync
+    // ========================================================================
+
+    /** Ids of primitives that the current animation specs target. */
+    const animatedIds = (): Set<string> =>
+      new Set((activeAnimationsRef.current ?? []).map((a) => a.target));
+
+    /**
+     * Rebuild the running-animation list from the active specs against the
+     * freshly-rendered containers, and add/remove the ticker callback. Must be
+     * called after every primitiveRenderer.renderAll (containers are recreated).
+     */
+    const syncAnimations = () => {
+      const renderer = primitiveRendererRef.current;
+      const ticker = pixiAppRef.current?.app.ticker;
+      const next: Array<{ container: Container; speed: number }> = [];
+      if (renderer) {
+        for (const spec of activeAnimationsRef.current ?? []) {
+          if (spec.type !== 'rotate') continue;
+          const target = renderer.getAnimationTarget(spec.target);
+          if (!target) continue;
+          next.push({ container: target.container, speed: spec.speed ?? 120 });
+        }
+      }
+      runningAnimationsRef.current = next;
+
+      if (!ticker) return;
+      const shouldRun = next.length > 0;
+      if (shouldRun && !tickerActiveRef.current) {
+        ticker.add(tickAnimationsRef.current);
+        tickerActiveRef.current = true;
+      } else if (!shouldRun && tickerActiveRef.current) {
+        ticker.remove(tickAnimationsRef.current);
+        tickerActiveRef.current = false;
+      }
+    };
+
+    // ========================================================================
     // React to symbol changes → re-render
     // ========================================================================
 
     useEffect(() => {
       if (!primitiveRendererRef.current || !pinRendererRef.current) return;
       if (symbol) {
-        primitiveRendererRef.current.renderAll(symbol.graphics);
+        primitiveRendererRef.current.renderAll(symbol.graphics, animatedIds());
         pinRendererRef.current.renderAll(symbol.pins, poweredPins);
       } else {
         primitiveRendererRef.current.renderAll([]);
         pinRendererRef.current.renderAll([]);
       }
-    }, [symbol, poweredPins]);
+      syncAnimations();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [symbol, poweredPins, activeAnimations]);
 
     // React to selection changes → update highlights
     useEffect(() => {

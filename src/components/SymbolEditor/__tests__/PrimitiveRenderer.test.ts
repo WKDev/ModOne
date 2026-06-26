@@ -74,12 +74,18 @@ const { MockGraphics, MockText, MockContainer } = vi.hoisted(() => {
    */
   class MockContainer {
     label = '';
+    rotation = 0;
+    position = { x: 0, y: 0, set(x: number, y: number) { this.x = x; this.y = y; } };
+    pivot = { x: 0, y: 0, set(x: number, y: number) { this.x = x; this.y = y; } };
     children: unknown[] = [];
+    _destroyCalled?: boolean;
 
     addChild(child: unknown) {
       this.children.push(child);
       return child;
     }
+
+    destroy() { this._destroyCalled = true; }
   }
 
   return { MockGraphics, MockText, MockContainer };
@@ -612,6 +618,58 @@ describe('PrimitiveRenderer — PixiJS rendering verification', () => {
 
       const strokeCall = g.callsFor('stroke')[0];
       expect((strokeCall.args[0] as Record<string, unknown>).color).toBe(0x000000);
+    });
+  });
+
+  // ── Animation targets ─────────────────────────────────────────────────────
+  // Primitives whose id is passed in `animatedIds` are wrapped in their own
+  // container and exposed via getAnimationTarget so a ticker can spin them.
+
+  describe('animation targets', () => {
+    const bar: GraphicPrimitive = {
+      id: 'bar',
+      kind: 'polyline',
+      points: [{ x: 28, y: 30 }, { x: 52, y: 30 }],
+      stroke: '#333333', fill: 'none', strokeWidth: 2,
+    };
+
+    it('wraps an animated primitive in its own container (not the shared graphics)', () => {
+      const layer = makeContainer();
+      const renderer = makeRenderer(layer as unknown as import('pixi.js').Container);
+
+      renderer.renderAll([bar], new Set(['bar']));
+
+      // layer children: shared graphics + the wrapping container
+      expect(layer.children).toHaveLength(2);
+      const container = layer.children[1] as InstanceType<typeof MockContainer>;
+      expect(container.label).toBe('rotated-primitive');
+    });
+
+    it('exposes the container + baseRotation via getAnimationTarget', () => {
+      const renderer = makeRenderer();
+      renderer.renderAll([bar], new Set(['bar']));
+
+      const target = renderer.getAnimationTarget('bar');
+      expect(target).toBeDefined();
+      expect(target!.baseRotation).toBe(0);
+      // center of the bar polyline = (40, 30) → container positioned there
+      expect(target!.container.position.x).toBe(40);
+      expect(target!.container.position.y).toBe(30);
+    });
+
+    it('does NOT register a target when its id is not in animatedIds', () => {
+      const renderer = makeRenderer();
+      renderer.renderAll([bar]);
+      expect(renderer.getAnimationTarget('bar')).toBeUndefined();
+    });
+
+    it('clears stale targets on the next renderAll', () => {
+      const renderer = makeRenderer();
+      renderer.renderAll([bar], new Set(['bar']));
+      expect(renderer.getAnimationTarget('bar')).toBeDefined();
+
+      renderer.renderAll([bar]); // no animatedIds this time
+      expect(renderer.getAnimationTarget('bar')).toBeUndefined();
     });
   });
 });
