@@ -9,6 +9,7 @@ import { projectDialogService } from '../../services/projectDialogService';
 import { fileDialogService } from '../../services/fileDialogService';
 import { importService } from '../../services/importService';
 import { commandRegistry } from '../CommandPalette/commandRegistry';
+import { useCommandPaletteStore } from '../../stores/commandPaletteStore';
 
 // ============================================================================
 // Platform detection (computed once)
@@ -182,6 +183,12 @@ const baseMenus: Menu[] = [
   {
     label: 'View',
     items: [
+      {
+        label: 'Command Palette…',
+        shortcut: 'Ctrl+Shift+P',
+        action: () => useCommandPaletteStore.getState().open(),
+      },
+      { separator: true, label: '' },
       {
         label: 'Toggle Sidebar',
         shortcut: 'Ctrl+B',

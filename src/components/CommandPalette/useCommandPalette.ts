@@ -5,7 +5,8 @@
  * Provides a simple interface for toggling the command palette.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useEffect } from 'react';
+import { useCommandPaletteStore } from '../../stores/commandPaletteStore';
 
 /**
  * Return type for useCommandPalette hook.
@@ -74,19 +75,12 @@ export function useCommandPalette(
     enableShortcut = true,
   } = options;
 
-  const [isOpen, setIsOpen] = useState(false);
-
-  const open = useCallback(() => {
-    setIsOpen(true);
-  }, []);
-
-  const close = useCallback(() => {
-    setIsOpen(false);
-  }, []);
-
-  const toggle = useCallback(() => {
-    setIsOpen((prev) => !prev);
-  }, []);
+  // Open state lives in a global store so external entry points (e.g. the
+  // MenuBar "Command Palette" item) can open the palette too.
+  const isOpen = useCommandPaletteStore((s) => s.isOpen);
+  const open = useCommandPaletteStore((s) => s.open);
+  const close = useCommandPaletteStore((s) => s.close);
+  const toggle = useCommandPaletteStore((s) => s.toggle);
 
   // Set up keyboard shortcut listener
   useEffect(() => {
