@@ -23,11 +23,14 @@
 - [x] 검증: `tsc --noEmit` 통과, `vitest run` 1684 passed / 0 failed
 - [ ] 검증(시각): 실제 앱에서 우측 도크 1/4 폭·리사이즈·토글 육안 확인 (CDP 루프) — **대기**
 
-## Phase 2 — Tag Manager (신규 인스펙터 패널)
-- [ ] `tag-manager` PanelType 추가 + 레지스트리 등록 (zone: inspector)
-- [ ] `src/components/panels/content/TagManagerPanel.tsx` 신설 (경량 — 태그 목록/검색/즐겨찾기; 전체화면 `tag-browser`와 역할 구분)
-- [ ] 우측 도크 기본 탭에 포함
-- [ ] 검증: 태그 추가/필터가 도크 안에서 동작
+## Phase 2 — Tag Manager (신규 인스펙터 패널) — ✅ 커밋 `df58f62`
+- [x] `tag-manager` PanelType 추가 + 레지스트리 등록 (zone: inspector, label "Tags")
+- [x] `TagManagerPanel.tsx` 신설 (경량 — 검색/watched-only 필터/행별 star watch+라이브값/인라인 빠른추가; 전체화면 `tag-browser`와 역할 구분)
+  - [x] `tagManager/TagManagerRow.tsx` (이름·주소·값·star), `tagManager/QuickAddTagForm.tsx` (name/area/index)
+  - [x] 기존 `useTagStore`/`useTagSearch` 재사용 (도메인 로직 신규 0)
+- [x] 우측 도크 기본 탭에 포함 (inspector zone → `INSPECTOR_PANEL_TYPES` 자동)
+- [x] 검증: `tsc --noEmit` 통과, `vitest run` 1684 passed / 0 failed
+- [ ] 검증(시각): 도크에서 검색·watch·추가 육안 확인 — **대기**
 
 ## Phase 1.5 — 명령 아키텍처 정규화 (Phase 3 선행, context-notes "명령 아키텍처" 절 참조)
 > 목적: 리본 제거로 잃는 발견성을 커맨드 팔레트로 메우고, 명령을 레지스트리 SSOT로 단일화.
