@@ -12,6 +12,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import type { Block, BlockType, Wire, WireEndpoint, Position, PortPosition } from '../types';
 import { isPortEndpoint } from '../types';
+import type { RotationDirection } from '../../../types/settings';
 import { isEditableTarget } from '@/canvas-core/input/isEditableTarget';
 
 // ============================================================================
@@ -67,6 +68,10 @@ interface UseCanvasKeyboardShortcutsOptions {
   undo: () => void;
   redo: () => void;
   rotateSelectedComponents?: (degrees: number) => void;
+  /** Degrees rotated per R press (magnitude). Default 90. */
+  rotationStepDegrees?: number;
+  /** Base rotation direction. R follows it; Shift+R reverses it. Default 'cw'. */
+  rotationDirection?: RotationDirection;
 }
 
 /**
@@ -93,7 +98,15 @@ export function useCanvasKeyboardShortcuts(options: UseCanvasKeyboardShortcutsOp
     undo,
     redo,
     rotateSelectedComponents,
+    rotationStepDegrees = 90,
+    rotationDirection = 'cw',
   } = options;
+
+  // Keep latest rotation settings in refs so the stable handler reads fresh values
+  const rotationStepRef = useRef(rotationStepDegrees);
+  rotationStepRef.current = rotationStepDegrees;
+  const rotationDirectionRef = useRef(rotationDirection);
+  rotationDirectionRef.current = rotationDirection;
 
   // Store ref for enabled so event handler always sees latest
   const enabledRef = useRef(enabled);
@@ -124,8 +137,8 @@ export function useCanvasKeyboardShortcuts(options: UseCanvasKeyboardShortcutsOp
     onDelete?.();
   }, [removeComponent, removeWire, clearSelection, onDelete]);
 
-  // Rotate selected components
-  const rotateSelected = useCallback(() => {
+  // Rotate selected components. `reverse` flips the configured direction (Shift+R).
+  const rotateSelected = useCallback((reverse = false) => {
     const ids = selectedIdsRef.current;
     if (ids.size === 0) return;
 
@@ -133,10 +146,12 @@ export function useCanvasKeyboardShortcuts(options: UseCanvasKeyboardShortcutsOp
     const hasComponents = Array.from(ids).some((id) =>
       componentsRef.current.has(id)
     );
+    if (!hasComponents) return;
 
-    if (hasComponents) {
-      rotateSelectedComponents?.(90);
-    }
+    const magnitude = rotationStepRef.current;
+    // cw = positive degrees (clockwise); ccw = negative. Shift+R reverses.
+    const cw = (rotationDirectionRef.current === 'cw') !== reverse;
+    rotateSelectedComponents?.(cw ? magnitude : -magnitude);
   }, [rotateSelectedComponents]);
 
   // Copy selected components to clipboard
@@ -325,11 +340,11 @@ export function useCanvasKeyboardShortcuts(options: UseCanvasKeyboardShortcutsOp
           }
           break;
 
-        // Rotate selected blocks
+        // Rotate selected blocks (Shift+R = reverse direction)
         case 'r':
-          if (!ctrl && !shift) {
+          if (!ctrl) {
             e.preventDefault();
-            rotateSelected();
+            rotateSelected(shift);
           }
           break;
 

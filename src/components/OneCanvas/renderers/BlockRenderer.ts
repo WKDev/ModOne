@@ -599,10 +599,9 @@ export class BlockRenderer {
 
     const rotation = block.rotation ?? 0;
     if (rotation !== 0) {
-      const cx = geometrySize.width / 2;
-      const cy = geometrySize.height / 2;
-      symbol.pivot.set(cx * SYMBOL_PX_TO_MM, cy * SYMBOL_PX_TO_MM);
-      symbol.position.set(size.width / 2, size.height / 2);
+      // Rotate around the symbol's 0,0 origin (placement anchor), not its center.
+      symbol.pivot.set(0, 0);
+      symbol.position.set(0, 0);
       symbol.rotation = (rotation * Math.PI) / 180;
     }
 
