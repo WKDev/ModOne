@@ -97,6 +97,29 @@ pub enum NodeType {
     MathMov,
 }
 
+/// 출력(구동) 노드인지 여부. 코일/타이머/카운터/연산은 rung의 파워플로우 평가에
+/// 기여하지 않고, 파워플로우로 구동되는 출력이다. (접점/블록/비교는 입력)
+fn is_output_node(node_type: NodeType) -> bool {
+    matches!(
+        node_type,
+        NodeType::CoilOut
+            | NodeType::CoilSet
+            | NodeType::CoilRst
+            | NodeType::TimerTon
+            | NodeType::TimerTof
+            | NodeType::TimerTmr
+            | NodeType::CounterCtu
+            | NodeType::CounterCtd
+            | NodeType::CounterCtud
+            | NodeType::MathAdd
+            | NodeType::MathSub
+            | NodeType::MathMul
+            | NodeType::MathDiv
+            | NodeType::MathMod
+            | NodeType::MathMov
+    )
+}
+
 /// Device address parsed from string
 #[derive(Debug, Clone)]
 pub struct DeviceAddress {
@@ -785,10 +808,15 @@ impl ProgramExecutor {
                 Ok(result)
             }
 
-            // Blocks
+            // Blocks — 출력 노드(코일/타이머/카운터/연산)는 파워플로우에 기여하지
+            // 않는다. 프론트(gridToAst)는 단일 행 rung을 block_series([입력..., 출력])
+            // 으로 내보내므로, 출력 자식을 AND/OR 평가에서 제외해야 한다.
             NodeType::BlockSeries => {
-                // AND logic - all children must be true
+                // AND logic - all input children must be true
                 for child in &node.children {
+                    if is_output_node(child.node_type) {
+                        continue;
+                    }
                     if !self.evaluate_node(child)? {
                         return Ok(false);
                     }
@@ -796,8 +824,11 @@ impl ProgramExecutor {
                 Ok(true)
             }
             NodeType::BlockParallel => {
-                // OR logic - any child true
+                // OR logic - any input child true
                 for child in &node.children {
+                    if is_output_node(child.node_type) {
+                        continue;
+                    }
                     if self.evaluate_node(child)? {
                         return Ok(true);
                     }
@@ -923,11 +954,12 @@ impl ProgramExecutor {
                 }
             }
 
-            // Execute child nodes for blocks
+            // 블록의 입력 파워플로우(입력 자식들의 AND/OR)로 출력 자식(코일 등)을
+            // 구동한다. 입력 자식(contact)에 대한 execute_output 은 no-op.
             NodeType::BlockSeries | NodeType::BlockParallel => {
+                let power = self.evaluate_node(node)?;
                 for child in &node.children {
-                    let child_input = self.evaluate_node(child)?;
-                    self.execute_output(child, child_input)?;
+                    self.execute_output(child, power)?;
                 }
             }
 

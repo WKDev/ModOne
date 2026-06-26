@@ -36,13 +36,14 @@
       `crate::sim::<module>::...` 경로·native 파일 super:: 전부 무변경 동작
 - [x] `cargo check --workspace`·`--tests` green
 - [x] `cargo check -p sim-engine --target wasm32-unknown-unknown` green
-- [~] `cargo test -p sim-engine`: **71 통과 / 6 실패** — 6개는 **기존 버그**
-      (내 이전은 순수 경로 재작성이라 동작 불변; create_executor는 profile 미사용).
-      그동안 symbols 컴파일 버그+Tauri 테스트 DLL 0xC0000139로 실행 불가라 잠복.
-      ⚠ 별도 처리 필요:
-        · executor P-bit coil 4종(P0 write 후 read 불일치)
-        · debugger 직렬화 1종(networkId camelCase 미포함)
-        · debugger 에러포맷 1종(Display가 Debug처럼 출력)
+- [x] `cargo test -p sim-engine`: **77 통과 / 0 실패**. 처음 노출된 기존 버그
+      6종 전부 수정 완료:
+        · debugger 2종(rename_all_fields, remove_watch 에러) — 27ef36d
+        · executor P-bit coil 3종 — LS profile P→OutputBit 도메인 결정, db803fb
+        · test_program_execution 1종 — **프로덕션 스캔 버그**: gridToAst는 rung을
+          block_series([contact, coil])로 내보내는데 evaluate_node가 코일을
+          파워플로우 AND에 포함(코일=false)해 코일이 절대 구동 안 됨. 출력 노드를
+          파워플로우 평가에서 제외 + 블록 입력 파워로 출력 구동하도록 수정.
 
 ## Phase 3 — 계약 wasm-purity (00-CONTRACT §3 부채)
 - [ ] memory.rs `chrono::Utc::now()` → 시간 주입/wasmbind feature
