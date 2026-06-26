@@ -8,11 +8,11 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::opcua::{is_bool_address, OpcUaMappingConfig};
+use crate::opcua::OpcUaMappingConfig;
 use crate::plc_runtime::{CanonicalAddress, CanonicalAreaKind};
 use crate::sim::types::{RegisterTagRequest, TagAccessLevel, TagDefinition};
 
-use super::tags::{tag_to_dto, MappingStoreState, TagDefinitionDto};
+use super::tags::MappingStoreState;
 use super::sim::SimState;
 
 // ============================================================================
@@ -3114,7 +3114,7 @@ mod tests {
 
     #[test]
     fn test_nodeset2_all_data_types() {
-        use crate::opcua::{ByteOrder, MappingAccessLevel, OpcUaDataType};
+        use crate::opcua::OpcUaDataType;
         let all_types = [
             (OpcUaDataType::Boolean, 1),
             (OpcUaDataType::SByte, 2),

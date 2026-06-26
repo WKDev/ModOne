@@ -4,7 +4,7 @@ pub mod keygen;
 pub mod crypto;
 pub mod store;
 
-use crate::{ModOneResult, ModOneError};
+use crate::ModOneResult;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum LicenseStatus {

@@ -1842,7 +1842,7 @@ mod tests {
     #[test]
     fn resolve_user_tokens_uses_bcrypt_verified_credentials() {
         use crate::opcua::auth::{
-            hash_password_with_cost, CredentialCache, UserAccountStore, VerifiedCredential,
+            CredentialCache, UserAccountStore,
             UserRole, resolve_verified_credentials,
         };
 
@@ -1888,7 +1888,7 @@ mod tests {
     #[test]
     fn resolve_user_tokens_rejects_wrong_bcrypt_password() {
         use crate::opcua::auth::{
-            CredentialCache, UserAccountStore, VerifiedCredential,
+            CredentialCache, UserAccountStore,
             UserRole, resolve_verified_credentials,
         };
 
@@ -1922,7 +1922,7 @@ mod tests {
     #[test]
     fn resolve_user_tokens_excludes_disabled_accounts() {
         use crate::opcua::auth::{
-            CredentialCache, UserAccountStore, VerifiedCredential,
+            CredentialCache, UserAccountStore,
             UserRole, resolve_verified_credentials,
         };
 
@@ -1955,7 +1955,7 @@ mod tests {
     #[test]
     fn resolve_user_tokens_partial_bcrypt_verification() {
         use crate::opcua::auth::{
-            CredentialCache, UserAccountStore, VerifiedCredential,
+            CredentialCache, UserAccountStore,
             UserRole, resolve_verified_credentials,
         };
 
@@ -1991,7 +1991,7 @@ mod tests {
     #[test]
     fn resolve_user_tokens_server_user_token_contains_verified_plaintext() {
         use crate::opcua::auth::{
-            CredentialCache, UserAccountStore, VerifiedCredential,
+            CredentialCache, UserAccountStore,
             UserRole, resolve_verified_credentials,
         };
 
