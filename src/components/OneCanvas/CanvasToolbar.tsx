@@ -19,7 +19,12 @@ import {
   FlipVertical2,
   Hash,
   Printer,
+  Sigma,
+  Circle,
+  Lightbulb,
+  Workflow,
 } from 'lucide-react';
+import { commandRegistry } from '../CommandPalette/commandRegistry';
 import type { CanvasInteractionMode } from './interaction';
 
 // ============================================================================
@@ -135,6 +140,40 @@ export const CanvasToolbar = memo(function CanvasToolbar({
         >
           운영 모드
         </button>
+      </div>
+
+      <Divider />
+
+      {/* Blocks Group — add canvas elements (commands shared with the palette) */}
+      <div className="flex items-center gap-0.5" title="Blocks">
+        <ToolButton
+          onClick={() => commandRegistry.execute('canvas.openSymbolEditor')}
+          title="Symbol"
+          disabled={!isEditMode}
+        >
+          <Sigma size={16} />
+        </ToolButton>
+        <ToolButton
+          onClick={() => commandRegistry.execute('canvas.addButton')}
+          title="Add Button"
+          disabled={!isEditMode}
+        >
+          <Circle size={16} />
+        </ToolButton>
+        <ToolButton
+          onClick={() => commandRegistry.execute('canvas.addLed')}
+          title="Add LED"
+          disabled={!isEditMode}
+        >
+          <Lightbulb size={16} />
+        </ToolButton>
+        <ToolButton
+          onClick={() => commandRegistry.execute('canvas.addScope')}
+          title="Add Scope"
+          disabled={!isEditMode}
+        >
+          <Workflow size={16} />
+        </ToolButton>
       </div>
 
       <Divider />

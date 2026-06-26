@@ -35,13 +35,11 @@ export const DEFAULT_LAYOUT: LayoutConfig = {
     activeTabId: undefined,
   },
   toolPanel: {
-    isVisible: true,
+    // Bottom panel (Console-only; inspector panels live in the right dock now)
+    // defaults to collapsed.
+    isVisible: false,
     height: 200,
-    tabs: [
-      { type: 'console', title: 'Console' },
-      { type: 'memory-visualizer', title: 'Memory Visualizer' },
-      { type: 'properties', title: 'Properties' },
-    ],
+    tabs: [{ type: 'console', title: 'Console' }],
     activeTabId: undefined,
   },
   isBuiltIn: true,

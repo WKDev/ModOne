@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 import { MenuBar } from './MenuBar';
-import { Toolbar } from './Toolbar';
 import { StatusBar } from './StatusBar';
 import { PanelErrorBoundary } from './PanelErrorBoundary';
 import { Sidebar } from './Sidebar';
 import { EditorArea } from './EditorArea';
 import { ToolPanel } from './ToolPanel';
+import { RightDock } from './RightDock';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSidebarStore } from '../../stores/sidebarStore';
 import { useEditorAreaStore } from '../../stores/editorAreaStore';
@@ -35,12 +35,10 @@ export function MainLayout() {
 
   return (
     <div data-testid="main-layout" className="h-screen w-screen overflow-hidden flex flex-col bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
-      {/* Header: Menu Bar + Toolbar */}
+      {/* Header: Menu Bar (the global ribbon was removed — commands now live in
+          per-editor toolbars, sidebar panels, the menu bar, and the palette) */}
       <header className="flex-shrink-0">
         {!IS_MAC && <MenuBar />}
-        <PanelErrorBoundary panelName="Ribbon">
-          <Toolbar />
-        </PanelErrorBoundary>
       </header>
 
       {/* Main Content Area */}
@@ -58,6 +56,11 @@ export function MainLayout() {
           {/* Tool Panel - collapsible bottom panel */}
           <ToolPanel />
         </main>
+
+        {/* Right Dock - inspector panels (Memory Visualizer, Properties, ...) */}
+        <PanelErrorBoundary panelName="RightDock">
+          <RightDock />
+        </PanelErrorBoundary>
       </div>
 
       {/* Footer: Status Bar */}

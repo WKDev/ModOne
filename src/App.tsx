@@ -8,6 +8,7 @@ import { ThemeProvider } from './providers/ThemeProvider';
 import { useStateSync } from './hooks/useStateSync';
 import { useWindowClose } from './hooks/useWindowClose';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
+import { useContextKeySync } from './hooks/useContextKeySync';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { FloatingWindowContent } from './components/floating/FloatingWindowContent';
 import { FloatingWindowRenderer } from './components/floating/FloatingWindowRenderer';
@@ -71,6 +72,9 @@ function MainWindowContent() {
 
   // Unified global keyboard shortcuts (reads overrides from settings)
   useGlobalShortcuts();
+
+  // Mirror source stores into the shared context-key store (command enablement)
+  useContextKeySync();
 
   // Centralized OPC UA event subscription
   useOpcUaInit();
