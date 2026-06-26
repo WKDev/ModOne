@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use parking_lot::Mutex;
 
-use crate::plc_runtime::{CanonicalAddress, CanonicalValue};
+use modone_contract::{CanonicalAddress, CanonicalValue};
 
 /// Unique identifier for an OPC UA node in the address space.
 ///
@@ -136,7 +136,7 @@ impl Default for OpcUaMemory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plc_runtime::CanonicalAreaKind;
+    use modone_contract::CanonicalAreaKind;
 
     #[test]
     fn record_and_drain_external_writes() {

@@ -11,12 +11,11 @@
 
 use std::collections::HashMap;
 
-use crate::modbus::DirtyPublishWindow;
-use crate::plc_runtime::{CanonicalAddress, CanonicalMemory};
+use modone_contract::DirtyPublishWindow;
+use modone_contract::{CanonicalAddress, CanonicalMemory};
 
-use super::memory::OpcUaNodeId;
-use super::server::OpcUaServer;
-use super::types::OpcUaError;
+use crate::error::OpcUaError;
+use crate::memory::OpcUaNodeId;
 
 /// OPC UA 서버 백엔드 추상화.
 ///
@@ -38,23 +37,4 @@ pub trait OpcUaServerBackend: Send + Sync {
         canonical_memory: &CanonicalMemory,
         publish_map: &HashMap<CanonicalAddress, Vec<OpcUaNodeId>>,
     ) -> Result<(), OpcUaError>;
-}
-
-impl OpcUaServerBackend for OpcUaServer {
-    fn update_node_values(
-        &self,
-        windows: &[DirtyPublishWindow],
-        canonical_memory: &CanonicalMemory,
-        publish_map: &HashMap<CanonicalAddress, Vec<OpcUaNodeId>>,
-    ) -> Result<(), OpcUaError> {
-        OpcUaServer::update_node_values(self, windows, canonical_memory, publish_map)
-    }
-
-    fn sync_all_node_values(
-        &self,
-        canonical_memory: &CanonicalMemory,
-        publish_map: &HashMap<CanonicalAddress, Vec<OpcUaNodeId>>,
-    ) -> Result<(), OpcUaError> {
-        OpcUaServer::sync_all_node_values(self, canonical_memory, publish_map)
-    }
 }

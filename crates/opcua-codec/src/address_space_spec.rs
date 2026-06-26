@@ -7,10 +7,10 @@
 
 use std::collections::HashMap;
 
-use crate::plc_runtime::{CanonicalAccess, CanonicalAddress, CanonicalAreaKind};
+use modone_contract::{CanonicalAccess, CanonicalAddress, CanonicalAreaKind};
 
-use super::mapping::MappingAccessLevel;
-use super::memory::OpcUaNodeId;
+use crate::mapping::MappingAccessLevel;
+use crate::memory::OpcUaNodeId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpcUaAccessLevel {
@@ -61,14 +61,14 @@ pub struct AddressSpaceSpec {
     pub publish_map: HashMap<CanonicalAddress, Vec<OpcUaNodeId>>,
 }
 
-pub(crate) fn access_level_from_canonical(access: CanonicalAccess) -> OpcUaAccessLevel {
+pub fn access_level_from_canonical(access: CanonicalAccess) -> OpcUaAccessLevel {
     match access {
         CanonicalAccess::ReadWrite => OpcUaAccessLevel::ReadWrite,
         CanonicalAccess::ReadOnly | CanonicalAccess::InternalOnly => OpcUaAccessLevel::ReadOnly,
     }
 }
 
-pub(crate) fn access_level_from_mapping(level: MappingAccessLevel) -> OpcUaAccessLevel {
+pub fn access_level_from_mapping(level: MappingAccessLevel) -> OpcUaAccessLevel {
     match level {
         MappingAccessLevel::ReadOnly => OpcUaAccessLevel::ReadOnly,
         MappingAccessLevel::ReadWrite => OpcUaAccessLevel::ReadWrite,
@@ -94,7 +94,7 @@ pub fn is_bool_address(address: CanonicalAddress) -> bool {
         )
 }
 
-pub(crate) fn push_publish_node(
+pub fn push_publish_node(
     publish_map: &mut HashMap<CanonicalAddress, Vec<OpcUaNodeId>>,
     address: CanonicalAddress,
     node_id: OpcUaNodeId,

@@ -26,6 +26,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 # Shared wasm/native contract crate (canonical memory + protocol adapter)
 modone-contract = { path = "../crates/modone-contract" }
+# OPC UA pure core (codec/address-space spec/adapter/backend trait)
+opcua-codec = { path = "../crates/opcua-codec" }
 
 # Tauri core
 tauri = { version = "2", features = ["devtools"] }

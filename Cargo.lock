@@ -2654,6 +2654,7 @@ dependencies = [
  "machine-uid",
  "modone-contract",
  "opcua",
+ "opcua-codec",
  "parking_lot",
  "quick-xml 0.38.4",
  "reqwest 0.12.28",
@@ -3204,6 +3205,17 @@ dependencies = [
  "tokio-util",
  "url 1.7.2",
  "uuid",
+]
+
+[[package]]
+name = "opcua-codec"
+version = "0.1.0"
+dependencies = [
+ "modone-contract",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use parking_lot::RwLock;
 
-use crate::modbus::{DirtyPublishWindow, ProtocolAdapter};
-use crate::plc_runtime::{CanonicalMemory, CanonicalWriteSource};
+use modone_contract::{DirtyPublishWindow, ProtocolAdapter};
+use modone_contract::{CanonicalMemory, CanonicalWriteSource};
 
-use super::backend::OpcUaServerBackend;
-use super::memory::OpcUaMemory;
+use crate::backend::OpcUaServerBackend;
+use crate::memory::OpcUaMemory;
 
 /// OPC UA protocol adapter implementing the ProtocolAdapter trait.
 ///
@@ -98,82 +98,5 @@ impl ProtocolAdapter for OpcUaAdapter {
     fn full_sync(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         self.apply_writes()?;
         self.publish_all()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::opcua::server::OpcUaServer;
-    use crate::opcua::types::OpcUaConfig;
-    use crate::plc_runtime::{
-        CanonicalAddress, CanonicalAreaKind, CanonicalMemory, CanonicalValue,
-    };
-
-    #[test]
-    fn apply_external_writes_updates_canonical_memory() {
-        let canonical = Arc::new(RwLock::new(CanonicalMemory::new()));
-        let opcua_memory = Arc::new(OpcUaMemory::new());
-        let server = Arc::new(OpcUaServer::new(
-            OpcUaConfig::default(),
-            Arc::clone(&opcua_memory),
-        ));
-        let adapter = OpcUaAdapter::new(Arc::clone(&canonical), Arc::clone(&opcua_memory), server);
-
-        // Simulate OPC UA client writing a value
-        opcua_memory.record_external_write(
-            CanonicalAddress::new(CanonicalAreaKind::DataWord, 42),
-            CanonicalValue::U16(1234),
-        );
-        opcua_memory.record_external_write(
-            CanonicalAddress::new(CanonicalAreaKind::InternalBit, 7),
-            CanonicalValue::Bool(true),
-        );
-
-        // Apply writes
-        adapter.apply_external_writes().unwrap();
-
-        // Verify canonical memory was updated
-        let mem = canonical.read();
-        assert_eq!(
-            mem.read(CanonicalAddress::new(CanonicalAreaKind::DataWord, 42))
-                .unwrap(),
-            CanonicalValue::U16(1234)
-        );
-        assert_eq!(
-            mem.read(CanonicalAddress::new(CanonicalAreaKind::InternalBit, 7))
-                .unwrap(),
-            CanonicalValue::Bool(true)
-        );
-
-        // Writes should be drained
-        assert!(opcua_memory.take_external_writes().is_empty());
-    }
-
-    #[test]
-    fn full_sync_applies_writes_then_publishes() {
-        let canonical = Arc::new(RwLock::new(CanonicalMemory::new()));
-        let opcua_memory = Arc::new(OpcUaMemory::new());
-        let server = Arc::new(OpcUaServer::new(
-            OpcUaConfig::default(),
-            Arc::clone(&opcua_memory),
-        ));
-        let adapter = OpcUaAdapter::new(Arc::clone(&canonical), Arc::clone(&opcua_memory), server);
-
-        // Record a write and do full sync
-        opcua_memory.record_external_write(
-            CanonicalAddress::new(CanonicalAreaKind::DataWord, 0),
-            CanonicalValue::U16(9999),
-        );
-
-        adapter.full_sync().unwrap();
-
-        // Should be applied
-        let mem = canonical.read();
-        assert_eq!(
-            mem.read(CanonicalAddress::new(CanonicalAreaKind::DataWord, 0))
-                .unwrap(),
-            CanonicalValue::U16(9999)
-        );
     }
 }
