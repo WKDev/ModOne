@@ -26,7 +26,7 @@ import {
   getSymbolDefaultProps,
   checkCompatibility,
 } from '../utils/symbolBlockDefAdapter';
-import { getBlockDefinition, getDefaultPorts, getBlockSize, getDefaultBlockProps } from '../components/OneCanvas/blockDefinitions';
+import BLOCK_DEFINITIONS_RAW, { getBlockDefinition, getDefaultPorts, getBlockSize, getDefaultBlockProps } from '../components/OneCanvas/blockDefinitions';
 import { BUILTIN_SYMBOLS, getBuiltinSymbol, getBuiltinSymbolForBlockType } from '../assets/builtin-symbols';
 import { relaySymbol } from '../assets/builtin-symbols/relay';
 import type { SymbolDefinition } from '../types/symbol';
@@ -862,6 +862,61 @@ describe('Compatibility: blockDefinitions.ts vs Symbol System', () => {
             legacyPort.absolutePosition.y,
             3,
           );
+        }
+      },
+    );
+  });
+
+  describe('blockDefinitions override set + symbol derivation', () => {
+    // The ONLY block types that stay hardcoded: no symbol (custom_symbol) or a
+    // strict size/ports(type,offset,abs)/props divergence from their symbol.
+    // Established by an exhaustive strict comparison; locked here so a new
+    // hardcoded entry (or a removed one) fails loudly.
+    const EXPECTED_OVERRIDES = [
+      'capacitor', 'connector', 'custom_symbol', 'inductor', 'junction_box',
+      'plc_output', 'power_source', 'power_source_dc_2p', 'relay_coil',
+      'resistor', 'text',
+    ];
+
+    it('BLOCK_DEFINITIONS holds exactly the intentional symbol-divergent overrides', () => {
+      expect(Object.keys(BLOCK_DEFINITIONS_RAW).sort()).toEqual([...EXPECTED_OVERRIDES].sort());
+    });
+
+    it('override types return the hardcoded override, not the symbol', () => {
+      // relay_coil is a 2-pin 20x30 simplification of the 5-pin relay symbol.
+      expect(getBlockSize('relay_coil' as BlockType)).toEqual({ width: 20, height: 30 });
+      expect(getDefaultPorts('relay_coil' as BlockType)).toHaveLength(2);
+      // resistor override pins are directed, not the symbol's bidirectional.
+      expect(getDefaultPorts('resistor' as BlockType).find((p) => p.id === 'in')?.type).toBe('input');
+    });
+
+    it('non-override symbol-backed types derive geometry from the symbol', () => {
+      // relay is NOT an override → full 5-pin symbol geometry, derived live.
+      expect(getDefaultPorts('relay')).toHaveLength(5);
+      expect(getBlockSize('relay')).toEqual(getSymbolSize('relay'));
+      // And every non-override key with a symbol resolves (no throw).
+      const overrides = new Set(EXPECTED_OVERRIDES);
+      for (const key of Object.keys(BLOCK_DEFINITIONS_RAW) as BlockType[]) {
+        if (overrides.has(key)) continue;
+        expect(getBlockDefinitionFromSymbol(key)).not.toBeNull();
+      }
+    });
+  });
+
+  describe('defaultProps reverse-coverage probe', () => {
+    // PROBE: does the symbol cover ALL legacy default-prop keys (with matching
+    // values)? If yes for every type, blockDefinitions defaultProps is fully
+    // redundant and the hardcoded entries can be derived from symbols.
+    it.each(COMPATIBLE_BLOCK_TYPES)(
+      '%s: legacy defaultProps keys are all present in symbol defaultProps with matching values',
+      (blockType) => {
+        const legacyProps = getDefaultBlockProps(blockType);
+        const symbolProps = getSymbolDefaultProps(blockType);
+
+        for (const [key, legacyValue] of Object.entries(legacyProps)) {
+          if (legacyValue === undefined) continue;
+          expect(symbolProps).toHaveProperty(key);
+          expect(String(symbolProps[key])).toBe(String(legacyValue));
         }
       },
     );
