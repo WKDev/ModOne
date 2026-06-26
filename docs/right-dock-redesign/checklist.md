@@ -32,19 +32,16 @@
 - [x] 검증: `tsc --noEmit` 통과, `vitest run` 1684 passed / 0 failed
 - [ ] 검증(시각): 도크에서 검색·watch·추가 육안 확인 — **대기**
 
-## Phase 1.5 — 명령 아키텍처 정규화 (Phase 3 선행, context-notes "명령 아키텍처" 절 참조)
-> 목적: 리본 제거로 잃는 발견성을 커맨드 팔레트로 메우고, 명령을 레지스트리 SSOT로 단일화.
-> Phase 3(명령 재배치)을 "새 surface 추가"로 환원하기 위한 선행 작업.
-- [ ] **커맨드 팔레트 전역 노출 보장**: Ctrl+Shift+P 단축키 + MenuBar(View) 진입점 연결, 모든 commandId 검색·실행 확인 (이미 존재 → 접근성만)
-- [ ] **context-key 스토어 신설** (`activeEditor` / `hasSelection` / `scenario.running` / `modbusTcpRunning` / `opcuaRunning` 등 반응형 키)
-  - [ ] 기존 `RibbonContext`(resolveRibbon.ts)와 Command `when()` 클로저를 이 스토어 키로 통일
-- [ ] **placement 모델 도입**: 배치 config를 순수 `{ commandId, group, order, when }`로 정규화 (label/icon/enablement는 Command에서 해석)
-  - [ ] `ribbon/config/*`를 placement로 마이그레이션 (표시 메타데이터 이중화 제거)
-  - [ ] `getPlacements(surface)` 헬퍼 — 로컬 툴바/메뉴바/패널 헤더가 공통 사용
-- [ ] 검증: 리본·팔레트·단축키가 같은 레지스트리/context-key를 읽고 동작 일치, `tsc`/`vitest` 통과
-- [ ] (보류) 플러그인 호스트는 만들지 않음 — contribution 데이터 구조까지만 (YAGNI)
+## Phase 1.5 — 명령 아키텍처 정규화 (A·B 완료, placement는 YAGNI로 보류)
+> 목적: 리본 제거로 잃는 발견성을 커맨드 팔레트로 메우고, enablement 어휘를 단일화.
+- [x] **커맨드 팔레트 전역 노출** — 커밋 `56b043c`. Ctrl+Shift+P(기존) + MenuBar(View) "Command Palette…" 진입점. 전역 `commandPaletteStore`로 외부 진입점 가능.
+- [x] **context-key 스토어 신설** — 커밋 `6ec81bd`. `activeEditorType` / `simulationStatus` / `scenarioStatus` / `modbusTcpRunning` / `opcuaRunning` 반응형 키. `useContextKeySync`가 소스 store→키 미러(소스가 SSOT). Toolbar가 `RibbonContext`를 이 스토어에서 조립 → 어휘 통일.
+  - `hasSelection`은 소비자(Phase 3 ladder edit enablement) 생길 때 추가 — 현재 미사용이라 YAGNI로 제외.
+- [x] 검증: `tsc --noEmit` 통과, `vitest run` 1684 passed / 0 failed
+- [~] **placement 모델 / `getPlacements`** — **보류 결정**(사용자 합의). 리본 config가 이미 placement 데이터이고 Phase 3는 그걸 `<EditorToolbar>`로 직접 재사용(Option B)하므로 별도 추상이 도크 재설계에 불필요. 여러 surface 통합이 실제로 필요해질 때 얇게 도입.
+  - label/icon 이중화(Command↔config) drift는 사소·기존 이슈로 수용. 필요 시 `Command.enabled()`만 나중에 추가.
 
-## Phase 3 — 리본 명령 재배치 (Phase 1.5의 `getPlacements`/context-key 위에서 진행)
+## Phase 3 — 리본 명령 재배치 (context-key 위에서, 리본 config 직접 재사용 = Option B)
 - [ ] **에디터 로컬 툴바**: Ladder(Contacts/Logic/Edit), Canvas(Tools/View), Scenario(File/Execution/Data)
   - [ ] 각 에디터 패널 상단에 얇은 로컬 툴바 컴포넌트 추가 (commandId 재사용)
 - [ ] **좌측 패널 헤더**: Modbus(TCP/RTU) → ModbusPanel, OPC UA(Start/Stop/Endpoint/Panel) → OpcUaUnifiedPanel
