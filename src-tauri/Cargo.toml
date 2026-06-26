@@ -26,6 +26,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 # Shared wasm/native contract crate (canonical memory + protocol adapter)
 modone-contract = { path = "../crates/modone-contract" }
+# vendor-neutral PLC 모델 (하드웨어 타입 + VendorProfile)
+plc-model = { path = "../crates/plc-model" }
 
 # Tauri core
 tauri = { version = "2", features = ["devtools"] }

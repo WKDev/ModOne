@@ -11,5 +11,11 @@ uuid = { version = "1", features = ["v4"] }
 thiserror = "1"
 tokio = { version = "1", default-features = false, features = ["sync"] }
 
+# wasm 타깃에서만 시간/난수 백엔드를 활성화 (계약 §3 wasm-purity 부채).
+# 네이티브 빌드는 영향 없음 — 기능 합집합으로 추가만 된다.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+chrono = { version = "0.4", features = ["wasmbind"] }
+uuid = { version = "1", features = ["js"] }
+
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }

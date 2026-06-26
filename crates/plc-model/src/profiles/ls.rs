@@ -1,14 +1,11 @@
-use crate::project::{PlcHardwareTopology, PlcIoDirection, PlcManufacturer};
+use crate::hardware::{PlcHardwareTopology, PlcIoDirection, PlcManufacturer};
 
-use super::super::{
-    profile::{
-        format_vendor_address, split_vendor_address, ModbusAddressSpace, ModbusMappingPolicy,
-        ModbusMappingRule, ModbusMappingSource, OpcUaAliasPolicy, VendorAddress,
-        VendorAddressMetadata, VendorAddressNumberBase, VendorDataKind, VendorProfile,
-        VendorProfileError, VendorProfileId,
-    },
-    types::{CanonicalAddress, CanonicalAreaKind},
+use crate::profile::{
+    format_vendor_address, split_vendor_address, ModbusAddressSpace, ModbusMappingPolicy,
+    ModbusMappingRule, ModbusMappingSource, OpcUaAliasPolicy, VendorAddress, VendorAddressMetadata,
+    VendorAddressNumberBase, VendorDataKind, VendorProfile, VendorProfileError, VendorProfileId,
 };
+use modone_contract::{CanonicalAddress, CanonicalAreaKind};
 
 const LS_FAMILIES: [&str; 12] = ["TD", "CD", "P", "M", "K", "F", "T", "C", "D", "R", "Z", "N"];
 
@@ -590,19 +587,19 @@ mod tests {
         let profile = LsProfile::new(
             "XGT-CPUH".to_string(),
             PlcHardwareTopology {
-                racks: vec![crate::project::PlcRackTopology {
+                racks: vec![crate::hardware::PlcRackTopology {
                     rack_id: "main".to_string(),
-                    rack_kind: crate::project::PlcRackKind::MainBase,
-                    modules: vec![crate::project::PlcHardwareModule {
+                    rack_kind: crate::hardware::PlcRackKind::MainBase,
+                    modules: vec![crate::hardware::PlcHardwareModule {
                         slot: 3,
-                        module_kind: crate::project::PlcModuleKind::DigitalOutput,
+                        module_kind: crate::hardware::PlcModuleKind::DigitalOutput,
                         model: "XBF-DO16A".to_string(),
                         point_count: Some(16),
-                        address_windows: vec![crate::project::PlcAddressWindow {
+                        address_windows: vec![crate::hardware::PlcAddressWindow {
                             family: "P".to_string(),
                             start: 64,
                             count: 16,
-                            io_direction: Some(crate::project::PlcIoDirection::Output),
+                            io_direction: Some(crate::hardware::PlcIoDirection::Output),
                         }],
                     }],
                 }],
