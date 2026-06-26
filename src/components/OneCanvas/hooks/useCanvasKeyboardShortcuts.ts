@@ -12,6 +12,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import type { Block, BlockType, Wire, WireEndpoint, Position, PortPosition } from '../types';
 import { isPortEndpoint } from '../types';
+import { isEditableTarget } from '@/canvas-core/input/isEditableTarget';
 
 // ============================================================================
 // Types
@@ -26,25 +27,6 @@ interface ClipboardData {
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
-/**
- * Check if an element is an input element where shortcuts should be disabled.
- */
-function isInputElement(target: EventTarget | null): boolean {
-  if (!target || !(target instanceof HTMLElement)) return false;
-
-  const tagName = target.tagName.toLowerCase();
-  if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') {
-    return true;
-  }
-
-  // Check for contenteditable
-  if (target.isContentEditable) {
-    return true;
-  }
-
-  return false;
-}
 
 /**
  * Generate a new unique ID.
@@ -253,7 +235,7 @@ export function useCanvasKeyboardShortcuts(options: UseCanvasKeyboardShortcutsOp
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       // Skip if disabled or in input element
-      if (!enabledRef.current || isInputElement(e.target)) return;
+      if (!enabledRef.current || isEditableTarget(e.target)) return;
 
       const ctrl = e.ctrlKey || e.metaKey;
       const shift = e.shiftKey;

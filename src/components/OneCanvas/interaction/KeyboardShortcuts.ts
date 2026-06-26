@@ -17,6 +17,7 @@
 
 import type { Position } from '../types';
 import { GRID_MODULE_MM } from '../canvasUnits';
+import { isEditableTarget } from '@/canvas-core/input/isEditableTarget';
 
 // ============================================================================
 // Types
@@ -144,9 +145,7 @@ export class KeyboardShortcuts {
     if (this._destroyed || !this._callbacks) return;
 
     // Don't capture when focus is on input elements
-    const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
-    if ((e.target as HTMLElement)?.isContentEditable) return;
+    if (isEditableTarget(e.target)) return;
 
     const ctrl = e.ctrlKey || e.metaKey;
     const shift = e.shiftKey;

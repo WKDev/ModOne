@@ -33,7 +33,7 @@ import { PixiApplication } from '@components/OneCanvas/core/PixiApplication';
 import { PixiViewport } from '@components/OneCanvas/core/PixiViewport';
 import { CoordinateSystem } from '@components/OneCanvas/core/CoordinateSystem';
 import { GridRenderer } from '@components/OneCanvas/renderers/GridRenderer';
-import { ToolInputBinding, GRID_MODULE_MM } from '@/canvas-core';
+import { ToolInputBinding, GRID_MODULE_MM, isEditableTarget } from '@/canvas-core';
 
 import { PrimitiveRenderer } from './renderers/PrimitiveRenderer';
 import { PinRenderer } from './renderers/PinRenderer';
@@ -693,12 +693,7 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
     useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
         // ── Tool switching shortcuts (no modifiers, not in input fields) ──
-        const target = event.target as HTMLElement;
-        const isInputField =
-          target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.tagName === 'SELECT' ||
-          target.isContentEditable;
+        const isInputField = isEditableTarget(event.target);
 
         if (
           !isInputField &&

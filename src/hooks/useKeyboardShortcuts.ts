@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useCallback } from 'react';
+import { isEditableTarget } from '@/canvas-core/input/isEditableTarget';
 
 interface KeyboardShortcutCallbacks {
   onNewProject?: () => void;
@@ -14,21 +15,6 @@ interface KeyboardShortcutCallbacks {
   onSaveAll?: () => void;
   onCloseProject?: () => void;
   onOpenSettings?: () => void;
-}
-
-/**
- * Check if the event target is an input element
- */
-function isInputElement(target: EventTarget | null): boolean {
-  if (!target) return false;
-  const element = target as HTMLElement;
-  const tagName = element.tagName?.toLowerCase();
-  return (
-    tagName === 'input' ||
-    tagName === 'textarea' ||
-    tagName === 'select' ||
-    element.isContentEditable
-  );
 }
 
 /**
@@ -46,7 +32,7 @@ export function useKeyboardShortcuts({
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       // Skip if typing in an input field
-      if (isInputElement(e.target)) {
+      if (isEditableTarget(e.target)) {
         // Still allow Ctrl+S in inputs for saving
         if (!((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's')) {
           return;
