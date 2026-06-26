@@ -488,6 +488,27 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
           hideGhost() {
             ghostPreviewRef.current?.hide();
           },
+          setHover(type, id) {
+            blockRendererRef.current?.setHoveredBlock(type === 'block' ? id : null);
+            wireRendererRef.current?.setHoveredWire(
+              type === 'wire' || type === 'segment' ? id : null,
+            );
+            junctionRendererRef.current?.setHoveredJunction(type === 'junction' ? id : null);
+
+            const el = containerRef.current;
+            if (el) {
+              el.style.cursor =
+                type === 'wire' || type === 'segment'
+                  ? 'pointer'
+                  : type === 'junction'
+                    ? 'pointer'
+                    : type === 'port'
+                      ? 'crosshair'
+                      : type === 'block'
+                        ? 'move'
+                        : 'default';
+            }
+          },
         };
 
         const controller = new InteractionController({

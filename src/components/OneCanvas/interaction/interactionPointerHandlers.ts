@@ -237,10 +237,15 @@ export function handleDraggingItemsMove(self: InteractionController, worldPos: P
 
   for (const [id, { originalPos, isJunction }] of self._dragGroup) {
     const newPos = add(originalPos, delta);
+    // skipHistory=true (no per-frame undo), skipWireRecalc=false so connected
+    // wires re-route orthogonally *live* during the drag instead of snapping to
+    // right angles only on release. recalculateAutoHandles is stable per frame
+    // (auto wires recompute from scratch; user-handle bridges are discarded and
+    // regenerated each pass), so this does not drift or accumulate handles.
     if (isJunction) {
-      facade.moveJunction(id, newPos, true, true);
+      facade.moveJunction(id, newPos, true, false);
     } else {
-      facade.moveComponent(id, newPos, true, true);
+      facade.moveComponent(id, newPos, true, false);
     }
   }
 }

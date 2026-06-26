@@ -160,9 +160,17 @@ export class SyncEngine {
 
       let hasChanges = false;
 
+      // Wire endpoints are resolved live from block/junction positions
+      // (WireRenderer._resolveEndpointPosition), so wires must re-render
+      // whenever blocks or junctions move — otherwise wires only snap to a
+      // dragged symbol on release (skipWireRecalc keeps the wires array
+      // reference stable during the drag).
+      let blocksOrJunctionsMoved = false;
+
       if (current.components !== previous.components) {
         this._dirtyFlags.add('blocks');
         hasChanges = true;
+        blocksOrJunctionsMoved = true;
       }
 
       if (current.wires !== previous.wires) {
@@ -173,6 +181,11 @@ export class SyncEngine {
       if (current.junctions !== previous.junctions) {
         this._dirtyFlags.add('junctions');
         hasChanges = true;
+        blocksOrJunctionsMoved = true;
+      }
+
+      if (blocksOrJunctionsMoved) {
+        this._dirtyFlags.add('wires');
       }
 
       const viewportChanged =
