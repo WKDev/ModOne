@@ -5,8 +5,8 @@ use parking_lot::RwLock;
 use crate::modbus::{DirtyPublishWindow, ProtocolAdapter};
 use crate::plc_runtime::{CanonicalMemory, CanonicalWriteSource};
 
+use super::backend::OpcUaServerBackend;
 use super::memory::OpcUaMemory;
-use super::server::OpcUaServer;
 
 /// OPC UA protocol adapter implementing the ProtocolAdapter trait.
 ///
@@ -14,17 +14,21 @@ use super::server::OpcUaServer;
 /// address space, handling bidirectional data flow:
 /// - External writes: OPC UA client → canonical memory
 /// - State publishing: canonical memory → OPC UA address space variables
+///
+/// Depends only on the [`OpcUaServerBackend`] trait (계약 §4): the concrete
+/// backend (`OpcUaServer` today, a .NET daemon later) is chosen at the
+/// src-tauri assembly point, not here.
 pub struct OpcUaAdapter {
     canonical_memory: Arc<RwLock<CanonicalMemory>>,
     opcua_memory: Arc<OpcUaMemory>,
-    server: Arc<OpcUaServer>,
+    server: Arc<dyn OpcUaServerBackend>,
 }
 
 impl OpcUaAdapter {
     pub fn new(
         canonical_memory: Arc<RwLock<CanonicalMemory>>,
         opcua_memory: Arc<OpcUaMemory>,
-        server: Arc<OpcUaServer>,
+        server: Arc<dyn OpcUaServerBackend>,
     ) -> Self {
         Self {
             canonical_memory,
@@ -100,6 +104,7 @@ impl ProtocolAdapter for OpcUaAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::opcua::server::OpcUaServer;
     use crate::opcua::types::OpcUaConfig;
     use crate::plc_runtime::{
         CanonicalAddress, CanonicalAreaKind, CanonicalMemory, CanonicalValue,

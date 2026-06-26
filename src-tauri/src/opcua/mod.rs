@@ -1,5 +1,6 @@
 pub mod adapter;
 pub mod address_space;
+pub mod backend;
 pub mod audit;
 pub mod auth;
 pub mod dirty_tracker;
@@ -9,6 +10,7 @@ pub mod server;
 pub mod types;
 
 pub use adapter::OpcUaAdapter;
+pub use backend::OpcUaServerBackend;
 pub use audit::{
     AuditClientInfo, AuditEventCategory, AuditEventType, AuditLogEntry, AuditLogQuery,
     AuditLogResult, AuditLogger, AuditLoggerState, AuditSeverity,
