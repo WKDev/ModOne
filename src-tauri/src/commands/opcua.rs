@@ -13,8 +13,8 @@ use crate::opcua::auth::UserRole;
 use crate::opcua::{
     resolve_verified_credentials_audited, AuditLogQuery, AuditLogResult,
     AuditLoggerState, CredentialCache, OpcUaConfig, OpcUaMappingStore, OpcUaMemory,
-    OpcUaSecurityPolicy, OpcUaServer, OpcUaSessionInfo, OpcUaStatus, UserAccountInfo,
-    UserAccountStore,
+    OpcUaSecurityPolicy, OpcUaServer, OpcUaServerControl, OpcUaSessionInfo, OpcUaStatus,
+    UserAccountInfo, UserAccountStore,
 };
 use crate::plc_runtime::{resolve_vendor_profile, CanonicalMemory, VendorProfile};
 use crate::project::{validate_project_config, ProjectConfig, SharedProjectManager};
@@ -69,7 +69,10 @@ impl Default for CredentialCacheState {
 }
 
 pub struct OpcUaState {
-    pub server: Mutex<Option<Arc<OpcUaServer>>>,
+    /// 구체 백엔드 대신 라이프사이클 trait에 의존한다(계약 §4). 구체 선택은
+    /// `start_server_common` 한 곳에서. publish 경로는 OpcUaAdapter가 별도의
+    /// OpcUaServerBackend(opcua-codec)에 의존한다.
+    pub server: Mutex<Option<Arc<dyn OpcUaServerControl>>>,
     pub memory: Arc<OpcUaMemory>,
     pub project_owned: Mutex<bool>,
 }
@@ -414,7 +417,8 @@ fn start_server_common(
         .start(canonical_memory, spec, audit_state, audit_data_dir)
         .map_err(|e| e.to_string())?;
 
-    *opcua_state.server.lock() = Some(Arc::clone(&server));
+    let control: Arc<dyn OpcUaServerControl> = server.clone();
+    *opcua_state.server.lock() = Some(control);
     *opcua_state.project_owned.lock() = project_owned;
     emit_status_update(app, &server.status());
     Ok(server)

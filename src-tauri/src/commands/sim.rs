@@ -643,8 +643,9 @@ mod tests {
         };
         server.start(&canonical_memory, spec, None, None).unwrap();
 
+        let server_control: std::sync::Arc<dyn crate::opcua::OpcUaServerControl> = server.clone();
         let opcua_state = OpcUaState {
-            server: parking_lot::Mutex::new(Some(server.clone())),
+            server: parking_lot::Mutex::new(Some(server_control)),
             memory: Arc::new(OpcUaMemory::new()),
             project_owned: parking_lot::Mutex::new(false),
         };

@@ -99,10 +99,20 @@ function calculateBounds(components: Map<string, Block>): Bounds {
   let maxY = DEFAULT_CANVAS_SHEET.y + DEFAULT_CANVAS_SHEET.height;
 
   for (const block of components.values()) {
-    minX = Math.min(minX, block.position.x);
-    minY = Math.min(minY, block.position.y);
-    maxX = Math.max(maxX, block.position.x + block.size.width);
-    maxY = Math.max(maxY, block.position.y + block.size.height);
+    const { x, y } = block.position;
+    const { width, height } = block.size;
+    // Skip blocks with corrupt geometry — a single NaN here would poison the
+    // whole bounds (Math.min/max with NaN → NaN) and blank the entire minimap.
+    if (
+      !Number.isFinite(x) || !Number.isFinite(y) ||
+      !Number.isFinite(width) || !Number.isFinite(height)
+    ) {
+      continue;
+    }
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x + width);
+    maxY = Math.max(maxY, y + height);
   }
 
   // Add some padding
@@ -309,6 +319,9 @@ export const CanvasMinimap = memo(function CanvasMinimap({
             ? MINIMAP_PADDING + (toComponent.position.y + toComponent.size.height / 2 - bounds.minY) * scale
             : MINIMAP_PADDING;
 
+          // Skip wires whose endpoints resolve to non-finite coords.
+          if (![x1, y1, x2, y2].every(Number.isFinite)) return null;
+
           return (
             <line
               key={wire.id}
@@ -330,6 +343,9 @@ export const CanvasMinimap = memo(function CanvasMinimap({
           const height = Math.max(block.size.height * scale, 3);
           const color = COMPONENT_COLORS[block.type] || '#888';
 
+          // Skip blocks with corrupt geometry rather than emitting NaN attrs.
+          if (![x, y, width, height].every(Number.isFinite)) return null;
+
           return (
             <rect
               key={block.id}
@@ -346,17 +362,19 @@ export const CanvasMinimap = memo(function CanvasMinimap({
         })}
 
         {/* Viewport rectangle */}
-        <rect
-          x={viewportRect.x}
-          y={viewportRect.y}
-          width={viewportRect.width}
-          height={viewportRect.height}
-          fill="transparent"
-          stroke="#3b82f6"
-          strokeWidth={1.5}
-          rx={2}
-          className="pointer-events-none"
-        />
+        {[viewportRect.x, viewportRect.y, viewportRect.width, viewportRect.height].every(Number.isFinite) && (
+          <rect
+            x={viewportRect.x}
+            y={viewportRect.y}
+            width={viewportRect.width}
+            height={viewportRect.height}
+            fill="transparent"
+            stroke="#3b82f6"
+            strokeWidth={1.5}
+            rx={2}
+            className="pointer-events-none"
+          />
+        )}
       </svg>
     </div>
   );

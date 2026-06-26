@@ -1,8 +1,8 @@
 /**
  * Symbol Thumbnail Generator
  *
- * Renders SymbolLibrary GraphicsContext definitions to cached data-URL images
- * via a single offscreen Pixi.js Application.  The resulting strings are
+ * Renders builtin XML-symbol GraphicsContext definitions to cached data-URL
+ * images via a single offscreen Pixi.js Application.  The resulting strings are
  * consumed by <SymbolRenderer> as <img src>.
  */
 

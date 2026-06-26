@@ -50,10 +50,17 @@ build_address_space_spec + trait impl)는 src-tauri 잔류.
       (단 modone-contract에 uuid `js`+chrono `wasmbind` 피처 추가 필요 — §3/A 소관,
       아래 참조. opcua-codec 소스 자체는 wasm-hostile 의존 전무.)
 
-## 워크트리 C 완료. 잔여 메모
-- §6 wasm 게이트 green은 modone-contract의 §3 wasm-purity 피처(uuid js,
-  chrono wasmbind)에 의존. 이는 계약상 **워크트리 A 소관**이라 별도 커밋으로
-  분리하고 플래그함(추가/네이티브 무해). A가 ID-주입 방식을 택하면 이 피처는
-  무해하거나 대체 가능.
-- 라이프사이클(start/stop/status/sessions) trait화 + .NET 프로세스 백엔드는
-  audit 싱크 재설계가 필요한 후속 과제(§4 심화). P1으로 어댑터-trait 의존은 충족.
+## 워크트리 C 완료 + 후속 작업 (main 병합 후)
+- §3 wasm-purity: 피처 방식 대신 **주입 방식** 채택(modone-contract `clock` 모듈
+  + chrono/uuid를 std-clock 피처로 optional화). opcua-codec은 default-features=
+  false로 의존해 단독 wasm 빌드 시 주입 경로. **A와 머지 시 조율 대상.**
+- **§4 라이프사이클 trait 완료**: `opcua/control.rs`의 OpcUaServerControl
+  (start/stop/status/sessions)을 도입하고 OpcUaState.server를
+  Arc<dyn OpcUaServerControl>로 전환. 커맨드/셸이 구체 OpcUaServer 비의존 →
+  .NET 백엔드 교체 경계 완성(어댑터는 OpcUaServerBackend, 커맨드는
+  OpcUaServerControl — 둘 다 구현하면 교체 가능). audit 재설계 없이 native
+  trait이 AuditLoggerState를 직접 참조해 해결.
+- **mapping.rs(4709줄) 분할 완료**: opcua-codec/mapping/ 모듈로(프로덕션 7파일
+  전부 <350줄). LLM 가독성 규칙 충족.
+- 잔여(C 직접 책임 아님): src-tauri의 server.rs(2435)/audit.rs(2173)/
+  address_space.rs(1200)는 표준 oversized 백로그.

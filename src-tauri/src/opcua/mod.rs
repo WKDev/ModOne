@@ -8,6 +8,7 @@ pub mod address_space;
 pub mod audit;
 pub mod auth;
 pub mod backend_impl;
+pub mod control;
 pub mod server;
 pub mod types;
 
@@ -22,6 +23,7 @@ mod mapping_project_tests;
 
 pub use opcua_codec::adapter::OpcUaAdapter;
 pub use opcua_codec::backend::OpcUaServerBackend;
+pub use control::OpcUaServerControl;
 pub use audit::{
     AuditClientInfo, AuditEventCategory, AuditEventType, AuditLogEntry, AuditLogQuery,
     AuditLogResult, AuditLogger, AuditLoggerState, AuditSeverity,
