@@ -16,7 +16,7 @@ import type { BlockType } from '../types';
 import { SYMBOL_PX_TO_MM } from '../canvasUnits';
 import { getBlockSize } from '../blockDefinitions';
 import { getSymbolContextForBlockType, getSymbolSizeForBlockType } from './symbols/symbolBridge';
-import { getSymbolContext, getSymbolSize } from './symbols';
+import { createPlaceholderContext, PLACEHOLDER_SYMBOL_SIZE } from './symbols/placeholderContext';
 
 // ============================================================================
 // Configuration
@@ -132,7 +132,7 @@ export class GhostPreviewRenderer {
     container.alpha = GHOST_ALPHA;
     container.cullable = true;
 
-    const ctx = getSymbolContextForBlockType(blockType) ?? getSymbolContext(blockType as BlockType);
+    const ctx = getSymbolContextForBlockType(blockType) ?? createPlaceholderContext();
     const symbol = new Graphics(ctx);
     symbol.label = 'ghost-symbol';
     symbol.tint = GHOST_TINT;
@@ -158,7 +158,7 @@ export class GhostPreviewRenderer {
     if (!symbol) return;
 
     const size = getBlockSize(state.blockType as BlockType);
-    const geometrySize = getSymbolSizeForBlockType(state.blockType) ?? getSymbolSize(state.blockType as BlockType);
+    const geometrySize = getSymbolSizeForBlockType(state.blockType) ?? PLACEHOLDER_SYMBOL_SIZE;
 
     // Reset transform
     symbol.position.set(0, 0);

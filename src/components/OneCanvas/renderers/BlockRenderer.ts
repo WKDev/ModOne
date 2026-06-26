@@ -36,11 +36,11 @@ import {
   getCustomSymbolDefinition,
   getCustomSymbolContext,
   getCustomSymbolSize,
-  getSymbolContext,
   getSymbolContextForBlockType,
   getSymbolDefinitionForBlockType,
-  getSymbolSize,
   getSymbolSizeForBlockType,
+  createPlaceholderContext,
+  PLACEHOLDER_SYMBOL_SIZE,
 } from './symbols';
 
 // ============================================================================
@@ -184,7 +184,7 @@ function resolveSymbolSource(block: Block): ResolvedSymbolSource {
   return {
     definition,
     definitionId: definition?.id ?? null,
-    fallbackContext: getSymbolContext(block.type),
+    fallbackContext: createPlaceholderContext(),
   };
 }
 
@@ -199,7 +199,7 @@ function resolveSymbolGeometrySize(block: Block): { width: number; height: numbe
     const sizeById = getCustomSymbolSize(block.symbolId);
     if (sizeById) return sizeById;
   }
-  return getSymbolSize(block.type);
+  return PLACEHOLDER_SYMBOL_SIZE;
 }
 
 function resolvePrimitiveOverride(
