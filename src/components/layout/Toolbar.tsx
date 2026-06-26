@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { commandRegistry } from '../CommandPalette/commandRegistry';
-import { useLayoutStore } from '../../stores/layoutStore';
-import { useScenarioStore } from '../../stores/scenarioStore';
-import { useModbusStore } from '../../stores/modbusStore';
+import { useContextKeyStore } from '../../stores/contextKeyStore';
 import {
   renderRibbonIcon,
   resolveRibbonTabs,
@@ -46,9 +44,11 @@ function RibbonGroupView({ title, actions }: RibbonResolvedGroup) {
 
 export function Toolbar() {
   const [activeTab, setActiveTab] = useState<RibbonTabId>('canvas');
-  const { simulationStatus, opcuaRunning } = useLayoutStore();
-  const scenarioStatus = useScenarioStore((state) => state.executionState.status);
-  const modbusStatus = useModbusStore((state) => state.status);
+  // Read enablement context from the shared context-key store (single vocabulary).
+  const simulationStatus = useContextKeyStore((s) => s.simulationStatus);
+  const scenarioStatus = useContextKeyStore((s) => s.scenarioStatus);
+  const modbusTcpRunning = useContextKeyStore((s) => s.modbusTcpRunning);
+  const opcuaRunning = useContextKeyStore((s) => s.opcuaRunning);
   const ribbonTabsConfig = useRibbonTabsConfig();
 
   const ribbonTabs = useMemo(
@@ -56,10 +56,10 @@ export function Toolbar() {
       resolveRibbonTabs(ribbonTabsConfig, {
         simulationStatus,
         scenarioStatus,
-        modbusTcpRunning: Boolean(modbusStatus?.tcp_running),
+        modbusTcpRunning,
         opcuaRunning,
       }),
-    [ribbonTabsConfig, modbusStatus?.tcp_running, opcuaRunning, scenarioStatus, simulationStatus]
+    [ribbonTabsConfig, modbusTcpRunning, opcuaRunning, scenarioStatus, simulationStatus]
   );
 
   useEffect(() => {
