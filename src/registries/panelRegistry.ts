@@ -51,7 +51,7 @@ const registry = {
   },
   'memory-visualizer': {
     label: 'Memory Visualizer',
-    zone: 'tool',
+    zone: 'inspector',
     component: MemoryVisualizerPanel,
   },
   'one-canvas': {
@@ -73,7 +73,7 @@ const registry = {
   },
   'properties': {
     label: 'Properties',
-    zone: 'tool',
+    zone: 'inspector',
     component: PropertiesPanel,
   },
   'csv-viewer': {
@@ -132,7 +132,7 @@ export function getLabel(type: PanelType): string {
   return registry[type].label;
 }
 
-/** Get the zone ('editor' | 'tool') for a given panel type. */
+/** Get the zone ('editor' | 'tool' | 'inspector') for a given panel type. */
 export function getPanelZone(type: PanelType): PanelZone {
   return registry[type].zone;
 }
@@ -149,6 +149,9 @@ const toolTypes: PanelType[] = (Object.keys(registry) as PanelType[]).filter(
 const editorTypes: PanelType[] = (Object.keys(registry) as PanelType[]).filter(
   (t) => registry[t].zone === 'editor',
 );
+const inspectorTypes: PanelType[] = (Object.keys(registry) as PanelType[]).filter(
+  (t) => registry[t].zone === 'inspector',
+);
 
 /** Panel types that belong to the tool zone (bottom panel). */
 export function getToolPanelTypes(): PanelType[] {
@@ -158,6 +161,11 @@ export function getToolPanelTypes(): PanelType[] {
 /** Panel types that belong to the editor zone (main area). */
 export function getEditorPanelTypes(): PanelType[] {
   return editorTypes;
+}
+
+/** Panel types that belong to the inspector zone (right dock). */
+export function getInspectorPanelTypes(): PanelType[] {
+  return inspectorTypes;
 }
 
 /**

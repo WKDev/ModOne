@@ -79,7 +79,9 @@ function createDefaultToolTabs(): TabState[] {
 }
 
 const initialState: ToolPanelState = {
-  isVisible: true,
+  // Decision: bottom panel (now Console-only) defaults to collapsed; inspector
+  // panels moved to the right dock.
+  isVisible: false,
   height: DEFAULT_TOOL_PANEL_HEIGHT,
   tabs: [],
   activeTabId: null,

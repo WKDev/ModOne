@@ -6,6 +6,7 @@ import { PanelErrorBoundary } from './PanelErrorBoundary';
 import { Sidebar } from './Sidebar';
 import { EditorArea } from './EditorArea';
 import { ToolPanel } from './ToolPanel';
+import { RightDock } from './RightDock';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSidebarStore } from '../../stores/sidebarStore';
 import { useEditorAreaStore } from '../../stores/editorAreaStore';
@@ -58,6 +59,11 @@ export function MainLayout() {
           {/* Tool Panel - collapsible bottom panel */}
           <ToolPanel />
         </main>
+
+        {/* Right Dock - inspector panels (Memory Visualizer, Properties, ...) */}
+        <PanelErrorBoundary panelName="RightDock">
+          <RightDock />
+        </PanelErrorBoundary>
       </div>
 
       {/* Footer: Status Bar */}
