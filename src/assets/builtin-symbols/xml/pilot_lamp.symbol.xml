@@ -19,12 +19,12 @@
 
   <ms:Ports>
     <ms:Port id="in" name="+" number="1"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="up"
       x="10" y="0" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="out" name="-" number="2"
-      electricalType="output" functionalRole="general"
+      type="output" electricalType="output" functionalRole="general"
       shape="line" orientation="down"
       x="10" y="20" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
@@ -74,6 +74,26 @@
 
   <ms:VisualStates>
     <ms:VisualState name="lit">
+      <ms:Graphics>
+        <ms:Circle id="halo" cx="10" cy="10" r="7" stroke="transparent" fill="#bbf7d0" strokeWidth="0"/>
+        <ms:Polyline id="lead-top" stroke="#22c55e" fill="none" strokeWidth="1">
+          <ms:Point x="10" y="0"/>
+          <ms:Point x="10" y="4"/>
+        </ms:Polyline>
+        <ms:Circle id="lamp-body" cx="10" cy="10" r="5" stroke="#22c55e" fill="#86efac" strokeWidth="1"/>
+        <ms:Polyline id="filament-1" stroke="#166534" fill="none" strokeWidth="0.75">
+          <ms:Point x="7" y="7"/>
+          <ms:Point x="13" y="13"/>
+        </ms:Polyline>
+        <ms:Polyline id="filament-2" stroke="#166534" fill="none" strokeWidth="0.75">
+          <ms:Point x="13" y="7"/>
+          <ms:Point x="7" y="13"/>
+        </ms:Polyline>
+        <ms:Polyline id="lead-bottom" stroke="#22c55e" fill="none" strokeWidth="1">
+          <ms:Point x="10" y="15"/>
+          <ms:Point x="10" y="20"/>
+        </ms:Polyline>
+      </ms:Graphics>
     </ms:VisualState>
   </ms:VisualStates>
 

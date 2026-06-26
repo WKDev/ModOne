@@ -19,17 +19,17 @@
 
   <ms:Ports>
     <ms:Port id="vcc" name="+V" number="1"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="up"
       x="10" y="0" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="out" name="OUT" number="4"
-      electricalType="output" functionalRole="general"
+      type="output" electricalType="output" functionalRole="general"
       shape="line" orientation="right"
       x="20" y="10" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="gnd" name="0V" number="3"
-      electricalType="output" functionalRole="general"
+      type="output" electricalType="output" functionalRole="general"
       shape="line" orientation="down"
       x="10" y="20" length="0" sortOrder="3"
       nameVisible="true" numberVisible="true"/>

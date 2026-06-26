@@ -19,12 +19,12 @@
 
   <ms:Ports>
     <ms:Port id="coil_in" name="A1" number="A1"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="up"
       x="10" y="0" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="coil_out" name="A2" number="A2"
-      electricalType="output" functionalRole="general"
+      type="output" electricalType="output" functionalRole="general"
       shape="line" orientation="down"
       x="10" y="30" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>

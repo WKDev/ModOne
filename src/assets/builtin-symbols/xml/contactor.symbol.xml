@@ -19,42 +19,42 @@
 
   <ms:Ports>
     <ms:Port id="coil_a1" name="A1" number="A1"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="left"
       x="0" y="10" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="coil_a2" name="A2" number="A2"
-      electricalType="output" functionalRole="general"
+      type="output" electricalType="output" functionalRole="general"
       shape="line" orientation="left"
       x="0" y="30" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="l1_in" name="1" number="1"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="up"
       x="10" y="0" length="0" sortOrder="3"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="l2_in" name="3" number="3"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="up"
       x="20" y="0" length="0" sortOrder="4"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="l3_in" name="5" number="5"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="up"
       x="30" y="0" length="0" sortOrder="5"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="l1_out" name="2" number="2"
-      electricalType="output" functionalRole="general"
+      type="output" electricalType="output" functionalRole="general"
       shape="line" orientation="down"
       x="10" y="40" length="0" sortOrder="6"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="l2_out" name="4" number="4"
-      electricalType="output" functionalRole="general"
+      type="output" electricalType="output" functionalRole="general"
       shape="line" orientation="down"
       x="20" y="40" length="0" sortOrder="7"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="l3_out" name="6" number="6"
-      electricalType="output" functionalRole="general"
+      type="output" electricalType="output" functionalRole="general"
       shape="line" orientation="down"
       x="30" y="40" length="0" sortOrder="8"
       nameVisible="true" numberVisible="true"/>
@@ -96,12 +96,12 @@
       </ms:Graphics>
       <ms:Ports>
         <ms:Port id="coil_a1" name="A1" number="A1"
-          electricalType="input" functionalRole="general"
+          type="input" electricalType="input" functionalRole="general"
           shape="line" orientation="left"
           x="0" y="10" length="0" sortOrder="1"
           nameVisible="true" numberVisible="true"/>
         <ms:Port id="coil_a2" name="A2" number="A2"
-          electricalType="output" functionalRole="general"
+          type="output" electricalType="output" functionalRole="general"
           shape="line" orientation="left"
           x="0" y="30" length="0" sortOrder="2"
           nameVisible="true" numberVisible="true"/>
@@ -124,32 +124,32 @@
       </ms:Graphics>
       <ms:Ports>
         <ms:Port id="l1_in" name="1" number="1"
-          electricalType="input" functionalRole="general"
+          type="input" electricalType="input" functionalRole="general"
           shape="line" orientation="up"
           x="10" y="0" length="0" sortOrder="1"
           nameVisible="true" numberVisible="true"/>
         <ms:Port id="l2_in" name="3" number="3"
-          electricalType="input" functionalRole="general"
+          type="input" electricalType="input" functionalRole="general"
           shape="line" orientation="up"
           x="20" y="0" length="0" sortOrder="2"
           nameVisible="true" numberVisible="true"/>
         <ms:Port id="l3_in" name="5" number="5"
-          electricalType="input" functionalRole="general"
+          type="input" electricalType="input" functionalRole="general"
           shape="line" orientation="up"
           x="30" y="0" length="0" sortOrder="3"
           nameVisible="true" numberVisible="true"/>
         <ms:Port id="l1_out" name="2" number="2"
-          electricalType="output" functionalRole="general"
+          type="output" electricalType="output" functionalRole="general"
           shape="line" orientation="down"
           x="10" y="40" length="0" sortOrder="4"
           nameVisible="true" numberVisible="true"/>
         <ms:Port id="l2_out" name="4" number="4"
-          electricalType="output" functionalRole="general"
+          type="output" electricalType="output" functionalRole="general"
           shape="line" orientation="down"
           x="20" y="40" length="0" sortOrder="5"
           nameVisible="true" numberVisible="true"/>
         <ms:Port id="l3_out" name="6" number="6"
-          electricalType="output" functionalRole="general"
+          type="output" electricalType="output" functionalRole="general"
           shape="line" orientation="down"
           x="30" y="40" length="0" sortOrder="6"
           nameVisible="true" numberVisible="true"/>

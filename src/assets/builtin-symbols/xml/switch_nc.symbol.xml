@@ -19,12 +19,12 @@
 
   <ms:Ports>
     <ms:Port id="in" name="IN" number="1"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="left"
       x="0" y="10" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="out" name="OUT" number="2"
-      electricalType="output" functionalRole="general"
+      type="output" electricalType="output" functionalRole="general"
       shape="line" orientation="right"
       x="30" y="10" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
@@ -65,6 +65,22 @@
 
   <ms:VisualStates>
     <ms:VisualState name="open">
+      <ms:Graphics>
+        <ms:Polyline id="lead-in" stroke="#888" fill="none" strokeWidth="1">
+          <ms:Point x="2" y="10"/>
+          <ms:Point x="10" y="10"/>
+        </ms:Polyline>
+        <ms:Polyline id="lead-out" stroke="#888" fill="none" strokeWidth="1">
+          <ms:Point x="20" y="10"/>
+          <ms:Point x="28" y="10"/>
+        </ms:Polyline>
+        <ms:Circle id="terminal-in" cx="10" cy="10" r="1" stroke="#888" fill="#888" strokeWidth="1"/>
+        <ms:Circle id="terminal-out" cx="20" cy="10" r="1" stroke="#888" fill="#888" strokeWidth="1"/>
+        <ms:Polyline id="contact-arm" stroke="#888" fill="none" strokeWidth="1">
+          <ms:Point x="10" y="10"/>
+          <ms:Point x="18" y="4"/>
+        </ms:Polyline>
+      </ms:Graphics>
     </ms:VisualState>
   </ms:VisualStates>
 

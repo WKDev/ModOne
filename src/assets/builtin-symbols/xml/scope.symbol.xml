@@ -19,22 +19,22 @@
 
   <ms:Ports>
     <ms:Port id="ch1" name="CH1" number="1"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="left"
       x="0" y="10" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="ch2" name="CH2" number="2"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="left"
       x="0" y="20" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="ch3" name="CH3" number="3"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="left"
       x="0" y="30" length="0" sortOrder="3"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="ch4" name="CH4" number="4"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="left"
       x="0" y="40" length="0" sortOrder="4"
       nameVisible="true" numberVisible="true"/>

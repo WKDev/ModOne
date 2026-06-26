@@ -19,12 +19,12 @@
 
   <ms:Ports>
     <ms:Port id="l" name="L" number="1"
-      electricalType="power_out" functionalRole="general"
+      type="output" electricalType="power_out" functionalRole="general"
       shape="line" orientation="up"
       x="15" y="0" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="n" name="N" number="2"
-      electricalType="power_out" functionalRole="general"
+      type="output" electricalType="power_out" functionalRole="general"
       shape="line" orientation="down"
       x="15" y="30" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>

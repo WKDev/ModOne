@@ -19,22 +19,22 @@
 
   <ms:Ports>
     <ms:Port id="l1" name="U" number="U"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="up"
       x="10" y="0" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="l2" name="V" number="V"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="up"
       x="20" y="0" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="l3" name="W" number="W"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="up"
       x="30" y="0" length="0" sortOrder="3"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="pe" name="PE" number="PE"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="down"
       x="20" y="40" length="0" sortOrder="4"
       nameVisible="true" numberVisible="true"/>
@@ -96,9 +96,17 @@
       <ms:PrimitiveOverrides>
         <ms:Override targetId="motor-body" stroke="#22c55e" fill="#dcfce7"/>
         <ms:Override targetId="motor-label" fill="#15803d"/>
-        <ms:Override targetId="rotor" stroke="#166534"/>
+        <ms:Override targetId="rotor" stroke="#166534">
+          <ms:Transform pivotX="40" pivotY="50"/>
+        </ms:Override>
       </ms:PrimitiveOverrides>
     </ms:VisualState>
   </ms:VisualStates>
+
+  <ms:Animations>
+    <ms:StateAnimations state="running">
+      <ms:Animation type="rotate" target="rotor" speed="240" pivotX="20" pivotY="25"/>
+    </ms:StateAnimations>
+  </ms:Animations>
 
 </ms:SymbolDefinition>

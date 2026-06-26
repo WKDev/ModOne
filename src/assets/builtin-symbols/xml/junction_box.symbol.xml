@@ -19,22 +19,22 @@
 
   <ms:Ports>
     <ms:Port id="top" name="TOP" number="1"
-      electricalType="bidirectional" functionalRole="general"
+      type="bidirectional" electricalType="bidirectional" functionalRole="general"
       shape="line" orientation="up"
       x="20" y="0" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="right" name="RIGHT" number="2"
-      electricalType="bidirectional" functionalRole="general"
+      type="bidirectional" electricalType="bidirectional" functionalRole="general"
       shape="line" orientation="right"
       x="40" y="20" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="bottom" name="BOT" number="3"
-      electricalType="bidirectional" functionalRole="general"
+      type="bidirectional" electricalType="bidirectional" functionalRole="general"
       shape="line" orientation="down"
       x="20" y="40" length="0" sortOrder="3"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="left" name="LEFT" number="4"
-      electricalType="bidirectional" functionalRole="general"
+      type="bidirectional" electricalType="bidirectional" functionalRole="general"
       shape="line" orientation="left"
       x="0" y="20" length="0" sortOrder="4"
       nameVisible="true" numberVisible="true"/>

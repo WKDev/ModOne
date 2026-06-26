@@ -19,22 +19,22 @@
 
   <ms:Ports>
     <ms:Port id="pri_1" name="L1" number="L1"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="up"
       x="10" y="0" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="pri_2" name="N" number="N1"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="up"
       x="30" y="0" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="sec_1" name="L" number="L2"
-      electricalType="output" functionalRole="general"
+      type="output" electricalType="output" functionalRole="general"
       shape="line" orientation="down"
       x="10" y="40" length="0" sortOrder="3"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="sec_2" name="N" number="N2"
-      electricalType="output" functionalRole="general"
+      type="output" electricalType="output" functionalRole="general"
       shape="line" orientation="down"
       x="30" y="40" length="0" sortOrder="4"
       nameVisible="true" numberVisible="true"/>

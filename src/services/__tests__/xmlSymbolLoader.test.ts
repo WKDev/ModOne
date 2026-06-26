@@ -22,11 +22,13 @@ import { parseXmlSymbolDefinition, validateSymbolDefinition } from '../xmlSymbol
 import { SymbolRegistry, initializeSymbolRegistry } from '../xmlSymbolRegistry';
 import { BUILTIN_SYMBOLS } from '@/assets/builtin-symbols';
 
-// TypeScript ground-truth symbol definitions
-import { relaySymbol } from '@/assets/builtin-symbols/relay';
-import { fuseSymbol } from '@/assets/builtin-symbols/fuse';
-import { circuitBreakerSymbol } from '@/assets/builtin-symbols/circuit_breaker';
-import { motorSymbol } from '@/assets/builtin-symbols/motor';
+// Ground-truth symbol definitions (now sourced from the XML-built registry —
+// the .ts definitions were removed when XML became the single source).
+import { getBuiltinSymbol } from '@/assets/builtin-symbols';
+const relaySymbol = getBuiltinSymbol('builtin:relay')!;
+const fuseSymbol = getBuiltinSymbol('builtin:fuse')!;
+const circuitBreakerSymbol = getBuiltinSymbol('builtin:circuit_breaker')!;
+const motorSymbol = getBuiltinSymbol('builtin:motor')!;
 
 // XML files imported as raw strings (Vite ?raw transform)
 import relayXml from '@/assets/builtin-symbols/xml/relay.symbol.xml?raw';

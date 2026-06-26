@@ -19,27 +19,27 @@
 
   <ms:Ports>
     <ms:Port id="coil_in" name="A1" number="A1"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="up"
       x="20" y="0" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="coil_out" name="A2" number="A2"
-      electricalType="output" functionalRole="general"
+      type="output" electricalType="output" functionalRole="general"
       shape="line" orientation="down"
       x="20" y="40" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="com" name="COM" number="11"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="left"
       x="0" y="20" length="0" sortOrder="3"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="no" name="NO" number="14"
-      electricalType="output" functionalRole="general"
+      type="output" electricalType="output" functionalRole="general"
       shape="line" orientation="right"
       x="40" y="10" length="0" sortOrder="4"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="nc" name="NC" number="12"
-      electricalType="output" functionalRole="general"
+      type="output" electricalType="output" functionalRole="general"
       shape="line" orientation="right"
       x="40" y="30" length="0" sortOrder="5"
       nameVisible="true" numberVisible="true"/>
@@ -66,12 +66,12 @@
       </ms:Graphics>
       <ms:Ports>
         <ms:Port id="coil_in" name="A1" number="A1"
-          electricalType="input" functionalRole="general"
+          type="input" electricalType="input" functionalRole="general"
           shape="line" orientation="up"
           x="20" y="0" length="0" sortOrder="1"
           nameVisible="true" numberVisible="true"/>
         <ms:Port id="coil_out" name="A2" number="A2"
-          electricalType="output" functionalRole="general"
+          type="output" electricalType="output" functionalRole="general"
           shape="line" orientation="down"
           x="20" y="40" length="0" sortOrder="2"
           nameVisible="true" numberVisible="true"/>
@@ -101,17 +101,17 @@
       </ms:Graphics>
       <ms:Ports>
         <ms:Port id="com" name="COM" number="11"
-          electricalType="input" functionalRole="general"
+          type="input" electricalType="input" functionalRole="general"
           shape="line" orientation="left"
           x="0" y="20" length="0" sortOrder="1"
           nameVisible="true" numberVisible="true"/>
         <ms:Port id="no" name="NO" number="14"
-          electricalType="output" functionalRole="general"
+          type="output" electricalType="output" functionalRole="general"
           shape="line" orientation="right"
           x="40" y="10" length="0" sortOrder="2"
           nameVisible="true" numberVisible="true"/>
         <ms:Port id="nc" name="NC" number="12"
-          electricalType="output" functionalRole="general"
+          type="output" electricalType="output" functionalRole="general"
           shape="line" orientation="right"
           x="40" y="30" length="0" sortOrder="3"
           nameVisible="true" numberVisible="true"/>

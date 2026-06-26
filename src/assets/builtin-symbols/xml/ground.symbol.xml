@@ -19,7 +19,7 @@
 
   <ms:Ports>
     <ms:Port id="in" name="GND" number="1"
-      electricalType="power_in" functionalRole="general"
+      type="power" electricalType="power_in" functionalRole="general"
       shape="line" orientation="up"
       x="10" y="0" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>

@@ -19,7 +19,7 @@
 
   <ms:Ports>
     <ms:Port id="conn" name="CONN" number="1"
-      electricalType="bidirectional" functionalRole="general"
+      type="bidirectional" electricalType="bidirectional" functionalRole="general"
       shape="line" orientation="left"
       x="0" y="10" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>

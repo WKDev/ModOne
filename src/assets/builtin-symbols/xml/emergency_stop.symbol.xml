@@ -19,12 +19,12 @@
 
   <ms:Ports>
     <ms:Port id="in" name="IN" number="1"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="left"
       x="0" y="10" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="out" name="OUT" number="2"
-      electricalType="output" functionalRole="general"
+      type="output" electricalType="output" functionalRole="general"
       shape="line" orientation="right"
       x="30" y="10" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
@@ -63,7 +63,9 @@
     <ms:VisualState name="pressed">
       <ms:PrimitiveOverrides>
         <ms:Override targetId="outer-ring" stroke="#dc2626" fill="#fecaca"/>
-        <ms:Override targetId="inner-button" stroke="#991b1b" fill="#ef4444"/>
+        <ms:Override targetId="inner-button" stroke="#991b1b" fill="#ef4444">
+          <ms:Transform translateY="2"/>
+        </ms:Override>
         <ms:Override targetId="lead-in" stroke="#dc2626"/>
         <ms:Override targetId="lead-out" stroke="#dc2626"/>
       </ms:PrimitiveOverrides>

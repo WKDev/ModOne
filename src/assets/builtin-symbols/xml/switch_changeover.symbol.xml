@@ -19,17 +19,17 @@
 
   <ms:Ports>
     <ms:Port id="com" name="COM" number="1"
-      electricalType="input" functionalRole="general"
+      type="input" electricalType="input" functionalRole="general"
       shape="line" orientation="left"
       x="0" y="20" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="pos1" name="NO" number="2"
-      electricalType="output" functionalRole="general"
+      type="output" electricalType="output" functionalRole="general"
       shape="line" orientation="right"
       x="40" y="10" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="pos2" name="NC" number="3"
-      electricalType="output" functionalRole="general"
+      type="output" electricalType="output" functionalRole="general"
       shape="line" orientation="right"
       x="40" y="20" length="0" sortOrder="3"
       nameVisible="true" numberVisible="true"/>
@@ -80,7 +80,9 @@
   <ms:VisualStates>
     <ms:VisualState name="open">
       <ms:PrimitiveOverrides>
-        <ms:Override targetId="switch-arm"/>
+        <ms:Override targetId="switch-arm">
+          <ms:Transform translateX="-4" translateY="4"/>
+        </ms:Override>
       </ms:PrimitiveOverrides>
     </ms:VisualState>
     <ms:VisualState name="closed">

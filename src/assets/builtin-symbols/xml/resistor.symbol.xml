@@ -19,12 +19,12 @@
 
   <ms:Ports>
     <ms:Port id="in" name="IN" number="1"
-      electricalType="passive" functionalRole="general"
+      type="passive" electricalType="passive" functionalRole="general"
       shape="line" orientation="left"
       x="0" y="10" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="out" name="OUT" number="2"
-      electricalType="passive" functionalRole="general"
+      type="passive" electricalType="passive" functionalRole="general"
       shape="line" orientation="right"
       x="30" y="10" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>

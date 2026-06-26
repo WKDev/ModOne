@@ -28,7 +28,7 @@ import {
 } from '../utils/symbolBlockDefAdapter';
 import BLOCK_DEFINITIONS_RAW, { getBlockDefinition, getDefaultPorts, getBlockSize, getDefaultBlockProps } from '../components/OneCanvas/blockDefinitions';
 import { BUILTIN_SYMBOLS, getBuiltinSymbol, getBuiltinSymbolForBlockType } from '../assets/builtin-symbols';
-import { relaySymbol } from '../assets/builtin-symbols/relay';
+const relaySymbol = getBuiltinSymbol('builtin:relay')!;
 import type { SymbolDefinition } from '../types/symbol';
 import type { BlockType } from '../components/OneCanvas/types';
 
