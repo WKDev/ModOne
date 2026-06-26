@@ -57,8 +57,8 @@ addComponent(type, pos, props)                                canvasStore.ts:476
 
 ### 2. prefix 조회 함수: `getDesignationPrefix(type)`
 `blockDefinitions.ts`에 추가. 우선순위.
-1. override 맵에 prefix가 있으면 그것 (power_source→`PS`, dc_2p→`BAT`, relay_coil→`K`)
-2. 심볼의 `designationPrefix`
+1. override 맵에 prefix가 있으면 그것 (power_source→`G`, dc_2p→`G`, relay_coil→`K`)
+2. 심볼의 `designationPrefix` (값은 `designation-codes.md` 확정표)
 3. 둘 다 없으면 `undefined` → 자동 넘버링 스킵 (designation 미부여)
 
 (과거 호환: 기존 designation DefaultValue `'K1'`에서 영문 prefix를 추출하는
