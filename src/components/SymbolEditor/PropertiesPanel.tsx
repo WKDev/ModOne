@@ -6,6 +6,7 @@ import type { PinUpdate } from './editorModel';
 import { saveSymbol } from '../../services/symbolService';
 import { validateSymbol } from '../../utils/symbolValidation';
 import { BehaviorRulesPanel } from './BehaviorRulesPanel';
+import { AnimationsPanel } from './AnimationsPanel';
 import { PIN_TYPES, PIN_TYPE_LABEL, PIN_SHAPES, PIN_SHAPE_LABEL } from './pinStyle';
 
 // ============================================================================
@@ -1043,6 +1044,28 @@ export function PropertiesPanel({
                   ...symbol.behavior,
                   rules,
                 },
+                updatedAt: new Date().toISOString(),
+              });
+            }}
+          />
+        </Section>
+
+        {/* ── Animations ── */}
+        <Section title="Animations" defaultOpen={false} badge={
+          Object.values(symbol.animations ?? {}).reduce((n, a) => n + a.length, 0) > 0
+            ? String(Object.values(symbol.animations ?? {}).reduce((n, a) => n + a.length, 0))
+            : undefined
+        }>
+          <AnimationsPanel
+            stateNames={Object.keys(symbol.visualStates ?? {})}
+            graphics={symbol.graphics
+              .filter((g): g is typeof g & { id: string } => g.id != null)
+              .map((g) => ({ id: g.id, label: g.label }))}
+            animations={symbol.animations ?? {}}
+            onChange={(animations) => {
+              onChange({
+                ...symbol,
+                animations,
                 updatedAt: new Date().toISOString(),
               });
             }}

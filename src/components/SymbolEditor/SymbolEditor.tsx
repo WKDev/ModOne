@@ -26,6 +26,7 @@ import type { SymbolEditorProps, LocalSymbol } from './editorModel';
 import { MAX_UNITS } from './editorModel';
 import { editorReducer, INITIAL_STATE } from './editorReducer';
 import { createBlankSymbol, applyVisualStateOverrides } from './editorHelpers';
+import { ARCHETYPE_PRESETS, createArchetypeSymbol, type ArchetypeId } from './presets';
 
 // Handler groups extracted into custom hooks (Stage 2 split) — each receives the
 // shared editor state/setters and returns its handlers.
@@ -255,6 +256,17 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
     }
   }, [localSymbol, projectDir, saveScope, onSave]);
 
+  // ── Load an archetype starter template ─────────────────────────────────────
+
+  const handleLoadTemplate = useCallback((id: ArchetypeId) => {
+    setLocalSymbol(createArchetypeSymbol(id));
+    setActiveUnit(null);
+    setPreviewPoweredPorts(new Set());
+    dispatch({ type: 'DESELECT_ALL' });
+    dispatch({ type: 'SET_VISUAL_STATE', state: null });
+    dispatch({ type: 'MARK_DIRTY' });
+  }, []);
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -305,6 +317,24 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
                 </button>
               )}
             </span>
+          )}
+
+          {!previewMode && (
+            <select
+              data-testid="template-select"
+              value=""
+              onChange={(e) => {
+                if (e.target.value) handleLoadTemplate(e.target.value as ArchetypeId);
+                e.target.value = '';
+              }}
+              className="px-2 py-1.5 text-sm rounded bg-neutral-700 text-neutral-300 border border-neutral-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              title="Start from an archetype template (replaces current symbol)"
+            >
+              <option value="">New from template…</option>
+              {ARCHETYPE_PRESETS.map((p) => (
+                <option key={p.id} value={p.id}>{p.label}</option>
+              ))}
+            </select>
           )}
 
           {!isMultiUnit && !previewMode && (
