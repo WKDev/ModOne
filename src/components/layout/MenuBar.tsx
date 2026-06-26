@@ -240,6 +240,15 @@ const baseMenus: Menu[] = [
         shortcut: 'Ctrl+-',
         action: () => commandRegistry.execute('view.zoomOut'),
       },
+      { separator: true, label: '' },
+      {
+        label: 'Sheet Editor',
+        action: () => commandRegistry.execute('layout.openSheetEditor'),
+      },
+      {
+        label: 'Sheet Editor (Popup)',
+        action: () => commandRegistry.execute('tools.openSheetEditorPopup'),
+      },
     ],
   },
   {
