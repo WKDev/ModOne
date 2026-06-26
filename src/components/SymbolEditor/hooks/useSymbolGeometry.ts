@@ -2,7 +2,7 @@
 import { useCallback } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { GraphicPrimitive, SymbolPin } from '../../../types/symbol';
-import type { EditorAction, LocalSymbol } from '../editorModel';
+import type { EditorAction, LocalSymbol, PinUpdate } from '../editorModel';
 import {
   HistoryManager,
   AddPrimitiveCommand,
@@ -376,7 +376,7 @@ export function useSymbolGeometry({
   // ── Update pin name / number ───────────────────────────────────────────────
 
   const handleUpdatePin = useCallback(
-    (pinId: string, updates: Partial<Pick<SymbolPin, 'name' | 'number' | 'type' | 'orientation' | 'position'>>) => {
+    (pinId: string, updates: PinUpdate) => {
       setLocalSymbol((prev) => {
         // If position is being updated, apply edge-snap
         let finalUpdates = updates;

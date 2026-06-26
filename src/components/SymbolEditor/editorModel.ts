@@ -1,4 +1,28 @@
-import type { SymbolDefinition } from '../../types/symbol';
+import type { SymbolDefinition, SymbolPin } from '../../types/symbol';
+
+/**
+ * The set of pin fields the editor's Pin Inspector can mutate in place.
+ * (Structural fields like `id` are managed elsewhere.)
+ */
+export type PinUpdate = Partial<
+  Pick<
+    SymbolPin,
+    | 'name'
+    | 'number'
+    | 'type'
+    | 'orientation'
+    | 'position'
+    | 'shape'
+    | 'length'
+    | 'color'
+    | 'hidden'
+    | 'nameVisible'
+    | 'numberVisible'
+    | 'locked'
+    | 'group'
+    | 'description'
+  >
+>;
 
 export const PREDEFINED_VISUAL_STATES = [
   'idle', 'energized', 'deenergized', 'lit', 'dark',

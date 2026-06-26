@@ -2,9 +2,11 @@ import { useState, useCallback, useMemo } from 'react';
 import { Save, AlertCircle, Check, ChevronDown, ChevronRight, Copy, Trash2, Layers2 } from 'lucide-react';
 import type { GraphicPrimitive, GraphicPrimitiveOverride, SymbolDefinition, SymbolPin, SymbolVisualVariant } from '../../types/symbol';
 import type { BehaviorRule } from '../../types/behaviorRules';
+import type { PinUpdate } from './editorModel';
 import { saveSymbol } from '../../services/symbolService';
 import { validateSymbol } from '../../utils/symbolValidation';
 import { BehaviorRulesPanel } from './BehaviorRulesPanel';
+import { PIN_TYPES, PIN_TYPE_LABEL, PIN_SHAPES, PIN_SHAPE_LABEL } from './pinStyle';
 
 // ============================================================================
 // Types
@@ -22,7 +24,7 @@ interface PropertiesPanelProps {
   onUpdatePrimitiveLabel?: (index: number, label: string) => void;
   onUpdatePrimitiveText?: (index: number, text: string) => void;
   onUpdatePrimitive?: (index: number, prim: GraphicPrimitive) => void;
-  onUpdatePin?: (pinId: string, updates: Partial<Pick<SymbolPin, 'name' | 'number' | 'type' | 'orientation' | 'position'>>) => void;
+  onUpdatePin?: (pinId: string, updates: PinUpdate) => void;
   // Sub-AC 3-1: Visual State context tracking
   /** The currently active VisualState being edited (null = base) */
   activeVisualState?: string | null;
@@ -391,7 +393,7 @@ interface ShapeInspectorProps {
   onUpdatePrimitiveLabel?: (index: number, label: string) => void;
   onUpdatePrimitiveText?: (index: number, text: string) => void;
   onUpdatePrimitive?: (index: number, prim: GraphicPrimitive) => void;
-  onUpdatePin?: (pinId: string, updates: Partial<Pick<SymbolPin, 'name' | 'number' | 'type' | 'orientation' | 'position'>>) => void;
+  onUpdatePin?: (pinId: string, updates: PinUpdate) => void;
   onEnsurePrimitiveId?: (index: number) => void;
   onUpdateVisualStateOverride?: (primitiveId: string, override: Partial<GraphicPrimitiveOverride>) => void;
   onClearVisualStateOverride?: (primitiveId: string) => void;
@@ -557,34 +559,63 @@ function ShapeInspector({
           />
         </Field>
 
-        <Field id="pin-type" label="Electrical Type">
-          <select
-            id="pin-type"
-            value={pin.type}
-            onChange={(e) => onUpdatePin?.(pin.id, { type: e.target.value as SymbolPin['type'] })}
-            className={inputClass()}
-          >
-            <option value="input">Input</option>
-            <option value="output">Output</option>
-            <option value="bidirectional">Bidirectional</option>
-            <option value="power">Power</option>
-            <option value="passive">Passive</option>
-          </select>
-        </Field>
+        <div className="grid grid-cols-2 gap-2">
+          <Field id="pin-type" label="Electrical Type">
+            <select
+              id="pin-type"
+              value={pin.type}
+              data-testid="pin-type-select"
+              onChange={(e) => onUpdatePin?.(pin.id, { type: e.target.value as SymbolPin['type'] })}
+              className={inputClass()}
+            >
+              {PIN_TYPES.map((t) => (
+                <option key={t} value={t}>{PIN_TYPE_LABEL[t]}</option>
+              ))}
+            </select>
+          </Field>
 
-        <Field id="pin-orientation" label="Orientation">
-          <select
-            id="pin-orientation"
-            value={pin.orientation}
-            onChange={(e) => onUpdatePin?.(pin.id, { orientation: e.target.value as SymbolPin['orientation'] })}
-            className={inputClass()}
-          >
-            <option value="right">Right</option>
-            <option value="left">Left</option>
-            <option value="up">Up</option>
-            <option value="down">Down</option>
-          </select>
-        </Field>
+          <Field id="pin-shape" label="Shape">
+            <select
+              id="pin-shape"
+              value={pin.shape}
+              data-testid="pin-shape-select"
+              onChange={(e) => onUpdatePin?.(pin.id, { shape: e.target.value as SymbolPin['shape'] })}
+              className={inputClass()}
+            >
+              {PIN_SHAPES.map((s) => (
+                <option key={s} value={s}>{PIN_SHAPE_LABEL[s]}</option>
+              ))}
+            </select>
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Field id="pin-orientation" label="Orientation">
+            <select
+              id="pin-orientation"
+              value={pin.orientation}
+              onChange={(e) => onUpdatePin?.(pin.id, { orientation: e.target.value as SymbolPin['orientation'] })}
+              className={inputClass()}
+            >
+              <option value="right">Right →</option>
+              <option value="left">Left ←</option>
+              <option value="up">Up ↑</option>
+              <option value="down">Down ↓</option>
+            </select>
+          </Field>
+
+          <Field id="pin-length" label="Length">
+            <input
+              id="pin-length"
+              type="number"
+              min={0}
+              step={5}
+              value={pin.length}
+              onChange={(e) => onUpdatePin?.(pin.id, { length: parseFloat(e.target.value) || 0 })}
+              className={inputClass()}
+            />
+          </Field>
+        </div>
 
         <div className="grid grid-cols-2 gap-2">
           <Field id="pin-pos-x" label="Position X">
@@ -607,6 +638,72 @@ function ShapeInspector({
               step={1}
             />
           </Field>
+        </div>
+
+        {/* Display & visibility */}
+        <Field id="pin-group" label="Group (optional)">
+          <input
+            id="pin-group"
+            type="text"
+            value={pin.group ?? ''}
+            onChange={(e) => onUpdatePin?.(pin.id, { group: e.target.value || undefined })}
+            className={inputClass()}
+            placeholder="e.g. Power, Data"
+          />
+        </Field>
+
+        <Field id="pin-desc" label="Description (tooltip)">
+          <input
+            id="pin-desc"
+            type="text"
+            value={pin.description ?? ''}
+            onChange={(e) => onUpdatePin?.(pin.id, { description: e.target.value || undefined })}
+            className={inputClass()}
+            placeholder="Optional"
+          />
+        </Field>
+
+        <div className="flex items-center gap-3 px-1 pt-1">
+          <label className="flex items-center gap-1.5 text-xs text-neutral-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              data-testid="pin-name-visible"
+              checked={pin.nameVisible !== false}
+              onChange={(e) => onUpdatePin?.(pin.id, { nameVisible: e.target.checked })}
+              className="accent-blue-500"
+            />
+            Name
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-neutral-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              data-testid="pin-number-visible"
+              checked={pin.numberVisible !== false}
+              onChange={(e) => onUpdatePin?.(pin.id, { numberVisible: e.target.checked })}
+              className="accent-blue-500"
+            />
+            Number
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-neutral-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              data-testid="pin-hidden"
+              checked={!!pin.hidden}
+              onChange={(e) => onUpdatePin?.(pin.id, { hidden: e.target.checked })}
+              className="accent-blue-500"
+            />
+            Hidden
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-neutral-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              data-testid="pin-locked"
+              checked={!!pin.locked}
+              onChange={(e) => onUpdatePin?.(pin.id, { locked: e.target.checked })}
+              className="accent-blue-500"
+            />
+            Lock
+          </label>
         </div>
       </Section>
     );

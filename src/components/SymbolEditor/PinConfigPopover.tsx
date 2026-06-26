@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { SymbolPin, PinElectricalTypeV2, PinFunctionalRole } from '../../types/symbol';
+import { PIN_SHAPES, PIN_SHAPE_LABEL } from './pinStyle';
 
 interface PinConfigPopoverProps {
   screenX: number;
@@ -21,6 +22,7 @@ export function PinConfigPopover({
   const [name, setName] = useState('');
   const [number, setNumber] = useState('');
   const [type, setType] = useState<SymbolPin['type']>('input');
+  const [shape, setShape] = useState<SymbolPin['shape']>('line');
   const [orientation, setOrientation] = useState<SymbolPin['orientation']>('right');
   const [length, setLength] = useState(40);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -49,7 +51,7 @@ export function PinConfigPopover({
       name,
       number,
       type,
-      shape: 'line',
+      shape,
       position: { x: canvasX, y: canvasY },
       orientation,
       length,
@@ -108,6 +110,19 @@ export function PinConfigPopover({
           <option value="bidirectional">Bidirectional</option>
           <option value="power">Power</option>
           <option value="passive">Passive</option>
+        </select>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="text-xs text-neutral-400">Shape</label>
+        <select
+          value={shape}
+          onChange={(e) => setShape(e.target.value as SymbolPin['shape'])}
+          className="bg-neutral-700 border border-neutral-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-blue-500"
+        >
+          {PIN_SHAPES.map((s) => (
+            <option key={s} value={s}>{PIN_SHAPE_LABEL[s]}</option>
+          ))}
         </select>
       </div>
 

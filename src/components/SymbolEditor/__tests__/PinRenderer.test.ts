@@ -160,15 +160,74 @@ describe('PinRenderer — PixiJS rendering verification', () => {
       expect(g.wasCalled('stroke')).toBe(true);
     });
 
-    it('adds a pin number Text label to the layer', () => {
+    it('adds pin number + pin name Text labels to the layer', () => {
       const { renderer, layer } = makeRenderer();
       renderer.renderAll([basePin]);
 
-      // Layer: 1 Graphics + 1 label Text
-      expect(layer.children).toHaveLength(2);
-      const label = layer.children[1] as InstanceType<typeof MockText>;
-      expect(label).toBeInstanceOf(MockText);
-      expect(label.text).toBe('1');
+      // Layer: 1 Graphics + number label + name label
+      expect(layer.children).toHaveLength(3);
+      const numberLabel = layer.children[1] as InstanceType<typeof MockText>;
+      expect(numberLabel).toBeInstanceOf(MockText);
+      expect(numberLabel.text).toBe('1');
+      const nameLabel = layer.children[2] as InstanceType<typeof MockText>;
+      expect(nameLabel.text).toBe('IN');
+    });
+  });
+
+  // ── Electrical-type color + shapes + label visibility ───────────────────────
+
+  describe('electrical type color', () => {
+    it('colors an input pin green (0x22c55e) by default', () => {
+      const { renderer } = makeRenderer();
+      const g = (renderer as unknown as { _graphics: InstanceType<typeof MockGraphics> })._graphics;
+      g._calls = [];
+      renderer.renderAll([{ ...basePin, type: 'input' }]);
+      expect(g.callsFor('fill')[0].args[0]).toBe(0x22c55e);
+    });
+
+    it('colors a power pin amber (0xf59e0b)', () => {
+      const { renderer } = makeRenderer();
+      const g = (renderer as unknown as { _graphics: InstanceType<typeof MockGraphics> })._graphics;
+      g._calls = [];
+      renderer.renderAll([{ ...basePin, type: 'power' }]);
+      expect(g.callsFor('fill')[0].args[0]).toBe(0xf59e0b);
+    });
+  });
+
+  describe('pin shape rendering', () => {
+    it('inverted shape draws a second circle (bubble) besides the dot', () => {
+      const { renderer } = makeRenderer();
+      const g = (renderer as unknown as { _graphics: InstanceType<typeof MockGraphics> })._graphics;
+      g._calls = [];
+      renderer.renderAll([{ ...basePin, shape: 'inverted' }]);
+      // dot circle + bubble circle = 2 circles
+      expect(g.callsFor('circle')).toHaveLength(2);
+    });
+
+    it('line shape draws only the dot circle', () => {
+      const { renderer } = makeRenderer();
+      const g = (renderer as unknown as { _graphics: InstanceType<typeof MockGraphics> })._graphics;
+      g._calls = [];
+      renderer.renderAll([{ ...basePin, shape: 'line' }]);
+      expect(g.callsFor('circle')).toHaveLength(1);
+    });
+  });
+
+  describe('label visibility flags', () => {
+    it('omits the name label when nameVisible is false', () => {
+      const { renderer, layer } = makeRenderer();
+      renderer.renderAll([{ ...basePin, nameVisible: false }]);
+      const texts = layer.children.filter((c) => c instanceof MockText) as InstanceType<typeof MockText>[];
+      expect(texts.some((t) => t.text === 'IN')).toBe(false);
+      expect(texts.some((t) => t.text === '1')).toBe(true);
+    });
+
+    it('omits the number label when numberVisible is false', () => {
+      const { renderer, layer } = makeRenderer();
+      renderer.renderAll([{ ...basePin, numberVisible: false }]);
+      const texts = layer.children.filter((c) => c instanceof MockText) as InstanceType<typeof MockText>[];
+      expect(texts.some((t) => t.text === '1')).toBe(false);
+      expect(texts.some((t) => t.text === 'IN')).toBe(true);
     });
   });
 
