@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { MenuBar } from './MenuBar';
-import { Toolbar } from './Toolbar';
 import { StatusBar } from './StatusBar';
 import { PanelErrorBoundary } from './PanelErrorBoundary';
 import { Sidebar } from './Sidebar';
@@ -36,12 +35,10 @@ export function MainLayout() {
 
   return (
     <div data-testid="main-layout" className="h-screen w-screen overflow-hidden flex flex-col bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]">
-      {/* Header: Menu Bar + Toolbar */}
+      {/* Header: Menu Bar (the global ribbon was removed — commands now live in
+          per-editor toolbars, sidebar panels, the menu bar, and the palette) */}
       <header className="flex-shrink-0">
         {!IS_MAC && <MenuBar />}
-        <PanelErrorBoundary panelName="Ribbon">
-          <Toolbar />
-        </PanelErrorBoundary>
       </header>
 
       {/* Main Content Area */}
