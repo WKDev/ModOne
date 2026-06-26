@@ -11,6 +11,7 @@
 
 import { Graphics, type Container } from 'pixi.js';
 import { LEGACY_MM_PER_PX } from '../canvasUnits';
+import { rotatePointAroundOrigin } from '../utils/rotationGeometry';
 // Direct module import (not the @/canvas-core barrel) — this file IS re-exported
 // by that barrel, so importing the barrel here would be circular.
 import { SELECTION_COLOR } from '@/canvas-core/selectionStyle';
@@ -161,14 +162,10 @@ export class SelectionRenderer {
 
     const pad = this._style.highlightPadding;
 
-    // Individual block highlights
+    // Individual block highlights (rotated to follow the block)
     for (const block of selectedBlocks) {
-      const x = block.position.x - pad;
-      const y = block.position.y - pad;
-      const w = block.size.width + pad * 2;
-      const h = block.size.height + pad * 2;
-
-      hg.rect(x, y, w, h);
+      const corners = this._paddedBlockCorners(block, pad);
+      hg.poly(corners.map((c) => [c.x, c.y]).flat());
     }
 
     hg.stroke({
@@ -194,31 +191,38 @@ export class SelectionRenderer {
       });
     }
 
-    // Resize handles for single selection
+    // Resize handles for single selection (placed at rotated corners)
     if (selectedBlocks.length === 1) {
       const block = selectedBlocks[0];
       const hSize = this._style.handleSize;
       const hHalf = hSize / 2;
-      const bx = block.position.x - pad;
-      const by = block.position.y - pad;
-      const bw = block.size.width + pad * 2;
-      const bh = block.size.height + pad * 2;
 
-      // Corner handles
-      const corners = [
-        { x: bx - hHalf, y: by - hHalf },
-        { x: bx + bw - hHalf, y: by - hHalf },
-        { x: bx - hHalf, y: by + bh - hHalf },
-        { x: bx + bw - hHalf, y: by + bh - hHalf },
-      ];
-
-      for (const c of corners) {
-        handles.rect(c.x, c.y, hSize, hSize);
+      for (const c of this._paddedBlockCorners(block, pad)) {
+        handles.rect(c.x - hHalf, c.y - hHalf, hSize, hSize);
       }
 
       handles.fill(this._style.handleFill);
       handles.stroke({ color: 0xffffff, width: 1, pixelLine: true });
     }
+  }
+
+  /**
+   * Four corners of a block's padded outline in world space, rotated around the
+   * block's 0,0 origin so highlights/handles track the rotated symbol.
+   */
+  private _paddedBlockCorners(block: Block, pad: number): Position[] {
+    const rot = block.rotation ?? 0;
+    const { x, y } = block.position;
+    const locals: Position[] = [
+      { x: -pad, y: -pad },
+      { x: block.size.width + pad, y: -pad },
+      { x: block.size.width + pad, y: block.size.height + pad },
+      { x: -pad, y: block.size.height + pad },
+    ];
+    return locals.map((l) => {
+      const r = rotatePointAroundOrigin(l, rot);
+      return { x: x + r.x, y: y + r.y };
+    });
   }
 
   /**

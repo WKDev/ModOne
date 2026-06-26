@@ -4,8 +4,9 @@
  * Utilities for calculating wire paths and port positions.
  */
 
-import type { Block, Position, PortPosition, HandleConstraint } from '../types';
+import type { Block, Port, Position, PortPosition, HandleConstraint } from '../types';
 import { normalizeLegacyValueToMm } from '../canvasUnits';
+import { rotatePointAroundOrigin } from './rotationGeometry';
 
 // ============================================================================
 // Position Calculations
@@ -36,7 +37,34 @@ export function getPortRelativePosition(
 }
 
 /**
- * Get absolute position of a port on a block
+ * Port offset relative to the block origin, BEFORE rotation.
+ * Prefers the precomputed `absolutePosition` (accurate pin location for custom
+ * symbols); falls back to edge-based placement from position+offset.
+ */
+export function getPortLocalOffset(block: Block, port: Port): Position {
+  if (port.absolutePosition) {
+    return { x: port.absolutePosition.x, y: port.absolutePosition.y };
+  }
+  return getPortRelativePosition(port.position, port.offset ?? 0.5, block.size);
+}
+
+/**
+ * World position of a port, accounting for the block's rotation (around 0,0).
+ * Single source of truth used by rendering, hit-testing, and wire routing so
+ * they stay consistent. At rotation 0 (incl. 4×90°) this equals the unrotated
+ * position exactly.
+ */
+export function getPortWorldPosition(block: Block, port: Port): Position {
+  const local = getPortLocalOffset(block, port);
+  const rotated = rotatePointAroundOrigin(local, block.rotation ?? 0);
+  return {
+    x: block.position.x + rotated.x,
+    y: block.position.y + rotated.y,
+  };
+}
+
+/**
+ * Get absolute position of a port on a block (rotation-aware).
  */
 export function getPortAbsolutePosition(
   block: Block,
@@ -44,18 +72,7 @@ export function getPortAbsolutePosition(
 ): Position | null {
   const port = block.ports.find((p) => p.id === portId);
   if (!port) return null;
-
-  const blockSize = block.size;
-  const relativePos = getPortRelativePosition(
-    port.position,
-    port.offset ?? 0.5,
-    blockSize
-  );
-
-  return {
-    x: block.position.x + relativePos.x,
-    y: block.position.y + relativePos.y,
-  };
+  return getPortWorldPosition(block, port);
 }
 
 /**

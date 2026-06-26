@@ -13,6 +13,7 @@
 
 import { Graphics, GraphicsContext, type Container } from 'pixi.js';
 import { LEGACY_MM_PER_PX } from '../canvasUnits';
+import { getPortWorldPosition } from '../utils/wirePathCalculator';
 import type {
   Block,
   PortType,
@@ -230,10 +231,9 @@ export class PortRenderer {
         this._layer.addChild(g);
       }
 
-       // Position the port at block.position + port.absolutePosition
-       const worldX = block.position.x + (port.absolutePosition?.x ?? 0);
-       const worldY = block.position.y + (port.absolutePosition?.y ?? 0);
-       g.position.set(worldX, worldY);
+       // Position the port at its rotation-aware world position
+       const worldPos = getPortWorldPosition(block, port);
+       g.position.set(worldPos.x, worldPos.y);
     }
   }
 

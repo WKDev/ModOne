@@ -18,8 +18,8 @@ import type {
 import { isPortEndpoint, isJunctionEndpoint, isFloatingEndpoint } from '../types';
 import { getGridStepMm } from '../canvasUnits';
 import {
-  getPortRelativePosition,
   getPortAbsolutePosition,
+  getPortWorldPosition,
   calculateWireBendPoints,
 } from './wirePathCalculator';
 
@@ -407,10 +407,10 @@ function resolveEndpoint(
     if (!block) return undefined;
     const port = block.ports.find((p) => p.id === endpoint.portId);
     if (!port) return undefined;
-    const relPos = getPortRelativePosition(port.position, port.offset ?? 0.5, block.size);
+    // 회전된 블록: 포트 월드 좌표와 출구 방향 모두 회전 반영
     return {
-      pos: { x: block.position.x + relPos.x, y: block.position.y + relPos.y },
-      dir: exitDirection || port.position,
+      pos: getPortWorldPosition(block, port),
+      dir: exitDirection || rotatePortPosition(port.position, block.rotation ?? 0),
     };
   } else if (isFloatingEndpoint(endpoint)) {
     const pos = endpoint.position;
@@ -485,13 +485,11 @@ export function detectPortAtPosition(
 
   for (const [componentId, block] of components) {
     for (const port of block.ports) {
-      const relPos = getPortRelativePosition(port.position, port.offset ?? 0.5, block.size);
-      const absX = block.position.x + relPos.x;
-      const absY = block.position.y + relPos.y;
+      const abs = getPortWorldPosition(block, port);
 
       if (
-        Math.abs(position.x - absX) <= tolerance &&
-        Math.abs(position.y - absY) <= tolerance
+        Math.abs(position.x - abs.x) <= tolerance &&
+        Math.abs(position.y - abs.y) <= tolerance
       ) {
         return { componentId, portId: port.id };
       }
@@ -526,10 +524,12 @@ export function rotatePortPosition(
   // Map positions to indices for rotation
   const positions: PortPosition[] = ['right', 'bottom', 'left', 'top'];
   const currentIndex = positions.indexOf(position);
+  if (currentIndex < 0) return position;
 
-  // Calculate rotated index (clockwise)
-  const rotationSteps = normalizedRotation / 90;
-  const newIndex = (currentIndex + rotationSteps) % 4;
+  // Calculate rotated index (clockwise). Snap to the nearest quadrant so
+  // arbitrary angles (rotation step ≠ 90°) still yield a cardinal exit dir.
+  const rotationSteps = Math.round(normalizedRotation / 90);
+  const newIndex = (((currentIndex + rotationSteps) % 4) + 4) % 4;
 
   return positions[newIndex];
 }

@@ -15,6 +15,8 @@ import { isPortEndpoint, isFloatingEndpoint, isJunctionEndpoint } from '../types
 import { LEGACY_MM_PER_PX } from '../canvasUnits';
 import { SpatialIndex } from './SpatialIndex';
 import type { SpatialItem } from './SpatialIndex';
+import { isPointInRotatedBlock } from '../utils/rotationGeometry';
+import { getPortAbsolutePosition } from '../utils/wirePathCalculator';
 
 /** Hit test configuration */
 export interface HitTestConfig {
@@ -30,7 +32,10 @@ export interface HitTestConfig {
 
 const DEFAULT_HIT_CONFIG: HitTestConfig = {
   portSnapRadius: 12 * LEGACY_MM_PER_PX,
-  wireHitRadius: 8 * LEGACY_MM_PER_PX,
+  // Selectable band around a wire is a bit wider than the rendered stroke
+  // (width 2) so thin wires are easy to grab. Ports/junctions still win on
+  // overlap via priority order.
+  wireHitRadius: 12 * LEGACY_MM_PER_PX,
   junctionHitRadius: 8 * LEGACY_MM_PER_PX,
   blockHitRadius: 0, // Blocks use bounds check, not radius
 };
@@ -234,8 +239,13 @@ export class HitTester {
     let nearestDist = Infinity;
 
     for (const b of blocks) {
-      // Point-in-rect test
-      if (pos.x >= b.minX && pos.x <= b.maxX && pos.y >= b.minY && pos.y <= b.maxY) {
+      const block = this._blocks[b.id];
+      // Precise oriented test against the rotated block; fall back to the
+      // (rotated) AABB if the full block isn't available.
+      const inside = block
+        ? isPointInRotatedBlock(pos, block)
+        : pos.x >= b.minX && pos.x <= b.maxX && pos.y >= b.minY && pos.y <= b.maxY;
+      if (inside) {
         // Distance to center for priority
         const cx = (b.minX + b.maxX) / 2;
         const cy = (b.minY + b.maxY) / 2;
@@ -334,12 +344,7 @@ export class HitTester {
     if (isPortEndpoint(ep)) {
       const block = this._blocks[ep.componentId];
       if (!block) return null;
-      const port = block.ports.find((p) => p.id === ep.portId);
-      if (!port) return null;
-      return {
-        x: block.position.x + (port.absolutePosition?.x ?? 0),
-        y: block.position.y + (port.absolutePosition?.y ?? 0),
-      };
+      return getPortAbsolutePosition(block, ep.portId);
     }
     if (isJunctionEndpoint(ep)) {
       const junction = this._junctions[ep.junctionId];

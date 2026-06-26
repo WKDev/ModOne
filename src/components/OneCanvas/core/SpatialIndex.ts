@@ -12,6 +12,8 @@ import RBush from 'rbush';
 import type { Position, Rect, Block, Wire, Junction } from '../types';
 import { LEGACY_MM_PER_PX } from '../canvasUnits';
 import { isFloatingEndpoint } from '../types';
+import { getRotatedBlockAABB } from '../utils/rotationGeometry';
+import { getPortWorldPosition } from '../utils/wirePathCalculator';
 
 // ============================================================================
 // R-Tree Item Types
@@ -82,22 +84,24 @@ export class SpatialIndex {
     // Index blocks
     for (const block of Object.values(blocks)) {
       if (block.visible === false) continue;
+      const aabb = getRotatedBlockAABB(block);
       const item: SpatialItem = {
-        minX: block.position.x,
-        minY: block.position.y,
-        maxX: block.position.x + block.size.width,
-        maxY: block.position.y + block.size.height,
+        minX: aabb.minX,
+        minY: aabb.minY,
+        maxX: aabb.maxX,
+        maxY: aabb.maxY,
         type: 'block',
         id: block.id,
       };
       items.push(item);
       this._items.set(`block:${block.id}`, item);
 
-      // Index ports
+      // Index ports (rotation-aware world position)
       for (let i = 0; i < block.ports.length; i++) {
         const port = block.ports[i];
-        const portX = block.position.x + (port.absolutePosition?.x ?? 0);
-        const portY = block.position.y + (port.absolutePosition?.y ?? 0);
+        const portPos = getPortWorldPosition(block, port);
+        const portX = portPos.x;
+        const portY = portPos.y;
         const portItem: SpatialItem = {
           minX: portX - (6 * LEGACY_MM_PER_PX),
           minY: portY - (6 * LEGACY_MM_PER_PX),
@@ -165,18 +169,19 @@ export class SpatialIndex {
       return;
     }
 
+    const aabb = getRotatedBlockAABB(block);
     const item: SpatialItem = {
-      minX: block.position.x,
-      minY: block.position.y,
-      maxX: block.position.x + block.size.width,
-      maxY: block.position.y + block.size.height,
+      minX: aabb.minX,
+      minY: aabb.minY,
+      maxX: aabb.maxX,
+      maxY: aabb.maxY,
       type: 'block',
       id: block.id,
     };
     this._items.set(key, item);
     this._tree.insert(item);
 
-     // Update ports
+     // Update ports (rotation-aware world position)
      for (let i = 0; i < block.ports.length; i++) {
        const port = block.ports[i];
        const portKey = `port:${block.id}:${port.id}`;
@@ -185,8 +190,9 @@ export class SpatialIndex {
          this._tree.remove(existingPort);
        }
 
-       const portX = block.position.x + (port.absolutePosition?.x ?? 0);
-       const portY = block.position.y + (port.absolutePosition?.y ?? 0);
+       const portPos = getPortWorldPosition(block, port);
+       const portX = portPos.x;
+       const portY = portPos.y;
       const portItem: SpatialItem = {
         minX: portX - (6 * LEGACY_MM_PER_PX),
         minY: portY - (6 * LEGACY_MM_PER_PX),
