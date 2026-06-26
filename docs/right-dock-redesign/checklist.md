@@ -54,13 +54,16 @@
 - [x] 검증: `tsc` + `vitest` 1684 통과. View 메뉴 Sheet Editor 항목 시각 확인.
   - [ ] Canvas Blocks 버튼 라이브 렌더 확인은 **보류** — 브라우저 런타임이 프로젝트 생성(네이티브 폴더 다이얼로그)을 못 해 캔버스를 못 띄움. 실제 Tauri 앱에서 후속 확인. (코드/타입/패턴은 검증됨)
 
-## Phase 4 — 전역 리본 제거
-- [ ] `MainLayout.tsx`에서 `<Toolbar />` + Ribbon ErrorBoundary 제거
-- [ ] `Toolbar.tsx` 및 `ribbon/config/*` 정리 (다른 참조 없으면 삭제)
-- [ ] header 높이 회수로 세로 공간 확보 확인
-- [ ] 검증: 빌드 통과, 모든 명령 접근 경로 유지, E2E(CDP) 스모크
+## Phase 4 — 전역 리본 제거 — ✅ 커밋 `4fbfb79` (634줄 삭제)
+- [x] `MainLayout.tsx`에서 `<Toolbar />` + Ribbon ErrorBoundary 제거 (header = MenuBar만)
+- [x] `Toolbar.tsx` 및 `ribbon/` 전체 디렉터리 삭제 (config/registry/resolve/icons/types — 잔여 참조 0)
+  - barrel `layout/index.ts`의 Toolbar export 제거. e2e `selectors.ts`의 toolbar/toolbarBtn은 고아지만 무해(스펙 미사용) → 남김.
+- [x] header 높이 회수: 시각 검증 `HEADER_H=32`(메뉴바만, 리본 ~100px 회수)
+- [x] 검증: `tsc` + `vitest`(1684) + `vite build` 통과. 시각: 리본 요소 0개(`RIBBON_ROOT=0/RIBBON_TABS=0`), 우측 도크 유지.
 
 ## Phase 5 — 마무리
-- [ ] `pnpm test` / 빌드 통과
-- [ ] 시맨틱 커밋 분할 (zone 추가 / 도크 / tag-manager / 명령 재배치 / 리본 제거)
-- [ ] context-notes.md 최종 결정사항 반영
+- [x] `pnpm test`(vitest 1684) / `vite build` 통과
+- [x] 시맨틱 커밋 분할: 도크 `6f60ec5` / tag-manager `df58f62` / 팔레트 `56b043c` / context-key `6ec81bd` / 하단접힘 `a9fed6d` / 갭메우기 `1653249` / 리본제거 `4fbfb79`
+- [x] context-notes.md 결정사항 반영 (placement 보류, Phase 3 재정의)
+- [ ] (후속) 실제 Tauri 앱에서 Canvas Blocks 버튼 + 리본 부재 최종 육안 확인
+- [ ] (후속) `feat/right-dock` → main 머지
