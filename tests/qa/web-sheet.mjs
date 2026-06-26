@@ -116,6 +116,41 @@ async function main() {
   console.log(`  elements after drag: ${elCount2}`);
   if (elCount2 !== '1') errors.push(`element count changed during drag: ${elCount2}`);
 
+  // Inline text editing: add a text element, double-click it, type, commit.
+  console.log('→ Add text + inline edit (double-click)');
+  await page.click('[title="Add Text"]');
+  await page.waitForTimeout(400);
+  if (box) {
+    // Mirror SheetCanvasHost's fit: zoom = min(cw/pageW, ch/pageH) * 0.9, page
+    // centered. Text element is placed at world (pageW/2-25, pageH/2-15).
+    const pageW = 297, pageH = 210;
+    const z = Math.min(box.width / pageW, box.height / pageH) * 0.9;
+    const tx = pageW / 2 - 25 + 8; // a little inside the text
+    const ty = pageH / 2 - 15;
+    const dcx = box.x + box.width / 2 + (tx - pageW / 2) * z;
+    const dcy = box.y + box.height / 2 + (ty - pageH / 2) * z;
+    await page.mouse.dblclick(dcx, dcy);
+    await page.waitForTimeout(300);
+    await shot(page, '2d-dblclick');
+    console.log(`  dblclick at screen (${Math.round(dcx)}, ${Math.round(dcy)}); canvas box x=${Math.round(box.x)} y=${Math.round(box.y)} w=${Math.round(box.width)} h=${Math.round(box.height)}`);
+    const editorOpen = await page.locator('[data-testid="sheet-inline-editor"]').count();
+    console.log(`  inline editor opened: ${editorOpen > 0}`);
+    if (editorOpen === 0) errors.push('inline editor did not open on double-click of text');
+    else {
+      await page.fill('[data-testid="sheet-inline-editor"]', 'Hello PIXI');
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(300);
+      await shot(page, '2d-text-edited');
+      // Re-open the editor and confirm the committed value round-trips.
+      await page.mouse.dblclick(dcx, dcy);
+      await page.waitForTimeout(300);
+      const val = await page.locator('[data-testid="sheet-inline-editor"]').inputValue().catch(() => '');
+      console.log(`  committed text round-trips: ${val === 'Hello PIXI'} (got "${val}")`);
+      if (val !== 'Hello PIXI') errors.push(`inline text edit did not persist: "${val}"`);
+      await page.keyboard.press('Escape');
+    }
+  }
+
   console.log('→ Reload + reopen from Explorer');
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForFunction(() => (document.getElementById('root')?.innerText?.length ?? 0) > 0);

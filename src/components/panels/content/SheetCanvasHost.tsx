@@ -6,14 +6,15 @@
  * GridRenderer) so the Sheet editor matches the Symbol and Schematic editors:
  * same white canvas, 5mm dot grid, middle/right-drag pan, wheel zoom.
  *
- * Element rendering reuses SheetOverlayRenderer (the existing PIXI sheet
- * renderer). Selection outline + resize handles and the select/move/resize
- * interaction are handled here, routed through the shared ToolInputBinding
- * pointer pipeline. Element creation / properties stay in the React panel,
- * which mutates the document via onUpdateElement.
+ * Element rendering reuses SheetOverlayRenderer. Selection outline + resize
+ * handles and the select/move/resize interaction are handled here, routed
+ * through the shared ToolInputBinding pointer pipeline. Double-clicking a text
+ * element or a table cell opens an HTML `<input>` overlay (positioned via the
+ * viewport's world→screen transform) for in-place editing — a capability the
+ * old SVG editor lacked.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Container, Graphics } from 'pixi.js';
 
 import type { SheetDocument, SheetElement } from '../../../types/sheet';
@@ -35,6 +36,18 @@ const SEL_COLOR = 0x2563eb;
 type HandlePos = 'nw' | 'ne' | 'sw' | 'se';
 type Bounds = { x: number; y: number; w: number; h: number };
 
+/** Active in-place editor (text element content or a table cell). */
+interface EditorState {
+  id: string;
+  field: { kind: 'text' } | { kind: 'cell'; col: number; row: number };
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  fontPx: number;
+  value: string;
+}
+
 interface Props {
   doc: SheetDocument;
   selectedId: string | null;
@@ -44,6 +57,7 @@ interface Props {
 }
 
 const snap = (v: number) => Math.round(v / SNAP) * SNAP;
+const pos = (v: number, min = 1) => Math.max(min, v);
 
 /** Bounding box of an element in mm (mirrors the SVG editor's getElBounds). */
 function getElBounds(el: SheetElement): Bounds {
@@ -75,8 +89,6 @@ function getElBounds(el: SheetElement): Bounds {
   }
 }
 
-const pos = (v: number, min = 1) => Math.max(min, v);
-
 export function SheetCanvasHost({
   doc,
   selectedId,
@@ -95,6 +107,10 @@ export function SheetCanvasHost({
   const selGfxRef = useRef<Graphics | null>(null);
   const toolInputRef = useRef<ToolInputBinding | null>(null);
 
+  const [editor, setEditor] = useState<EditorState | null>(null);
+  const editorRef = useRef<EditorState | null>(null);
+  editorRef.current = editor;
+
   // Stable refs so the input handlers always see current props.
   const docRef = useRef(doc);
   docRef.current = doc;
@@ -107,7 +123,6 @@ export function SheetCanvasHost({
   const onModifiedRef = useRef(onModified);
   onModifiedRef.current = onModified;
 
-  // Active interaction (move / resize) state.
   const dragRef = useRef<{
     mode: 'none' | 'move' | 'resize';
     handle: HandlePos;
@@ -128,24 +143,19 @@ export function SheetCanvasHost({
     const page = docRef.current.page;
     if (!g) return;
     g.clear();
-    // Page border.
     g.rect(0, 0, page.width, page.height);
     g.fill({ color: 0xffffff });
     g.stroke({ width: 0.3, color: 0xbbbbbb });
-    // Margin guide.
     const m = page.margins;
     g.rect(m.left, m.top, page.width - m.left - m.right, page.height - m.top - m.bottom);
     g.stroke({ width: 0.2, color: 0xd0d7e2 });
   };
 
-  const drawSelection = () => {
+  const drawSelectionBounds = (b: Bounds | null) => {
     const g = selGfxRef.current;
     if (!g) return;
     g.clear();
-    const el = docRef.current.elements.find((e) => e.id === selectedIdRef.current);
-    if (!el) return;
-    const b = getElBounds(el);
-    // Dashed-look outline (solid here; thin) + corner handles.
+    if (!b) return;
     g.rect(b.x - 0.5, b.y - 0.5, b.w + 1, b.h + 1);
     g.stroke({ width: 0.4, color: SEL_COLOR });
     for (const [hx, hy] of [
@@ -160,8 +170,27 @@ export function SheetCanvasHost({
     }
   };
 
+  const drawSelection = () => {
+    const el = docRef.current.elements.find((e) => e.id === selectedIdRef.current);
+    drawSelectionBounds(el ? getElBounds(el) : null);
+  };
+
   const renderContent = () => {
     contentRef.current?.setDocument(docRef.current);
+  };
+
+  // Center + fit the page in the current viewport. Re-run on container resize so
+  // the page never drifts off-centre (the init-time size can be stale).
+  const fitPage = (w?: number, h?: number) => {
+    const vp = viewportRef.current;
+    const c = containerRef.current;
+    if (!vp || !c) return;
+    const cw = w ?? (c.clientWidth || 800);
+    const ch = h ?? (c.clientHeight || 600);
+    const page = docRef.current.page;
+    const zoom = Math.max(0.1, Math.min(cw / page.width, ch / page.height) * 0.9);
+    vp.centerOn(page.width / 2, page.height / 2, zoom);
+    gridRef.current?.render(vp.visibleBounds, vp.state.zoom);
   };
 
   // --- hit testing -------------------------------------------------------
@@ -183,25 +212,108 @@ export function SheetCanvasHost({
 
   const elementAt = (wx: number, wy: number): SheetElement | null => {
     const els = docRef.current.elements;
-    // Topmost first.
     for (let i = els.length - 1; i >= 0; i--) {
       const el = els[i];
       if (el.type === 'line') {
-        // Distance from point to segment.
         const dx = el.x2 - el.x1;
         const dy = el.y2 - el.y1;
         const len2 = dx * dx + dy * dy || 1;
         let t = ((wx - el.x1) * dx + (wy - el.y1) * dy) / len2;
         t = Math.max(0, Math.min(1, t));
-        const px = el.x1 + t * dx;
-        const py = el.y1 + t * dy;
-        if (Math.hypot(wx - px, wy - py) <= 1.5) return el;
+        if (Math.hypot(wx - (el.x1 + t * dx), wy - (el.y1 + t * dy)) <= 1.5) return el;
         continue;
       }
       const b = getElBounds(el);
       if (wx >= b.x && wx <= b.x + b.w && wy >= b.y && wy <= b.y + b.h) return el;
     }
     return null;
+  };
+
+  // World → container-screen via the viewport transform.
+  const worldToScreen = (wx: number, wy: number): { x: number; y: number } => {
+    const vp = viewportRef.current?.viewport;
+    if (!vp) return { x: 0, y: 0 };
+    const p = vp.toScreen(wx, wy);
+    return { x: p.x, y: p.y };
+  };
+
+  // Open the in-place editor for a text element or table cell at world (wx,wy).
+  const openEditorAt = (wx: number, wy: number) => {
+    const el = elementAt(wx, wy);
+    if (!el) return;
+    const zoom = viewportRef.current?.state.zoom ?? 1;
+    if (el.type === 'text') {
+      const top = worldToScreen(el.x, el.y - el.fontSize);
+      onSelectRef.current(el.id);
+      setEditor({
+        id: el.id,
+        field: { kind: 'text' },
+        left: top.x,
+        top: top.y,
+        width: Math.max(60, getElBounds(el).w * zoom),
+        height: Math.max(18, el.fontSize * 1.4 * zoom),
+        fontPx: Math.max(8, el.fontSize * zoom),
+        value: el.content,
+      });
+    } else if (el.type === 'table') {
+      // Locate the cell under the cursor.
+      let cy = el.y;
+      for (let ri = 0; ri < el.rows.length; ri++) {
+        const rh = el.rows[ri].height;
+        if (wy >= cy && wy <= cy + rh) {
+          let cx = el.x;
+          for (let ci = 0; ci < el.columns.length; ci++) {
+            const cw = el.columns[ci].width;
+            if (wx >= cx && wx <= cx + cw) {
+              const tl = worldToScreen(cx, cy);
+              onSelectRef.current(el.id);
+              setEditor({
+                id: el.id,
+                field: { kind: 'cell', col: ci, row: ri },
+                left: tl.x,
+                top: tl.y,
+                width: cw * zoom,
+                height: rh * zoom,
+                fontPx: Math.max(8, el.fontSize * zoom),
+                value: el.rows[ri].cells[el.columns[ci].key] ?? '',
+              });
+              return;
+            }
+            cx += cw;
+          }
+        }
+        cy += rh;
+      }
+    }
+  };
+
+  const commitEditor = (value: string) => {
+    const ed = editorRef.current;
+    if (!ed) return;
+    const el = docRef.current.elements.find((e) => e.id === ed.id);
+    if (el) {
+      if (ed.field.kind === 'text') {
+        onUpdateRef.current(ed.id, { content: value } as Partial<SheetElement>);
+      } else if (el.type === 'table') {
+        const { col, row } = ed.field;
+        const key = el.columns[col].key;
+        const rows = el.rows.map((r, ri) =>
+          ri === row ? { ...r, cells: { ...r.cells, [key]: value } } : r,
+        );
+        onUpdateRef.current(ed.id, { rows } as Partial<SheetElement>);
+      }
+      onModifiedRef.current();
+    }
+    setEditor(null);
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    const container = containerRef.current;
+    const vp = viewportRef.current?.viewport;
+    if (!container || !vp) return;
+    const rect = container.getBoundingClientRect();
+    const w = vp.toWorld(e.clientX - rect.left, e.clientY - rect.top);
+    openEditorAt(w.x, w.y);
   };
 
   // --- mount -------------------------------------------------------------
@@ -224,6 +336,10 @@ export function SheetCanvasHost({
       await app.init({
         container,
         config: { backgroundColor: 0xffffff, grid: gridConfig, minZoom: 0.1, maxZoom: 10 },
+        onResize: (w, h) => {
+          fitPage(w, h);
+          if (editorRef.current) setEditor(null);
+        },
       });
       if (destroyed) {
         app.destroy();
@@ -243,12 +359,13 @@ export function SheetCanvasHost({
               viewportRef.current.state.zoom,
             );
           }
+          // Close the in-place editor on pan/zoom (it would otherwise drift).
+          if (editorRef.current) setEditor(null);
         },
       });
       viewportRef.current = viewport;
       app.app.stage.addChild(vpContainer);
 
-      // Layers (bottom → top): grid, page, content, selection.
       const gridLayer = new Container();
       const pageLayer = new Container();
       const contentLayer = new Container();
@@ -291,8 +408,6 @@ export function SheetCanvasHost({
       selectionLayer.addChild(selGfx);
       selGfxRef.current = selGfx;
 
-      // Pointer input through the shared pipeline (primary button only;
-      // middle/right → native pixi-viewport pan).
       const toolInput = new ToolInputBinding();
       toolInput.init({
         viewport: viewport.viewport,
@@ -310,18 +425,13 @@ export function SheetCanvasHost({
       drawSelection();
       gridRef.current.render(viewport.visibleBounds, viewport.state.zoom);
 
-      // Fit the page in view.
-      const page = docRef.current.page;
-      const cw = container.clientWidth || 800;
-      const ch = container.clientHeight || 600;
-      const zoom = Math.max(0.1, Math.min(cw / page.width, ch / page.height) * 0.9);
-      viewport.centerOn(page.width / 2, page.height / 2, zoom);
+      fitPage();
 
       if (!destroyed) app.start();
     };
 
-    // Interaction handlers (defined inside so they close over refs).
     const onDown = (wx: number, wy: number) => {
+      if (editorRef.current) commitEditor(editorRef.current.value);
       const h = handleAt(wx, wy);
       if (h) {
         const el = docRef.current.elements.find((e) => e.id === selectedIdRef.current);
@@ -368,17 +478,18 @@ export function SheetCanvasHost({
         const dx = snap(d.elStart.x + (wx - d.start.x)) - d.elStart.x;
         const dy = snap(d.elStart.y + (wy - d.start.y)) - d.elStart.y;
         if (el.type === 'line') {
-          onUpdateRef.current(id, {
-            x1: d.elStart.x + dx,
-            y1: d.elStart.y + dy,
-            x2: d.elStart.x2 + dx,
-            y2: d.elStart.y2 + dy,
-          } as Partial<SheetElement>);
+          const nx1 = d.elStart.x + dx, ny1 = d.elStart.y + dy;
+          const nx2 = d.elStart.x2 + dx, ny2 = d.elStart.y2 + dy;
+          onUpdateRef.current(id, { x1: nx1, y1: ny1, x2: nx2, y2: ny2 } as Partial<SheetElement>);
+          drawSelectionBounds({
+            x: Math.min(nx1, nx2),
+            y: Math.min(ny1, ny2),
+            w: Math.abs(nx2 - nx1) || 2,
+            h: Math.abs(ny2 - ny1) || 2,
+          });
         } else {
-          onUpdateRef.current(id, {
-            x: d.elStart.x + dx,
-            y: d.elStart.y + dy,
-          } as Partial<SheetElement>);
+          onUpdateRef.current(id, { x: d.elStart.x + dx, y: d.elStart.y + dy } as Partial<SheetElement>);
+          drawSelectionBounds({ x: d.elStart.x + dx, y: d.elStart.y + dy, w: d.startBounds.w, h: d.startBounds.h });
         }
         onModifiedRef.current();
         return;
@@ -396,6 +507,7 @@ export function SheetCanvasHost({
         if (hh.includes('n')) { ny = snap(b.y + dy); nh = pos(b.h + (b.y - ny)); }
         if (hh.includes('s')) { nh = pos(snap(b.h + dy)); }
         onUpdateRef.current(id, { x: nx, y: ny, w: nw, h: nh } as Partial<SheetElement>);
+        drawSelectionBounds({ x: nx, y: ny, w: nw, h: nh });
         onModifiedRef.current();
       } else if (el.type === 'line') {
         if (hh === 'nw') onUpdateRef.current(id, { x1: snap(b.x + dx), y1: snap(b.y + dy) } as Partial<SheetElement>);
@@ -406,6 +518,7 @@ export function SheetCanvasHost({
 
     const onUp = () => {
       dragRef.current.mode = 'none';
+      drawSelection();
     };
 
     init();
@@ -434,7 +547,6 @@ export function SheetCanvasHost({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Re-render content + page when the document changes.
   useEffect(() => {
     renderContent();
     drawPage();
@@ -442,7 +554,6 @@ export function SheetCanvasHost({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc]);
 
-  // Re-draw selection overlay when selection changes.
   useEffect(() => {
     drawSelection();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -453,6 +564,43 @@ export function SheetCanvasHost({
       ref={containerRef}
       className="flex-1 overflow-hidden relative"
       style={{ backgroundColor: '#ffffff', cursor: 'crosshair' }}
-    />
+      onDoubleClick={handleDoubleClick}
+    >
+      {editor && (
+        <input
+          data-testid="sheet-inline-editor"
+          autoFocus
+          defaultValue={editor.value}
+          onBlur={(e) => commitEditor(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              commitEditor(e.currentTarget.value);
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              setEditor(null);
+            }
+            e.stopPropagation();
+          }}
+          style={{
+            position: 'absolute',
+            left: editor.left,
+            top: editor.top,
+            width: editor.width,
+            height: editor.height,
+            fontSize: editor.fontPx,
+            lineHeight: `${editor.height}px`,
+            padding: '0 2px',
+            margin: 0,
+            border: `1px solid ${'#2563eb'}`,
+            outline: 'none',
+            background: 'white',
+            color: 'black',
+            zIndex: 20,
+            boxSizing: 'border-box',
+          }}
+        />
+      )}
+    </div>
   );
 }
