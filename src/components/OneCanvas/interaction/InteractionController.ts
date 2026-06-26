@@ -8,6 +8,17 @@ import type {
 import { isPortEndpoint, isFloatingEndpoint } from '../types';
 import type { HitTester } from '../core/HitTester';
 import type { SpatialIndex } from '../core/SpatialIndex';
+import {
+  DEFAULT_GRID_SNAP,
+  getDistance,
+  subtract,
+  add,
+  snapDelta,
+  snapToGrid,
+  constrainSegmentDelta,
+  getPortDirection,
+  rectFromTwoPoints,
+} from './interactionGeometry';
 
 // ============================================================================
 // Types
@@ -90,16 +101,8 @@ export interface InteractionControllerConfig {
 // Constants
 // ============================================================================
 
-/** Default grid snap step in world-space mm (matches DEFAULT_GRID.size). */
-const DEFAULT_GRID_SNAP = 5;
 const DRAG_THRESHOLD_PX = 4;
 const WIRE_SNAP_STICKY_RADIUS_PX = 10;
-const PORT_DIRECTIONS: readonly PortPosition[] = [
-  'top',
-  'right',
-  'bottom',
-  'left',
-];
 
 // ============================================================================
 // InteractionController
@@ -1182,59 +1185,4 @@ export class InteractionController {
     this._placingFlipV = false;
     this._clearPointerTracking();
   }
-}
-
-// ============================================================================
-// Geometry Helpers
-// ============================================================================
-
-function getDistance(a: Position, b: Position): number {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
-function subtract(a: Position, b: Position): Position {
-  return { x: a.x - b.x, y: a.y - b.y };
-}
-
-function add(a: Position, b: Position): Position {
-  return { x: a.x + b.x, y: a.y + b.y };
-}
-
-function snapDelta(delta: Position, step: number = DEFAULT_GRID_SNAP): Position {
-  return {
-    x: Math.round(delta.x / step) * step,
-    y: Math.round(delta.y / step) * step,
-  };
-}
-
-function snapToGrid(pos: Position, step: number = DEFAULT_GRID_SNAP): Position {
-  return {
-    x: Math.round(pos.x / step) * step,
-    y: Math.round(pos.y / step) * step,
-  };
-}
-
-function constrainSegmentDelta(
-  delta: Position,
-  orientation: 'horizontal' | 'vertical' | null
-): Position {
-  if (orientation === 'horizontal') return { x: 0, y: delta.y };
-  if (orientation === 'vertical') return { x: delta.x, y: 0 };
-  return delta;
-}
-
-function getPortDirection(target: HitTestResult): PortPosition | null {
-  if (typeof target.subIndex !== 'number') return null;
-  return PORT_DIRECTIONS[target.subIndex] ?? null;
-}
-
-function rectFromTwoPoints(a: Position, b: Position) {
-  return {
-    x: Math.min(a.x, b.x),
-    y: Math.min(a.y, b.y),
-    width: Math.abs(a.x - b.x),
-    height: Math.abs(a.y - b.y),
-  };
 }
