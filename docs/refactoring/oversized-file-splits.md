@@ -44,16 +44,36 @@ suite each time:
 | `LadderEditor/utils/gridConverter.ts` | 1353 | 35 barrel | astFactories/astToGrid/nodeUtils/gridGrouping/gridToAst (431) |
 | `LadderEditor/utils/wireGenerator.ts` | 1263 | 34 barrel | wireGeneration/wireDirections/wireTypeResolution/parallelBranches/wireMerge (441) |
 | `lib/symbolXmlParser.ts` | 1512 | 22 barrel | symbolXmlTypes/xmlDomUtils/xmlElementParsers/symbolXmlParse/symbolXmlSerialize/symbolXmlUtils (514) |
+| `components/SymbolEditor/SymbolEditor.tsx` | 1243 | 409 component | hooks/useSymbolGeometry (434) /useSymbolClipboard/useSymbolHistory/useSymbolMultiUnit/useSymbolVisualState + editorModel/Reducer/Helpers |
 
-## In progress
+### SymbolEditor — the custom-hook pattern (React state-threading)
 
-- `components/SymbolEditor/SymbolEditor.tsx` — **partial** (1243 → 999).
-  Extracted `editorModel.ts` / `editorReducer.ts` / `editorHelpers.ts` (pure
-  parts) and re-export via `export *`. **Stage 2 remaining:** the component body
-  is still ~999 lines (handlers + effects + JSX). Extract handler groups into
-  custom hooks (`useSymbolClipboard` / `useSymbolHistory` / `useSymbolMultiUnit`)
-  — higher-risk because it threads shared state (localSymbol/setLocalSymbol/
-  dispatch/historyRef), so it was deferred from the pure-util splits.
+Stage 1 pulled the pure parts (`editorModel` / `editorReducer` / `editorHelpers`)
+out and re-exported via `export *`. **Stage 2 (done)** extracted the handler
+groups — which thread shared state (`localSymbol`/`setLocalSymbol`/`dispatch`/
+`historyRef`/`bumpHistory`) — into custom hooks under `hooks/`:
+
+- `useSymbolHistory(dispatch)` owns `historyRef` + `historyVersion`/`bumpHistory`
+  and returns `handleUndo`/`handleRedo`/`canUndo`/`canRedo`.
+- `useSymbolGeometry({...})` — all primitive/pin mutation handlers + `getActiveGeometry`.
+- `useSymbolClipboard({...})` — copy/paste/cut/duplicate/select-all **and owns the
+  Ctrl/Cmd keyboard `useEffect`**; the component calls it purely for that effect.
+- `useSymbolMultiUnit({...})` / `useSymbolVisualState({...})` — unit + visual-state lifecycle.
+
+**Pattern rules that kept it behavior-neutral:**
+- Handler bodies copied **byte-for-byte**; only `state.selectedIds` /
+  `state.activeVisualState` became plain `selectedIds` / `activeVisualState`
+  params (same value).
+- Hooks are called **unconditionally, in fixed order, with no early return before
+  them** — Rules of Hooks satisfied.
+- Stable values now passed as params (`dispatch`, `getActiveGeometry`) were added
+  to the relevant `useCallback`/`useEffect` deps — referentially stable, so a
+  runtime no-op that just silences `exhaustive-deps`.
+- `useRef` typed `RefObject<HistoryManager>` (not the deprecated `MutableRefObject`).
+- Verified: `tsc --noEmit` clean, full vitest suite green (1684 pass), **and** the
+  runtime QA harnesses `tests/qa/web-symbol.mjs` + `web-symbol-clipboard.mjs`
+  (Ctrl+A→Ctrl+D duplicate → 2 graphics + 2 pins, symbol persisted) — unit tests
+  don't mount the component, so the web harness is the real check.
 
 ## Remaining backlog (live files, 1000+ lines)
 
