@@ -5,6 +5,9 @@ edition = "2021"
 rust-version = "1.77.2"
 
 [dependencies]
-modone-contract = { path = "../modone-contract" }
+# 코어 크레이트는 contract를 default-features=false 로 의존 → wasm에서 chrono/uuid
+# 컴파일 회피(native 셸이 std-clock 활성화). Modbus 정책 타입은 modbus-codec 소유.
+modone-contract = { path = "../modone-contract", default-features = false }
+modbus-codec = { path = "../modbus-codec" }
 serde = { version = "1", features = ["derive"] }
 thiserror = "1"

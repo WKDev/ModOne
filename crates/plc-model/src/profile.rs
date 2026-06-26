@@ -106,36 +106,12 @@ pub struct VendorAddressMetadata {
     pub number_base: VendorAddressNumberBase,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ModbusAddressSpace {
-    Coil,
-    DiscreteInput,
-    HoldingRegister,
-    InputRegister,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ModbusMappingRule {
-    pub family: String,
-    pub canonical_area: CanonicalAreaKind,
-    pub address_space: ModbusAddressSpace,
-    pub offset: u16,
-    pub count: u16,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ModbusMappingPolicy {
-    pub profile_id: VendorProfileId,
-    pub source: ModbusMappingSource,
-    pub rules: Vec<ModbusMappingRule>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ModbusMappingSource {
-    Recommended,
-    LegacyWide,
-    Custom,
-}
+// Modbus 매핑 정책 타입은 `modbus-codec` 로 이전됨. `crate::plc_runtime::X` 및
+// `profile::X` 경로 호환을 위해 재노출한다. (정책의 `profile_id` 는 codec 에서
+// vendor enum 결합을 끊기 위해 `String` 라벨이다.)
+pub use modbus_codec::{
+    ModbusAddressSpace, ModbusMappingPolicy, ModbusMappingRule, ModbusMappingSource,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OpcUaAliasPolicy {

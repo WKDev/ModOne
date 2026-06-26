@@ -249,15 +249,6 @@ pub struct OpcUaSessionInfo {
     pub subscription_count: u32,
 }
 
-/// Errors specific to OPC UA operations.
-#[derive(Debug, thiserror::Error)]
-pub enum OpcUaError {
-    #[error("OPC UA server error: {0}")]
-    Server(String),
-    #[error("OPC UA configuration error: {0}")]
-    Config(String),
-    #[error("OPC UA address space error: {0}")]
-    AddressSpace(String),
-    #[error("OPC UA node not found: {0}")]
-    NodeNotFound(String),
-}
+// OpcUaError는 opcua-codec 크레이트로 이전됨. 기존 `crate::opcua::types::OpcUaError`
+// 및 `super::types::OpcUaError` 경로 호환을 위해 재노출한다.
+pub use opcua_codec::OpcUaError;

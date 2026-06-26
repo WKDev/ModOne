@@ -12,6 +12,7 @@
 export type PanelType =
   | 'ladder-editor'
   | 'memory-visualizer'
+  | 'tag-manager'
   | 'one-canvas'
   | 'scenario-editor'
   | 'console'
@@ -103,8 +104,9 @@ export const MIN_PANEL_SIZE = 150;
  * Panel zone classification for VSCode-style layout.
  * - 'editor': Panels that appear in the main editor area as tabs
  * - 'tool': Panels that appear in the bottom tool panel
+ * - 'inspector': Panels that appear in the right docking panel
  */
-export type PanelZone = 'editor' | 'tool';
+export type PanelZone = 'editor' | 'tool' | 'inspector';
 
 // Re-export from the canonical panel registry for backward compatibility.
 // New code should import directly from '@/registries/panelRegistry'.
@@ -112,10 +114,16 @@ export {
   PANEL_TYPE_LABELS,
   getToolPanelTypes,
   getEditorPanelTypes,
+  getInspectorPanelTypes,
   getPanelZone,
 } from '../registries/panelRegistry';
 
 /** @deprecated Import getToolPanelTypes() from panelRegistry instead. */
-import { getToolPanelTypes, getEditorPanelTypes } from '../registries/panelRegistry';
+import {
+  getToolPanelTypes,
+  getEditorPanelTypes,
+  getInspectorPanelTypes,
+} from '../registries/panelRegistry';
 export const TOOL_PANEL_TYPES: PanelType[] = getToolPanelTypes();
 export const EDITOR_PANEL_TYPES: PanelType[] = getEditorPanelTypes();
+export const INSPECTOR_PANEL_TYPES: PanelType[] = getInspectorPanelTypes();

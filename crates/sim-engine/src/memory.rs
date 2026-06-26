@@ -270,9 +270,9 @@ impl CanonicalRuntimeFacade {
         }
 
         MemorySnapshot {
-            id: modone_contract::runtime_env::new_id(),
+            id: modone_contract::clock::new_batch_id(),
             name: name.to_string(),
-            timestamp: modone_contract::runtime_env::now_rfc3339(),
+            timestamp: modone_contract::clock::now_rfc3339(),
             bit_devices,
             word_devices,
             timer_states,

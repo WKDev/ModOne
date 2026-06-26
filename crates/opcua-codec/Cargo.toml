@@ -1,0 +1,17 @@
+[package]
+name = "opcua-codec"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77.2"
+
+[dependencies]
+# default-features=false → wasm 단독 빌드에서 contract의 chrono/uuid를 제외하고
+# 주입 경로(clock 훅)를 쓴다. 네이티브 워크스페이스 빌드는 src-tauri가 std-clock을
+# 켜므로 피처 단일화로 chrono/uuid가 켜진다.
+modone-contract = { path = "../modone-contract", default-features = false }
+serde = { version = "1", features = ["derive"] }
+parking_lot = "0.12"
+thiserror = "1"
+
+[dev-dependencies]
+serde_json = "1"

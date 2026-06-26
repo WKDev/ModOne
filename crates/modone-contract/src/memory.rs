@@ -2,8 +2,6 @@ use std::collections::BTreeMap;
 
 use thiserror::Error;
 
-use crate::runtime_env;
-
 use super::{
     event_bus::CanonicalMemoryBus,
     types::{
@@ -158,7 +156,7 @@ impl CanonicalMemory {
         source: CanonicalWriteSource,
     ) -> Result<(), CanonicalMemoryError> {
         let timestamp = Self::timestamp();
-        let batch_id = runtime_env::new_id();
+        let batch_id = crate::clock::new_batch_id();
         let mut changes = Vec::new();
 
         for (address, value) in writes {
@@ -429,7 +427,7 @@ impl CanonicalMemory {
     }
 
     fn timestamp() -> String {
-        runtime_env::now_rfc3339()
+        crate::clock::now_rfc3339()
     }
 }
 

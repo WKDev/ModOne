@@ -496,16 +496,18 @@ pub fn start_secure_test_server(trace_path: &Path) -> TestServerFixture {
     {
         let _runtime_guard = runtime.enter();
         trace_to(trace_path, "starting server");
-        server
-            .start(
-                &canonical_memory,
+        let spec = {
+            let memory = canonical_memory.read();
+            app_lib::opcua::address_space::build_address_space_spec(
+                &memory,
                 profile.as_ref(),
                 &settings,
                 &tag_registry,
                 None,
-                None,
-                None,
             )
+        };
+        server
+            .start(&canonical_memory, spec, None, None)
             .expect("server should start");
         trace_to(trace_path, "server start returned");
     }
@@ -521,7 +523,10 @@ pub fn start_secure_test_server(trace_path: &Path) -> TestServerFixture {
     let adapter = OpcUaAdapter::new(
         Arc::clone(&canonical_memory),
         Arc::clone(&opcua_memory),
-        Arc::clone(&server),
+        // server.clone() 으로 Arc<OpcUaServer>를 반환시킨 뒤 인자 위치에서
+        // Arc<dyn OpcUaServerBackend>로 unsizing coercion (Arc::clone(&server)는
+        // 기대 타입이 T=dyn을 역추론해 &Arc<dyn> 참조를 요구하므로 사용 불가).
+        server.clone(),
     );
     adapter
         .publish_runtime_state()

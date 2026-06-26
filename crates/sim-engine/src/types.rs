@@ -366,7 +366,7 @@ impl Default for SimulationStatus {
             max_scan_time_us: 0,
             min_scan_time_us: 0,
             error: None,
-            last_update_time: modone_contract::runtime_env::now_rfc3339(),
+            last_update_time: modone_contract::clock::now_rfc3339(),
         }
     }
 }
@@ -537,7 +537,7 @@ impl Breakpoint {
     /// Create a new breakpoint
     pub fn new(breakpoint_type: BreakpointType) -> Self {
         Self {
-            id: modone_contract::runtime_env::new_id(),
+            id: modone_contract::clock::new_batch_id(),
             breakpoint_type,
             enabled: true,
             network_id: None,
@@ -595,7 +595,7 @@ impl WatchVariable {
         initial_value: serde_json::Value,
         max_history: usize,
     ) -> Self {
-        let now = modone_contract::runtime_env::now_millis();
+        let now = modone_contract::clock::now_millis();
         Self {
             binding,
             address,
@@ -614,7 +614,7 @@ impl WatchVariable {
     /// Update with a new value
     pub fn update(&mut self, new_value: serde_json::Value) {
         if self.current_value != new_value {
-            let now = modone_contract::runtime_env::now_millis();
+            let now = modone_contract::clock::now_millis();
             self.previous_value = self.current_value.clone();
             self.current_value = new_value.clone();
             self.change_count += 1;
@@ -666,9 +666,9 @@ pub struct MemorySnapshot {
 impl Default for MemorySnapshot {
     fn default() -> Self {
         Self {
-            id: modone_contract::runtime_env::new_id(),
+            id: modone_contract::clock::new_batch_id(),
             name: "Snapshot".to_string(),
-            timestamp: modone_contract::runtime_env::now_rfc3339(),
+            timestamp: modone_contract::clock::now_rfc3339(),
             bit_devices: HashMap::new(),
             word_devices: HashMap::new(),
             timer_states: HashMap::new(),

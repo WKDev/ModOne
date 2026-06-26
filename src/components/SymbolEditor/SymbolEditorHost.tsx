@@ -441,19 +441,37 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
         activeApp?.stop();
         pixiAppRef.current?.stop();
 
+        // Best-effort teardown: a throw in any single step must not abort the
+        // rest or escape the unmount and trip the error boundary. Destroying PIXI
+        // Text renderables (pin labels) returns their pooled render texture to
+        // PIXI's renderer-shared global TexturePool; during mount/unmount churn
+        // (StrictMode, or this editor and OneCanvas briefly coexisting) a sibling
+        // renderer's teardown can wipe the pool bucket first, making
+        // TexturePool.returnTexture throw "Cannot read properties of undefined
+        // (reading 'push')". GPU memory is reclaimed by context teardown anyway.
+        const safeDestroy = (fn: () => void) => {
+          try {
+            fn();
+          } catch (err) {
+            if (import.meta.env.DEV) {
+              console.warn('[SymbolEditorHost] non-fatal error during teardown:', err);
+            }
+          }
+        };
+
         // Destroy in reverse order. Detach pointer input first so no federated
         // event fires into half-destroyed renderers.
-        toolInputRef.current?.destroy();
-        overlayRendererRef.current?.destroy();
-        ghostRendererRef.current?.destroy();
-        pinRendererRef.current?.destroy();
-        primitiveRendererRef.current?.destroy();
-        gridRendererRef.current?.destroy();
+        safeDestroy(() => toolInputRef.current?.destroy());
+        safeDestroy(() => overlayRendererRef.current?.destroy());
+        safeDestroy(() => ghostRendererRef.current?.destroy());
+        safeDestroy(() => pinRendererRef.current?.destroy());
+        safeDestroy(() => primitiveRendererRef.current?.destroy());
+        safeDestroy(() => gridRendererRef.current?.destroy());
 
-        coordSysRef.current?.destroy();
-        destroyLayers(layersRef.current);
-        viewportRef.current?.destroy();
-        pixiAppRef.current?.destroy();
+        safeDestroy(() => coordSysRef.current?.destroy());
+        safeDestroy(() => destroyLayers(layersRef.current));
+        safeDestroy(() => viewportRef.current?.destroy());
+        safeDestroy(() => pixiAppRef.current?.destroy());
 
         overlayRendererRef.current = null;
         ghostRendererRef.current = null;

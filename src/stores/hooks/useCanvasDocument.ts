@@ -34,6 +34,7 @@ import {
   getWiresConnectedToComponent,
   getWiresConnectedToJunction,
   recalculateAutoHandles,
+  cleanupRedundantHandles,
   detectPortAtPosition,
 } from '../../components/OneCanvas/utils/canvasHelpers';
 import { polylineToHandles, simplifyWireHandles, enforceOrthogonalPolyline } from '../../components/OneCanvas/utils/wireSimplifier';
@@ -271,6 +272,14 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
                 if (simplified !== target.handles) {
                   target.handles = simplified;
                 }
+                // Keep joints on the grid and free of redundant bends after recompute
+                if (data.snapToGrid && target.handles) {
+                  target.handles = target.handles.map((h) => ({
+                    ...h,
+                    position: snapToGridPosition(h.position, data.gridSize, data.gridUnit),
+                  }));
+                }
+                cleanupRedundantHandles(target);
               }
             }
           }
@@ -308,6 +317,14 @@ export function useCanvasDocument(documentId: string | null): UseCanvasDocumentR
                 if (simplified !== target.handles) {
                   target.handles = simplified;
                 }
+                // Keep joints on the grid and free of redundant bends after recompute
+                if (data.snapToGrid && target.handles) {
+                  target.handles = target.handles.map((h) => ({
+                    ...h,
+                    position: snapToGridPosition(h.position, data.gridSize, data.gridUnit),
+                  }));
+                }
+                cleanupRedundantHandles(target);
               }
             }
           }

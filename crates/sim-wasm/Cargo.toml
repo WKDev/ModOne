@@ -8,6 +8,8 @@ rust-version = "1.77.2"
 crate-type = ["cdylib"]
 
 [dependencies]
-modone-contract = { path = "../modone-contract" }
+# default-features=false → std-clock off → clock이 자기완결 폴백(빈 타임스탬프,
+# 카운터 ID) 사용. wasm에 chrono/uuid 안 들어옴.
+modone-contract = { path = "../modone-contract", default-features = false }
 plc-model = { path = "../plc-model" }
 sim-engine = { path = "../sim-engine" }

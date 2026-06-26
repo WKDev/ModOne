@@ -11,9 +11,9 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::broadcast;
 
-use super::memory::ModbusMemory;
 use super::pdu;
 use super::types::{ConnectionEvent, ConnectionInfo, ModbusError, TcpConfig};
+use super::ModbusMemory;
 
 // Event channel name for connection events
 const EVENT_CONNECTION: &str = "modbus:connection";

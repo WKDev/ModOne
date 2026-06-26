@@ -9,6 +9,7 @@ import { projectDialogService } from '../../services/projectDialogService';
 import { fileDialogService } from '../../services/fileDialogService';
 import { importService } from '../../services/importService';
 import { commandRegistry } from '../CommandPalette/commandRegistry';
+import { useCommandPaletteStore } from '../../stores/commandPaletteStore';
 
 // ============================================================================
 // Platform detection (computed once)
@@ -183,6 +184,12 @@ const baseMenus: Menu[] = [
     label: 'View',
     items: [
       {
+        label: 'Command Palette…',
+        shortcut: 'Ctrl+Shift+P',
+        action: () => useCommandPaletteStore.getState().open(),
+      },
+      { separator: true, label: '' },
+      {
         label: 'Toggle Sidebar',
         shortcut: 'Ctrl+B',
         action: () => commandRegistry.execute('view.toggleLeftPanel'),
@@ -232,6 +239,15 @@ const baseMenus: Menu[] = [
         label: 'Zoom Out',
         shortcut: 'Ctrl+-',
         action: () => commandRegistry.execute('view.zoomOut'),
+      },
+      { separator: true, label: '' },
+      {
+        label: 'Sheet Editor',
+        action: () => commandRegistry.execute('layout.openSheetEditor'),
+      },
+      {
+        label: 'Sheet Editor (Popup)',
+        action: () => commandRegistry.execute('tools.openSheetEditorPopup'),
       },
     ],
   },

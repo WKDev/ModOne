@@ -64,14 +64,19 @@
       M0=0+scan→P0=0. 브라우저/Node wasm에서 PLC 스캔 → canonical memory 관찰.
 - [x] README(빌드/실행/ABI).
 
-## Phase 5 — main reconcile (C 완료 후 한 번에) — 계획: 05-RECONCILE-PLAN.md
-B(modbus-codec)·C(opcua-codec)가 이미 main 병합 → 충돌 면 발생. C 진행 중이라
-**C 안정 후 한 번에 reconcile**(사용자 결정 2026-06-27).
-- [ ] main fetch + rebase
-- [ ] contract: main `clock.rs` 채택, 내 `runtime_env.rs` 폐기, 호출부 교체
-- [ ] plc-model: Modbus 정책 타입을 `modbus-codec`에서 import(중복 정의 제거),
-      main 수정본 profile.rs 기준 재추출. modbus/opcua-codec 의존 추가(무순환).
-- [ ] sim-engine/sim-wasm 경로 점검, P→OutputBit ls.rs 수동 병합
-- [ ] 검증 게이트 전부 + sim-wasm 데모 PASS
-- [~] 트레이트 분할(ModbusPolicyProfile/OpcUaAliasProfile)은 **불필요**해짐
-      (plc-model이 codec 타입 import로 해결). 깔끔한 분할은 선택적 후속.
+## Phase 5 — main reconcile ✅ 완료 (계획: 05-RECONCILE-PLAN.md)
+B(modbus-codec)·C(opcua-codec) 병합된 main을 feat/wasm-sim-core에 머지·해소.
+- [x] `git merge main` — rename 감지로 B/C의 profile/ls/melsec 수정이 plc-model에
+      자동 적용. 충돌 4파일 수동 해소.
+- [x] contract: main `clock.rs` 채택, 내 `runtime_env.rs` 폐기, sim-engine 호출부를
+      clock으로 교체. clock에 `now_millis()` 추가(sim 스캔 타이밍용).
+- [x] plc-model: Modbus 정책 타입을 `modbus-codec`에서 import(profile_id String),
+      modbus-codec 의존 추가. contract는 default-features=false(코어 크레이트 규약).
+      project 의존 `modbus_mapping_policy(exposure)` 메서드는 trait에서 제거 유지.
+- [x] modbus_policy.rs profile_id → String. src-tauri Cargo.toml 4개 크레이트 통합.
+- [x] **modbus-codec 임시 hack 정리**: contract default-features=false + wasm uuid js
+      제거(B가 "A 상환 전까지 임시"로 남긴 것 → 정식 상환 완료). sim-wasm import 0개 복원.
+- [x] 검증: workspace check green · contract11/plc-model11/sim-engine77/modbus-codec27
+      통과 · sim-wasm wasm 빌드(import 0) · node 데모 PASS.
+- [~] 트레이트 분할은 불필요(plc-model이 codec 타입 import로 해결). 깔끔한 분할은
+      선택적 후속(원하면 ModbusPolicyProfile/OpcUaAliasProfile로 plc-model을 leaf화).

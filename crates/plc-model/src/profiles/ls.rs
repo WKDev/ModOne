@@ -392,7 +392,7 @@ impl VendorProfile for LsProfile {
 
     fn recommended_modbus_mapping_policy(&self) -> ModbusMappingPolicy {
         ModbusMappingPolicy {
-            profile_id: self.id(),
+            profile_id: self.id().as_str().to_string(),
             source: ModbusMappingSource::Recommended,
             rules: vec![
                 ModbusMappingRule {
@@ -415,7 +415,7 @@ impl VendorProfile for LsProfile {
 
     fn legacy_modbus_mapping_policy(&self) -> ModbusMappingPolicy {
         ModbusMappingPolicy {
-            profile_id: self.id(),
+            profile_id: self.id().as_str().to_string(),
             source: ModbusMappingSource::LegacyWide,
             rules: vec![
                 ModbusMappingRule {

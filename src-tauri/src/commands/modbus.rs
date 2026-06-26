@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 use crate::commands::network::NetworkState;
 use crate::modbus::{
     list_available_ports, MemoryMapSettings, ModbusMemory, ModbusRtuServer, ModbusTcpServer,
-    PortInfo, RtuConfig, RtuDataBits, RtuParity, RtuStopBits, TcpConfig,
+    PortInfo, RtuConfig, RtuDataBits, RtuParity, RtuStopBits, TauriEventSink, TcpConfig,
 };
 use crate::project::{ModbusSimulationTransport, Parity as ProjectParity, ProjectConfig};
 
@@ -131,7 +131,9 @@ pub(crate) async fn modbus_start_project_simulation(
     state
         .memory
         .reconfigure(&build_project_memory_map(project_config));
-    state.memory.set_app_handle(app_handle.clone());
+    state
+        .memory
+        .set_event_sink(Arc::new(TauriEventSink::new(app_handle.clone())));
 
     // If plc_ip is configured, ensure the IP alias is set up
     let network = &project_config.network;
@@ -379,7 +381,9 @@ pub async fn modbus_start_tcp(
     }
 
     // Set app handle on memory for event emission
-    state.memory.set_app_handle(app_handle.clone());
+    state
+        .memory
+        .set_event_sink(Arc::new(TauriEventSink::new(app_handle.clone())));
 
     let tcp_config: TcpConfig = config.unwrap_or_default().into();
     let mut server = ModbusTcpServer::new(tcp_config, Arc::clone(&state.memory));
@@ -430,7 +434,9 @@ pub async fn modbus_start_rtu(
     }
 
     // Set app handle on memory for event emission
-    state.memory.set_app_handle(app_handle.clone());
+    state
+        .memory
+        .set_event_sink(Arc::new(TauriEventSink::new(app_handle.clone())));
 
     let mut server = ModbusRtuServer::new(config, Arc::clone(&state.memory));
 

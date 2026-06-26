@@ -175,11 +175,13 @@ export function recalculateAutoHandles(
         first.position = { x: first.position.x, y: fromPos.y };
       } else {
         // Off-axis: insert bridge handle to maintain Manhattan routing
-        // Bridge at (first.x, fromPos.y) → creates horizontal from port, then vertical to first
+        // Bridge at (first.x, fromPos.y) → creates horizontal from port, then vertical to first.
+        // Source 'auto' so the next recalc discards & recomputes it — no accumulation;
+        // the wire heals back to the clean shape once the port re-aligns.
         const bridge: WireHandle = {
           position: { x: first.position.x, y: fromPos.y },
           constraint: 'free',
-          source: 'user',
+          source: 'auto',
         };
         userHandles.unshift(bridge);
       }
@@ -196,11 +198,12 @@ export function recalculateAutoHandles(
       } else if (dy < 1) {
         last.position = { x: last.position.x, y: toPos.y };
       } else {
-        // Off-axis: insert bridge handle to maintain Manhattan routing
+        // Off-axis: insert bridge handle to maintain Manhattan routing.
+        // Source 'auto' (see 'from' side above) — recomputed each recalc, never accumulates.
         const bridge: WireHandle = {
           position: { x: last.position.x, y: toPos.y },
           constraint: 'free',
-          source: 'user',
+          source: 'auto',
         };
         userHandles.push(bridge);
       }

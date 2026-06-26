@@ -2640,6 +2640,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "modbus-codec"
+version = "0.1.0"
+dependencies = [
+ "bitvec",
+ "modone-contract",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "modone"
 version = "0.1.0"
 dependencies = [
@@ -2652,8 +2665,10 @@ dependencies = [
  "keyring",
  "log",
  "machine-uid",
+ "modbus-codec",
  "modone-contract",
  "opcua",
+ "opcua-codec",
  "parking_lot",
  "plc-model",
  "quick-xml 0.38.4",
@@ -3209,6 +3224,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "opcua-codec"
+version = "0.1.0"
+dependencies = [
+ "modone-contract",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "open"
 version = "5.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3457,6 +3483,7 @@ checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
 name = "plc-model"
 version = "0.1.0"
 dependencies = [
+ "modbus-codec",
  "modone-contract",
  "serde",
  "thiserror 1.0.69",

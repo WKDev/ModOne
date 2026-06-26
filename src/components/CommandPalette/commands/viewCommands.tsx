@@ -18,6 +18,7 @@ import {
 import { commandRegistry } from '../commandRegistry';
 import { useLayoutStore } from '../../../stores/layoutStore';
 import { useLayoutPersistenceStore } from '../../../stores/layoutPersistenceStore';
+import { useRightDockStore } from '../../../stores/rightDockStore';
 import type { Command } from '../types';
 
 /**
@@ -44,10 +45,9 @@ export function registerViewCommands(): void {
       description: 'Show or hide the right panel',
       icon: <PanelRightClose size={16} />,
       shortcut: 'Ctrl+Alt+B',
-      keywords: ['panel', 'sidebar', 'right', 'properties'],
+      keywords: ['panel', 'sidebar', 'right', 'properties', 'inspector', 'memory'],
       execute: () => {
-        // Right panel toggle not yet implemented in layoutStore
-        console.log('Toggle Right Panel - not yet implemented');
+        useRightDockStore.getState().toggle();
       },
     },
     {

@@ -12,6 +12,7 @@
 import { useCallback } from 'react';
 import { useEditorAreaStore } from '../stores/editorAreaStore';
 import { useToolPanelStore } from '../stores/toolPanelStore';
+import { useRightDockStore } from '../stores/rightDockStore';
 import { useDocumentRegistry } from '../stores/documentRegistry';
 import { canvasService } from '../services/canvasService';
 import { circuitStateToVersionedSerializable } from '../components/OneCanvas/canvasUnits';
@@ -52,6 +53,9 @@ export function useFileOpen(): UseFileOpenResult {
 
   // Tool panel store for tool tabs
   const showAndActivateTool = useToolPanelStore((state) => state.showAndActivate);
+
+  // Right dock store for inspector tabs
+  const showAndActivateInspector = useRightDockStore((state) => state.showAndActivate);
 
   // Document registry for multi-document editing
   const createDocument = useDocumentRegistry((state) => state.createDocument);
@@ -109,9 +113,15 @@ export function useFileOpen(): UseFileOpenResult {
       const panelType = fileInfo.panelType as PanelType;
       const zone = getPanelZone(panelType);
 
-      // Handle tool panel types (console, memory-visualizer, properties)
+      // Handle tool panel types (console)
       if (zone === 'tool') {
         showAndActivateTool(panelType);
+        return;
+      }
+
+      // Handle inspector types (memory-visualizer, properties) → right dock
+      if (zone === 'inspector') {
+        showAndActivateInspector(panelType);
         return;
       }
 

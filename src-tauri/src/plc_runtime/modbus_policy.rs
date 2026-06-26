@@ -40,7 +40,8 @@ pub fn resolve_modbus_mapping_policy(
             }
 
             Ok(ModbusMappingPolicy {
-                profile_id: profile.id(),
+                // modbus-codec의 정책 profile_id는 vendor enum 결합을 끊은 String 라벨.
+                profile_id: profile.id().as_str().to_string(),
                 source: ModbusMappingSource::Custom,
                 rules,
             })
