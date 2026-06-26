@@ -183,7 +183,12 @@ function parsePort(el: Element): SymbolPin {
     id: attr(el, 'id') ?? '',
     name: attr(el, 'name') ?? '',
     number: attr(el, 'number') ?? '',
-    type: (attr(el, 'electricalType') as SymbolPin['type']) ?? 'input',
+    // Canvas pin type is stored separately from electricalType — they are not
+    // 1:1 (power_in→power, power_out→output). Fall back to electricalType only
+    // for older XML written before the `type` attribute existed.
+    type: (attr(el, 'type') as SymbolPin['type'])
+      ?? (attr(el, 'electricalType') as SymbolPin['type'])
+      ?? 'input',
     electricalType: attr(el, 'electricalType') as SymbolPin['electricalType'],
     functionalRole: attr(el, 'functionalRole') as SymbolPin['functionalRole'],
     shape: (attr(el, 'shape') as SymbolPin['shape']) ?? 'line',
@@ -497,7 +502,7 @@ export function symbolToXml(sym: SymbolDefinition): string {
   lines.push(`${ind(1)}<ms:Ports>`);
   for (const pin of sym.pins) {
     lines.push(`${ind(2)}<ms:Port id="${esc(pin.id)}" name="${esc(pin.name)}" number="${esc(pin.number)}"`);
-    lines.push(`${ind(3)}electricalType="${pin.electricalType ?? pin.type}" functionalRole="${pin.functionalRole ?? 'general'}"`);
+    lines.push(`${ind(3)}type="${pin.type}" electricalType="${pin.electricalType ?? pin.type}" functionalRole="${pin.functionalRole ?? 'general'}"`);
     lines.push(`${ind(3)}shape="${pin.shape}" orientation="${pin.orientation}"`);
     lines.push(`${ind(3)}x="${pin.position.x}" y="${pin.position.y}" length="${pin.length}" sortOrder="${pin.sortOrder ?? 1}"`);
     lines.push(`${ind(3)}nameVisible="${pin.nameVisible ?? true}" numberVisible="${pin.numberVisible ?? true}"/>`);
@@ -528,7 +533,7 @@ export function symbolToXml(sym: SymbolDefinition): string {
       lines.push(`${ind(3)}<ms:Ports>`);
       for (const pin of u.pins) {
         lines.push(`${ind(4)}<ms:Port id="${esc(pin.id)}" name="${esc(pin.name)}" number="${esc(pin.number)}"`);
-        lines.push(`${ind(5)}electricalType="${pin.electricalType ?? pin.type}" functionalRole="${pin.functionalRole ?? 'general'}"`);
+        lines.push(`${ind(5)}type="${pin.type}" electricalType="${pin.electricalType ?? pin.type}" functionalRole="${pin.functionalRole ?? 'general'}"`);
         lines.push(`${ind(5)}shape="${pin.shape}" orientation="${pin.orientation}"`);
         lines.push(`${ind(5)}x="${pin.position.x}" y="${pin.position.y}" length="${pin.length}" sortOrder="${pin.sortOrder ?? 1}"`);
         lines.push(`${ind(5)}nameVisible="${pin.nameVisible ?? true}" numberVisible="${pin.numberVisible ?? true}"/>`);
@@ -604,8 +609,28 @@ export function symbolToXml(sym: SymbolDefinition): string {
             ov.opacity != null ? `opacity="${ov.opacity}"` : '',
             ov.visible != null ? `visible="${ov.visible}"` : '',
             ov.strokeWidth != null ? `strokeWidth="${ov.strokeWidth}"` : '',
+            ov.text != null ? `text="${esc(ov.text)}"` : '',
+            ov.fontSize != null ? `fontSize="${ov.fontSize}"` : '',
+            ov.fontFamily ? `fontFamily="${esc(ov.fontFamily)}"` : '',
           ].filter(Boolean).join(' ');
-          lines.push(`${ind(4)}<ms:Override ${ovAttrs}/>`);
+          // Transform is a child element (not an attribute); previously dropped.
+          if (ov.transform) {
+            const t = ov.transform;
+            const tAttrs = [
+              t.translateX != null ? `translateX="${t.translateX}"` : '',
+              t.translateY != null ? `translateY="${t.translateY}"` : '',
+              t.rotation != null ? `rotation="${t.rotation}"` : '',
+              t.scaleX != null ? `scaleX="${t.scaleX}"` : '',
+              t.scaleY != null ? `scaleY="${t.scaleY}"` : '',
+              t.pivotX != null ? `pivotX="${t.pivotX}"` : '',
+              t.pivotY != null ? `pivotY="${t.pivotY}"` : '',
+            ].filter(Boolean).join(' ');
+            lines.push(`${ind(4)}<ms:Override ${ovAttrs}>`);
+            lines.push(`${ind(5)}<ms:Transform ${tAttrs}/>`);
+            lines.push(`${ind(4)}</ms:Override>`);
+          } else {
+            lines.push(`${ind(4)}<ms:Override ${ovAttrs}/>`);
+          }
         }
         lines.push(`${ind(3)}</ms:PrimitiveOverrides>`);
       }
