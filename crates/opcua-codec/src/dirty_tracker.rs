@@ -8,9 +8,9 @@ use std::sync::Arc;
 
 use parking_lot::RwLock;
 
-use crate::plc_runtime::CanonicalAddress;
+use modone_contract::CanonicalAddress;
 
-use super::mapping::{OpcUaMappingStore, RegisterRange};
+use crate::mapping::{OpcUaMappingStore, RegisterRange};
 
 // ---------------------------------------------------------------------------
 // Dirty flag tracker — per-register change detection for mapping conversion
@@ -264,7 +264,7 @@ impl DirtyTracker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plc_runtime::CanonicalAreaKind;
+    use modone_contract::CanonicalAreaKind;
 
     fn addr(area: CanonicalAreaKind, index: u32) -> CanonicalAddress {
         CanonicalAddress::new(area, index)
@@ -511,7 +511,7 @@ mod tests {
 
     #[test]
     fn collect_dirty_tags_returns_only_dirty() {
-        use super::super::mapping::{
+        use crate::mapping::{
             ByteOrder, MappingAccessLevel, OpcUaDataType, OpcUaMappingConfig, OpcUaMappingStore,
         };
 
@@ -581,7 +581,7 @@ mod tests {
 
     #[test]
     fn collect_dirty_tags_empty_when_clean() {
-        use super::super::mapping::{OpcUaMappingConfig, OpcUaMappingStore};
+        use crate::mapping::{OpcUaMappingConfig, OpcUaMappingStore};
 
         let store = OpcUaMappingStore::new();
         store.insert("tag-a".to_string(), OpcUaMappingConfig::default_for_word());
@@ -599,7 +599,7 @@ mod tests {
 
     #[test]
     fn collect_and_drain_returns_dirty_and_clears() {
-        use super::super::mapping::{OpcUaMappingConfig, OpcUaMappingStore};
+        use crate::mapping::{OpcUaMappingConfig, OpcUaMappingStore};
 
         let store = OpcUaMappingStore::new();
         store.insert("tag-a".to_string(), OpcUaMappingConfig::default_for_word());
@@ -626,7 +626,7 @@ mod tests {
 
     #[test]
     fn collect_dirty_tags_skips_tags_without_address() {
-        use super::super::mapping::{OpcUaMappingConfig, OpcUaMappingStore};
+        use crate::mapping::{OpcUaMappingConfig, OpcUaMappingStore};
 
         let store = OpcUaMappingStore::new();
         store.insert("tag-a".to_string(), OpcUaMappingConfig::default_for_word());
@@ -648,7 +648,7 @@ mod tests {
 
     #[test]
     fn collect_dirty_tags_boolean_bit_address() {
-        use super::super::mapping::{
+        use crate::mapping::{
             ByteOrder, MappingAccessLevel, OpcUaDataType, OpcUaMappingConfig, OpcUaMappingStore,
         };
 
@@ -688,7 +688,7 @@ mod tests {
 
     #[test]
     fn multi_word_tag_dirty_on_first_register_only() {
-        use super::super::mapping::{
+        use crate::mapping::{
             ByteOrder, MappingAccessLevel, OpcUaDataType, OpcUaMappingConfig, OpcUaMappingStore,
         };
 
@@ -719,7 +719,7 @@ mod tests {
 
     #[test]
     fn multi_word_tag_dirty_on_last_register_only() {
-        use super::super::mapping::{
+        use crate::mapping::{
             ByteOrder, MappingAccessLevel, OpcUaDataType, OpcUaMappingConfig, OpcUaMappingStore,
         };
 
@@ -753,7 +753,7 @@ mod tests {
 
     #[test]
     fn dirty_register_outside_all_tag_ranges_yields_no_tags() {
-        use super::super::mapping::{OpcUaMappingConfig, OpcUaMappingStore};
+        use crate::mapping::{OpcUaMappingConfig, OpcUaMappingStore};
 
         let store = OpcUaMappingStore::new();
         store.insert("tag-a".to_string(), OpcUaMappingConfig::default_for_word());
@@ -774,7 +774,7 @@ mod tests {
 
     #[test]
     fn large_scale_dirty_tracking_10k_tags() {
-        use super::super::mapping::{OpcUaMappingConfig, OpcUaMappingStore};
+        use crate::mapping::{OpcUaMappingConfig, OpcUaMappingStore};
 
         let store = OpcUaMappingStore::new();
         let mut tag_addrs = HashMap::new();

@@ -559,7 +559,7 @@ mod tests {
 
     fn sample_xml(id: &str) -> String {
         format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?>
+            r##"<?xml version="1.0" encoding="UTF-8"?>
 <ms:SymbolDefinition
   xmlns:ms="http://modone.io/schema/symbol/1.0"
   id="{id}"
@@ -579,7 +579,7 @@ mod tests {
              stroke="#888888" fill="transparent" strokeWidth="2"/>
   </ms:Graphics>
 </ms:SymbolDefinition>
-"#,
+"##,
             id = id
         )
     }
