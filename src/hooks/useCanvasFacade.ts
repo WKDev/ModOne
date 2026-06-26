@@ -37,6 +37,7 @@ import {
   alignComponents,
   distributeComponents,
   flipComponents,
+  rotateComponents,
 } from '../components/OneCanvas/utils/canvas-commands';
 import type { CanvasFacadeReturn, WireDrawingState } from '../types/canvasFacade';
 
@@ -348,6 +349,45 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
     ]
   );
 
+  const rotateDocumentSelected = useCallback(
+    (degrees: number) => {
+      if (!documentId || !activeDocumentState) return;
+      pushHistory(documentId);
+      if (document && isCanvasDocument(document)) {
+        updateCanvasData(documentId, (docData) => {
+          docData.components = rotateComponents(docData.components, documentSelectedIds, degrees);
+        });
+        return;
+      }
+      if (document && isSchematicDocument(document)) {
+        updateSchematicData(documentId, (docData) => {
+          const page =
+            docData.schematic.pages.find(
+              (candidate) => candidate.id === docData.schematic.activePageId
+            ) ?? null;
+          if (!page) return;
+          const components = rotateComponents(
+            new Map(Object.entries(page.circuit.components)) as Map<string, Block>,
+            documentSelectedIds,
+            degrees
+          );
+          page.circuit.components = Object.fromEntries(components);
+          page.updatedAt = new Date().toISOString();
+          docData.schematic.updatedAt = new Date().toISOString();
+        });
+      }
+    },
+    [
+      documentId,
+      activeDocumentState,
+      documentSelectedIds,
+      pushHistory,
+      document,
+      updateCanvasData,
+      updateSchematicData,
+    ]
+  );
+
   const flipDocumentSelected = useCallback(
     (axis: 'horizontal' | 'vertical') => {
       if (!documentId || !activeDocumentState) return;
@@ -549,6 +589,7 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
         alignSelected: alignDocumentSelected,
         distributeSelected: distributeDocumentSelected,
         flipSelected: flipDocumentSelected,
+        rotateSelected: rotateDocumentSelected,
         // CircuitIO
         getCircuitData: getDocumentCircuitData,
         loadCircuit: loadDocumentCircuit,
@@ -621,6 +662,7 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
         alignSelected: () => { },
         distributeSelected: () => { },
         flipSelected: () => { },
+        rotateSelected: () => { },
         getCircuitData: () => ({
           components: {},
           wires: [],
@@ -677,6 +719,7 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
     alignDocumentSelected,
     distributeDocumentSelected,
     flipDocumentSelected,
+    rotateDocumentSelected,
     getDocumentCircuitData,
     loadDocumentCircuit,
     documentUndo,

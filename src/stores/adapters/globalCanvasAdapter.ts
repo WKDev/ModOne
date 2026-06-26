@@ -110,6 +110,7 @@ export function useGlobalCanvasAdapter(): CanvasFacadeReturn {
   const alignSelected = useCanvasStore((s) => s.alignSelected);
   const distributeSelected = useCanvasStore((s) => s.distributeSelected);
   const flipSelected = useCanvasStore((s) => s.flipSelected);
+  const rotateSelected = useCanvasStore((s) => s.rotateSelectedComponents);
 
   // History
   const globalUndo = useCanvasStore((s) => s.undo);
@@ -176,6 +177,7 @@ export function useGlobalCanvasAdapter(): CanvasFacadeReturn {
       alignSelected,
       distributeSelected,
       flipSelected,
+      rotateSelected,
 
       // Circuit I/O
       getCircuitData,
@@ -248,6 +250,7 @@ export function useGlobalCanvasAdapter(): CanvasFacadeReturn {
       alignSelected,
       distributeSelected,
       flipSelected,
+      rotateSelected,
       // Circuit I/O
       getCircuitData,
       loadCircuit,

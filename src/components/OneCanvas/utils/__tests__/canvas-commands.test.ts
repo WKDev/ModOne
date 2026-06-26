@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Block } from '../../types';
-import { alignComponents, distributeComponents, flipComponents } from '../canvas-commands';
+import { alignComponents, distributeComponents, flipComponents, rotateComponents } from '../canvas-commands';
 
 function makeBlock(id: string, x: number, y: number, w: number, h: number): Block {
   return {
@@ -156,6 +156,28 @@ describe('canvas-commands', () => {
     expect(result.get('a')?.position.y).toBe(80);
     expect(result.get('b')?.position.y).toBe(50);
     expect(result.get('c')?.position.y).toBe(0);
+  });
+
+  it('rotateComponents adds degrees cumulatively to each selected block', () => {
+    const components = new Map<string, Block>([
+      ['a', { ...makeBlock('a', 0, 0, 10, 10), rotation: 90 }],
+      ['b', makeBlock('b', 0, 0, 10, 10)],
+    ]);
+
+    const result = rotateComponents(components, new Set(['a', 'b']), 90);
+
+    expect(result.get('a')?.rotation).toBe(180);
+    expect(result.get('b')?.rotation).toBe(90);
+  });
+
+  it('rotateComponents normalizes wrap-around and negative (CCW) degrees to 0..359', () => {
+    const components = new Map<string, Block>([
+      ['a', { ...makeBlock('a', 0, 0, 10, 10), rotation: 270 }],
+      ['b', makeBlock('b', 0, 0, 10, 10)],
+    ]);
+
+    expect(rotateComponents(components, new Set(['a']), 90).get('a')?.rotation).toBe(0);
+    expect(rotateComponents(components, new Set(['b']), -90).get('b')?.rotation).toBe(270);
   });
 
   it('filters missing selected IDs and ignores non-existent blocks', () => {

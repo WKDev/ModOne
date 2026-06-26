@@ -44,6 +44,7 @@ function createFacade(): CanvasFacadeReturn {
     alignSelected: vi.fn(),
     distributeSelected: vi.fn(),
     flipSelected: vi.fn(),
+    rotateSelected: vi.fn(),
     getCircuitData: vi.fn(),
     loadCircuit: vi.fn(),
     wireDrawing: null,
