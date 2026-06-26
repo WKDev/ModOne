@@ -1,11 +1,16 @@
 import { useCallback, useMemo, useReducer, useState } from 'react';
+import { toast } from 'sonner';
 import { Save, X, Layers, FileDown, Play, Pencil } from 'lucide-react';
-import type { SymbolDefinition } from '../../types/symbol';
+import type { SymbolDefinition, LibraryScope, TextPrimitive } from '../../types/symbol';
 import { EditorToolbar } from './EditorToolbar';
 import { PinConfigPopover } from './PinConfigPopover';
+import { TextInputPopover } from './TextInputPopover';
 import { PropertiesPanel } from './PropertiesPanel';
 import { VisualStateBar } from './VisualStateBar';
 import { symbolToXml } from '../../services/symbolXmlParser';
+import { saveSymbol as saveSymbolToLibrary } from '../../services/symbolService';
+import { validateSymbol } from '../../utils/symbolValidation';
+import { useSymbolStore } from '../../stores/symbolStore';
 import { SymbolEditorHost } from './SymbolEditorHost';
 
 // Editor model / reducer / helpers — split out of this file to keep it small
@@ -41,6 +46,12 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
     () => (symbol?.units && symbol.units.length > 0) ? 0 : null,
   );
   const [pinPopover, setPinPopover] = useState<{
+    screenX: number;
+    screenY: number;
+    canvasX: number;
+    canvasY: number;
+  } | null>(null);
+  const [textPopover, setTextPopover] = useState<{
     screenX: number;
     screenY: number;
     canvasX: number;
@@ -171,16 +182,44 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
   }, [localSymbol]);
 
   // ── Preview mode ───────────────────────────────────────────────────────────
+  // Preview is a static, non-editing view: edit handles are hidden and the
+  // active visual state can be cycled to inspect the symbol's appearance.
   // (`previewMode` state is declared up top, beside the other editor state.)
 
-  const [previewPoweredPorts, setPreviewPoweredPorts] = useState<Set<string>>(new Set());
-  void previewPoweredPorts; // used by future Preview sub-AC
+  // ── Save to project / global library ───────────────────────────────────────
 
-  // ── Save ───────────────────────────────────────────────────────────────────
+  const [saveScope, setSaveScope] = useState<LibraryScope>('project');
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = () => {
-    onSave?.(localSymbol);
-  };
+  const handleSave = useCallback(async () => {
+    // Validate before persisting — block on any validation error.
+    const result = validateSymbol(localSymbol);
+    if (!result.valid) {
+      toast.error('Cannot save symbol', { description: result.errors[0].message });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // symbolService already surfaces failures via toast and rethrows.
+      await saveSymbolToLibrary(projectDir, localSymbol, saveScope);
+      // Refresh the in-memory library so the Toolbox picks the symbol up
+      // immediately (the saved symbol becomes loadable/placeable right away).
+      await useSymbolStore.getState().loadLibrary(projectDir);
+      dispatch({ type: 'MARK_CLEAN' });
+      onSave?.(localSymbol);
+      toast.success(
+        saveScope === 'project'
+          ? 'Saved to project library'
+          : 'Saved to global library',
+        { description: localSymbol.name },
+      );
+    } catch {
+      // Error toast already shown by symbolService; keep editor state intact.
+    } finally {
+      setIsSaving(false);
+    }
+  }, [localSymbol, projectDir, saveScope, onSave]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -204,12 +243,7 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
           {/* Edit / Preview toggle */}
           <button
             type="button"
-            onClick={() => {
-              setPreviewMode((v) => {
-                if (!v) setPreviewPoweredPorts(new Set());
-                return !v;
-              });
-            }}
+            onClick={() => setPreviewMode((v) => !v)}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded transition-colors ${
               previewMode
                 ? 'bg-amber-600 text-white hover:bg-amber-500'
@@ -243,14 +277,31 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
             XML
           </button>
 
+          {/* Save target library scope */}
+          <select
+            data-testid="save-scope-select"
+            value={saveScope}
+            onChange={(e) => setSaveScope(e.target.value as LibraryScope)}
+            disabled={isSaving}
+            className="px-2 py-1.5 text-sm rounded bg-neutral-700 text-neutral-200 border border-neutral-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            title="Library to save into"
+          >
+            <option value="project">Project</option>
+            <option value="global">Global</option>
+          </select>
+
           <button
             type="button"
+            data-testid="save-to-library-btn"
             onClick={handleSave}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-500"
-            title="Save"
+            disabled={isSaving}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded text-white transition-colors ${
+              isSaving ? 'bg-neutral-600 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500'
+            }`}
+            title={`Save to ${saveScope} library`}
           >
             <Save size={14} />
-            Save
+            {isSaving ? 'Saving…' : 'Save to Library'}
           </button>
           <button
             type="button"
@@ -344,6 +395,9 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
             onOpenPinPopover={previewMode ? undefined : (screenX, screenY, canvasX, canvasY) => {
               setPinPopover({ screenX, screenY, canvasX, canvasY });
             }}
+            onOpenTextPopover={previewMode ? undefined : (screenX, screenY, canvasX, canvasY) => {
+              setTextPopover({ screenX, screenY, canvasX, canvasY });
+            }}
             editingPolylineIndex={state.editingPolylineIndex}
             activeVisualState={state.activeVisualState}
             style={{ width: '100%', height: '100%' }}
@@ -384,6 +438,7 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
           onEnsurePrimitiveId={handleEnsurePrimitiveId}
           onUpdatePrimitiveLabel={handleUpdatePrimitiveLabel}
           onUpdatePrimitiveText={handleUpdatePrimitiveText}
+          onUpdatePrimitive={handleUpdatePrimitive}
           onUpdatePin={handleUpdatePin}
         />
       </div>
@@ -400,6 +455,29 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
             setPinPopover(null);
           }}
           onCancel={() => setPinPopover(null)}
+        />
+      )}
+
+      {/* ─ Text input popover ──────────────────────────────────────────────── */}
+      {textPopover && (
+        <TextInputPopover
+          screenX={textPopover.screenX}
+          screenY={textPopover.screenY}
+          onConfirm={(text) => {
+            const textPrim: TextPrimitive = {
+              kind: 'text',
+              x: textPopover.canvasX,
+              y: textPopover.canvasY,
+              text,
+              fontSize: 12,
+              fontFamily: 'monospace',
+              fill: '#333333',
+              anchor: 'start',
+            };
+            handleAddPrimitive(textPrim);
+            setTextPopover(null);
+          }}
+          onCancel={() => setTextPopover(null)}
         />
       )}
     </div>

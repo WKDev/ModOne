@@ -1,28 +1,26 @@
-
+// 텍스트 배치 도구 — 클릭 시 인앱 팝오버를 열어 텍스트 내용을 입력받는다
 import { BaseTool, type CanvasPoint, type ToolCallbacks } from './BaseTool';
-import type { TextPrimitive } from '../../../types/symbol';
 import type { GhostShape } from '../types';
 
+export interface TextToolCallbacks extends ToolCallbacks {
+  onOpenTextPopover: (screenX: number, screenY: number, canvasX: number, canvasY: number) => void;
+}
+
 export class TextTool extends BaseTool {
+  private _lastScreen: { x: number; y: number } = { x: 0, y: 0 };
+
+  setLastScreen(x: number, y: number): void {
+    this._lastScreen = { x, y };
+  }
+
   onMouseDown(pt: CanvasPoint, callbacks: ToolCallbacks): void {
-    // Use a small timeout to ensure the click event doesn't interfere with the prompt
-    // or just call it directly. React events are synthetic, so it should be fine.
-    // However, window.prompt blocks the UI.
-    
-    const text = window.prompt('Enter text:', '');
-    if (text) {
-      const textPrim: TextPrimitive = {
-        kind: 'text',
-        x: pt.x,
-        y: pt.y,
-        text,
-        fontSize: 12,
-        fontFamily: 'monospace',
-        fill: '#333333',
-        anchor: 'start',
-      };
-      callbacks.onAddPrimitive(textPrim);
-    }
+    const textCallbacks = callbacks as TextToolCallbacks;
+    textCallbacks.onOpenTextPopover(
+      this._lastScreen.x,
+      this._lastScreen.y,
+      pt.x,
+      pt.y,
+    );
   }
 
   onMouseMove(_pt: CanvasPoint, _callbacks: ToolCallbacks): GhostShape | null {
@@ -33,4 +31,6 @@ export class TextTool extends BaseTool {
   onMouseUp(_pt: CanvasPoint, _callbacks: ToolCallbacks): void {
     // No-op
   }
+
+  cancel(): void {}
 }

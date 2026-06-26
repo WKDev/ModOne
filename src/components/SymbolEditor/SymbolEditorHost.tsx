@@ -24,7 +24,7 @@ import {
 } from 'react';
 import { Container } from 'pixi.js';
 
-import type { GraphicPrimitive, SymbolDefinition, SymbolPin } from '@/types/symbol';
+import type { GraphicPrimitive, SymbolDefinition } from '@/types/symbol';
 import type { EditorAction } from './SymbolEditor';
 import type { GhostShape, SymbolEditorHostHandle, SymbolEditorLayerConfig, SymbolEditorLayerName } from './types';
 import { SYMBOL_EDITOR_LAYERS } from './types';
@@ -43,6 +43,7 @@ import { OverlayRenderer } from './renderers/OverlayRenderer';
 import type { BaseTool, CanvasPoint, ToolCallbacks } from './tools';
 import { SelectTool, RectTool, CircleTool, LineTool, PolylineTool, ArcTool, TextTool, PinTool } from './tools';
 import type { PinToolCallbacks } from './tools/PinTool';
+import type { TextToolCallbacks } from './tools/TextTool';
 
 import type { EditorTool } from './SymbolEditor';
 
@@ -61,8 +62,6 @@ export interface SymbolEditorHostProps {
   dispatch: React.Dispatch<EditorAction>;
   /** Callback when a primitive is added */
   onAddPrimitive?: (prim: GraphicPrimitive) => void;
-  /** Callback when a pin is being placed (opens popover) */
-  onAddPin?: (pin: SymbolPin) => void;
   /** Callback when an existing pin is dragged to a new position (legacy singular) */
   onMovePin?: (pinId: string, newPosition: { x: number; y: number }) => void;
   /** Callback when selected primitives are dragged */
@@ -81,6 +80,8 @@ export interface SymbolEditorHostProps {
   onDeleteSelected?: () => void;
   /** Callback to open pin config popover */
   onOpenPinPopover?: (screenX: number, screenY: number, canvasX: number, canvasY: number) => void;
+  /** Callback to open the text-input popover (text tool) */
+  onOpenTextPopover?: (screenX: number, screenY: number, canvasX: number, canvasY: number) => void;
   /** Active visual state context (null = base/default). Overrides applied upstream. */
   activeVisualState?: string | null;
   /** Container CSS class */
@@ -198,6 +199,7 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       editingPolylineIndex,
       onDeleteSelected,
       onOpenPinPopover,
+      onOpenTextPopover,
       className,
       style,
     } = props;
@@ -251,6 +253,8 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
     onDeleteSelectedRef.current = onDeleteSelected;
     const onOpenPinPopoverRef = useRef(onOpenPinPopover);
     onOpenPinPopoverRef.current = onOpenPinPopover;
+    const onOpenTextPopoverRef = useRef(onOpenTextPopover);
+    onOpenTextPopoverRef.current = onOpenTextPopover;
     const selectedIdsRef = useRef(selectedIds);
     selectedIdsRef.current = selectedIds;
     const currentToolRef = useRef(currentTool);
@@ -594,6 +598,11 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       onOpenPinPopover: onOpenPinPopoverRef.current ?? (() => {}),
     });
 
+    const getTextToolCallbacks = (): TextToolCallbacks => ({
+      ...getToolCallbacks(),
+      onOpenTextPopover: onOpenTextPopoverRef.current ?? (() => {}),
+    });
+
     // ── Tool dispatch (coordinate-source agnostic) ──
     // These run the active tool for a pointer event. `clientX/clientY` are the
     // window-relative coords used only to position the pin popover (DOM overlay);
@@ -607,6 +616,9 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       if (tool instanceof PinTool) {
         tool.setLastScreen(clientX, clientY);
         tool.onMouseDown(point, getPinToolCallbacks());
+      } else if (tool instanceof TextTool) {
+        tool.setLastScreen(clientX, clientY);
+        tool.onMouseDown(point, getTextToolCallbacks());
       } else {
         tool.onMouseDown(point, getToolCallbacks());
       }
@@ -622,6 +634,9 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       if (tool instanceof PinTool) {
         tool.setLastScreen(clientX, clientY);
         ghost = tool.onMouseMove(point, getPinToolCallbacks());
+      } else if (tool instanceof TextTool) {
+        tool.setLastScreen(clientX, clientY);
+        ghost = tool.onMouseMove(point, getTextToolCallbacks());
       } else {
         ghost = tool.onMouseMove(point, getToolCallbacks());
       }
@@ -676,6 +691,9 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       if (tool instanceof PinTool) {
         tool.setLastScreen(clientX, clientY);
         tool.onMouseUp(point, getPinToolCallbacks());
+      } else if (tool instanceof TextTool) {
+        tool.setLastScreen(clientX, clientY);
+        tool.onMouseUp(point, getTextToolCallbacks());
       } else {
         tool.onMouseUp(point, getToolCallbacks());
       }

@@ -21,6 +21,7 @@ interface PropertiesPanelProps {
   activeUnit?: number | null;
   onUpdatePrimitiveLabel?: (index: number, label: string) => void;
   onUpdatePrimitiveText?: (index: number, text: string) => void;
+  onUpdatePrimitive?: (index: number, prim: GraphicPrimitive) => void;
   onUpdatePin?: (pinId: string, updates: Partial<Pick<SymbolPin, 'name' | 'number' | 'type' | 'orientation' | 'position'>>) => void;
   // Sub-AC 3-1: Visual State context tracking
   /** The currently active VisualState being edited (null = base) */
@@ -389,6 +390,7 @@ interface ShapeInspectorProps {
   currentOverride?: GraphicPrimitiveOverride;
   onUpdatePrimitiveLabel?: (index: number, label: string) => void;
   onUpdatePrimitiveText?: (index: number, text: string) => void;
+  onUpdatePrimitive?: (index: number, prim: GraphicPrimitive) => void;
   onUpdatePin?: (pinId: string, updates: Partial<Pick<SymbolPin, 'name' | 'number' | 'type' | 'orientation' | 'position'>>) => void;
   onEnsurePrimitiveId?: (index: number) => void;
   onUpdateVisualStateOverride?: (primitiveId: string, override: Partial<GraphicPrimitiveOverride>) => void;
@@ -401,6 +403,7 @@ function ShapeInspector({
   currentOverride,
   onUpdatePrimitiveLabel,
   onUpdatePrimitiveText,
+  onUpdatePrimitive,
   onUpdatePin,
   onEnsurePrimitiveId,
   onUpdateVisualStateOverride,
@@ -494,6 +497,22 @@ function ShapeInspector({
             </p>
           )}
         </div>
+
+        {/* Closed-polygon toggle — only for polylines */}
+        {primitive.kind === 'polyline' && (
+          <label className="flex items-center gap-2 px-1 text-xs text-neutral-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              data-testid={`polyline-closed-${index}`}
+              checked={!!primitive.closed}
+              onChange={(e) =>
+                onUpdatePrimitive?.(index, { ...primitive, closed: e.target.checked })
+              }
+              className="accent-blue-500"
+            />
+            Closed polygon (connect last point to first)
+          </label>
+        )}
 
         {/* ── Visual State Override Section ── */}
         {inNamedState && (
@@ -611,6 +630,7 @@ export function PropertiesPanel({
   activeVisualState,
   onUpdatePrimitiveLabel,
   onUpdatePrimitiveText,
+  onUpdatePrimitive,
   onUpdatePin,
   onEnsurePrimitiveId,
   onUpdateVisualStateOverride,
@@ -766,6 +786,7 @@ export function PropertiesPanel({
             currentOverride={currentOverride}
             onUpdatePrimitiveLabel={onUpdatePrimitiveLabel}
             onUpdatePrimitiveText={onUpdatePrimitiveText}
+            onUpdatePrimitive={onUpdatePrimitive}
             onUpdatePin={onUpdatePin}
             onEnsurePrimitiveId={onEnsurePrimitiveId}
             onUpdateVisualStateOverride={onUpdateVisualStateOverride}
