@@ -189,5 +189,7 @@ editor save:  SymbolDefinition ──symbolToXml──▶ .symbol.xml   (lossles
   `lib/symbolXmlParser`, `utils/xmlSymbolLoader`) are not unified.
 - Latent symbol-data bugs in §3 (pin electrical types, plc_output address).
 - Sheet editor migrated to the shared PIXI engine (`SheetCanvasHost`, Phase 3) —
-  render/pan/zoom/grid/select/move/resize done; selection-redraw-after-move and
-  proper inline text/table cell editing remain (3b).
+  render / pan / zoom / grid / select / move / resize, live selection, fit-on-
+  resize, and double-click inline text + table-cell editing (an HTML `<input>`
+  overlay placed via the viewport world→screen transform). Resize is ported but
+  not yet exercised by the QA harness.
