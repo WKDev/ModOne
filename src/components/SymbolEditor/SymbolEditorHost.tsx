@@ -82,6 +82,12 @@ export interface SymbolEditorHostProps {
   onOpenPinPopover?: (screenX: number, screenY: number, canvasX: number, canvasY: number) => void;
   /** Callback to open the text-input popover (text tool) */
   onOpenTextPopover?: (screenX: number, screenY: number, canvasX: number, canvasY: number) => void;
+  /** Interactive preview mode — clicking a pin toggles its powered state. */
+  previewMode?: boolean;
+  /** Pin ids currently powered (preview) — drawn with a glow. */
+  poweredPins?: ReadonlySet<string>;
+  /** Called in preview when a pin is clicked (to toggle its powered state). */
+  onTogglePoweredPin?: (pinId: string) => void;
   /** Active visual state context (null = base/default). Overrides applied upstream. */
   activeVisualState?: string | null;
   /** Container CSS class */
@@ -200,6 +206,9 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       onDeleteSelected,
       onOpenPinPopover,
       onOpenTextPopover,
+      previewMode,
+      poweredPins,
+      onTogglePoweredPin,
       className,
       style,
     } = props;
@@ -255,6 +264,12 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
     onOpenPinPopoverRef.current = onOpenPinPopover;
     const onOpenTextPopoverRef = useRef(onOpenTextPopover);
     onOpenTextPopoverRef.current = onOpenTextPopover;
+    const previewModeRef = useRef(previewMode);
+    previewModeRef.current = previewMode;
+    const poweredPinsRef = useRef(poweredPins);
+    poweredPinsRef.current = poweredPins;
+    const onTogglePoweredPinRef = useRef(onTogglePoweredPin);
+    onTogglePoweredPinRef.current = onTogglePoweredPin;
     const selectedIdsRef = useRef(selectedIds);
     selectedIdsRef.current = selectedIds;
     const currentToolRef = useRef(currentTool);
@@ -393,12 +408,19 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
           viewport: viewport.viewport,
           coordSys,
           handlers: {
-            onPointerDown: (p) =>
+            onPointerDown: (p) => {
+              // Interactive preview: a click toggles the nearest pin's power
+              // instead of running an editing tool.
+              if (previewModeRef.current) {
+                handlePreviewPointerDown(p.snapped.x, p.snapped.y);
+                return;
+              }
               runToolDown(
                 { x: p.snapped.x, y: p.snapped.y, shiftKey: p.shiftKey, altKey: p.altKey },
                 p.client.x,
                 p.client.y,
-              ),
+              );
+            },
             onPointerMove: (p) =>
               runToolMove(
                 { x: p.snapped.x, y: p.snapped.y, shiftKey: p.shiftKey, altKey: p.altKey },
@@ -424,7 +446,7 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
         // 7. Initial symbol render
         if (symbolRef.current) {
           primitiveRendererRef.current.renderAll(symbolRef.current.graphics);
-          pinRendererRef.current.renderAll(symbolRef.current.pins);
+          pinRendererRef.current.renderAll(symbolRef.current.pins, poweredPinsRef.current);
         }
 
         // 8. Center viewport on origin
@@ -497,12 +519,12 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
       if (!primitiveRendererRef.current || !pinRendererRef.current) return;
       if (symbol) {
         primitiveRendererRef.current.renderAll(symbol.graphics);
-        pinRendererRef.current.renderAll(symbol.pins);
+        pinRendererRef.current.renderAll(symbol.pins, poweredPins);
       } else {
         primitiveRendererRef.current.renderAll([]);
         pinRendererRef.current.renderAll([]);
       }
-    }, [symbol]);
+    }, [symbol, poweredPins]);
 
     // React to selection changes → update highlights
     useEffect(() => {
@@ -607,6 +629,25 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
     // These run the active tool for a pointer event. `clientX/clientY` are the
     // window-relative coords used only to position the pin popover (DOM overlay);
     // `point` is the snapped world point. Fed by PIXI federated events below.
+
+    // ── Interactive preview: hit-test pins and toggle their powered state ──
+    const handlePreviewPointerDown = (x: number, y: number) => {
+      const sym = symbolRef.current;
+      const toggle = onTogglePoweredPinRef.current;
+      if (!sym || !toggle) return;
+      const HIT_RADIUS = 8;
+      let best: { id: string; dist: number } | null = null;
+      for (const pin of sym.pins) {
+        if (pin.hidden) continue;
+        const dx = pin.position.x - x;
+        const dy = pin.position.y - y;
+        const dist = Math.hypot(dx, dy);
+        if (dist <= HIT_RADIUS && (!best || dist < best.dist)) {
+          best = { id: pin.id, dist };
+        }
+      }
+      if (best) toggle(best.id);
+    };
 
     const runToolDown = (point: CanvasPoint, clientX: number, clientY: number) => {
       const tool = toolRef.current;

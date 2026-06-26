@@ -49,8 +49,11 @@ export class PinRenderer {
 
   /**
    * Render all pins. Clears previous output.
+   *
+   * `poweredPins` (optional) draws a green glow ring on the given pin ids —
+   * used by the editor's interactive preview to show energised connection points.
    */
-  renderAll(pins: SymbolPin[]): void {
+  renderAll(pins: SymbolPin[], poweredPins?: ReadonlySet<string>): void {
     if (this._destroyed) return;
 
     this._graphics.clear();
@@ -61,14 +64,20 @@ export class PinRenderer {
 
     for (const pin of pins) {
       if (pin.hidden) continue;
-      this._renderPin(pin);
+      this._renderPin(pin, poweredPins?.has(pin.id) ?? false);
     }
   }
 
-  private _renderPin(pin: SymbolPin): void {
+  private _renderPin(pin: SymbolPin, powered: boolean): void {
     const g = this._graphics;
     const { x, y } = pin.position;
     const markerLength = pin.length > 0 ? Math.min(pin.length, 12) : 12;
+
+    // Powered glow (preview) — drawn first so it sits behind the dot.
+    if (powered) {
+      g.circle(x, y, PIN_RADIUS + 4);
+      g.fill({ color: 0x22c55e, alpha: 0.35 });
+    }
     const { ux, uy } = orientationVector(pin.orientation);
     const dx = ux * markerLength;
     const dy = uy * markerLength;

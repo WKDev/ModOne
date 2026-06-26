@@ -11,6 +11,12 @@ import { symbolToXml } from '../../services/symbolXmlParser';
 import { saveSymbol as saveSymbolToLibrary } from '../../services/symbolService';
 import { validateSymbol } from '../../utils/symbolValidation';
 import { useSymbolStore } from '../../stores/symbolStore';
+import {
+  evaluateBehaviorRules,
+  deriveVisualStateFromRules,
+  type RuleEvalContext,
+} from '../OneCanvas/runtime/behaviorRuleEngine';
+import { createEmptyRuntimeState } from '../../types/behavior';
 import { SymbolEditorHost } from './SymbolEditorHost';
 
 // Editor model / reducer / helpers — split out of this file to keep it small
@@ -61,6 +67,8 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
   // Preview mode gates editing shortcuts (declared early so the keyboard
   // handler below can reference it without a temporal-dead-zone error).
   const [previewMode, setPreviewMode] = useState(false);
+  // Interactive preview: pin ids the user has toggled "powered" by clicking.
+  const [previewPoweredPorts, setPreviewPoweredPorts] = useState<Set<string>>(new Set());
 
   const isMultiUnit = localSymbol.units !== undefined && localSymbol.units.length > 0;
 
@@ -137,6 +145,30 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
     dispatch,
   });
 
+  // ── Interactive preview: derive the active visual state from behavior rules ──
+  // Clicking pins in preview toggles their "powered" set; the same rule engine
+  // the live canvas uses then picks the visual state (relay energized, LED lit,
+  // switch closed, …) so designers can build & test behavior inside the editor.
+  const previewActiveState: string | null = useMemo(() => {
+    if (!previewMode) return null;
+    const rules = localSymbol.behavior?.rules ?? [];
+    if (rules.length === 0) return null;
+    const properties: Record<string, unknown> = {};
+    for (const p of localSymbol.properties ?? []) properties[p.key] = p.value;
+    const ctx: RuleEvalContext = {
+      block: {} as RuleEvalContext['block'],
+      properties,
+      runtimeState: {},
+      poweredPorts: previewPoweredPorts,
+      portVoltages: new Map(),
+      currentVisualState: undefined,
+      globalRuntime: createEmptyRuntimeState(),
+      domain: localSymbol.behavior?.domain ?? 'circuit',
+    };
+    const result = evaluateBehaviorRules(rules, ctx);
+    return deriveVisualStateFromRules(result, 'idle');
+  }, [previewMode, previewPoweredPorts, localSymbol.behavior, localSymbol.properties, localSymbol.id]);
+
   // ── Canvas symbol (current unit + visual state overrides applied) ──────────
 
   const canvasSymbol: SymbolDefinition | null = useMemo(() => {
@@ -154,9 +186,11 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
       };
     }
 
-    // Step 2: apply visual state overrides for preview/edit
-    if (state.activeVisualState !== null) {
-      const variant = localSymbol.visualStates?.[state.activeVisualState];
+    // Step 2: apply visual state overrides. In preview the state is driven by
+    // the behavior rules; in edit mode by the manually-selected VisualState tab.
+    const effectiveState = previewMode ? previewActiveState : state.activeVisualState;
+    if (effectiveState !== null && effectiveState !== undefined) {
+      const variant = localSymbol.visualStates?.[effectiveState];
       if (variant) {
         return {
           ...base,
@@ -166,7 +200,7 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
     }
 
     return base;
-  }, [localSymbol, isMultiUnit, activeUnit, state.activeVisualState]);
+  }, [localSymbol, isMultiUnit, activeUnit, state.activeVisualState, previewMode, previewActiveState]);
 
   // ── XML Export ─────────────────────────────────────────────────────────────
 
@@ -243,7 +277,10 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
           {/* Edit / Preview toggle */}
           <button
             type="button"
-            onClick={() => setPreviewMode((v) => !v)}
+            onClick={() => {
+              setPreviewPoweredPorts(new Set());
+              setPreviewMode((v) => !v);
+            }}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded transition-colors ${
               previewMode
                 ? 'bg-amber-600 text-white hover:bg-amber-500'
@@ -253,6 +290,22 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
           >
             {previewMode ? <><Pencil size={14} /> Edit</> : <><Play size={14} /> Preview</>}
           </button>
+
+          {/* Preview hint + reset */}
+          {previewMode && (
+            <span className="text-xs text-amber-300/80">
+              Click pins to power
+              {previewPoweredPorts.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setPreviewPoweredPorts(new Set())}
+                  className="ml-2 underline hover:text-amber-200"
+                >
+                  reset
+                </button>
+              )}
+            </span>
+          )}
 
           {!isMultiUnit && !previewMode && (
             <button
@@ -400,6 +453,16 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
             }}
             editingPolylineIndex={state.editingPolylineIndex}
             activeVisualState={state.activeVisualState}
+            previewMode={previewMode}
+            poweredPins={previewPoweredPorts}
+            onTogglePoweredPin={(pinId) =>
+              setPreviewPoweredPorts((prev) => {
+                const next = new Set(prev);
+                if (next.has(pinId)) next.delete(pinId);
+                else next.add(pinId);
+                return next;
+              })
+            }
             style={{ width: '100%', height: '100%' }}
           />
 
@@ -420,6 +483,17 @@ export function SymbolEditor({ symbol, projectDir, onClose, onSave }: SymbolEdit
               data-testid="preview-mode-overlay"
               className="pointer-events-none absolute inset-0 z-10 rounded border-2 border-amber-500/30"
             />
+          )}
+
+          {/* Preview active-state badge (driven by behavior rules) */}
+          {previewMode && previewActiveState && (
+            <div
+              data-testid="preview-state-badge"
+              className="pointer-events-none absolute left-1/2 top-2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-900/75 px-3 py-0.5 text-xs font-medium text-amber-200 backdrop-blur-sm"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+              State: <span className="font-bold">{previewActiveState}</span>
+            </div>
           )}
         </div>
 
