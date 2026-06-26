@@ -490,7 +490,7 @@ export function symbolToXml(sym: SymbolDefinition): string {
   lines.push(`${ind(1)}<ms:CreatedAt>${esc(sym.createdAt)}</ms:CreatedAt>`);
   lines.push(`${ind(1)}<ms:UpdatedAt>${esc(sym.updatedAt)}</ms:UpdatedAt>`);
   lines.push('');
-  lines.push(`${ind(1)}<ms:Layout width="${sym.width}" height="${sym.height}" unit="px"/>`);
+  lines.push(`${ind(1)}<ms:Layout width="${sym.width}" height="${sym.height}" unit="mm"/>`);
   lines.push('');
 
   // Ports
@@ -587,6 +587,13 @@ export function symbolToXml(sym: SymbolDefinition): string {
     for (const [stateName, variant] of Object.entries(sym.visualStates)) {
       if (!variant) continue;
       lines.push(`${ind(2)}<ms:VisualState name="${esc(stateName)}">`);
+      // Full-replacement graphics form (e.g. led "lit"). Must be emitted or the
+      // state's geometry is silently dropped on save.
+      if (variant.graphics && variant.graphics.length > 0) {
+        lines.push(`${ind(3)}<ms:Graphics>`);
+        for (const g of variant.graphics) lines.push(graphicToXml(g, 4));
+        lines.push(`${ind(3)}</ms:Graphics>`);
+      }
       if (variant.primitiveOverrides) {
         lines.push(`${ind(3)}<ms:PrimitiveOverrides>`);
         for (const [targetId, ov] of Object.entries(variant.primitiveOverrides)) {
@@ -605,6 +612,27 @@ export function symbolToXml(sym: SymbolDefinition): string {
       lines.push(`${ind(2)}</ms:VisualState>`);
     }
     lines.push(`${ind(1)}</ms:VisualStates>`);
+    lines.push('');
+  }
+
+  // Animations (e.g. motor "running" rotation). Dropped before this fix.
+  if (sym.animations && Object.keys(sym.animations).length > 0) {
+    lines.push(`${ind(1)}<ms:Animations>`);
+    for (const [state, specs] of Object.entries(sym.animations)) {
+      if (!specs || specs.length === 0) continue;
+      lines.push(`${ind(2)}<ms:StateAnimations state="${esc(state)}">`);
+      for (const a of specs) {
+        const aAttrs = [
+          `type="${esc(a.type)}"`,
+          `target="${esc(a.target)}"`,
+          a.speed != null ? `speed="${a.speed}"` : '',
+          a.pivot ? `pivotX="${a.pivot.x}" pivotY="${a.pivot.y}"` : '',
+        ].filter(Boolean).join(' ');
+        lines.push(`${ind(3)}<ms:Animation ${aAttrs}/>`);
+      }
+      lines.push(`${ind(2)}</ms:StateAnimations>`);
+    }
+    lines.push(`${ind(1)}</ms:Animations>`);
     lines.push('');
   }
 
