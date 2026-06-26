@@ -3,6 +3,30 @@
 ## Development Environment
 - **Platform:** windows, pnpm
 
+## Code Organization — keep the codebase LLM/AI-readable (FIRST-CLASS RULE)
+이 프로젝트는 **LLM/AI가 읽고 편집하기 쉬워야 한다.** 이건 선택이 아니라 규약이다.
+
+LLMs read whole files into a limited context window — a 1,500-line file wastes
+context, slows navigation, and makes edits error-prone (even with LSP symbol
+outlines). So:
+
+- **One file = one clear responsibility.** Name files and exported symbols
+  descriptively so intent is obvious without reading the body.
+- **Size limits:** aim for **< ~400 lines** per file. **> ~600 lines is a smell
+  — split it. > ~800 lines must be split** unless there's a strong reason.
+- **When you create or substantially edit a file that exceeds this, split it**
+  in the same change: extract helpers, sub-renderers, per-concern modules, and
+  types into their own focused files. Prefer many small files over few large
+  ones.
+- **No god objects / mega-modules.** Splitting by responsibility ≠ a god object;
+  one cohesive responsibility per module is the goal.
+- Tests follow the same spirit where practical.
+
+There is a standing backlog of oversized files (1000+ lines: `stores/canvasStore`,
+`lib/symbolXmlParser`, `LadderEditor/utils/gridConverter`, `SymbolEditor.tsx`,
+`OneCanvas/types`, `InteractionController`, …). When you touch one, leave it
+smaller than you found it (extract at least the part you came for).
+
 ## Obsidian Integration
 - **Base Path:** `03_Projects/04_ModOne` in the connected Obsidian vault
 - Use MCP Obsidian tools (`obsidian_append_content`, `obsidian_get_file_contents`, etc.)
