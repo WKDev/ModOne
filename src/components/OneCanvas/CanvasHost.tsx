@@ -661,30 +661,49 @@ export const CanvasHost = forwardRef<CanvasHostHandle, CanvasHostProps>(
         activeApp?.stop();
         pixiAppRef.current?.stop();
 
+        // Best-effort teardown: a throw in any single step must not abort the
+        // rest or escape the unmount and trip the error boundary (which would
+        // tear down the whole app). Destroying PIXI Text renderables returns
+        // their pooled render texture to PIXI's renderer-shared global
+        // TexturePool; during mount/unmount churn (StrictMode, or OneCanvas and
+        // the sheet editor briefly coexisting) a sibling renderer's teardown can
+        // wipe the pool bucket first, making TexturePool.returnTexture throw
+        // "Cannot read properties of undefined (reading 'push')". GPU memory is
+        // reclaimed by the renderer's context teardown regardless.
+        const safeDestroy = (fn: () => void) => {
+          try {
+            fn();
+          } catch (err) {
+            if (import.meta.env.DEV) {
+              console.warn('[CanvasHost] non-fatal error during teardown:', err);
+            }
+          }
+        };
+
         // Destroy in reverse order
-        simulationOverlayRef.current?.destroy();
-        ghostPreviewRef.current?.destroy();
-        simulationRendererRef.current?.destroy();
-        pageGuideRendererRef.current?.destroy();
-        viewportSyncRef.current?.destroy();
-        syncEngineRef.current?.destroy();
-        keyboardShortcutsRef.current?.destroy();
-        eventBridgeRef.current?.destroy();
-        controllerRef.current?.destroy();
+        safeDestroy(() => simulationOverlayRef.current?.destroy());
+        safeDestroy(() => ghostPreviewRef.current?.destroy());
+        safeDestroy(() => simulationRendererRef.current?.destroy());
+        safeDestroy(() => pageGuideRendererRef.current?.destroy());
+        safeDestroy(() => viewportSyncRef.current?.destroy());
+        safeDestroy(() => syncEngineRef.current?.destroy());
+        safeDestroy(() => keyboardShortcutsRef.current?.destroy());
+        safeDestroy(() => eventBridgeRef.current?.destroy());
+        safeDestroy(() => controllerRef.current?.destroy());
 
-        selectionRendererRef.current?.destroy();
-        junctionRendererRef.current?.destroy();
-        portRendererRef.current?.destroy();
-        wireRendererRef.current?.destroy();
-        blockRendererRef.current?.destroy();
-        sheetOverlayRef.current?.destroy();
-        gridRendererRef.current?.destroy();
+        safeDestroy(() => selectionRendererRef.current?.destroy());
+        safeDestroy(() => junctionRendererRef.current?.destroy());
+        safeDestroy(() => portRendererRef.current?.destroy());
+        safeDestroy(() => wireRendererRef.current?.destroy());
+        safeDestroy(() => blockRendererRef.current?.destroy());
+        safeDestroy(() => sheetOverlayRef.current?.destroy());
+        safeDestroy(() => gridRendererRef.current?.destroy());
 
-        hitTesterRef.current?.destroy();
-        spatialRef.current?.destroy();
-        layerMgrRef.current?.destroy();
-        viewportRef.current?.destroy();
-        pixiAppRef.current?.destroy();
+        safeDestroy(() => hitTesterRef.current?.destroy());
+        safeDestroy(() => spatialRef.current?.destroy());
+        safeDestroy(() => layerMgrRef.current?.destroy());
+        safeDestroy(() => viewportRef.current?.destroy());
+        safeDestroy(() => pixiAppRef.current?.destroy());
 
         keyboardShortcutsRef.current = null;
         eventBridgeRef.current = null;

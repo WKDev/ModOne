@@ -146,9 +146,13 @@ export class SimulationOverlay {
       this._config.ticker.remove(this._tick);
     }
 
-    this._statusBg?.destroy();
-    this._statusText?.destroy();
-    this._wireFlowGraphics?.destroy();
+    // Tear down the whole subtree in one pass via the root; Container.destroy
+    // detaches and destroys the children (status bg/text, wire flow) for us.
+    //
+    // NOTE: destroying the status Text returns its pooled render texture to
+    // PIXI's renderer-shared global TexturePool, which can throw during
+    // mount/unmount churn (see CanvasHost's guarded teardown). The caller wraps
+    // this in best-effort error handling, so we don't double-guard here.
     this._root?.destroy({ children: true });
 
     this._statusBg = null;
