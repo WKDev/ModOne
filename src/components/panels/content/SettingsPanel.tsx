@@ -1,19 +1,27 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Settings, MonitorCog, Network, Palette, Keyboard, Search } from 'lucide-react';
+import { Settings, MonitorCog, Network, Palette, Keyboard, Tag, Search } from 'lucide-react';
 import { useSettingsStore } from '../../../stores/settingsStore';
 import { GeneralSettings } from '../../settings/GeneralSettings';
 import { SimulationSettings } from '../../settings/SimulationSettings';
 import { ModbusSettings } from '../../settings/ModbusSettings';
 import { AppearanceSettings } from '../../settings/AppearanceSettings';
 import { KeyboardShortcutsSettings } from '../../settings/KeyboardShortcutsSettings';
+import { DesignationSettings } from '../../settings/DesignationSettings';
 
-type SettingsCategory = 'general' | 'simulation' | 'modbus' | 'appearance' | 'shortcuts';
+type SettingsCategory =
+  | 'general'
+  | 'simulation'
+  | 'modbus'
+  | 'appearance'
+  | 'designation'
+  | 'shortcuts';
 
 const categories: { id: SettingsCategory; label: string; icon: React.ReactNode }[] = [
   { id: 'general', label: '일반', icon: <Settings size={18} /> },
   { id: 'simulation', label: '시뮬레이션', icon: <MonitorCog size={18} /> },
   { id: 'modbus', label: 'Modbus', icon: <Network size={18} /> },
   { id: 'appearance', label: '외관', icon: <Palette size={18} /> },
+  { id: 'designation', label: '부품 넘버링', icon: <Tag size={18} /> },
   { id: 'shortcuts', label: '단축키', icon: <Keyboard size={18} /> },
 ];
 
@@ -107,6 +115,9 @@ export function SettingsPanel() {
               {activeCategory === 'modbus' && <ModbusSettings searchFilter={searchFilter} />}
               {activeCategory === 'appearance' && (
                 <AppearanceSettings searchFilter={searchFilter} />
+              )}
+              {activeCategory === 'designation' && (
+                <DesignationSettings searchFilter={searchFilter} />
               )}
               {activeCategory === 'shortcuts' && (
                 <KeyboardShortcutsSettings searchFilter={searchFilter} />

@@ -85,3 +85,15 @@ export function getBuiltinSymbolForBlockType(blockType: string): SymbolDefinitio
   const symbolId = BLOCK_TYPE_TO_SYMBOL_ID.get(blockType) ?? `builtin:${blockType}`;
   return BUILTIN_SYMBOLS.get(symbolId);
 }
+
+/**
+ * Collapse a block type to its canonical key — the builtin symbol id without the
+ * `builtin:` prefix. Aliases that share a symbol fold together
+ * (e.g. `power_source`/`powersource` → `powersource`, `relay_coil`/`relay` → `relay`),
+ * so callers can key per-symbol data (like designation prefixes) without worrying
+ * which alias was placed.
+ */
+export function canonicalBlockType(blockType: string): string {
+  const symbolId = BLOCK_TYPE_TO_SYMBOL_ID.get(blockType);
+  return symbolId ? symbolId.replace(/^builtin:/, '') : blockType;
+}

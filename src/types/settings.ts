@@ -65,6 +65,11 @@ export interface AppSettings {
   // Only stores user-modified bindings. Key: command ID, Value: key combo string.
   // e.g. { "edit.undo": "Ctrl+Shift+Z" }
   keybindingOverrides: Record<string, string>;
+
+  // Auto-designation prefix overrides
+  // Only stores user-modified prefixes on top of the IEC 81346-2 default table.
+  // Key: canonical block type, Value: prefix. e.g. { "contactor": "KM" }
+  designationPrefixOverrides: Record<string, string>;
 }
 
 /**
@@ -114,4 +119,7 @@ export const defaultSettings: AppSettings = {
 
   // Keyboard shortcut overrides (empty = all defaults)
   keybindingOverrides: {},
+
+  // Auto-designation prefix overrides (empty = IEC 81346-2 defaults)
+  designationPrefixOverrides: {},
 };

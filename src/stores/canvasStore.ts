@@ -66,6 +66,7 @@ import {
 } from '../components/OneCanvas/canvasUnits';
 import { isValidConnection } from '../components/OneCanvas/utils/connectionValidator';
 import { createBlockInstance } from '../components/OneCanvas/runtime/blockFactory';
+import { nextAutoDesignation } from '../components/OneCanvas/utils/designation';
 
 // ============================================================================
 // Wire Endpoint Promotion
@@ -481,7 +482,15 @@ export const useCanvasStore = create<CanvasStore>()(
           ? snapToGridPosition(position, state.gridSize)
           : position;
 
-        const newBlock = createBlockInstance(id, type, finalPosition, props);
+        // Auto-designation: assign PS1/K2… by type unless caller already set one
+        // (paste/duplicate/load pass an explicit designation and are left untouched).
+        let finalProps = props;
+        if (finalProps.designation === undefined) {
+          const designation = nextAutoDesignation(type, state.components.values());
+          if (designation) finalProps = { ...finalProps, designation };
+        }
+
+        const newBlock = createBlockInstance(id, type, finalPosition, finalProps);
 
         set(
           (state) => {

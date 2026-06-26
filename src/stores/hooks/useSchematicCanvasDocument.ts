@@ -18,6 +18,7 @@ import type {
 } from '../../components/OneCanvas/types';
 import { isPortEndpoint, isFloatingEndpoint, isJunctionEndpoint } from '../../components/OneCanvas/types';
 import { createBlockInstance } from '../../components/OneCanvas/runtime/blockFactory';
+import { nextAutoDesignation } from '../../components/OneCanvas/utils/designation';
 import {
   generateId,
   snapToGridPosition,
@@ -201,7 +202,14 @@ export function useSchematicCanvasDocument(
         ? snapToGridPosition(position, data.gridSize, data.gridUnit)
         : position;
 
-      const newBlock = createBlockInstance(id, type, finalPosition, props);
+      // Auto-designation: assign PS1/K2… by type unless caller already set one.
+      let finalProps = props;
+      if (finalProps.designation === undefined) {
+        const designation = nextAutoDesignation(type, data.components.values());
+        if (designation) finalProps = { ...finalProps, designation };
+      }
+
+      const newBlock = createBlockInstance(id, type, finalPosition, finalProps);
 
       pushHistory(documentId);
       updateActivePageCircuit((working) => {

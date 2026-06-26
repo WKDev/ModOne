@@ -74,6 +74,12 @@ pub struct AppSettings {
     // e.g. { "edit.undo": "Ctrl+Shift+Z" }
     #[serde(default)]
     pub keybinding_overrides: HashMap<String, String>,
+
+    // Auto-designation prefix overrides
+    // Only stores user-modified prefixes on top of the IEC 81346-2 default table.
+    // Key: canonical block type, Value: prefix. e.g. { "contactor": "KM" }
+    #[serde(default)]
+    pub designation_prefix_overrides: HashMap<String, String>,
 }
 
 fn default_sheet() -> String {
@@ -191,6 +197,9 @@ impl Default for AppSettings {
 
             // Keyboard shortcut overrides (empty = all defaults)
             keybinding_overrides: HashMap::new(),
+
+            // Auto-designation prefix overrides (empty = IEC 81346-2 defaults)
+            designation_prefix_overrides: HashMap::new(),
         }
     }
 }

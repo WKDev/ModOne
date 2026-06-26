@@ -43,10 +43,34 @@ merge` 단일선이고, 그 최상단 호출자가 `addComponent`(canvasStore.ts
   이번엔 생략하고 향후 도입 가능.
 
 ### 참고 파일 좌표
-- 심볼 designation 기본값: `relay.symbol.xml:122-125`
 - props 매핑: `symbolBlockDefAdapter.ts:132` (`symbolPropsToDefaultProps`)
-- override 맵: `blockDefinitions.ts:45-90`
-- 인스턴스 생성: `blockFactory.ts:24` (merge)
-- 주입 지점: `canvasStore.ts:476` (`addComponent`)
+- 인스턴스 생성: `blockFactory.ts` (merge)
 - BOM(기존): `bomGenerator.ts`
-- Rust 파서 Category 핸들러: `xml_parser.rs:221`
+
+## 2026-06-27 — 구현 (설정 기반으로 전환)
+
+### 왜 심볼 XML이 아니라 설정인가
+사용자 제안으로 prefix를 앱 전역 설정으로 옮겼다. prefix는 심볼 고유 속성이 아니라
+조직/표준 관례(IEC vs ANSI vs 사내)라 사용자가 바꿔야 한다. 부수 효과로 심볼 XML
+35개·Rust 파서·symbol.ts·blockDefinitions를 안 건드려 작업이 크게 줄었다.
+`keybindingOverrides`(이미 존재하는 Record<string,string> 설정)와 같은 패턴.
+
+### 별칭 정규화 — canonicalBlockType
+런타임 `block.type`이 canonical(`power_source`)일 수도 legacy/심볼명(`powersource`)일
+수도 있다. `BLOCK_TYPE_TO_SYMBOL_ID`(builtin-symbols)가 별칭을 같은 심볼 id로
+모아주므로, 그 id에서 `builtin:`을 뗀 값을 canonical 키로 썼다. 덕분에
+power_source/powersource, relay_coil/relay, plc_input/plc_in이 한 칸으로 모이고
+override도 별칭 어긋남 없이 적용된다.
+
+### 주입을 3곳에 한 이유
+facade 아키텍처라 createBlockInstance 호출부가 셋이다 — useSchematicCanvasDocument
+(OneCanvas 라이브), useCanvasDocument, canvasStore(deprecated). createBlockInstance는
+순수 함수라 기존 부품 목록을 모른다(다음 번호 계산 불가). 그래서 번호 계산은
+components Map을 쥔 addComponent 쪽에서 하고, 셋 다 동일하게 주입했다.
+
+### 검증 메모
+- vitest는 worktree에 node_modules가 없어 메인 repo의 `.bin/vitest`를 worktree
+  cwd에서 실행(중첩 경로라 상위 node_modules로 해석됨). 12+219 그린.
+- cargo는 fresh worktree에서 openssl 소스 빌드가 perl 환경 문제로 실패 →
+  `CARGO_TARGET_DIR`을 메인 target으로 돌려 캐시 재사용. `cargo check` exit 0.
+- settings 테스트 exe는 STATUS_ENTRYPOINT_NOT_FOUND(DLL 로딩) — 코드 아닌 환경 문제.

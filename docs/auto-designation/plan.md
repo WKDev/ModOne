@@ -12,10 +12,14 @@
 
 | 항목 | 결정 | 근거 |
 |------|------|------|
-| prefix 정의 위치 | **심볼 XML 메타데이터** | 데이터 일원화. 심볼이 single source of truth |
+| prefix 정의 위치 | **앱 전역 설정 override + 코드 기본표** | prefix는 심볼 기하학이 아니라 조직/표준 관례. 사용자가 바꿔야 함 |
+| 기본표 기준 | **IEC 81346-2** | `designation-codes.md` 확정표를 TS 상수로 박제 |
 | 빈 번호 처리 | **최댓값+1 (gap 허용)** | 예측 가능. EDA 툴 관례. PS1·PS3 → 다음 PS4 |
 | 수동 수정 designation | **보존** | 사용자가 직접 박은 값은 자동 로직이 덮지 않음 |
-| 이번 범위 | **설계 문서까지** | 코드는 다음 턴 |
+
+> 방향 전환: 초기엔 prefix를 심볼 XML 메타(`DesignationPrefix`)에 넣을 계획이었으나,
+> prefix는 심볼 고유 속성이 아니라 사용자가 바꾸는 관례라서 **앱 전역 설정**으로
+> 옮겼다. 결과적으로 심볼 XML 35개·Rust 파서·symbol.ts를 건드리지 않아 작업이 줄었다.
 
 ## 현재 구조 (조사 결과)
 
@@ -46,63 +50,63 @@ addComponent(type, pos, props)                                canvasStore.ts:476
 
 ## 설계
 
-### 1. 심볼 메타: `DesignationPrefix`
-각 `.symbol.xml`의 `<ms:Category>` 다음에 한 줄 추가.
-```xml
-<ms:Category>switching</ms:Category>
-<ms:DesignationPrefix>K</ms:DesignationPrefix>
-```
-- TS 로더와 Rust `xml_parser.rs` 둘 다 파싱 → `SymbolDefinition.designationPrefix?: string`.
-- 없으면 `undefined`. designation을 안 쓰는 부품(text 등)은 생략.
+### 1. 기본 prefix 테이블 (코드 상수)
+`src/components/OneCanvas/utils/designation.ts`의 `DEFAULT_DESIGNATION_PREFIXES`.
+키는 **canonical 블록 타입** = builtin 심볼 id에서 `builtin:`을 뗀 값
+(`canonicalBlockType()` in `assets/builtin-symbols/index.ts`). 이 정규화 덕에
+`power_source`/`powersource`, `relay_coil`/`relay`, `plc_input`/`plc_in` 같은
+별칭이 한 칸으로 모인다. 값은 `designation-codes.md` 확정표.
 
-### 2. prefix 조회 함수: `getDesignationPrefix(type)`
-`blockDefinitions.ts`에 추가. 우선순위.
-1. override 맵에 prefix가 있으면 그것 (power_source→`G`, dc_2p→`G`, relay_coil→`K`)
-2. 심볼의 `designationPrefix` (값은 `designation-codes.md` 확정표)
-3. 둘 다 없으면 `undefined` → 자동 넘버링 스킵 (designation 미부여)
+### 2. 설정 override (앱 전역)
+`AppSettings.designationPrefixOverrides: Record<string,string>` (TS + Rust 1:1).
+`keybindingOverrides`와 동일 패턴 — 사용자가 바꾼 항목만 저장, 기본표 위에 덮어쓴다.
 
-(과거 호환: 기존 designation DefaultValue `'K1'`에서 영문 prefix를 추출하는
-fallback을 둘지는 구현 시 결정. 명시 메타로 모두 채우면 불필요.)
+### 3. prefix 조회: `resolveDesignationPrefix(type, overrides)`
+순수 함수. 우선순위: override[canonical] → 기본표[canonical] → `undefined`.
+빈 문자열 override는 "끔"으로 보고 `undefined`(자동 넘버링 안 함).
 
-### 3. 넘버링 로직: `nextDesignation(prefix, components)`
-순수 함수. 새 util 파일(`utils/designation.ts`).
+### 4. 넘버링 로직: `nextDesignation(prefix, components)`
+순수 함수. `utils/designation.ts`.
 ```
 같은 prefix로 시작하는 모든 designation을 스캔
- → 정규식 ^{prefix}(\d+)$ 로 숫자부 추출
+ → 정규식 ^{prefix}(\d+)$ 로 숫자부 추출 (앵커 고정 — KM1은 K풀이 아님)
  → max + 1  (없으면 1)
  → `${prefix}${n}` 반환
 ```
 - **수동 값도 max 계산에 포함**한다. 사용자가 K9를 박아뒀으면 다음은 K10이어야
   충돌이 없다. "보존"은 기존 값을 안 바꾼다는 뜻이지, 무시한다는 뜻이 아니다.
 
-### 4. 주입 지점: `addComponent`
-`canvasStore.ts:476`에서 `createBlockInstance` 호출 전.
-```
-const prefix = getDesignationPrefix(type)
-if (prefix && props.designation === undefined) {
-  props = { ...props, designation: nextDesignation(prefix, state.components) }
+### 5. 주입 지점: `addComponent` (생성 경로 3곳)
+`createBlockInstance` 호출 직전에 `nextAutoDesignation(type, components.values())`.
+```ts
+let finalProps = props;
+if (finalProps.designation === undefined) {
+  const designation = nextAutoDesignation(type, <components>.values());
+  if (designation) finalProps = { ...finalProps, designation };
 }
 ```
-- `props.designation`이 이미 주어지면(붙여넣기·복제·로드) 건드리지 않는다.
-- prefix 없으면 기존 동작 그대로(심볼 DefaultValue가 들어감).
+- facade 아키텍처라 생성 경로가 셋: `useSchematicCanvasDocument`(OneCanvas 라이브),
+  `useCanvasDocument`, `canvasStore`(deprecated). 셋 다 주입.
+- `nextAutoDesignation`은 앱 전역 설정의 override를 읽고 `resolveDesignationPrefix`로
+  prefix를 구한 뒤 `nextDesignation`을 부른다.
+- `props.designation`이 이미 있으면(붙여넣기·복제·로드) 건드리지 않는다.
 
-### 5. 수동 보존 훅 (향후 Renumber용, 이번엔 데이터만)
-사용자가 인스펙터에서 designation을 직접 수정하면 `Block.designationManual = true`.
-이번 자동 넘버링(생성 시점)엔 영향 없지만, 향후 "Renumber All" 기능이 이 플래그를
-존중하도록 자리만 마련. 미구현이면 생략 가능.
-
-## 영향 범위 (구현 시)
+## 영향 범위 (실제 구현)
 
 | 파일 | 변경 |
 |------|------|
-| `src/assets/builtin-symbols/xml/*.symbol.xml` | `DesignationPrefix` 줄 추가 (designation 쓰는 심볼) |
-| `src/types/symbol.ts` | `SymbolDefinition.designationPrefix?: string` |
-| TS 심볼 로더 | `DesignationPrefix` 파싱 |
-| `src-tauri/src/symbols/xml_parser.rs` | `DesignationPrefix` 파싱 (line 221 Category 핸들러 근처) + 타입 필드 |
-| `src/components/OneCanvas/blockDefinitions.ts` | override에 prefix, `getDesignationPrefix()` |
-| `src/components/OneCanvas/utils/designation.ts` | **신규** — `nextDesignation()` 순수 함수 |
-| `src/stores/canvasStore.ts` | `addComponent`에 주입 (line 476) |
-| (선택) 인스펙터 designation 편집 | `designationManual` 세팅 |
+| `src/assets/builtin-symbols/index.ts` | `canonicalBlockType()` 추가 (별칭 정규화) |
+| `src/components/OneCanvas/utils/designation.ts` | **신규** — 기본표 + `resolveDesignationPrefix`/`nextDesignation`/`nextAutoDesignation` |
+| `src/components/OneCanvas/utils/__tests__/designation.test.ts` | **신규** — 순수 함수 12 테스트 |
+| `src/types/settings.ts` | `designationPrefixOverrides: Record<string,string>` |
+| `src-tauri/src/commands/settings.rs` | `designation_prefix_overrides: HashMap` (serde default) |
+| `src/stores/canvasStore.ts` | `addComponent` 주입 |
+| `src/stores/hooks/useSchematicCanvasDocument.ts` | `addComponent` 주입 |
+| `src/stores/hooks/useCanvasDocument.ts` | `addComponent` 주입 |
+| `src/components/settings/DesignationSettings.tsx` | **신규** — prefix 편집 UI |
+| `src/components/panels/content/SettingsPanel.tsx` | "부품 넘버링" 카테고리 연결 |
+
+심볼 XML·Rust 파서·symbol.ts·blockDefinitions는 **건드리지 않음**(설정 기반 전환 덕).
 
 ## 비목표 (이번 작업 아님)
 
