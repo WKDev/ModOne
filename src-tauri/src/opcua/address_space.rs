@@ -1,102 +1,25 @@
 use std::collections::HashMap;
 
 use crate::plc_runtime::{
-    CanonicalAccess, CanonicalAddress, CanonicalAreaKind, CanonicalMemory, VendorProfile,
+    CanonicalAddress, CanonicalAreaKind, CanonicalMemory, VendorProfile,
 };
 use crate::project::{PlcAddressWindow, PlcHardwareTopology, PlcIoDirection, PlcSettings};
 use crate::sim::tag_registry::SharedTagRegistry;
 use crate::sim::types::{TagAccessLevel, TagClass, TagDefinition};
 
-use super::mapping::{MappingAccessLevel, OpcUaMappingStore};
+use super::mapping::OpcUaMappingStore;
 use super::memory::OpcUaNodeId;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OpcUaAccessLevel {
-    ReadOnly,
-    ReadWrite,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OpcUaNodeKind {
-    RawPrimary,
-    Tag,
-    VendorAlias,
-}
-
-#[derive(Debug, Clone)]
-pub struct OpcUaNodeSpec {
-    pub node_id: OpcUaNodeId,
-    pub browse_name: String,
-    pub display_name: String,
-    pub canonical_address: CanonicalAddress,
-    pub access_level: OpcUaAccessLevel,
-    pub is_bool: bool,
-    pub path_segments: Vec<String>,
-    pub kind: OpcUaNodeKind,
-    /// Optional engineering unit string (e.g. "°C", "bar", "RPM").
-    /// When present, exposed as an OPC UA `EngineeringUnits` property
-    /// (`EUInformation` extension object) on the Variable node.
-    pub engineering_unit: Option<String>,
-    /// Optional human-readable description for the OPC UA Variable node's
-    /// Description attribute. Sourced from [`OpcUaMappingConfig::description`].
-    pub description: Option<String>,
-}
-
-impl OpcUaNodeSpec {
-    pub fn requires_live_value_getter(&self) -> bool {
-        match self.kind {
-            OpcUaNodeKind::Tag => true,
-            OpcUaNodeKind::RawPrimary | OpcUaNodeKind::VendorAlias => {
-                self.access_level == OpcUaAccessLevel::ReadWrite
-            }
-        }
-    }
-}
-
-pub struct AddressSpaceSpec {
-    pub nodes: Vec<OpcUaNodeSpec>,
-    pub primary_node_map: HashMap<CanonicalAddress, OpcUaNodeId>,
-    pub publish_map: HashMap<CanonicalAddress, Vec<OpcUaNodeId>>,
-}
-
-fn access_level_from_canonical(access: CanonicalAccess) -> OpcUaAccessLevel {
-    match access {
-        CanonicalAccess::ReadWrite => OpcUaAccessLevel::ReadWrite,
-        CanonicalAccess::ReadOnly | CanonicalAccess::InternalOnly => OpcUaAccessLevel::ReadOnly,
-    }
-}
+// 순수 노드 스펙 타입/헬퍼는 address_space_spec.rs로 분리(crate 이전 대상).
+// 기존 `crate::opcua::address_space::...` 경로 호환을 위해 re-export하고,
+// 빌더 코드가 unqualified로 호출할 수 있게 스코프로 가져온다.
+pub use super::address_space_spec::*;
 
 fn access_level_from_tag(access: TagAccessLevel) -> OpcUaAccessLevel {
     match access {
         TagAccessLevel::ReadOnly => OpcUaAccessLevel::ReadOnly,
         TagAccessLevel::ReadWrite => OpcUaAccessLevel::ReadWrite,
     }
-}
-
-fn access_level_from_mapping(level: MappingAccessLevel) -> OpcUaAccessLevel {
-    match level {
-        MappingAccessLevel::ReadOnly => OpcUaAccessLevel::ReadOnly,
-        MappingAccessLevel::ReadWrite => OpcUaAccessLevel::ReadWrite,
-    }
-}
-
-/// Returns `true` when the canonical address refers to a boolean (bit) memory area.
-///
-/// This is the canonical `is_bool` detection used across the OPC UA module to
-/// decide whether a register should be presented as `Boolean` or `UInt16`.
-pub fn is_bool_address(address: CanonicalAddress) -> bool {
-    address.bit_index.is_some()
-        || matches!(
-            address.area,
-            CanonicalAreaKind::InputBit
-                | CanonicalAreaKind::OutputBit
-                | CanonicalAreaKind::InternalBit
-                | CanonicalAreaKind::RetentiveBit
-                | CanonicalAreaKind::SpecialBit
-                | CanonicalAreaKind::TimerDoneBit
-                | CanonicalAreaKind::CounterDoneBit
-                | CanonicalAreaKind::SystemBit
-        )
 }
 
 fn documented_default_exposure(area: CanonicalAreaKind) -> u32 {
@@ -161,14 +84,6 @@ fn raw_exposure_limit(area: CanonicalAreaKind, plc_settings: &PlcSettings) -> u3
     topology_limit
         .unwrap_or_else(|| documented_default_exposure(area))
         .min(area.default_size() as u32)
-}
-
-fn push_publish_node(
-    publish_map: &mut HashMap<CanonicalAddress, Vec<OpcUaNodeId>>,
-    address: CanonicalAddress,
-    node_id: OpcUaNodeId,
-) {
-    publish_map.entry(address).or_default().push(node_id);
 }
 
 /// Build the OPC UA Address Space path segments for a tag definition.

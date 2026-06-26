@@ -1,5 +1,6 @@
 pub mod adapter;
 pub mod address_space;
+pub mod address_space_spec;
 pub mod backend;
 pub mod audit;
 pub mod auth;
