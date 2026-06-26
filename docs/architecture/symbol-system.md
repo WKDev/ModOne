@@ -188,4 +188,6 @@ editor save:  SymbolDefinition ──symbolToXml──▶ .symbol.xml   (lossles
 - Three other XML symbol parser/serializers (`services/xmlSymbolLoader`,
   `lib/symbolXmlParser`, `utils/xmlSymbolLoader`) are not unified.
 - Latent symbol-data bugs in §3 (pin electrical types, plc_output address).
-- Sheet editor is still SVG (not yet on the shared PIXI canvas engine).
+- Sheet editor migrated to the shared PIXI engine (`SheetCanvasHost`, Phase 3) —
+  render/pan/zoom/grid/select/move/resize done; selection-redraw-after-move and
+  proper inline text/table cell editing remain (3b).
