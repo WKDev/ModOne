@@ -129,6 +129,10 @@ export class InteractionController {
   // Mouse presence state
   _isMouseOverCanvas = false;
 
+  // Hover state (drives cursor + hover highlight while idle)
+  _hoverType: 'block' | 'wire' | 'junction' | 'port' | 'segment' | null = null;
+  _hoverId: string | null = null;
+
   constructor(config: InteractionControllerConfig) {
     this._mode = config.mode ?? 'edit';
     this._hitTester = config.hitTester;
@@ -220,6 +224,7 @@ export class InteractionController {
 
   handlePointerOut(): void {
     this._isMouseOverCanvas = false;
+    this._clearHover();
   }
 
   cancel(): void {
@@ -290,6 +295,10 @@ export class InteractionController {
     if (this._destroyed) return;
 
     switch (this._state) {
+      case 'idle':
+        this._updateHover(worldPos);
+        break;
+
       case 'panning':
         break;
 
@@ -337,6 +346,31 @@ export class InteractionController {
       default:
         break;
     }
+  }
+
+  /**
+   * Hover hit-test while idle: updates the cursor + hover highlight to signal
+   * what's under the pointer. No-op outside edit mode; only emits on change.
+   */
+  _updateHover(worldPos: Position): void {
+    if (this._mode !== 'edit') {
+      this._clearHover();
+      return;
+    }
+    const hit = this._hitTester.hitTest(worldPos);
+    const type = hit.type === 'none' ? null : hit.type;
+    const id = type ? hit.id : null;
+    if (type === this._hoverType && id === this._hoverId) return;
+    this._hoverType = type;
+    this._hoverId = id;
+    this._visuals.setHover(type, id);
+  }
+
+  _clearHover(): void {
+    if (this._hoverType === null && this._hoverId === null) return;
+    this._hoverType = null;
+    this._hoverId = null;
+    this._visuals.setHover(null, null);
   }
 
   handlePointerUp(

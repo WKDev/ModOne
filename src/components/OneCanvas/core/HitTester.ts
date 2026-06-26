@@ -30,7 +30,10 @@ export interface HitTestConfig {
 
 const DEFAULT_HIT_CONFIG: HitTestConfig = {
   portSnapRadius: 12 * LEGACY_MM_PER_PX,
-  wireHitRadius: 8 * LEGACY_MM_PER_PX,
+  // Selectable band around a wire is a bit wider than the rendered stroke
+  // (width 2) so thin wires are easy to grab. Ports/junctions still win on
+  // overlap via priority order.
+  wireHitRadius: 12 * LEGACY_MM_PER_PX,
   junctionHitRadius: 8 * LEGACY_MM_PER_PX,
   blockHitRadius: 0, // Blocks use bounds check, not radius
 };

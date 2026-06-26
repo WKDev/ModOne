@@ -55,6 +55,15 @@ export interface InteractionVisuals {
     flipV: boolean;
   }): void;
   hideGhost(): void;
+  /**
+   * Reflect the hovered element: updates the hover highlight on renderers and
+   * the DOM cursor. `null` clears hover (default cursor). Called on idle
+   * pointer-move so the cursor signals what's under the pointer.
+   */
+  setHover(
+    type: 'block' | 'wire' | 'junction' | 'port' | 'segment' | null,
+    id: string | null,
+  ): void;
 }
 
 export interface InteractionControllerConfig {

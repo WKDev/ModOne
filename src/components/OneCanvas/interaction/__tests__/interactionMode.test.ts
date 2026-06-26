@@ -15,6 +15,7 @@ function createVisuals(): InteractionVisuals {
     showGhost: vi.fn(),
     updateGhost: vi.fn(),
     hideGhost: vi.fn(),
+    setHover: vi.fn(),
   };
 }
 
