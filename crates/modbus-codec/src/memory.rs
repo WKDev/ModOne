@@ -1,4 +1,4 @@
-//! Modbus memory implementation with thread-safe access
+// 스레드 안전한 Modbus 메모리 저장소 (전송 비의존, 이벤트는 싱크로 송출)
 
 use bitvec::prelude::*;
 use parking_lot::RwLock;
@@ -7,16 +7,11 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 use std::sync::Arc;
-use tauri::Emitter;
 
-use super::types::{
-    ChangeSource, MemoryBatchChangeEvent, MemoryChangeEvent, MemoryError, MemoryMapSettings,
-    MemoryType,
+use crate::types::{
+    ChangeSource, MemoryBatchChangeEvent, MemoryChangeEvent, MemoryError, MemoryEventSink,
+    MemoryMapSettings, MemoryType,
 };
-
-// Event channel names
-const EVENT_MEMORY_CHANGED: &str = "modbus:memory-changed";
-const EVENT_MEMORY_BATCH_CHANGED: &str = "modbus:memory-batch-changed";
 
 /// Thread-safe Modbus memory storage
 ///
@@ -31,8 +26,8 @@ pub struct ModbusMemory {
     holding_registers: RwLock<Vec<u16>>,
     input_registers: RwLock<Vec<u16>>,
     config: RwLock<MemoryMapSettings>,
-    /// Tauri app handle for event emission
-    app_handle: RwLock<Option<Arc<tauri::AppHandle>>>,
+    /// 변경 이벤트 송출 싱크 (native 셸이 주입; 없으면 송출 안 함)
+    event_sink: RwLock<Option<Arc<dyn MemoryEventSink>>>,
     /// Buffer for batching change events
     change_buffer: RwLock<Vec<MemoryChangeEvent>>,
     /// Whether we're in batch mode
@@ -54,7 +49,7 @@ impl ModbusMemory {
             holding_registers: RwLock::new(vec![0u16; config.holding_register_count as usize]),
             input_registers: RwLock::new(vec![0u16; config.input_register_count as usize]),
             config: RwLock::new(config.clone()),
-            app_handle: RwLock::new(None),
+            event_sink: RwLock::new(None),
             change_buffer: RwLock::new(Vec::new()),
             batch_mode: RwLock::new(false),
             external_coil_writes: RwLock::new(HashSet::new()),
@@ -87,9 +82,9 @@ impl ModbusMemory {
 
     // ========== Event Infrastructure ==========
 
-    /// Set the Tauri app handle for event emission
-    pub fn set_app_handle(&self, handle: tauri::AppHandle) {
-        *self.app_handle.write() = Some(Arc::new(handle));
+    /// 변경 이벤트 송출 싱크를 주입한다 (native 셸 전용).
+    pub fn set_event_sink(&self, sink: Arc<dyn MemoryEventSink>) {
+        *self.event_sink.write() = Some(sink);
     }
 
     /// Start batch mode - changes will be buffered until end_batch is called
@@ -114,9 +109,9 @@ impl ModbusMemory {
             return;
         }
 
-        if let Some(handle) = self.app_handle.read().as_ref() {
+        if let Some(sink) = self.event_sink.read().as_ref() {
             let event = MemoryBatchChangeEvent { changes };
-            let _ = handle.emit(EVENT_MEMORY_BATCH_CHANGED, event);
+            sink.emit_batch(&event);
         }
     }
 
@@ -124,8 +119,8 @@ impl ModbusMemory {
     fn emit_change(&self, event: MemoryChangeEvent) {
         if *self.batch_mode.read() {
             self.change_buffer.write().push(event);
-        } else if let Some(handle) = self.app_handle.read().as_ref() {
-            let _ = handle.emit(EVENT_MEMORY_CHANGED, event);
+        } else if let Some(sink) = self.event_sink.read().as_ref() {
+            sink.emit_change(&event);
         }
     }
 

@@ -2640,6 +2640,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "modbus-codec"
+version = "0.1.0"
+dependencies = [
+ "bitvec",
+ "modone-contract",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
 name = "modone"
 version = "0.1.0"
 dependencies = [
@@ -2652,6 +2666,7 @@ dependencies = [
  "keyring",
  "log",
  "machine-uid",
+ "modbus-codec",
  "modone-contract",
  "opcua",
  "parking_lot",

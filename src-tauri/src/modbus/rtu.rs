@@ -11,9 +11,9 @@ use tauri::Emitter;
 use tokio::sync::Mutex;
 use tokio_serial::{DataBits, Parity, SerialPortBuilderExt, SerialStream, StopBits};
 
-use super::memory::ModbusMemory;
 use super::pdu;
 use super::types::{ConnectionEvent, ModbusError};
+use super::ModbusMemory;
 
 // Event channel name for connection events
 const EVENT_CONNECTION: &str = "modbus:connection";

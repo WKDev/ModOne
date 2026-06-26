@@ -13,8 +13,8 @@ use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
 
 use super::types::{Scenario, ScenarioEvent};
-use crate::modbus::memory::ModbusMemory;
 use crate::modbus::types::{ChangeSource, MemoryType};
+use crate::modbus::ModbusMemory;
 
 // ============================================================================
 // Execution State Types
