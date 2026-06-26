@@ -36,6 +36,51 @@ suite each time:
 - A util barrel that `export *`s its own modules must NOT be imported by those
   modules (cycle) — import siblings directly.
 
+## Verifying a behavior-preserving move (tooling)
+
+For pure/util splits `tsc` + the test suite is enough. For **risky stateful
+splits** (a god-class → context-object handlers, a store `create()` → action
+factories) the real risk is a **transcription slip during the mechanical move** —
+and the two classes of slip need two different checks:
+
+- **Type-mismatched slip** (wrong-typed field/arg, dropped call) → caught by
+  `tsc --noEmit` (every reference must resolve and type-check).
+- **Same-type slip** (`_segmentHandleA` ↔ `_segmentHandleB`, two assignments
+  reordered) → `tsc` is blind. Catch it with a **per-function sequence diff
+  against the git baseline**: prove each moved body is line-for-line identical to
+  the original, modulo the intended rewrites (`this.`→`self.`, `_priv`→pub,
+  `m()`→`fn(self)`).
+
+Tool: `scripts/verify-equivalent-move.mjs <config.json>` does exactly this —
+enumerates functions on both sides, auto-pairs by normalized name, and compares
+canonicalized body lines in order (exit 1 + line-level diff on mismatch). Example
+config (the InteractionController FSM split):
+
+```json
+{
+  "baselineRef": "3d2d581^",
+  "originalPath": "src/components/OneCanvas/interaction/InteractionController.ts",
+  "newPaths": ["src/.../InteractionController.ts", "src/.../interactionPointerHandlers.ts", "…"],
+  "contextNames": ["self", "this", "ctx"],
+  "stripUnderscores": true,
+  "dropSuffixes": ["Ctx"]
+}
+```
+
+**Always run a negative control** before trusting a green: tamper one line
+(swap two same-type assignments) and confirm the tool FAILs on it — otherwise a
+silently-broken extractor reads as "all equivalent." (That actually happened:
+an early extractor matched call-sites instead of definitions and "passed" garbage.)
+
+**Gotchas:**
+- Node `execSync` on Windows uses **cmd.exe, where `^` is the escape char** — a
+  ref like `3d2d581^` silently becomes `3d2d581` (the wrong, post-split commit).
+  Use `execFileSync('git', [...])` (no shell) so `^`/`~` reach git intact.
+- The tool **warns about unmatched originals** (functions with no new
+  counterpart) instead of silently dropping them — a verifier that hides
+  under-coverage is worse than none. Interface method signatures show up here
+  (no body) and are expected.
+
 ## Done (commits on `feature/web-runtime-shim`)
 
 | File | Was | Now | Modules (largest) |
