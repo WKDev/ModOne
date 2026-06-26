@@ -3,11 +3,12 @@
 //! This module introduces the canonical memory model that future vendor
 //! profiles, tags, and protocol adapters will build on.
 
-pub mod event_bus;
-pub mod memory;
 pub mod profile;
 pub mod profiles;
-pub mod types;
+
+// canonical 메모리 모델/타입/이벤트버스는 modone-contract 크레이트로 이전됨.
+// 기존 `crate::plc_runtime::...` 경로 호환을 위해 모듈과 항목을 재노출한다.
+pub use modone_contract::{event_bus, memory, types};
 
 pub use event_bus::CanonicalMemoryBus;
 pub use memory::{CanonicalMemory, CanonicalMemoryError, CanonicalMemorySnapshot};

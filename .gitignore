@@ -29,6 +29,7 @@ build/
 dist/
 
 # Rust/Cargo
+/target/
 src-tauri/target/
 src-tauri/target-test/
 

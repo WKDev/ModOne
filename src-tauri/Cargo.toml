@@ -24,6 +24,9 @@ webdriver = ["dep:tauri-plugin-webdriver"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+# Shared wasm/native contract crate (canonical memory + protocol adapter)
+modone-contract = { path = "../crates/modone-contract" }
+
 # Tauri core
 tauri = { version = "2", features = ["devtools"] }
 tauri-plugin-log = "2"

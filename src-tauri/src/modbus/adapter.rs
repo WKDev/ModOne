@@ -11,28 +11,9 @@ use crate::plc_runtime::{
 
 use super::{ChangeSource, MemoryError, ModbusMemory};
 
-/// Transport-agnostic protocol adapter trait.
-///
-/// This trait defines the interface between the protocol runtime and
-/// specific protocol adapters (Modbus, OPC UA, etc.). The protocol runtime
-/// uses this trait to synchronize canonical memory with protocol-specific
-/// address spaces.
-pub trait ProtocolAdapter: Send + Sync {
-    /// Apply external writes from protocol clients back into canonical memory.
-    fn apply_external_writes(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
-
-    /// Publish only the dirty canonical regions into protocol address space.
-    fn publish_dirty_state(
-        &self,
-        windows: &[DirtyPublishWindow],
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
-
-    /// Publish full canonical runtime state into protocol address space.
-    fn publish_runtime_state(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
-
-    /// Full synchronization: apply external writes then publish all state.
-    fn full_sync(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
-}
+// ProtocolAdapter / DirtyPublishWindow 는 modone-contract 로 이전됨. 재노출하여
+// 기존 `crate::modbus::{ProtocolAdapter, DirtyPublishWindow}` 경로를 유지한다.
+pub use modone_contract::adapter::{DirtyPublishWindow, ProtocolAdapter};
 
 #[derive(Debug, Error)]
 pub enum ModbusAdapterError {
@@ -44,30 +25,14 @@ pub enum ModbusAdapterError {
 
 pub type ModbusAdapterResult<T> = Result<T, ModbusAdapterError>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DirtyPublishWindow {
-    pub area: CanonicalAreaKind,
-    pub start_index: u32,
-    pub end_index: u32,
-}
-
-impl DirtyPublishWindow {
-    pub fn single(address: CanonicalAddress) -> Self {
-        Self {
-            area: address.area,
-            start_index: address.index,
-            end_index: address.index,
-        }
+/// modbus 매핑 규칙과 dirty 윈도우가 교차하는지 판정 (modbus 전용 로직).
+fn window_intersects_rule(window: &DirtyPublishWindow, rule: &ModbusMappingRule) -> bool {
+    if window.area != rule.canonical_area {
+        return false;
     }
 
-    fn intersects_rule(&self, rule: &ModbusMappingRule) -> bool {
-        if self.area != rule.canonical_area {
-            return false;
-        }
-
-        let rule_end = rule.count.saturating_sub(1) as u32;
-        self.start_index <= rule_end
-    }
+    let rule_end = rule.count.saturating_sub(1) as u32;
+    window.start_index <= rule_end
 }
 
 /// Canonical-runtime-first Modbus adapter.
@@ -176,7 +141,7 @@ impl ModbusAdapter {
         for rule in &policy.rules {
             if !dirty_windows
                 .iter()
-                .any(|window| window.intersects_rule(rule))
+                .any(|window| window_intersects_rule(window, rule))
             {
                 continue;
             }

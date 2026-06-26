@@ -34,7 +34,7 @@ impl Default for CanonicalMemoryBus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plc_runtime::types::{
+    use crate::types::{
         CanonicalAddress, CanonicalAreaKind, CanonicalMemoryBatchChange, CanonicalMemoryChange,
         CanonicalMemoryEvent, CanonicalValue, CanonicalWriteSource,
     };
