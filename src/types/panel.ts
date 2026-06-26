@@ -12,6 +12,7 @@
 export type PanelType =
   | 'ladder-editor'
   | 'memory-visualizer'
+  | 'tag-manager'
   | 'one-canvas'
   | 'scenario-editor'
   | 'console'

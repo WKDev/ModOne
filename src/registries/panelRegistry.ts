@@ -14,6 +14,7 @@ import type { DocumentType } from '../types/document';
 // Lazy imports to avoid circular dependencies and improve code-splitting
 import { LadderEditorPanel } from '../components/panels/content/LadderEditorPanel';
 import { MemoryVisualizerPanel } from '../components/panels/content/MemoryVisualizerPanel';
+import { TagManagerPanel } from '../components/panels/content/TagManagerPanel';
 import { OneCanvasPanel } from '../components/panels/content/OneCanvasPanel';
 import { ScenarioEditorPanel } from '../components/panels/content/ScenarioEditorPanel';
 import { ConsolePanel } from '../components/panels/content/ConsolePanel';
@@ -53,6 +54,11 @@ const registry = {
     label: 'Memory Visualizer',
     zone: 'inspector',
     component: MemoryVisualizerPanel,
+  },
+  'tag-manager': {
+    label: 'Tags',
+    zone: 'inspector',
+    component: TagManagerPanel,
   },
   'one-canvas': {
     label: 'One Canvas',
