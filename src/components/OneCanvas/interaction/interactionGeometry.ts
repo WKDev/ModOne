@@ -4,6 +4,12 @@ import type { HitTestResult, Position, PortPosition } from '../types';
 /** Default grid snap step in world-space mm (matches DEFAULT_GRID.size). */
 export const DEFAULT_GRID_SNAP = 5;
 
+/** Screen-space pointer travel (px) before a press becomes a drag. */
+export const DRAG_THRESHOLD_PX = 4;
+
+/** Screen-space radius (px) within which a wire endpoint stays snapped. */
+export const WIRE_SNAP_STICKY_RADIUS_PX = 10;
+
 export const PORT_DIRECTIONS: readonly PortPosition[] = [
   'top',
   'right',

@@ -1,175 +1,133 @@
+// OneCanvas 상호작용 FSM — 상태/디스패치만 보유, 핸들러 로직은 interaction*Handlers 모듈에 위임
 import type { CanvasFacadeReturn } from '@/types/canvasFacade';
-import type {
-  HitTestResult,
-  Position,
-  PortPosition,
-  WireEndpoint,
-} from '../types';
-import { isPortEndpoint, isFloatingEndpoint } from '../types';
+import type { Position, PortPosition, WireEndpoint } from '../types';
 import type { HitTester } from '../core/HitTester';
 import type { SpatialIndex } from '../core/SpatialIndex';
+import { getDistance, DRAG_THRESHOLD_PX } from './interactionGeometry';
+
+// Shared FSM types — split into interactionTypes.ts (CLAUDE.md → Code Org).
+// Re-exported below so existing importers keep `from './InteractionController'`.
+import type {
+  CanvasInteractionMode,
+  InteractionState,
+  WireSnapTarget,
+  DragGroupItem,
+  InteractionVisuals,
+  InteractionControllerConfig,
+  Modifiers,
+} from './interactionTypes';
+
+export type {
+  Modifiers,
+  CanvasInteractionMode,
+  InteractionState,
+  InteractionVisuals,
+  InteractionControllerConfig,
+} from './interactionTypes';
+
+// FSM handler groups — free functions taking the controller as their context
+// (`self`). They read/write the public `_*` fields declared below.
+import { resetTransient, clearPointerTracking } from './interactionHelpers';
 import {
-  DEFAULT_GRID_SNAP,
-  getDistance,
-  subtract,
-  add,
-  snapDelta,
-  snapToGrid,
-  constrainSegmentDelta,
-  getPortDirection,
-  rectFromTwoPoints,
-} from './interactionGeometry';
-
-// ============================================================================
-// Types
-// ============================================================================
-
-export interface Modifiers {
-  ctrl: boolean;
-  shift: boolean;
-  alt: boolean;
-  meta: boolean;
-  space: boolean;
-}
-
-export type CanvasInteractionMode = 'edit' | 'operate';
-
-export type InteractionState =
-  | 'idle'
-  | 'panning'
-  | 'item_pending'
-  | 'dragging_items'
-  | 'box_pending'
-  | 'box_selecting'
-  | 'wire_drawing'
-  | 'wire_segment_dragging'
-  | 'operating_pressing'
-  | 'placing'
-  | 'wire_mode';
-
-type WireSnapTarget = {
-  type: 'port' | 'junction' | 'wire';
-  id: string;
-  parentId?: string;
-  position: Position;
-};
-
-interface DragGroupItem {
-  originalPos: Position;
-  isJunction: boolean;
-}
-
-export interface InteractionVisuals {
-  renderMarquee(start: Position | null, end: Position | null): void;
-  clearMarquee(): void;
-  renderWirePreview(points: Position[]): void;
-  clearWirePreview(): void;
-  setPortsVisible(visible: boolean): void;
-  showPortSnap(position: Position): void;
-  hidePortSnap(): void;
-  showGhost(blockType: string): void;
-  updateGhost(options: {
-    blockType: string;
-    position: Position;
-    rotation: number;
-    flipH: boolean;
-    flipV: boolean;
-  }): void;
-  hideGhost(): void;
-}
-
-export interface InteractionControllerConfig {
-  hitTester: HitTester;
-  spatialIndex: SpatialIndex;
-  visuals: InteractionVisuals;
-  mode?: CanvasInteractionMode;
-  onPlaceBlock?: (
-    blockType: string,
-    position: Position,
-    rotation: number,
-    flipH: boolean,
-    flipV: boolean
-  ) => void;
-  onOperateBlockInteraction?: (
-    blockId: string,
-    phase: 'press' | 'release' | 'click'
-  ) => void;
-  onStateChange?: (state: InteractionState) => void;
-}
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-const DRAG_THRESHOLD_PX = 4;
-const WIRE_SNAP_STICKY_RADIUS_PX = 10;
+  handleOperatePointerDown,
+  handleOperatePointerUp,
+  handleOperateCancel,
+  handleIdlePointerDown,
+  handleItemPendingMove,
+  handleDraggingItemsMove,
+  handleItemPendingUp,
+  handleDraggingItemsUp,
+  handleBoxPendingMove,
+  handleBoxSelectingUp,
+} from './interactionPointerHandlers';
+import {
+  handleWireDrawingMove,
+  handleWireDrawingUp,
+  handleWireModePointerDown,
+  handleWireDrawingPointerDown,
+  completeWire,
+  resetWireDrawing,
+} from './interactionWireHandlers';
+import {
+  handleSegmentDraggingMove,
+  handleSegmentDraggingUp,
+} from './interactionSegmentHandlers';
+import {
+  handlePlacingPointerDown,
+  handlePlacingMove,
+  updateGhostPreview,
+} from './interactionPlacingHandlers';
 
 // ============================================================================
 // InteractionController
 // ============================================================================
 
+/**
+ * Interaction state machine. Holds all FSM state in public `_*` fields and
+ * dispatches pointer/key events to handler free functions (which mutate those
+ * fields). The `_`-prefix marks them as internal — only the handler modules in
+ * this folder should touch them.
+ */
 export class InteractionController {
-  private _state: InteractionState = 'idle';
-  private _mode: CanvasInteractionMode;
-  private _hitTester: HitTester;
-  private _spatialIndex: SpatialIndex;
-  private _visuals: InteractionVisuals;
-  private _onPlaceBlock: InteractionControllerConfig['onPlaceBlock'];
-  private _onOperateBlockInteraction: InteractionControllerConfig['onOperateBlockInteraction'];
-  private _onStateChange: InteractionControllerConfig['onStateChange'];
-  private _destroyed = false;
+  _state: InteractionState = 'idle';
+  _mode: CanvasInteractionMode;
+  _hitTester: HitTester;
+  _spatialIndex: SpatialIndex;
+  _visuals: InteractionVisuals;
+  _onPlaceBlock: InteractionControllerConfig['onPlaceBlock'];
+  _onOperateBlockInteraction: InteractionControllerConfig['onOperateBlockInteraction'];
+  _onStateChange: InteractionControllerConfig['onStateChange'];
+  _destroyed = false;
 
   // Facade ref — updated externally on every React render
-  private _facade: CanvasFacadeReturn | null = null;
+  _facade: CanvasFacadeReturn | null = null;
 
   // Pointer tracking
-  private _pointerStartWorld: Position | null = null;
-  private _pointerStartScreen: Position | null = null;
-  private _downModifiers: Modifiers | null = null;
-  private _lastMoveWorld: Position | null = null;
+  _pointerStartWorld: Position | null = null;
+  _pointerStartScreen: Position | null = null;
+  _downModifiers: Modifiers | null = null;
+  _lastMoveWorld: Position | null = null;
 
   // Item drag state
-  private _dragPrimaryId: string | null = null;
-  private _dragGroup: Map<string, DragGroupItem> | null = null;
-  private _dragThresholdPassed = false;
-  private _operateBlockId: string | null = null;
-  private _operatePointerMoved = false;
+  _dragPrimaryId: string | null = null;
+  _dragGroup: Map<string, DragGroupItem> | null = null;
+  _dragThresholdPassed = false;
+  _operateBlockId: string | null = null;
+  _operatePointerMoved = false;
 
   // Box select state
-  private _boxSelectStart: Position | null = null;
-  private _boxSelectCurrent: Position | null = null;
+  _boxSelectStart: Position | null = null;
+  _boxSelectCurrent: Position | null = null;
 
   // Wire drawing state
-  private _wireFrom: WireEndpoint | null = null;
-  private _wireFromExitDirection: PortPosition | null = null;
-  private _wireSnapTarget: WireSnapTarget | null = null;
-  private _wireDrawingReturnState: 'idle' | 'wire_mode' = 'idle';
-  private _wireDrawingFromPos: Position = { x: 0, y: 0 };
-  private _wireBendPoints: Position[] = [];
+  _wireFrom: WireEndpoint | null = null;
+  _wireFromExitDirection: PortPosition | null = null;
+  _wireSnapTarget: WireSnapTarget | null = null;
+  _wireDrawingReturnState: 'idle' | 'wire_mode' = 'idle';
+  _wireDrawingFromPos: Position = { x: 0, y: 0 };
+  _wireBendPoints: Position[] = [];
 
   // Wire segment dragging
-  private _segmentWireId: string | null = null;
-  private _segmentPolyIndex = 0;
-  private _segmentHandleA = -1;
-  private _segmentHandleB = -1;
-  private _segmentOrientation: 'horizontal' | 'vertical' | null = null;
-  private _segmentPrevDelta: Position = { x: 0, y: 0 };
-  private _segmentIsFirstMove = true;
-
-  // Wire segment dragging (polyline index for first move)
+  _segmentWireId: string | null = null;
+  _segmentPolyIndex = 0;
+  _segmentHandleA = -1;
+  _segmentHandleB = -1;
+  _segmentOrientation: 'horizontal' | 'vertical' | null = null;
+  _segmentPrevDelta: Position = { x: 0, y: 0 };
+  _segmentIsFirstMove = true;
 
   // Placing state
-  private _placingBlockType: string | null = null;
-  private _placingPosition: Position | null = null;
-  private _placingRotation = 0;
-  private _placingFlipH = false;
-  private _placingFlipV = false;
+  _placingBlockType: string | null = null;
+  _placingPosition: Position | null = null;
+  _placingRotation = 0;
+  _placingFlipH = false;
+  _placingFlipV = false;
 
   // Key state
-  private _isSpaceHeld = false;
+  _isSpaceHeld = false;
 
   // Mouse presence state
-  private _isMouseOverCanvas = false;
+  _isMouseOverCanvas = false;
 
   constructor(config: InteractionControllerConfig) {
     this._mode = config.mode ?? 'edit';
@@ -229,7 +187,7 @@ export class InteractionController {
 
   startPlacing(blockType: string): void {
     if (this._mode !== 'edit') return;
-    this._resetTransient();
+    resetTransient(this);
     this._state = 'placing';
     this._placingBlockType = blockType;
     this._placingPosition = null;
@@ -242,7 +200,7 @@ export class InteractionController {
 
   startWireMode(): void {
     if (this._mode !== 'edit') return;
-    this._resetTransient();
+    resetTransient(this);
     this._state = 'wire_mode';
     this._visuals.setPortsVisible(true);
     this._onStateChange?.(this._state);
@@ -252,7 +210,7 @@ export class InteractionController {
       if (import.meta.env.DEV) {
         console.debug('[InteractionController] w-key immediate wire start at', this._lastMoveWorld);
       }
-      this._handleWireModePointerDown(this._lastMoveWorld, 0);
+      handleWireModePointerDown(this, this._lastMoveWorld, 0);
     }
   }
 
@@ -277,7 +235,7 @@ export class InteractionController {
     if (this._state === 'box_selecting' || this._state === 'box_pending') {
       this._visuals.clearMarquee();
     }
-    this._resetTransient();
+    resetTransient(this);
     this._state = 'idle';
     this._onStateChange?.(this._state);
   }
@@ -288,7 +246,7 @@ export class InteractionController {
   }
 
   // ==========================================================================
-  // Pointer Events (called by EventBridge)
+  // Pointer Events (called by EventBridge) — dispatch to handler free functions
   // ==========================================================================
 
   handlePointerDown(
@@ -302,22 +260,22 @@ export class InteractionController {
     this._downModifiers = modifiers;
 
     if (this._mode === 'operate') {
-      this._handleOperatePointerDown(worldPos, screenPos, button);
+      handleOperatePointerDown(this, worldPos, screenPos, button);
       return;
     }
 
     switch (this._state) {
       case 'idle':
-        this._handleIdlePointerDown(worldPos, screenPos, button, modifiers);
+        handleIdlePointerDown(this, worldPos, screenPos, button, modifiers);
         break;
       case 'placing':
-        this._handlePlacingPointerDown(worldPos, button);
+        handlePlacingPointerDown(this, worldPos, button);
         break;
       case 'wire_mode':
-        this._handleWireModePointerDown(worldPos, button);
+        handleWireModePointerDown(this, worldPos, button);
         break;
       case 'wire_drawing':
-        this._handleWireDrawingPointerDown(worldPos, button);
+        handleWireDrawingPointerDown(this, worldPos, button);
         break;
       default:
         break;
@@ -345,15 +303,15 @@ export class InteractionController {
         break;
 
       case 'item_pending':
-        this._handleItemPendingMove(worldPos, screenPos);
+        handleItemPendingMove(this, worldPos, screenPos);
         break;
 
       case 'dragging_items':
-        this._handleDraggingItemsMove(worldPos);
+        handleDraggingItemsMove(this, worldPos);
         break;
 
       case 'box_pending':
-        this._handleBoxPendingMove(worldPos, screenPos);
+        handleBoxPendingMove(this, worldPos, screenPos);
         break;
 
       case 'box_selecting':
@@ -362,15 +320,15 @@ export class InteractionController {
         break;
 
       case 'wire_drawing':
-        this._handleWireDrawingMove(worldPos);
+        handleWireDrawingMove(this, worldPos);
         break;
 
       case 'wire_segment_dragging':
-        this._handleSegmentDraggingMove(worldPos);
+        handleSegmentDraggingMove(this, worldPos);
         break;
 
       case 'placing':
-        this._handlePlacingMove(worldPos);
+        handlePlacingMove(this, worldPos);
         break;
 
       case 'wire_mode':
@@ -392,38 +350,38 @@ export class InteractionController {
     switch (this._state) {
       case 'panning':
         this._state = 'idle';
-        this._clearPointerTracking();
+        clearPointerTracking(this);
         break;
 
       case 'operating_pressing':
-        this._handleOperatePointerUp(worldPos, button);
+        handleOperatePointerUp(this, worldPos, button);
         break;
 
       case 'item_pending':
-        this._handleItemPendingUp(modifiers);
+        handleItemPendingUp(this, modifiers);
         break;
 
       case 'dragging_items':
-        this._handleDraggingItemsUp();
+        handleDraggingItemsUp(this);
         break;
 
       case 'box_pending':
         this._facade?.clearSelection();
         this._visuals.clearMarquee();
         this._state = 'idle';
-        this._clearPointerTracking();
+        clearPointerTracking(this);
         break;
 
       case 'box_selecting':
-        this._handleBoxSelectingUp(modifiers);
+        handleBoxSelectingUp(this, modifiers);
         break;
 
       case 'wire_drawing':
-        this._handleWireDrawingUp(worldPos, button);
+        handleWireDrawingUp(this, worldPos, button);
         break;
 
       case 'wire_segment_dragging':
-        this._handleSegmentDraggingUp();
+        handleSegmentDraggingUp(this);
         break;
 
       default:
@@ -441,16 +399,16 @@ export class InteractionController {
 
     if (key === 'Escape') {
       if (this._state === 'operating_pressing') {
-        this._handleOperateCancel();
+        handleOperateCancel(this);
         return;
       }
       if (this._state === 'wire_drawing') {
         if (this._wireBendPoints.length > 0) {
           // Last bend becomes the endpoint; remove it from handles to avoid duplication
           const lastBend = this._wireBendPoints.pop()!;
-          this._completeWire(lastBend);
+          completeWire(this, lastBend);
         } else {
-          this._resetWireDrawing();
+          resetWireDrawing(this);
         }
         return;
       }
@@ -462,13 +420,13 @@ export class InteractionController {
       const k = key.toLowerCase();
       if (k === 'r') {
         this._placingRotation = (this._placingRotation + 90) % 360;
-        this._updateGhostPreview();
+        updateGhostPreview(this);
       } else if (k === 'x') {
         this._placingFlipH = !this._placingFlipH;
-        this._updateGhostPreview();
+        updateGhostPreview(this);
       } else if (k === 'y') {
         this._placingFlipV = !this._placingFlipV;
-        this._updateGhostPreview();
+        updateGhostPreview(this);
       }
     }
   }
@@ -478,711 +436,5 @@ export class InteractionController {
     if (key === ' ') {
       this._isSpaceHeld = false;
     }
-  }
-
-  // ==========================================================================
-  // Idle State Handlers
-  // ==========================================================================
-
-  private _handleOperatePointerDown(
-    worldPos: Position,
-    screenPos: Position,
-    button: number
-  ): void {
-    if (button === 1 || (button === 0 && this._isSpaceHeld)) {
-      this._state = 'panning';
-      this._pointerStartWorld = worldPos;
-      this._pointerStartScreen = screenPos;
-      return;
-    }
-
-    if (button !== 0) return;
-
-    const target = this._hitTester.hitTest(worldPos);
-    if (target.type !== 'block' || !target.id) return;
-
-    this._pointerStartWorld = worldPos;
-    this._pointerStartScreen = screenPos;
-    this._operateBlockId = target.id;
-    this._operatePointerMoved = false;
-    this._state = 'operating_pressing';
-    this._onOperateBlockInteraction?.(target.id, 'press');
-  }
-
-  private _handleOperatePointerUp(worldPos: Position, button: number): void {
-    if (button !== 0) return;
-
-    const blockId = this._operateBlockId;
-    if (blockId) {
-      this._onOperateBlockInteraction?.(blockId, 'release');
-
-      const target = this._hitTester.hitTest(worldPos);
-      if (!this._operatePointerMoved && target.type === 'block' && target.id === blockId) {
-        this._onOperateBlockInteraction?.(blockId, 'click');
-      }
-    }
-
-    this._handleOperateCancel();
-  }
-
-  private _handleOperateCancel(): void {
-    this._operateBlockId = null;
-    this._operatePointerMoved = false;
-    this._state = 'idle';
-    this._clearPointerTracking();
-  }
-
-  private _handleIdlePointerDown(
-    worldPos: Position,
-    screenPos: Position,
-    button: number,
-    modifiers: Modifiers
-  ): void {
-    if (button === 1 || (button === 0 && this._isSpaceHeld)) {
-      this._state = 'panning';
-      this._pointerStartWorld = worldPos;
-      this._pointerStartScreen = screenPos;
-      return;
-    }
-
-    if (button !== 0) return;
-
-    const target = this._hitTester.hitTest(worldPos);
-
-    if (import.meta.env.DEV) {
-      console.debug(
-        '[InteractionController] idle hitTest →', target.type, target.id || '',
-        '| spatialIndex.size:', this._spatialIndex.size,
-        '| worldPos:', worldPos,
-        '| facade?:', !!this._facade,
-        '| facade.components.size:', this._facade?.components?.size ?? 'N/A'
-      );
-    }
-
-    this._pointerStartWorld = worldPos;
-    this._pointerStartScreen = screenPos;
-
-    switch (target.type) {
-      case 'port':
-        this._startWireDrawing(worldPos, target);
-        break;
-
-      case 'segment':
-        this._startWireSegmentDragging(worldPos, target);
-        break;
-
-      case 'block':
-      case 'junction':
-      case 'wire':
-        this._startItemPending(target, modifiers);
-        break;
-
-      case 'none':
-      default:
-        // In wire_mode-like behavior: if wire_mode is active, start wire from empty canvas
-        // Otherwise, start box selection
-        this._state = 'box_pending';
-        this._boxSelectStart = worldPos;
-        this._boxSelectCurrent = worldPos;
-        break;
-    }
-  }
-
-  // ==========================================================================
-  // Item Click / Drag
-  // ==========================================================================
-
-  private _startItemPending(
-    target: HitTestResult,
-    _modifiers: Modifiers
-  ): void {
-    this._state = 'item_pending';
-    this._dragPrimaryId = target.id;
-    this._dragThresholdPassed = false;
-
-    const facade = this._facade;
-    if (!facade) return;
-
-    if (target.id && facade.selectedIds.has(target.id)) {
-      const group = new Map<string, DragGroupItem>();
-      for (const id of facade.selectedIds) {
-        const block = facade.components.get(id);
-        if (block) {
-          group.set(id, {
-            originalPos: { x: block.position.x, y: block.position.y },
-            isJunction: false,
-          });
-          continue;
-        }
-        const junction = facade.junctions.get(id);
-        if (junction) {
-          group.set(id, {
-            originalPos: {
-              x: junction.position.x,
-              y: junction.position.y,
-            },
-            isJunction: true,
-          });
-        }
-      }
-      this._dragGroup = group.size > 0 ? group : null;
-    } else {
-      this._dragGroup = null;
-    }
-  }
-
-  private _handleItemPendingMove(
-    worldPos: Position,
-    screenPos: Position
-  ): void {
-    if (!this._pointerStartScreen) return;
-
-    if (
-      getDistance(this._pointerStartScreen, screenPos) > DRAG_THRESHOLD_PX
-    ) {
-      this._dragThresholdPassed = true;
-
-      if (!this._dragGroup && this._dragPrimaryId) {
-        const facade = this._facade;
-        if (facade) {
-          const block = facade.components.get(this._dragPrimaryId);
-          if (block) {
-            this._dragGroup = new Map([
-              [
-                this._dragPrimaryId,
-                {
-                  originalPos: {
-                    x: block.position.x,
-                    y: block.position.y,
-                  },
-                  isJunction: false,
-                },
-              ],
-            ]);
-          } else {
-            const junction = facade.junctions.get(this._dragPrimaryId);
-            if (junction) {
-              this._dragGroup = new Map([
-                [
-                  this._dragPrimaryId,
-                  {
-                    originalPos: {
-                      x: junction.position.x,
-                      y: junction.position.y,
-                    },
-                    isJunction: true,
-                  },
-                ],
-              ]);
-            }
-          }
-        }
-      }
-
-      this._state = 'dragging_items';
-      this._handleDraggingItemsMove(worldPos);
-    }
-  }
-
-  private _handleDraggingItemsMove(worldPos: Position): void {
-    if (!this._pointerStartWorld || !this._dragGroup) return;
-    this._lastMoveWorld = worldPos;
-
-    const facade = this._facade;
-    if (!facade) return;
-
-    const delta = snapDelta(subtract(worldPos, this._pointerStartWorld), this._getGridSnap());
-
-    for (const [id, { originalPos, isJunction }] of this._dragGroup) {
-      const newPos = add(originalPos, delta);
-      if (isJunction) {
-        facade.moveJunction(id, newPos, true, true);
-      } else {
-        facade.moveComponent(id, newPos, true, true);
-      }
-    }
-  }
-
-  private _handleItemPendingUp(_modifiers: Modifiers): void {
-    if (!this._dragThresholdPassed && this._dragPrimaryId) {
-      const facade = this._facade;
-      const mods = this._downModifiers;
-      if (facade && mods) {
-        if (mods.shift) {
-          facade.addToSelection(this._dragPrimaryId);
-        } else if (mods.ctrl || mods.meta) {
-          facade.toggleSelection(this._dragPrimaryId);
-        } else {
-          facade.setSelection([this._dragPrimaryId]);
-        }
-      }
-    }
-
-    this._dragPrimaryId = null;
-    this._dragGroup = null;
-    this._dragThresholdPassed = false;
-    this._state = 'idle';
-    this._clearPointerTracking();
-  }
-
-  private _handleDraggingItemsUp(): void {
-    if (this._dragGroup && this._pointerStartWorld) {
-      const facade = this._facade;
-      if (facade) {
-        const lastWorld = this._pointerStartWorld;
-        const delta = snapDelta(
-          subtract(
-            this._lastMoveWorld ?? lastWorld,
-            this._pointerStartWorld
-          ),
-          this._getGridSnap()
-        );
-
-        for (const [id, { originalPos, isJunction }] of this._dragGroup) {
-          const newPos = add(originalPos, delta);
-          if (isJunction) {
-            facade.moveJunction(id, newPos, false, false);
-          } else {
-            facade.moveComponent(id, newPos, false, false);
-          }
-        }
-      }
-    }
-
-    this._dragPrimaryId = null;
-    this._dragGroup = null;
-    this._dragThresholdPassed = false;
-    this._state = 'idle';
-    this._clearPointerTracking();
-  }
-
-  // ==========================================================================
-  // Box Selection
-  // ==========================================================================
-
-  private _handleBoxPendingMove(
-    worldPos: Position,
-    screenPos: Position
-  ): void {
-    if (!this._pointerStartScreen) return;
-
-    if (
-      getDistance(this._pointerStartScreen, screenPos) > DRAG_THRESHOLD_PX
-    ) {
-      this._state = 'box_selecting';
-      this._boxSelectCurrent = worldPos;
-      this._visuals.renderMarquee(this._boxSelectStart!, worldPos);
-    }
-  }
-
-  private _handleBoxSelectingUp(modifiers: Modifiers): void {
-    const facade = this._facade;
-    if (facade && this._boxSelectStart && this._boxSelectCurrent) {
-      const bounds = rectFromTwoPoints(
-        this._boxSelectStart,
-        this._boxSelectCurrent
-      );
-      const items = this._spatialIndex.queryRect(bounds);
-      const ids = items
-        .filter(
-          (item) =>
-            item.type === 'block' ||
-            item.type === 'junction' ||
-            item.type === 'wire'
-        )
-        .map((item) => item.id);
-
-      if (modifiers.shift) {
-        const currentIds = Array.from(facade.selectedIds);
-        const merged = new Set([...currentIds, ...ids]);
-        facade.setSelection(Array.from(merged));
-      } else {
-        facade.setSelection(ids);
-      }
-    }
-
-    this._visuals.clearMarquee();
-    this._boxSelectStart = null;
-    this._boxSelectCurrent = null;
-    this._state = 'idle';
-    this._clearPointerTracking();
-  }
-
-  // ==========================================================================
-  // Wire Drawing
-  // ==========================================================================
-
-  private _startWireDrawing(
-    _worldPos: Position,
-    target: HitTestResult
-  ): void {
-    this._wireDrawingReturnState = this._state === 'wire_mode' ? 'wire_mode' : 'idle';
-    this._state = 'wire_drawing';
-    this._wireFrom = {
-      componentId: target.parentId ?? '',
-      portId: target.id,
-    };
-    this._wireFromExitDirection = getPortDirection(target);
-    // Use the exact port center position (from hit test), not the raw mouse position.
-    // This ensures preview matches the final rendered wire, which resolves
-    // endpoints from block.position + port.absolutePosition.
-    this._wireDrawingFromPos = target.position;
-    this._lastMoveWorld = target.position;
-    this._wireSnapTarget = null;
-    this._wireBendPoints = [];
-  }
-
-  private _handleWireDrawingMove(worldPos: Position): void {
-    this._lastMoveWorld = worldPos;
-
-    // Check snap target sticky
-    if (this._wireSnapTarget) {
-      const dist = getDistance(worldPos, this._wireSnapTarget.position);
-      if (dist > WIRE_SNAP_STICKY_RADIUS_PX) {
-        this._wireSnapTarget = null;
-      }
-    }
-
-    // Find new snap target
-    if (!this._wireSnapTarget) {
-      const fromBlockId =
-        this._wireFrom && isPortEndpoint(this._wireFrom)
-          ? this._wireFrom.componentId
-          : undefined;
-      const portHit = this._hitTester.findNearestPort(worldPos, fromBlockId);
-      if (portHit) {
-        this._wireSnapTarget = {
-          type: 'port',
-          id: portHit.id,
-          parentId: portHit.parentId,
-          position: portHit.position,
-        };
-      }
-    }
-
-    // Visual feedback — orthogonal lines through bend points
-    const fromPos = this._wireDrawingFromPos;
-    const rawTarget = this._wireSnapTarget?.position ?? this._snapToGrid(worldPos);
-    const currentTarget = this._wireSnapTarget
-      ? rawTarget
-      : this._snapToOrthogonal(rawTarget);
-    const previewPoints: Position[] = [fromPos, ...this._wireBendPoints, currentTarget];
-
-    this._visuals.renderWirePreview(previewPoints);
-
-    if (this._wireSnapTarget) {
-      this._visuals.showPortSnap(this._wireSnapTarget.position);
-    } else {
-      this._visuals.hidePortSnap();
-    }
-  }
-
-  private _handleWireDrawingUp(_worldPos: Position, button: number): void {
-    if (button !== 0) return;
-    // Wire completion is now handled by _handleWireDrawingPointerDown
-    // (port click / snap target) and ESC key. Mouse up is a no-op
-    // during multi-click wire drawing.
-  }
-
-  private _handleWireModePointerDown(
-    worldPos: Position,
-    button: number
-  ): void {
-    if (button !== 0) return;
-
-    const target = this._hitTester.hitTest(worldPos);
-    if (target.type === 'port') {
-      // Start from port (existing behavior)
-      this._pointerStartWorld = worldPos;
-      this._pointerStartScreen = worldPos;
-      this._startWireDrawing(worldPos, target);
-    } else {
-      // Start from empty canvas — FloatingEndpoint
-      const snappedPos = this._snapToGrid(worldPos);
-      this._wireDrawingReturnState = 'wire_mode';
-      this._state = 'wire_drawing';
-      this._wireFrom = { position: snappedPos };
-      this._wireFromExitDirection = null;
-      this._wireDrawingFromPos = snappedPos;
-      this._lastMoveWorld = snappedPos;
-      this._wireSnapTarget = null;
-      this._wireBendPoints = [];
-    }
-  }
-
-  private _handleWireDrawingPointerDown(
-    worldPos: Position,
-    button: number
-  ): void {
-    if (button !== 0) return;
-
-    // If there's a snap target, complete the wire
-    if (this._wireSnapTarget) {
-      this._completeWire();
-      return;
-    }
-
-    // If clicking on a port, complete wire there
-    const target = this._hitTester.hitTest(worldPos);
-    if (target.type === 'port') {
-      this._wireSnapTarget = {
-        type: 'port',
-        id: target.id,
-        parentId: target.parentId,
-        position: target.position,
-      };
-      this._completeWire();
-      return;
-    }
-
-    // Click on empty canvas — record bend point orthogonally constrained
-    const snappedPos = this._snapToOrthogonal(this._snapToGrid(worldPos));
-    this._wireBendPoints.push(snappedPos);
-  }
-
-  private _completeWire(_endPosition?: Position): void {
-    if (!this._wireFrom) {
-      this._resetWireDrawing();
-      return;
-    }
-
-    // Cancel if starting from a floating endpoint (not connected to anything)
-    if (isFloatingEndpoint(this._wireFrom)) {
-      this._resetWireDrawing();
-      return;
-    }
-
-    let to: WireEndpoint | null = null;
-
-    if (this._wireSnapTarget) {
-      const snapTarget = this._wireSnapTarget;
-      if (snapTarget.type === 'port' && snapTarget.parentId) {
-        to = { componentId: snapTarget.parentId, portId: snapTarget.id };
-      } else if (snapTarget.type === 'junction') {
-        to = { junctionId: snapTarget.id } as WireEndpoint;
-      }
-    }
-    // No floating endpoint creation — wire must end at a port or junction
-
-    if (to && this._facade) {
-      // Convert user bend points to WireHandle format
-      const handles = this._wireBendPoints.length > 0
-        ? this._wireBendPoints.map(pos => ({
-          position: pos,
-          constraint: 'free' as const,
-          source: 'user' as const,
-        }))
-        : undefined;
-
-      this._facade.addWire(this._wireFrom, to, {
-        fromExitDirection: this._wireFromExitDirection ?? undefined,
-        handles,
-      });
-    }
-
-    this._resetWireDrawing();
-  }
-
-  private _resetWireDrawing(): void {
-    this._visuals.clearWirePreview();
-    this._visuals.hidePortSnap();
-    this._wireFrom = null;
-    this._wireFromExitDirection = null;
-    this._lastMoveWorld = null;
-    this._wireSnapTarget = null;
-    this._wireDrawingFromPos = { x: 0, y: 0 };
-    this._wireBendPoints = [];
-    this._state = this._wireDrawingReturnState;
-    this._onStateChange?.(this._state);
-  }
-
-  private _getGridSnap(): number {
-    return this._facade?.gridSize ?? DEFAULT_GRID_SNAP;
-  }
-
-  private _snapToGrid(pos: Position): Position {
-    const step = this._getGridSnap();
-    return {
-      x: Math.round(pos.x / step) * step,
-      y: Math.round(pos.y / step) * step,
-    };
-  }
-
-  /** Constrain position to 90-degree (horizontal/vertical) from last anchor point */
-  private _snapToOrthogonal(pos: Position): Position {
-    const anchor =
-      this._wireBendPoints.length > 0
-        ? this._wireBendPoints[this._wireBendPoints.length - 1]
-        : this._wireDrawingFromPos;
-    if (!anchor) return pos;
-    const dx = Math.abs(pos.x - anchor.x);
-    const dy = Math.abs(pos.y - anchor.y);
-    // Snap to whichever axis has more displacement
-    if (dx >= dy) {
-      return { x: pos.x, y: anchor.y }; // horizontal
-    } else {
-      return { x: anchor.x, y: pos.y }; // vertical
-    }
-  }
-
-  // ==========================================================================
-  // Wire Segment Dragging
-  // ==========================================================================
-
-  /**
-   * Start dragging a wire segment.
-   * Stores the polyline segment index; actual endpoint handle insertion
-   * happens atomically inside dragWireSegment on first move.
-   */
-  private _startWireSegmentDragging(
-    _worldPos: Position,
-    target: HitTestResult
-  ): void {
-    this._state = 'wire_segment_dragging';
-    this._segmentWireId = target.id || null;
-    this._segmentOrientation = null;
-    this._segmentPrevDelta = { x: 0, y: 0 };
-    this._segmentIsFirstMove = true;
-    this._segmentHandleA = -1;
-    this._segmentHandleB = -1;
-    this._segmentPolyIndex = typeof target.subIndex === 'number' ? target.subIndex : 0;
-  }
-
-  private _handleSegmentDraggingMove(worldPos: Position): void {
-    if (!this._pointerStartWorld || !this._segmentWireId) return;
-    const facade = this._facade;
-    if (!facade) return;
-
-    const snapped = snapDelta(subtract(worldPos, this._pointerStartWorld), this._getGridSnap());
-    const constrained = constrainSegmentDelta(snapped, this._segmentOrientation);
-
-    const incrementalDelta = {
-      x: constrained.x - this._segmentPrevDelta.x,
-      y: constrained.y - this._segmentPrevDelta.y,
-    };
-    this._segmentPrevDelta = constrained;
-
-    if (incrementalDelta.x !== 0 || incrementalDelta.y !== 0) {
-      const isFirstMove = this._segmentIsFirstMove;
-      this._segmentIsFirstMove = false;
-
-      if (isFirstMove) {
-        // First move: use dragWireSegment which atomically inserts endpoint
-        // handles + applies delta + returns resolved handle indices & orientation.
-        const result = facade.dragWireSegment(
-          this._segmentWireId,
-          this._segmentPolyIndex,
-          incrementalDelta,
-          true
-        );
-        if (result) {
-          this._segmentHandleA = result.handleA;
-          this._segmentHandleB = result.handleB;
-          this._segmentOrientation = result.orientation;
-        }
-      } else {
-        // Subsequent moves: handles already resolved, use direct moveWireSegment.
-        facade.moveWireSegment(
-          this._segmentWireId,
-          this._segmentHandleA,
-          this._segmentHandleB,
-          incrementalDelta,
-          false
-        );
-      }
-    }
-  }
-
-  private _handleSegmentDraggingUp(): void {
-    // Handles are already at the correct final position from incremental move handler.
-    // No duplicate delta application needed.
-    if (this._segmentWireId) {
-      this._facade?.cleanupOverlappingHandles(this._segmentWireId);
-    }
-    this._segmentWireId = null;
-    this._segmentPolyIndex = 0;
-    this._segmentHandleA = -1;
-    this._segmentHandleB = -1;
-    this._segmentOrientation = null;
-    this._segmentPrevDelta = { x: 0, y: 0 };
-    this._segmentIsFirstMove = true;
-    this._state = 'idle';
-    this._clearPointerTracking();
-  }
-
-  // ==========================================================================
-  // Placing Mode
-  // ==========================================================================
-
-  private _handlePlacingPointerDown(
-    worldPos: Position,
-    button: number
-  ): void {
-    if (button !== 0 || !this._placingBlockType) return;
-
-    const snappedPos = snapToGrid(worldPos, this._getGridSnap());
-    this._onPlaceBlock?.(
-      this._placingBlockType,
-      snappedPos,
-      this._placingRotation,
-      this._placingFlipH,
-      this._placingFlipV
-    );
-  }
-
-  private _handlePlacingMove(worldPos: Position): void {
-    this._placingPosition = snapToGrid(worldPos, this._getGridSnap());
-    this._updateGhostPreview();
-  }
-
-  private _updateGhostPreview(): void {
-    if (this._placingBlockType && this._placingPosition) {
-      this._visuals.updateGhost({
-        blockType: this._placingBlockType,
-        position: this._placingPosition,
-        rotation: this._placingRotation,
-        flipH: this._placingFlipH,
-        flipV: this._placingFlipV,
-      });
-    }
-  }
-
-  // ==========================================================================
-  // Helpers
-  // ==========================================================================
-
-  private _clearPointerTracking(): void {
-    this._pointerStartWorld = null;
-    this._pointerStartScreen = null;
-    this._lastMoveWorld = null;
-  }
-
-  private _resetTransient(): void {
-    this._dragPrimaryId = null;
-    this._dragGroup = null;
-    this._dragThresholdPassed = false;
-    this._operateBlockId = null;
-    this._operatePointerMoved = false;
-    this._boxSelectStart = null;
-    this._boxSelectCurrent = null;
-    this._wireFrom = null;
-    this._wireFromExitDirection = null;
-    this._lastMoveWorld = null;
-    this._wireSnapTarget = null;
-    this._wireDrawingReturnState = 'idle';
-    this._wireDrawingFromPos = { x: 0, y: 0 };
-    this._segmentWireId = null;
-    this._segmentPolyIndex = 0;
-    this._segmentHandleA = -1;
-    this._segmentHandleB = -1;
-    this._segmentOrientation = null;
-    this._segmentPrevDelta = { x: 0, y: 0 };
-    this._segmentIsFirstMove = true;
-    this._placingBlockType = null;
-    this._placingPosition = null;
-    this._placingRotation = 0;
-    this._placingFlipH = false;
-    this._placingFlipV = false;
-    this._clearPointerTracking();
   }
 }
