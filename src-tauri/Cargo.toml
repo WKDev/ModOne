@@ -24,8 +24,12 @@ webdriver = ["dep:tauri-plugin-webdriver"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-# Shared wasm/native contract crate (canonical memory + protocol adapter)
+# Shared wasm/native contract crate. native 셸이므로 std-clock(기본 features) 활성화.
 modone-contract = { path = "../crates/modone-contract" }
+# vendor-neutral PLC 모델 (하드웨어 타입 + VendorProfile)
+plc-model = { path = "../crates/plc-model" }
+# PLC 사이클 실행기 코어 (전송/tokio 없는 순수 시뮬레이션)
+sim-engine = { path = "../crates/sim-engine" }
 # Modbus 코덱/메모리/어댑터 (전송 비의존, wasm·native 공용)
 modbus-codec = { path = "../crates/modbus-codec" }
 # OPC UA pure core (codec/address-space spec/adapter/backend trait)

@@ -1,14 +1,11 @@
-use crate::project::{PlcHardwareTopology, PlcManufacturer};
+use crate::hardware::{PlcHardwareTopology, PlcManufacturer};
 
-use super::super::{
-    profile::{
-        format_vendor_address, split_vendor_address, ModbusAddressSpace, ModbusMappingPolicy,
-        ModbusMappingRule, ModbusMappingSource, OpcUaAliasPolicy, VendorAddress,
-        VendorAddressMetadata, VendorAddressNumberBase, VendorDataKind, VendorProfile,
-        VendorProfileError, VendorProfileId,
-    },
-    types::{CanonicalAddress, CanonicalAreaKind},
+use crate::profile::{
+    format_vendor_address, split_vendor_address, ModbusAddressSpace, ModbusMappingPolicy,
+    ModbusMappingRule, ModbusMappingSource, OpcUaAliasPolicy, VendorAddress, VendorAddressMetadata,
+    VendorAddressNumberBase, VendorDataKind, VendorProfile, VendorProfileError, VendorProfileId,
 };
+use modone_contract::{CanonicalAddress, CanonicalAreaKind};
 
 const MELSEC_FAMILIES: [&str; 7] = ["X", "Y", "M", "L", "T", "C", "D"];
 

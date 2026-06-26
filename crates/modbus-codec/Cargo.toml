@@ -5,18 +5,15 @@ edition = "2021"
 rust-version = "1.77.2"
 
 [dependencies]
-modone-contract = { path = "../modone-contract" }
+# A가 계약 §3 wasm-purity를 clock 주입으로 정식 상환 → default-features=false 로
+# 의존해 wasm에서 chrono/uuid를 끌어오지 않는다(native 셸이 std-clock 활성화).
+# 이전의 wasm-target uuid js 임시 통일은 제거됨.
+modone-contract = { path = "../modone-contract", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
 bitvec = "1"
 parking_lot = "0.12"
-
-# wasm 타깃에서 의존 트리의 uuid 가 getrandom(js) 백엔드를 쓰도록 feature 를
-# 통일한다. modone-contract(§3 wasm-purity 부채)를 A 가 정식 상환하기 전까지의
-# 임시 통일 — 계약 코드/표면은 건드리지 않고 manifest 에서 additive feature 만 켠다.
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-uuid = { version = "1", features = ["js"] }
 
 [dev-dependencies]
 tempfile = "3"

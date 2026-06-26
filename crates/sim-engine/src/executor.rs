@@ -7,10 +7,10 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Instant;
 use thiserror::Error;
 
-use crate::plc_runtime::{CanonicalAddress, VendorProfile};
+use modone_contract::CanonicalAddress;
+use plc_model::VendorProfile;
 
 use super::counter::CounterManager;
 use super::memory::{CanonicalRuntimeFacade, SimMemoryError};
@@ -94,6 +94,56 @@ pub enum NodeType {
     MathDiv,
     MathMod,
     MathMov,
+}
+
+/// 출력(구동) 노드인지 여부. 코일/타이머/카운터/연산은 rung의 파워플로우 평가에
+/// 기여하지 않고, 파워플로우로 구동되는 출력이다. (접점/블록/비교는 입력)
+fn is_output_node(node_type: NodeType) -> bool {
+    matches!(
+        node_type,
+        NodeType::CoilOut
+            | NodeType::CoilSet
+            | NodeType::CoilRst
+            | NodeType::TimerTon
+            | NodeType::TimerTof
+            | NodeType::TimerTmr
+            | NodeType::CounterCtu
+            | NodeType::CounterCtd
+            | NodeType::CounterCtud
+            | NodeType::MathAdd
+            | NodeType::MathSub
+            | NodeType::MathMul
+            | NodeType::MathDiv
+            | NodeType::MathMod
+            | NodeType::MathMov
+    )
+}
+
+/// 스캔 소요시간 측정용 스톱워치. native는 monotonic Instant, wasm은 시계가 없어
+/// (Instant::now()가 트랩) 0을 반환한다 — 성능 지표일 뿐 로직과 무관.
+#[cfg(not(target_arch = "wasm32"))]
+struct StopWatch(std::time::Instant);
+#[cfg(target_arch = "wasm32")]
+struct StopWatch;
+
+impl StopWatch {
+    #[cfg(not(target_arch = "wasm32"))]
+    fn start() -> Self {
+        Self(std::time::Instant::now())
+    }
+    #[cfg(target_arch = "wasm32")]
+    fn start() -> Self {
+        Self
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn elapsed_us(&self) -> u64 {
+        self.0.elapsed().as_micros() as u64
+    }
+    #[cfg(target_arch = "wasm32")]
+    fn elapsed_us(&self) -> u64 {
+        0
+    }
 }
 
 /// Device address parsed from string
@@ -691,7 +741,7 @@ impl ProgramExecutor {
 
     /// Execute a full ladder program
     pub fn execute_program(&self, program: &CompiledProgram) -> ProgramExecutionResult {
-        let start = Instant::now();
+        let watch = StopWatch::start();
         let mut network_results = Vec::with_capacity(program.networks.len());
         let mut all_success = true;
         let mut first_error: Option<String> = None;
@@ -710,7 +760,7 @@ impl ProgramExecutor {
 
         ProgramExecutionResult {
             network_results,
-            total_time_us: start.elapsed().as_micros() as u64,
+            total_time_us: watch.elapsed_us(),
             success: all_success,
             error: first_error,
         }
@@ -718,7 +768,7 @@ impl ProgramExecutor {
 
     /// Execute a single network
     pub fn execute_network(&self, network: &CompiledNetwork) -> NetworkExecutionResult {
-        let start = Instant::now();
+        let watch = StopWatch::start();
 
         for node in &network.nodes {
             // Evaluate input condition
@@ -727,7 +777,7 @@ impl ProgramExecutor {
                 Err(e) => {
                     return NetworkExecutionResult {
                         network_id: network.id,
-                        execution_time_us: start.elapsed().as_micros() as u64,
+                        execution_time_us: watch.elapsed_us(),
                         success: false,
                         error: Some(e.to_string()),
                     };
@@ -738,7 +788,7 @@ impl ProgramExecutor {
             if let Err(e) = self.execute_output(node, power_flow) {
                 return NetworkExecutionResult {
                     network_id: network.id,
-                    execution_time_us: start.elapsed().as_micros() as u64,
+                    execution_time_us: watch.elapsed_us(),
                     success: false,
                     error: Some(e.to_string()),
                 };
@@ -747,7 +797,7 @@ impl ProgramExecutor {
 
         NetworkExecutionResult {
             network_id: network.id,
-            execution_time_us: start.elapsed().as_micros() as u64,
+            execution_time_us: watch.elapsed_us(),
             success: true,
             error: None,
         }
@@ -784,10 +834,15 @@ impl ProgramExecutor {
                 Ok(result)
             }
 
-            // Blocks
+            // Blocks — 출력 노드(코일/타이머/카운터/연산)는 파워플로우에 기여하지
+            // 않는다. 프론트(gridToAst)는 단일 행 rung을 block_series([입력..., 출력])
+            // 으로 내보내므로, 출력 자식을 AND/OR 평가에서 제외해야 한다.
             NodeType::BlockSeries => {
-                // AND logic - all children must be true
+                // AND logic - all input children must be true
                 for child in &node.children {
+                    if is_output_node(child.node_type) {
+                        continue;
+                    }
                     if !self.evaluate_node(child)? {
                         return Ok(false);
                     }
@@ -795,8 +850,11 @@ impl ProgramExecutor {
                 Ok(true)
             }
             NodeType::BlockParallel => {
-                // OR logic - any child true
+                // OR logic - any input child true
                 for child in &node.children {
+                    if is_output_node(child.node_type) {
+                        continue;
+                    }
                     if self.evaluate_node(child)? {
                         return Ok(true);
                     }
@@ -815,7 +873,7 @@ impl ProgramExecutor {
             // Timers - read done bit
             NodeType::TimerTon | NodeType::TimerTof | NodeType::TimerTmr => {
                 let addr = self.require_address(node.address)?;
-                if addr.area == crate::plc_runtime::CanonicalAreaKind::TimerDoneBit {
+                if addr.area == modone_contract::CanonicalAreaKind::TimerDoneBit {
                     if let Some(state) = self.timer_mgr.get_state(addr.index as u16) {
                         return Ok(state.done);
                     }
@@ -826,7 +884,7 @@ impl ProgramExecutor {
             // Counters - read done bit
             NodeType::CounterCtu | NodeType::CounterCtd | NodeType::CounterCtud => {
                 let addr = self.require_address(node.address)?;
-                if addr.area == crate::plc_runtime::CanonicalAreaKind::CounterDoneBit {
+                if addr.area == modone_contract::CanonicalAreaKind::CounterDoneBit {
                     if let Some(state) = self.counter_mgr.get_state(addr.index as u16) {
                         return Ok(state.done);
                     }
@@ -922,11 +980,12 @@ impl ProgramExecutor {
                 }
             }
 
-            // Execute child nodes for blocks
+            // 블록의 입력 파워플로우(입력 자식들의 AND/OR)로 출력 자식(코일 등)을
+            // 구동한다. 입력 자식(contact)에 대한 execute_output 은 no-op.
             NodeType::BlockSeries | NodeType::BlockParallel => {
+                let power = self.evaluate_node(node)?;
                 for child in &node.children {
-                    let child_input = self.evaluate_node(child)?;
-                    self.execute_output(child, child_input)?;
+                    self.execute_output(child, power)?;
                 }
             }
 
@@ -963,13 +1022,13 @@ impl ProgramExecutor {
             Ok(self.runtime.write_bool(
                 addr,
                 value,
-                crate::plc_runtime::CanonicalWriteSource::Simulation,
+                modone_contract::CanonicalWriteSource::Simulation,
             )?)
         } else {
             Ok(self.runtime.write_word_value(
                 addr,
                 if value { 1 } else { 0 },
-                crate::plc_runtime::CanonicalWriteSource::Simulation,
+                modone_contract::CanonicalWriteSource::Simulation,
             )?)
         }
     }
@@ -1019,7 +1078,7 @@ impl ProgramExecutor {
         timer_type: SimTimerType,
     ) -> ExecutionResult<()> {
         let addr = self.require_address(node.address)?;
-        if addr.area != crate::plc_runtime::CanonicalAreaKind::TimerDoneBit {
+        if addr.area != modone_contract::CanonicalAreaKind::TimerDoneBit {
             return Err(ExecutionError::InvalidAddress(format!(
                 "Timer must use TimerDoneBit, got {:?}",
                 addr.area
@@ -1037,15 +1096,15 @@ impl ProgramExecutor {
         let _ = self.runtime.write_bool(
             addr,
             done,
-            crate::plc_runtime::CanonicalWriteSource::InternalRuntime,
+            modone_contract::CanonicalWriteSource::InternalRuntime,
         );
         self.runtime.write_word_value(
             CanonicalAddress::new(
-                crate::plc_runtime::CanonicalAreaKind::TimerValueWord,
+                modone_contract::CanonicalAreaKind::TimerValueWord,
                 addr.index,
             ),
             _elapsed as u16,
-            crate::plc_runtime::CanonicalWriteSource::InternalRuntime,
+            modone_contract::CanonicalWriteSource::InternalRuntime,
         )?;
 
         Ok(())
@@ -1059,7 +1118,7 @@ impl ProgramExecutor {
         counter_type: SimCounterType,
     ) -> ExecutionResult<()> {
         let addr = self.require_address(node.address)?;
-        if addr.area != crate::plc_runtime::CanonicalAreaKind::CounterDoneBit {
+        if addr.area != modone_contract::CanonicalAreaKind::CounterDoneBit {
             return Err(ExecutionError::InvalidAddress(format!(
                 "Counter must use CounterDoneBit, got {:?}",
                 addr.area
@@ -1080,16 +1139,16 @@ impl ProgramExecutor {
         let _ = self.runtime.write_bool(
             addr,
             done,
-            crate::plc_runtime::CanonicalWriteSource::InternalRuntime,
+            modone_contract::CanonicalWriteSource::InternalRuntime,
         )?;
         if let Some(state) = self.counter_mgr.get_state(addr.index as u16) {
             self.runtime.write_word_value(
                 CanonicalAddress::new(
-                    crate::plc_runtime::CanonicalAreaKind::CounterValueWord,
+                    modone_contract::CanonicalAreaKind::CounterValueWord,
                     addr.index,
                 ),
                 state.current_value.clamp(0, u16::MAX as i32) as u16,
-                crate::plc_runtime::CanonicalWriteSource::InternalRuntime,
+                modone_contract::CanonicalWriteSource::InternalRuntime,
             )?;
         }
 
@@ -1121,7 +1180,7 @@ impl ProgramExecutor {
             self.runtime.write_word_value(
                 dest,
                 result as u16,
-                crate::plc_runtime::CanonicalWriteSource::Simulation,
+                modone_contract::CanonicalWriteSource::Simulation,
             )?;
         }
 
@@ -1156,7 +1215,7 @@ impl ProgramExecutor {
             self.runtime.write_word_value(
                 *dest,
                 result as u16,
-                crate::plc_runtime::CanonicalWriteSource::Simulation,
+                modone_contract::CanonicalWriteSource::Simulation,
             )?;
         }
 
@@ -1190,7 +1249,7 @@ impl ProgramExecutor {
             self.runtime.write_word_value(
                 *dest,
                 result as u16,
-                crate::plc_runtime::CanonicalWriteSource::Simulation,
+                modone_contract::CanonicalWriteSource::Simulation,
             )?;
         }
 
@@ -1213,7 +1272,7 @@ impl ProgramExecutor {
             self.runtime.write_word_value(
                 *dest,
                 value as u16,
-                crate::plc_runtime::CanonicalWriteSource::Simulation,
+                modone_contract::CanonicalWriteSource::Simulation,
             )?;
         }
 
@@ -1248,8 +1307,8 @@ impl Default for ProgramExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plc_runtime::profiles::LsProfile;
-    use crate::project::PlcHardwareTopology;
+    use plc_model::LsProfile;
+    use plc_model::PlcHardwareTopology;
 
     fn create_executor() -> (
         ProgramExecutor,

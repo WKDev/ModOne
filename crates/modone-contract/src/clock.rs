@@ -29,6 +29,19 @@ pub fn new_batch_id() -> String {
     }
 }
 
+/// 현재 시각을 epoch milliseconds로 반환 (sim 스캔 타이밍 등). wasm(피처 off)은
+/// 실시계가 없으면 단조 카운터.
+pub fn now_millis() -> u64 {
+    #[cfg(feature = "std-clock")]
+    {
+        chrono::Utc::now().timestamp_millis() as u64
+    }
+    #[cfg(not(feature = "std-clock"))]
+    {
+        injected::now_millis()
+    }
+}
+
 #[cfg(not(feature = "std-clock"))]
 pub use injected::{set_clock, set_id_source};
 
@@ -60,5 +73,10 @@ mod injected {
             Some(f) => f(),
             None => format!("batch-{}", COUNTER.fetch_add(1, Ordering::Relaxed)),
         }
+    }
+
+    pub fn now_millis() -> u64 {
+        // 실시계 없음 — 단조 카운터로 대체(스캔 타이밍 지표는 wasm tier에서 무의미).
+        COUNTER.fetch_add(1, Ordering::Relaxed)
     }
 }

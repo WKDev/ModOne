@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::plc_runtime::CanonicalValue;
+use modone_contract::CanonicalValue;
 
 use super::memory::CanonicalRuntimeFacade;
 use super::tag_registry::SharedTagRegistry;
@@ -40,7 +40,7 @@ impl Default for StepType {
 
 /// Represents a breakpoint that was hit during execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", tag = "type")]
+#[serde(rename_all = "camelCase", rename_all_fields = "camelCase", tag = "type")]
 pub enum BreakpointHit {
     /// Network breakpoint was hit
     #[serde(rename = "network")]
@@ -450,7 +450,9 @@ impl SimDebugger {
     /// Remove a watch variable
     pub fn remove_watch(&self, address: &str) -> DebuggerResult<()> {
         let binding = RuntimeBinding::tag(address.to_string());
+        // 주소 기반 API이므로 실패 시 바인딩 Debug 표현 대신 원래 주소를 보고한다.
         self.remove_watch_binding(&binding)
+            .map_err(|_| DebuggerError::WatchNotFound(address.to_string()))
     }
 
     pub fn remove_watch_binding(&self, binding: &RuntimeBinding) -> DebuggerResult<()> {

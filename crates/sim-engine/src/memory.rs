@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 
-use crate::plc_runtime::{
+use modone_contract::{
     CanonicalAddress, CanonicalAreaKind, CanonicalMemory, CanonicalMemoryError,
     CanonicalMemorySnapshot, CanonicalValue, CanonicalWriteSource,
 };
@@ -270,9 +270,9 @@ impl CanonicalRuntimeFacade {
         }
 
         MemorySnapshot {
-            id: uuid::Uuid::new_v4().to_string(),
+            id: modone_contract::clock::new_batch_id(),
             name: name.to_string(),
-            timestamp: chrono::Utc::now().to_rfc3339(),
+            timestamp: modone_contract::clock::now_rfc3339(),
             bit_devices,
             word_devices,
             timer_states,

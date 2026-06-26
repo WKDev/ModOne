@@ -4,7 +4,7 @@ use std::sync::Arc;
 use parking_lot::RwLock;
 use thiserror::Error;
 
-use crate::plc_runtime::{CanonicalAccess, CanonicalAddress, CanonicalAreaKind};
+use modone_contract::{CanonicalAccess, CanonicalAddress, CanonicalAreaKind};
 
 use super::types::{RegisterTagRequest, RuntimeBinding, TagAccessLevel, TagClass, TagDefinition};
 
@@ -367,7 +367,7 @@ fn semantic_tag_id(display_name: &str) -> String {
         .collect::<Vec<_>>()
         .join("-");
     if slug.is_empty() {
-        format!("tag-{}", uuid::Uuid::new_v4())
+        format!("tag-{}", modone_contract::clock::new_batch_id())
     } else {
         slug
     }
