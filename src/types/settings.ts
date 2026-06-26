@@ -12,6 +12,8 @@ export type BaudRate = 9600 | 19200 | 38400 | 57600 | 115200;
 export type Parity = 'none' | 'odd' | 'even';
 export type StopBits = 1 | 2;
 export type LadderShortcutProfile = 'default' | 'xg5000' | 'gxworks';
+/** R 키 회전 방향: 시계(cw) / 반시계(ccw) */
+export type RotationDirection = 'cw' | 'ccw';
 
 /**
  * Application settings interface
@@ -49,6 +51,10 @@ export interface AppSettings {
 
   // Ladder settings
   ladderShortcutProfile: LadderShortcutProfile;
+
+  // Canvas / symbol settings
+  symbolRotationStep: number;            // R 1회당 회전 각도(도), 1-360
+  symbolRotationDirection: RotationDirection; // 기본 회전 방향
 
   // Sheet settings
   defaultSheet: string;     // built-in template name: 'A3-landscape' | 'A4-landscape' | etc.
@@ -95,6 +101,10 @@ export const defaultSettings: AppSettings = {
 
   // Ladder
   ladderShortcutProfile: 'default',
+
+  // Canvas / symbol
+  symbolRotationStep: 90,
+  symbolRotationDirection: 'cw',
 
   // Sheet
   defaultSheet: 'A3-landscape',

@@ -55,6 +55,12 @@ pub struct AppSettings {
     #[serde(default)]
     pub ladder_shortcut_profile: LadderShortcutProfile,
 
+    // Canvas / symbol settings
+    #[serde(default = "default_rotation_step")]
+    pub symbol_rotation_step: u32,
+    #[serde(default)]
+    pub symbol_rotation_direction: RotationDirection,
+
     // Sheet settings
     #[serde(default = "default_sheet")]
     pub default_sheet: String,
@@ -70,6 +76,10 @@ pub struct AppSettings {
 
 fn default_sheet() -> String {
     "A3-landscape".to_string()
+}
+
+fn default_rotation_step() -> u32 {
+    90
 }
 
 fn default_sheet_snap_grid() -> u32 {
@@ -117,6 +127,14 @@ pub enum LadderShortcutProfile {
     GxWorks,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum RotationDirection {
+    #[default]
+    Cw,
+    Ccw,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Parity {
@@ -159,6 +177,10 @@ impl Default for AppSettings {
 
             // Ladder
             ladder_shortcut_profile: LadderShortcutProfile::Default,
+
+            // Canvas / symbol
+            symbol_rotation_step: default_rotation_step(),
+            symbol_rotation_direction: RotationDirection::Cw,
 
             // Sheet
             default_sheet: default_sheet(),
@@ -284,6 +306,25 @@ mod tests {
         assert_eq!(serde_json::to_string(&Theme::Light).unwrap(), "\"light\"");
         assert_eq!(serde_json::to_string(&Theme::Dark).unwrap(), "\"dark\"");
         assert_eq!(serde_json::to_string(&Theme::System).unwrap(), "\"system\"");
+    }
+
+    #[test]
+    fn test_rotation_direction_serialization() {
+        assert_eq!(
+            serde_json::to_string(&RotationDirection::Cw).unwrap(),
+            "\"cw\""
+        );
+        assert_eq!(
+            serde_json::to_string(&RotationDirection::Ccw).unwrap(),
+            "\"ccw\""
+        );
+    }
+
+    #[test]
+    fn test_rotation_defaults() {
+        let settings = AppSettings::default();
+        assert_eq!(settings.symbol_rotation_step, 90);
+        assert_eq!(settings.symbol_rotation_direction, RotationDirection::Cw);
     }
 
     #[test]
