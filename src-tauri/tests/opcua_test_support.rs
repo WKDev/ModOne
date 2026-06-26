@@ -496,16 +496,18 @@ pub fn start_secure_test_server(trace_path: &Path) -> TestServerFixture {
     {
         let _runtime_guard = runtime.enter();
         trace_to(trace_path, "starting server");
-        server
-            .start(
-                &canonical_memory,
+        let spec = {
+            let memory = canonical_memory.read();
+            app_lib::opcua::address_space::build_address_space_spec(
+                &memory,
                 profile.as_ref(),
                 &settings,
                 &tag_registry,
                 None,
-                None,
-                None,
             )
+        };
+        server
+            .start(&canonical_memory, spec, None, None)
             .expect("server should start");
         trace_to(trace_path, "server start returned");
     }

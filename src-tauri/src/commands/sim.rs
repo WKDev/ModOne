@@ -631,17 +631,17 @@ mod tests {
             },
             Arc::new(OpcUaMemory::new()),
         ));
-        server
-            .start(
-                &canonical_memory,
+        let spec = {
+            let memory = canonical_memory.read();
+            crate::opcua::address_space::build_address_space_spec(
+                &memory,
                 profile.as_ref(),
                 &settings,
                 &tag_registry,
                 None,
-                None,
-                None,
             )
-            .unwrap();
+        };
+        server.start(&canonical_memory, spec, None, None).unwrap();
 
         let opcua_state = OpcUaState {
             server: parking_lot::Mutex::new(Some(server.clone())),

@@ -7,16 +7,13 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 
 use crate::plc_runtime::{
-    CanonicalAddress, CanonicalMemory, CanonicalMemoryError, CanonicalValue, VendorProfile,
+    CanonicalAddress, CanonicalMemory, CanonicalMemoryError, CanonicalValue,
 };
-use crate::project::PlcSettings;
-use crate::sim::tag_registry::SharedTagRegistry;
 
 #[cfg(feature = "opcua-server")]
 use super::address_space::OpcUaAccessLevel;
-use super::address_space::{build_address_space_spec, AddressSpaceSpec};
+use super::address_space::AddressSpaceSpec;
 use super::audit::{AuditEventType, AuditLoggerState, AuditSeverity};
-use super::mapping::OpcUaMappingStore;
 use super::memory::{OpcUaMemory, OpcUaNodeId};
 use super::types::{OpcUaConfig, OpcUaError, OpcUaSessionInfo, OpcUaStatus};
 #[cfg(feature = "opcua-server")]
@@ -298,10 +295,7 @@ impl OpcUaServer {
     pub fn start(
         &self,
         canonical_memory: &Arc<parking_lot::RwLock<CanonicalMemory>>,
-        vendor_profile: &dyn VendorProfile,
-        plc_settings: &PlcSettings,
-        tag_registry: &SharedTagRegistry,
-        mapping_store: Option<&OpcUaMappingStore>,
+        spec: AddressSpaceSpec,
         audit_logger: Option<&AuditLoggerState>,
         audit_data_dir: Option<PathBuf>,
     ) -> Result<(), OpcUaError> {
@@ -317,10 +311,8 @@ impl OpcUaServer {
             ));
         }
 
-        let memory = canonical_memory.read();
-        let spec = build_address_space_spec(&memory, vendor_profile, plc_settings, tag_registry, mapping_store);
-        drop(memory);
-
+        // `spec`는 호출부(src-tauri 조립 지점)에서 프로젝트 토폴로지/태그로부터
+        // 미리 빌드해 넘겨준다. 이 메서드는 project/sim에 결합되지 않는다(계약 §1).
         self.opcua_memory
             .register_nodes(spec.primary_node_map.clone(), spec.publish_map.clone());
 

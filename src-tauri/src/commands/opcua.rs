@@ -396,16 +396,22 @@ fn start_server_common(
         .map(|dir| dir.to_path_buf());
 
     let server = Arc::new(OpcUaServer::new(config, Arc::clone(&opcua_state.memory)));
-    server
-        .start(
-            canonical_memory,
+
+    // 프로젝트 토폴로지/태그 → OPC UA 주소공간 spec 해석은 src-tauri(여기)에서
+    // 수행하고, 결과 spec만 백엔드에 넘긴다 (계약 §1: 코어는 project/sim 비결합).
+    let spec = {
+        let memory = canonical_memory.read();
+        crate::opcua::address_space::build_address_space_spec(
+            &memory,
             vendor_profile,
             plc_settings,
             tag_registry,
             mapping_store,
-            audit_state,
-            audit_data_dir,
         )
+    };
+
+    server
+        .start(canonical_memory, spec, audit_state, audit_data_dir)
         .map_err(|e| e.to_string())?;
 
     *opcua_state.server.lock() = Some(Arc::clone(&server));
