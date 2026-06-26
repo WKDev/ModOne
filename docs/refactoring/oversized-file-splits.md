@@ -45,6 +45,35 @@ suite each time:
 | `LadderEditor/utils/wireGenerator.ts` | 1263 | 34 barrel | wireGeneration/wireDirections/wireTypeResolution/parallelBranches/wireMerge (441) |
 | `lib/symbolXmlParser.ts` | 1512 | 22 barrel | symbolXmlTypes/xmlDomUtils/xmlElementParsers/symbolXmlParse/symbolXmlSerialize/symbolXmlUtils (514) |
 | `components/SymbolEditor/SymbolEditor.tsx` | 1243 | 409 component | hooks/useSymbolGeometry (434) /useSymbolClipboard/useSymbolHistory/useSymbolMultiUnit/useSymbolVisualState + editorModel/Reducer/Helpers |
+| `stores/documentRegistry.ts` | 1031 | 119 store | documentHistoryActions (257) /documentDataActions/documentLifecycleActions + documentRegistryTypes/Helpers |
+
+### documentRegistry — the action-factory pattern (Zustand state core)
+
+The state-core redesign (after the pure-helper Stage 1). Rather than the finicky
+`StateCreator` per-slice generics, the single `create()` closure's actions were
+split into **action-factory modules** that each take the store's `(set, get)` and
+return their slice of actions, spread together in one `create()`:
+
+```
+immer((set, get) => ({
+  ...initialState,
+  ...createLifecycleActions(set, get),
+  ...createDataActions(set, get),
+  ...createHistoryActions(set, get),
+  reset: () => { ... },   // stays inline (uses the replacement-form set)
+}))
+```
+
+- `set` is typed once in `documentRegistryTypes` as `DocRegistrySet`
+  (`(recipe, replace?: false, action?) => void`). **`replace` must be `false`,
+  not `boolean`** — newer zustand+immer constrains the replace flag to `false`
+  so actions can't be replaced away; `boolean` fails contravariance.
+- Action bodies are **byte-for-byte identical**; the same `set`/`get` references
+  flow in, devtools action-name strings are preserved → immer/devtools behavior
+  unchanged. No cross-factory action calls (only `get().documents`), so ordering
+  is irrelevant.
+- Verified: tsc clean, full vitest green (1684), QA `web-flow`/`web-sheet`/
+  `web-schematic` pass (create/edit/save/reload+reopen).
 
 ### SymbolEditor — the custom-hook pattern (React state-threading)
 
@@ -98,9 +127,11 @@ this writing:
 - `OneCanvas/interaction/InteractionController` (~1188) — interaction FSM. Pure
   geometry already split out; **state-core redesign pending** (extract FSM handler
   groups behind a shared mutable context — operate / idle-drag / box-select /
-  wire-draw / wire-segment / placing). Runtime risk; needs care.
-- `stores/documentRegistry` (~864) — store. Pure helpers already split out;
-  **state-core redesign pending** (Zustand slice pattern; runtime risk).
+  wire-draw / wire-segment / placing). Highest runtime risk of the backlog: ~40
+  mutable `this._*` fields shared across ~45 methods, thin unit coverage (30
+  tests) → the `tests/qa/web-*.mjs` harness is the real safety net.
+- ~~`stores/documentRegistry`~~ — **done** (state core split into action factories,
+  see Done table).
 - … plus ~18 more files over 700 lines.
 
 **Do NOT split `stores/ladderStore` (1095)** — it is `@deprecated` (header says
