@@ -124,11 +124,11 @@ symbol-derived definition; the other ~39 entries were byte-identical and were
 deleted. Guarded by `xml-loader-integration.test.ts`. When editing the override
 map, re-run that test.
 
-> Latent data bugs surfaced by that comparison (not yet fixed): the
-> resistor/capacitor/inductor/connector/junction_box **symbols** have
-> bidirectional pins where placement uses directed in/out; the `plc_output`
-> symbol's default address is `C:0x0000` (should be `DO:0x0000`). The overrides
-> preserve correct runtime behavior in the meantime.
+> The override set was once 11; the 6 passive/connector/plc entries were removed
+> after fixing the underlying symbols (connector pins → bidirectional; plc_out
+> address `C:0x0000` → `DO:0x0000`), so they now derive correctly. Port `type`
+> is safe to change: it doesn't gate wiring (no check in InteractionController)
+> and only affects unconnected-port warning severity in ERC.
 
 ---
 
@@ -142,7 +142,13 @@ The Symbol editor and OneCanvas share input primitives from `@/canvas-core`:
   dispatch (all-buttons FSM vs primary-only tool).
 - **Keyboard**: `isEditableTarget(target)` is the single "is the user typing?"
   guard used by every keyboard handler. Keymaps stay distinct (Symbol = tool
-  switch + per-tool `onKeyDown`; OneCanvas = command callbacks).
+  switch + per-tool `onKeyDown`; OneCanvas = command callbacks; Sheet =
+  Delete/Escape). Delete-removes-selection + Escape-deselects is the shared
+  convention across all three.
+- **Selection chrome**: `canvas-core/selectionStyle` (`SELECTION_COLOR` =
+  `0x4dabf7`, `SELECTION_HANDLE_STROKE`, `SELECTION_COLOR_CSS`) is the one source
+  for selection outlines / handles / marquees — all three editors reference it,
+  so selection looks identical everywhere.
 
 Symbol editor command shortcuts (in `SymbolEditor.tsx`): `Ctrl+Z/Shift+Z/Y`
 undo/redo, `Ctrl+A` select-all, `Ctrl+C/V/X/D` copy/paste(offset)/cut/duplicate.
