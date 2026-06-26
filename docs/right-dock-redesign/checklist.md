@@ -41,12 +41,18 @@
 - [~] **placement 모델 / `getPlacements`** — **보류 결정**(사용자 합의). 리본 config가 이미 placement 데이터이고 Phase 3는 그걸 `<EditorToolbar>`로 직접 재사용(Option B)하므로 별도 추상이 도크 재설계에 불필요. 여러 surface 통합이 실제로 필요해질 때 얇게 도입.
   - label/icon 이중화(Command↔config) drift는 사소·기존 이슈로 수용. 필요 시 `Command.enabled()`만 나중에 추가.
 
-## Phase 3 — 리본 명령 재배치 (context-key 위에서, 리본 config 직접 재사용 = Option B)
-- [ ] **에디터 로컬 툴바**: Ladder(Contacts/Logic/Edit), Canvas(Tools/View), Scenario(File/Execution/Data)
-  - [ ] 각 에디터 패널 상단에 얇은 로컬 툴바 컴포넌트 추가 (commandId 재사용)
-- [ ] **좌측 패널 헤더**: Modbus(TCP/RTU) → ModbusPanel, OPC UA(Start/Stop/Endpoint/Panel) → OpcUaUnifiedPanel
-- [ ] **MenuBar(전역)**: file.new/open/save, layout.openSheetEditor, tools.openSheetEditorPopup
-- [ ] 검증: 모든 commandId가 새 위치에서 정상 실행 (커맨드 라우팅은 그대로, UI 표면만 이동)
+## Phase 3 — 리본 명령 "갭 메우기" (커밋 `1653249`) — ⚠️ 범위 재정의
+> **커버리지 감사 결과 Option B(EditorToolbar 신설) 불필요**: 에디터들이 이미 자체 로컬 툴바 보유
+> (LadderToolbox/Toolbar, ScenarioToolbar, CanvasToolbar) + 사이드바 패널(ModbusPanel, OpcUaUnifiedPanel)
+> + 커맨드 팔레트. 리본 명령 대부분이 **이미 다른 곳에 존재**. 신규 툴바를 만들면 3중 중복 →
+> Phase 3는 "집 없는 명령만 메우기"로 축소.
+- [x] **커버리지 감사** — 리본 5탭 전 명령 vs 네이티브 UI 매핑. 결과:
+  - 완전 중복(손댈 것 없음): Ladder(12) / Scenario(10) / Modbus(4) / OPC UA start·stop·endpoint / Canvas zoom·grid·snap / file.new·open·save → 이미 네이티브 툴바·패널·팔레트
+  - **갭(집 없음) 2건만 처리**:
+    - [x] Canvas Symbol/Button/LED/Scope → `CanvasToolbar`에 Blocks 그룹 추가 (commandId 재사용)
+    - [x] Sheet Editor / Sheet Editor (Popup) → MenuBar View 항목 추가
+- [x] 검증: `tsc` + `vitest` 1684 통과. View 메뉴 Sheet Editor 항목 시각 확인.
+  - [ ] Canvas Blocks 버튼 라이브 렌더 확인은 **보류** — 브라우저 런타임이 프로젝트 생성(네이티브 폴더 다이얼로그)을 못 해 캔버스를 못 띄움. 실제 Tauri 앱에서 후속 확인. (코드/타입/패턴은 검증됨)
 
 ## Phase 4 — 전역 리본 제거
 - [ ] `MainLayout.tsx`에서 `<Toolbar />` + Ribbon ErrorBoundary 제거
