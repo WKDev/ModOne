@@ -75,16 +75,39 @@ groups — which thread shared state (`localSymbol`/`setLocalSymbol`/`dispatch`/
   (Ctrl+A→Ctrl+D duplicate → 2 graphics + 2 pins, symbol persisted) — unit tests
   don't mount the component, so the web harness is the real check.
 
+## Stage 1 (pure-helper) extractions done for the state-core files
+
+Before redesigning the stateful cores, the **pure, state-independent** helper
+blocks were lifted out first (low-risk byte-move + import-back, the proven
+pattern). This shrinks each file without touching its shared-mutable-state core:
+
+| File | Was | Now | Extracted module |
+|---|---|---|---|
+| `stores/documentRegistry` | 1031 | 864 | `documentRegistryHelpers.ts` — 8 helpers (history snapshot create/restore, canvas serialize/deserialize, scenario snapshot, path basename) |
+| `OneCanvas/interaction/InteractionController` | 1240 | 1188 | `interactionGeometry.ts` — 8 pure geometry fns + DEFAULT_GRID_SNAP / PORT_DIRECTIONS |
+
+The remaining bulk in both is the **state core** (the `create()` closure / the
+FSM class body) — that is the redesign step below, which carries real runtime
+risk and must be verified with the `tests/qa/web-*.mjs` harness.
+
 ## Remaining backlog (live files, 1000+ lines)
 
 Run `find src -name '*.ts*' | xargs wc -l | sort -rn` for the current list. As of
 this writing:
 
-- `OneCanvas/interaction/InteractionController` (~1240) — interaction FSM
-  (runtime/state; **not** a pure split — needs care).
-- `stores/ladderStore` (~1095) — Zustand store (slice pattern; runtime risk).
-- `stores/documentRegistry` (~1031) — store (runtime risk).
+- `OneCanvas/interaction/InteractionController` (~1188) — interaction FSM. Pure
+  geometry already split out; **state-core redesign pending** (extract FSM handler
+  groups behind a shared mutable context — operate / idle-drag / box-select /
+  wire-draw / wire-segment / placing). Runtime risk; needs care.
+- `stores/documentRegistry` (~864) — store. Pure helpers already split out;
+  **state-core redesign pending** (Zustand slice pattern; runtime risk).
 - … plus ~18 more files over 700 lines.
+
+**Do NOT split `stores/ladderStore` (1095)** — it is `@deprecated` (header says
+"No component should import from this file … will be deleted"), and has **zero
+non-test consumers** (only `__tests__/ladderStore.undo-redo.test.ts` imports it).
+Like `canvasStore`, it is doomed code → splitting is wasted effort. It belongs on
+the *deletion* track, not the *split* track.
 
 **Do NOT split `stores/canvasStore` (1754)** — it is `@deprecated`, has a single
 non-test consumer (`stores/adapters/globalCanvasAdapter`), and is scheduled for
