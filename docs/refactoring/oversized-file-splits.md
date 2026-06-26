@@ -46,6 +46,7 @@ suite each time:
 | `lib/symbolXmlParser.ts` | 1512 | 22 barrel | symbolXmlTypes/xmlDomUtils/xmlElementParsers/symbolXmlParse/symbolXmlSerialize/symbolXmlUtils (514) |
 | `components/SymbolEditor/SymbolEditor.tsx` | 1243 | 409 component | hooks/useSymbolGeometry (434) /useSymbolClipboard/useSymbolHistory/useSymbolMultiUnit/useSymbolVisualState + editorModel/Reducer/Helpers |
 | `stores/documentRegistry.ts` | 1031 | 119 store | documentHistoryActions (257) /documentDataActions/documentLifecycleActions + documentRegistryTypes/Helpers |
+| `OneCanvas/interaction/InteractionController.ts` | 1240 | 440 FSM shell | interactionPointerHandlers (352) /WireHandlers/SegmentHandlers/PlacingHandlers + interactionHelpers/Types/Geometry |
 
 ### documentRegistry — the action-factory pattern (Zustand state core)
 
@@ -119,20 +120,32 @@ The remaining bulk in both is the **state core** (the `create()` closure / the
 FSM class body) — that is the redesign step below, which carries real runtime
 risk and must be verified with the `tests/qa/web-*.mjs` harness.
 
+### InteractionController — the context-object handler pattern (stateful class)
+
+State-core redesign for a mutable FSM class (the hardest kind — ~40 `this._*`
+fields shared across ~45 methods). The class keeps **only** the state fields and
+the public command/event dispatch methods; every handler becomes a **free
+function taking the controller as its context** (`self: InteractionController`)
+and mutating its fields. Grouped by concern into `interaction*Handlers` modules.
+
+- Fields are made **public** (dropped `private`, kept the `_` prefix as the
+  "internal — handlers only" signal) so the sibling modules can read/write them.
+- Handlers call each other by **direct import** passing `self`; the handler
+  modules `import type { InteractionController }` only, so the value-import graph
+  is one-directional (controller → handlers) with **no runtime cycle**.
+- Transform was mechanical and contained: `this.field` → `self.field`,
+  `this._method(...)` → `methodFreeFn(self, ...)`. Bodies otherwise byte-identical.
+- Verified: tsc clean, full vitest green (1684) + interaction unit tests (18),
+  QA `web-sheet` (the drag step exercises idle→item_pending→dragging_items→up).
+
 ## Remaining backlog (live files, 1000+ lines)
 
-Run `find src -name '*.ts*' | xargs wc -l | sort -rn` for the current list. As of
-this writing:
-
-- `OneCanvas/interaction/InteractionController` (~1188) — interaction FSM. Pure
-  geometry already split out; **state-core redesign pending** (extract FSM handler
-  groups behind a shared mutable context — operate / idle-drag / box-select /
-  wire-draw / wire-segment / placing). Highest runtime risk of the backlog: ~40
-  mutable `this._*` fields shared across ~45 methods, thin unit coverage (30
-  tests) → the `tests/qa/web-*.mjs` harness is the real safety net.
-- ~~`stores/documentRegistry`~~ — **done** (state core split into action factories,
-  see Done table).
-- … plus ~18 more files over 700 lines.
+Run `find src -name '*.ts*' | xargs wc -l | sort -rn` for the current list. The
+two big stateful cores (documentRegistry, InteractionController) are **done**
+(see Done table); ladderStore is **delete-track** (below). Next candidates are
+the 700–1000 line tier: `components/SymbolEditor/PropertiesPanel` (990),
+`SymbolEditor/tools/SelectTool` (926), `SymbolEditor/SymbolEditorHost` (796), …
+plus ~15 more over 700 lines.
 
 **Do NOT split `stores/ladderStore` (1095)** — it is `@deprecated` (header says
 "No component should import from this file … will be deleted"), and has **zero
