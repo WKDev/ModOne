@@ -19,12 +19,12 @@
 
   <ms:Ports>
     <ms:Port id="left" name="L" number="1"
-      type="input" electricalType="input" functionalRole="general"
+      type="bidirectional" electricalType="bidirectional" functionalRole="general"
       shape="line" orientation="left"
       x="0" y="10" length="0" sortOrder="1"
       nameVisible="true" numberVisible="true"/>
     <ms:Port id="right" name="R" number="2"
-      type="output" electricalType="output" functionalRole="general"
+      type="bidirectional" electricalType="bidirectional" functionalRole="general"
       shape="line" orientation="right"
       x="30" y="10" length="0" sortOrder="2"
       nameVisible="true" numberVisible="true"/>

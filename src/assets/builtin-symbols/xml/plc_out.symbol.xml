@@ -45,7 +45,7 @@
 
   <ms:Properties>
     <ms:Property key="address" type="string" editorType="text" visible="true">
-      <ms:DefaultValue>C:0x0000</ms:DefaultValue>
+      <ms:DefaultValue>DO:0x0000</ms:DefaultValue>
     </ms:Property>
     <ms:Property key="normallyOpen" type="boolean" editorType="checkbox" visible="true">
       <ms:DefaultValue>true</ms:DefaultValue>

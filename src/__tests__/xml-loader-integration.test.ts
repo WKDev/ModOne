@@ -873,9 +873,7 @@ describe('Compatibility: blockDefinitions.ts vs Symbol System', () => {
     // Established by an exhaustive strict comparison; locked here so a new
     // hardcoded entry (or a removed one) fails loudly.
     const EXPECTED_OVERRIDES = [
-      'capacitor', 'connector', 'custom_symbol', 'inductor', 'junction_box',
-      'plc_output', 'power_source', 'power_source_dc_2p', 'relay_coil',
-      'resistor', 'text',
+      'custom_symbol', 'power_source', 'power_source_dc_2p', 'relay_coil', 'text',
     ];
 
     it('BLOCK_DEFINITIONS holds exactly the intentional symbol-divergent overrides', () => {
@@ -886,8 +884,16 @@ describe('Compatibility: blockDefinitions.ts vs Symbol System', () => {
       // relay_coil is a 2-pin 20x30 simplification of the 5-pin relay symbol.
       expect(getBlockSize('relay_coil' as BlockType)).toEqual({ width: 20, height: 30 });
       expect(getDefaultPorts('relay_coil' as BlockType)).toHaveLength(2);
-      // resistor override pins are directed, not the symbol's bidirectional.
-      expect(getDefaultPorts('resistor' as BlockType).find((p) => p.id === 'in')?.type).toBe('input');
+    });
+
+    it('formerly-overridden passive parts now derive (correct) port types', () => {
+      // resistor/capacitor/inductor/junction_box symbols are bidirectional; the
+      // connector symbol was fixed to bidirectional. plc_out address typo fixed.
+      // All now derive from the symbol (overrides removed).
+      expect(getDefaultPorts('resistor').find((p) => p.id === 'in')?.type).toBe('bidirectional');
+      expect(getDefaultPorts('connector').find((p) => p.id === 'left')?.type).toBe('bidirectional');
+      expect(getDefaultBlockProps('plc_out').address).toBe('DO:0x0000');
+      expect(getDefaultBlockProps('plc_output').address).toBe('DO:0x0000');
     });
 
     it('non-override symbol-backed types derive geometry from the symbol', () => {

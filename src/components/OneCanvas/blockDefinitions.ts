@@ -5,11 +5,11 @@
  * builtin symbol registry via symbolBlockDefAdapter — the symbol is the single
  * source of truth. This map holds ONLY the intentional overrides: block types
  * that have no symbol (custom_symbol) or whose placement geometry deliberately
- * differs from their symbol (e.g. relay_coil is a 2-pin simplification of the
- * 5-pin relay symbol; resistor/capacitor/inductor/connector/junction_box pin
- * electrical types differ from the symbol; plc_output / text / power_source*
- * default props differ). For every other block type the getters below derive
- * from the symbol, so symbol edits propagate automatically (no hand-syncing).
+ * differs from their symbol — relay_coil/power_source/power_source_dc_2p are
+ * simplified placement variants of their parent symbol, and `text` keeps a
+ * different default fontSize. For every other block type the getters below
+ * derive from the symbol, so symbol edits propagate automatically (no
+ * hand-syncing).
  *
  * The override set was established by a strict size+ports(incl. type/offset/abs)
  * +props comparison against the symbol-derived definition (see
@@ -86,58 +86,6 @@ const BLOCK_DEFINITIONS: Partial<Record<BlockType, BlockDefinition>> = {
       { id: 'out', type: 'output', label: 'A2', position: 'bottom', absolutePosition: { x: 10, y: 30 } },
     ],
     defaultProps: { designation: 'K1', coilVoltage: 24, energized: false },
-  },
-  // Symbol pins are bidirectional; placement uses directed in/out.
-  ['resistor' as BlockType]: {
-    size: { width: 30, height: 20 },
-    defaultPorts: [
-      { id: 'in', type: 'input', label: 'IN', position: 'left', absolutePosition: { x: 0, y: 10 } },
-      { id: 'out', type: 'output', label: 'OUT', position: 'right', absolutePosition: { x: 30, y: 10 } },
-    ],
-    defaultProps: { designation: 'R1', value: 1000, tolerancePercent: 5 },
-  },
-  ['capacitor' as BlockType]: {
-    size: { width: 20, height: 20 },
-    defaultPorts: [
-      { id: 'in', type: 'input', label: 'IN', position: 'top', absolutePosition: { x: 10, y: 0 } },
-      { id: 'out', type: 'output', label: 'OUT', position: 'bottom', absolutePosition: { x: 10, y: 20 } },
-    ],
-    defaultProps: { designation: 'C1', value: 10, unit: 'uF', voltageRating: 50 },
-  },
-  ['inductor' as BlockType]: {
-    size: { width: 30, height: 20 },
-    defaultPorts: [
-      { id: 'in', type: 'input', label: 'IN', position: 'left', absolutePosition: { x: 0, y: 10 } },
-      { id: 'out', type: 'output', label: 'OUT', position: 'right', absolutePosition: { x: 30, y: 10 } },
-    ],
-    defaultProps: { designation: 'L1', value: 10, unit: 'mH' },
-  },
-  // Symbol default address is wrong (C:0x0000); placement keeps DO:0x0000.
-  ['plc_output' as BlockType]: {
-    size: { width: 40, height: 20 },
-    defaultPorts: [
-      { id: 'in', type: 'input', label: 'IN', position: 'left', absolutePosition: { x: 0, y: 10 } },
-      { id: 'out', type: 'output', label: 'OUT', position: 'right', absolutePosition: { x: 40, y: 10 } },
-    ],
-    defaultProps: { address: 'DO:0x0000' },
-  },
-  ['connector' as BlockType]: {
-    size: { width: 30, height: 20 },
-    defaultPorts: [
-      { id: 'left', type: 'bidirectional', label: 'L', position: 'left', absolutePosition: { x: 0, y: 10 } },
-      { id: 'right', type: 'bidirectional', label: 'R', position: 'right', absolutePosition: { x: 30, y: 10 } },
-    ],
-    defaultProps: { designation: 'J1', connectorType: 'generic' },
-  },
-  ['junction_box' as BlockType]: {
-    size: { width: 40, height: 40 },
-    defaultPorts: [
-      { id: 'top', type: 'input', label: 'TOP', position: 'top', absolutePosition: { x: 20, y: 0 } },
-      { id: 'right', type: 'output', label: 'RIGHT', position: 'right', absolutePosition: { x: 40, y: 20 } },
-      { id: 'bottom', type: 'output', label: 'BOT', position: 'bottom', absolutePosition: { x: 20, y: 40 } },
-      { id: 'left', type: 'input', label: 'LEFT', position: 'left', absolutePosition: { x: 0, y: 20 } },
-    ],
-    defaultProps: { designation: 'JB1', enclosureRating: 'IP65' },
   },
 };
 
