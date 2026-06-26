@@ -24,11 +24,15 @@
 - [ ] 애니메이션 편집 UI (state별 rotate target/speed)
 - [ ] visualState↔룰 연결 헬퍼/디스커버빌리티
 
-## Phase D — PortListPanel 정리 ← Bundle 4
-- [ ] types/port·usePortManager·history/commands·port-model.test 의존성 확인됨 → 모델은 유지
-- [ ] 고아 PortListPanel.tsx 처리 (Pin Inspector로 기능 흡수 후 제거 또는 보류 결정)
+## Phase D — PortListPanel 정리 ← Bundle 4 (완료)
+- [x] 의존성 확인: types/port는 history/commands.ts(라이브)+port-model.test가 사용 → 유지
+- [x] 고아 PortListPanel.tsx + 유일 소비자 usePortManager.ts 삭제 (기능은 Phase A Pin Inspector로 흡수)
 
-## 검증
-- [ ] `npx tsc --noEmit` 0
-- [ ] `npx vitest run` 그린 유지
-- [ ] 각 Phase 단위 커밋
+## 검증 (완료)
+- [x] `npx tsc --noEmit` 0
+- [x] `npx vitest run` 전체 1748 pass / 0 fail
+- [x] 각 Phase 단위 커밋 (A/B/C/D)
+
+## 후속 과제 (문서화)
+- 에디터 내 애니메이션 실시간 재생: PrimitiveRenderer가 단일 Graphics에 그려 개별
+  도형 회전 불가 → id별 컨테이너로 분리하는 리팩터 필요. 현재 캔버스에선 재생됨.
