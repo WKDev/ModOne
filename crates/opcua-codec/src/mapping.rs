@@ -924,6 +924,18 @@ impl ByteOrder {
     ///
     /// The returned `Vec` always has most-significant word at index 0.
     /// Input `regs` are in address order (register N, N+1, …).
+    /// `LittleEndianWordSwap`의 다중 레지스터 해석 규약 전환 플래그.
+    ///
+    /// "리틀엔디안 + 워드스왑"의 정확한 레지스터 배열은 벤더/게이트웨이마다 정의가
+    /// 달라 단일 정답이 없다. 내부 플래그로 언제든 전환할 수 있게 둔다.
+    /// - `false`(기본, 권장): 인접 워드쌍 스왑 후 전체 반전.
+    ///   `[1,2,3,4] → [3,4,1,2]`. `LittleEndian`(`[4,3,2,1]`)과 구별되고
+    ///   `to`/`from`이 서로 역함수라 round-trip이 일관된다.
+    /// - `true`: 전체 반전만. `[1,2,3,4] → [4,3,2,1]`. 단 이 결과는 평범한
+    ///   `LittleEndian`과 동일해져 워드스왑 변형이 사실상 무의미해진다.
+    ///   (특정 레거시 장비 호환이 필요할 때만 켠다.)
+    const LITTLE_ENDIAN_WORD_SWAP_FULL_REVERSE: bool = false;
+
     pub fn to_logical_order(&self, regs: &[u16]) -> Vec<u16> {
         match self {
             ByteOrder::BigEndian => regs.to_vec(),
@@ -943,8 +955,10 @@ impl ByteOrder {
             // Little-endian but adjacent word-pairs are swapped (CD-AB → DC-BA).
             ByteOrder::LittleEndianWordSwap => {
                 let mut v = regs.to_vec();
-                for chunk in v.chunks_exact_mut(2) {
-                    chunk.swap(0, 1);
+                if !Self::LITTLE_ENDIAN_WORD_SWAP_FULL_REVERSE {
+                    for chunk in v.chunks_exact_mut(2) {
+                        chunk.swap(0, 1);
+                    }
                 }
                 v.reverse();
                 v
@@ -972,8 +986,10 @@ impl ByteOrder {
             ByteOrder::LittleEndianWordSwap => {
                 let mut v = logical.to_vec();
                 v.reverse();
-                for chunk in v.chunks_exact_mut(2) {
-                    chunk.swap(0, 1);
+                if !Self::LITTLE_ENDIAN_WORD_SWAP_FULL_REVERSE {
+                    for chunk in v.chunks_exact_mut(2) {
+                        chunk.swap(0, 1);
+                    }
                 }
                 v
             }
@@ -1197,6 +1213,7 @@ pub fn write_mapped_to_registers(
                 OpcUaDataType::UInt64 => "UInt64",
                 OpcUaDataType::Float => "Float",
                 OpcUaDataType::Double => "Double",
+                OpcUaDataType::String => "String",
                 _ => "Unknown",
             },
             detail: format!("expected matching MappedValue variant, got {:?}", val),
@@ -2761,7 +2778,10 @@ mod int_mapping_tests {
     fn byte_order_little_endian_word_swap_4regs() {
         let regs = [0x0001u16, 0x0002, 0x0003, 0x0004];
         let logical = ByteOrder::LittleEndianWordSwap.to_logical_order(&regs);
-        assert_eq!(logical, vec![0x0004, 0x0003, 0x0002, 0x0001]);
+        // 기본 규약(LITTLE_ENDIAN_WORD_SWAP_FULL_REVERSE=false): 워드쌍 스왑 후 반전.
+        // (이전 기대값 [4,3,2,1]은 평범한 LittleEndian과 동일해 워드스왑이 무의미
+        //  해지는 복붙 오류였다. 규약을 바꾸려면 위 플래그를 토글한다.)
+        assert_eq!(logical, vec![0x0003, 0x0004, 0x0001, 0x0002]);
     }
 
     #[test]
