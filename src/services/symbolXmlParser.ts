@@ -52,7 +52,12 @@ function attr(el: Element, name: string): string | undefined {
 
 function numAttr(el: Element, name: string): number | undefined {
   const v = attr(el, name);
-  return v != null ? Number(v) : undefined;
+  if (v == null) return undefined;
+  const n = Number(v);
+  // Treat malformed numbers as missing so `?? default` applies instead of
+  // letting NaN flow into geometry (a NaN width/height crashes downstream
+  // renderers — `??` does NOT catch NaN).
+  return Number.isFinite(n) ? n : undefined;
 }
 
 function boolAttr(el: Element, name: string): boolean | undefined {
@@ -458,8 +463,8 @@ function parseSymbolDefinitionElement(el: Element): SymbolDefinition {
     author: textOf(el, 'Author'),
     createdAt: textOf(el, 'CreatedAt') ?? new Date().toISOString(),
     updatedAt: textOf(el, 'UpdatedAt') ?? new Date().toISOString(),
-    width: numAttr(layoutEl!, 'width') ?? 60,
-    height: numAttr(layoutEl!, 'height') ?? 60,
+    width: (layoutEl ? numAttr(layoutEl, 'width') : undefined) ?? 60,
+    height: (layoutEl ? numAttr(layoutEl, 'height') : undefined) ?? 60,
     graphics: parseGraphics(child(el, 'Graphics')),
     pins: parsePorts(child(el, 'Ports')),
     units: parseUnits(child(el, 'Units')),

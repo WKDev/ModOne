@@ -119,6 +119,27 @@ export function distributeComponents(
 }
 
 /**
+ * Rotate selected components in place, each around its own 0,0 origin.
+ * `degrees` may be negative (counter-clockwise); result is normalized to 0..359.
+ */
+export function rotateComponents(
+  components: Map<string, Block>,
+  selectedIds: Set<string>,
+  degrees: number
+): Map<string, Block> {
+  const nextComponents = new Map(components);
+  const selectedComponents = getSelectedComponents(components, selectedIds);
+
+  selectedComponents.forEach((c) => {
+    const current = c.rotation ?? 0;
+    const next = (((current + degrees) % 360) + 360) % 360;
+    nextComponents.set(c.id, { ...c, rotation: next });
+  });
+
+  return nextComponents;
+}
+
+/**
  * Flip (mirror) components around the center of selection.
  */
 export function flipComponents(

@@ -590,9 +590,9 @@ export const useCanvasStore = create<CanvasStore>()(
 
             pushHistorySnapshot(state);
 
-            // Calculate new rotation (cumulative, normalized to 0-359)
+            // Calculate new rotation (cumulative, normalized to 0-359; degrees may be negative)
             const currentRotation = component.rotation || 0;
-            const newRotation = (currentRotation + degrees) % 360;
+            const newRotation = (((currentRotation + degrees) % 360) + 360) % 360;
 
             // Update component with new rotation
             state.components.set(id, {
@@ -624,7 +624,7 @@ export const useCanvasStore = create<CanvasStore>()(
               if (!component) return;
 
               const currentRotation = component.rotation || 0;
-              const newRotation = (currentRotation + degrees) % 360;
+              const newRotation = (((currentRotation + degrees) % 360) + 360) % 360;
 
               state.components.set(id, {
                 ...component,

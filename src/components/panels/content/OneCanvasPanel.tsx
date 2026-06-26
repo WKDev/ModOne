@@ -90,6 +90,7 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
     alignSelected,
     distributeSelected,
     flipSelected,
+    rotateSelected,
     undo,
     redo,
   } = facade;
@@ -117,6 +118,8 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
   const [isWireMode, setIsWireMode] = useState(false);
   const [interactionMode, setInteractionMode] = useState<CanvasInteractionMode>('edit');
   const canvasCrosshairEnabled = useSettingsStore((state) => state.getMergedSettings().canvasCrosshairEnabled);
+  const symbolRotationStep = useSettingsStore((state) => state.getMergedSettings().symbolRotationStep);
+  const symbolRotationDirection = useSettingsStore((state) => state.getMergedSettings().symbolRotationDirection);
 
 
   useEffect(() => {
@@ -204,6 +207,9 @@ const OneCanvasPanelContent = memo(function OneCanvasPanelContent({
     removeWire,
     undo,
     redo,
+    rotateSelectedComponents: rotateSelected,
+    rotationStepDegrees: symbolRotationStep,
+    rotationDirection: symbolRotationDirection,
   });
 
   const handleWireContextMenu = useCallback((wireId: string, position: Position, screenPos: { x: number; y: number }) => {

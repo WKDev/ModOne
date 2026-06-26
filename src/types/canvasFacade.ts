@@ -155,6 +155,8 @@ export interface CanvasFacadeReturn {
   distributeSelected: (direction: 'horizontal' | 'vertical') => void;
   /** Flip (mirror) selected blocks */
   flipSelected: (axis: 'horizontal' | 'vertical') => void;
+  /** Rotate selected blocks in place around their 0,0 origin. degrees may be negative (CCW). */
+  rotateSelected: (degrees: number) => void;
 
   // --------------------------------------------------------------------------
   // Circuit I/O

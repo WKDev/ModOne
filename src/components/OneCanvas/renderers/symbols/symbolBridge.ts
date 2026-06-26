@@ -4,8 +4,10 @@
  * Strategy:
  * 1. At startup, registerBuiltinSymbols() loads all builtin SymbolDefinitions
  *    into the same cache used by customSymbolBridge.
- * 2. Unified lookup functions try the definition cache first (covers both
- *    builtin and custom symbols), then fall back to SymbolLibrary.
+ * 2. Unified lookup functions resolve from the definition cache (covers both
+ *    builtin and custom symbols). XML is the single source of truth — there is
+ *    no hardcoded symbol fallback; callers handle a null result (e.g. an empty
+ *    custom_symbol) with a placeholder.
  */
 import { GraphicsContext } from 'pixi.js';
 import type { SymbolDefinition } from '../../../../types/symbol';

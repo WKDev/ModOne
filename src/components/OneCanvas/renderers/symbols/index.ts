@@ -1,3 +1,3 @@
-export * from './SymbolLibrary';
+export * from './placeholderContext';
 export * from './customSymbolBridge';
 export * from './symbolBridge';
