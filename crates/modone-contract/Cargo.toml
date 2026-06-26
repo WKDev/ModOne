@@ -6,8 +6,8 @@ rust-version = "1.77.2"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-chrono = { version = "0.4", features = ["serde"] }
-uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde", "wasmbind"] }
+uuid = { version = "1", features = ["v4", "js"] }
 thiserror = "1"
 tokio = { version = "1", default-features = false, features = ["sync"] }
 
