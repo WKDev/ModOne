@@ -1,18 +1,22 @@
+// canonical 런타임 ↔ modbus 메모리 동기화 어댑터 (소켓 없음, 순수 동기화 로직)
+
 use std::collections::HashSet;
 use std::sync::Arc;
 
 use parking_lot::RwLock;
 use thiserror::Error;
 
-use crate::plc_runtime::{
-    CanonicalAddress, CanonicalAreaKind, CanonicalMemory, CanonicalMemoryError, CanonicalValue,
-    CanonicalWriteSource, ModbusAddressSpace, ModbusMappingPolicy, ModbusMappingRule,
+use modone_contract::memory::{CanonicalMemory, CanonicalMemoryError};
+use modone_contract::types::{
+    CanonicalAddress, CanonicalAreaKind, CanonicalValue, CanonicalWriteSource,
 };
 
-use super::{ChangeSource, MemoryError, ModbusMemory};
+use crate::memory::ModbusMemory;
+use crate::policy::{ModbusAddressSpace, ModbusMappingPolicy, ModbusMappingRule};
+use crate::types::{ChangeSource, MemoryError};
 
-// ProtocolAdapter / DirtyPublishWindow 는 modone-contract 로 이전됨. 재노출하여
-// 기존 `crate::modbus::{ProtocolAdapter, DirtyPublishWindow}` 경로를 유지한다.
+// ProtocolAdapter / DirtyPublishWindow 는 modone-contract 가 소유. 재노출하여
+// codec 소비자가 `modbus_codec::{ProtocolAdapter, DirtyPublishWindow}` 로 쓰게 한다.
 pub use modone_contract::adapter::{DirtyPublishWindow, ProtocolAdapter};
 
 #[derive(Debug, Error)]
@@ -407,14 +411,14 @@ fn clamp_rule_count(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modbus::MemoryMapSettings;
-    use crate::plc_runtime::{
-        CanonicalMemory, CanonicalWriteSource, ModbusMappingSource, VendorProfileId,
-    };
+    use crate::policy::ModbusMappingSource;
+    use crate::types::MemoryMapSettings;
+    use modone_contract::memory::CanonicalMemory;
+    use modone_contract::types::CanonicalWriteSource;
 
     fn test_policy() -> ModbusMappingPolicy {
         ModbusMappingPolicy {
-            profile_id: VendorProfileId::LsXg5000,
+            profile_id: "ls-xg5000".to_string(),
             source: ModbusMappingSource::Recommended,
             rules: vec![
                 ModbusMappingRule {
@@ -530,7 +534,7 @@ mod tests {
         }));
 
         let policy = ModbusMappingPolicy {
-            profile_id: VendorProfileId::MelsecFxQCommon,
+            profile_id: "melsec-fx-q-common".to_string(),
             source: ModbusMappingSource::Custom,
             rules: vec![
                 ModbusMappingRule {
@@ -589,7 +593,7 @@ mod tests {
         }));
 
         let policy = ModbusMappingPolicy {
-            profile_id: VendorProfileId::LsXg5000,
+            profile_id: "ls-xg5000".to_string(),
             source: ModbusMappingSource::Custom,
             rules: vec![
                 ModbusMappingRule {
@@ -626,17 +630,22 @@ mod tests {
             modbus_memory.read_holding_registers(214, 1).unwrap()[0],
             4444
         );
+        // 매핑은 canonical[i] ↔ modbus[space_start + offset + i] 이다 (offset 은
+        // modbus 측 창만 이동). 외부 coil 13 → modbus_start(coil_start 10 + offset 1 =
+        // 11) 기준 relative 2 → OutputBit[2]. 외부 holding 214 → modbus_start(210 + 2 =
+        // 212) 기준 relative 2 → DataWord[2]. (원본 테스트는 src-tauri `[lib] test=false`
+        // 로 실행된 적이 없어 offset 을 canonical 인덱스에 잘못 더한 단언을 갖고 있었다.)
         assert_eq!(
             canonical
                 .read()
-                .read(CanonicalAddress::new(CanonicalAreaKind::OutputBit, 3))
+                .read(CanonicalAddress::new(CanonicalAreaKind::OutputBit, 2))
                 .unwrap(),
             CanonicalValue::Bool(true)
         );
         assert_eq!(
             canonical
                 .read()
-                .read(CanonicalAddress::new(CanonicalAreaKind::DataWord, 4))
+                .read(CanonicalAddress::new(CanonicalAreaKind::DataWord, 2))
                 .unwrap(),
             CanonicalValue::U16(4444)
         );

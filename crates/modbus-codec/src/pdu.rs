@@ -4,8 +4,8 @@
 //! shared by both TCP and RTU servers. The PDU format is identical
 //! regardless of the transport framing (MBAP header for TCP, CRC16 for RTU).
 
-use super::memory::ModbusMemory;
-use super::types::ChangeSource;
+use crate::memory::ModbusMemory;
+use crate::types::ChangeSource;
 
 /// Process a Modbus request PDU and return the response PDU.
 ///
@@ -224,7 +224,7 @@ pub fn unpack_bits(bytes: &[u8], count: usize) -> Vec<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modbus::types::MemoryMapSettings;
+    use crate::types::MemoryMapSettings;
 
     #[test]
     fn test_pack_bits() {
