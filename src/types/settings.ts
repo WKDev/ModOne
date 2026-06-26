@@ -55,6 +55,7 @@ export interface AppSettings {
   // Canvas / symbol settings
   symbolRotationStep: number;            // R 1회당 회전 각도(도), 1-360
   symbolRotationDirection: RotationDirection; // 기본 회전 방향
+  symbolRotationKeepConnections: boolean; // 회전 시 포트-와이어 연결 유지(true) / 끊기(false)
 
   // Sheet settings
   defaultSheet: string;     // built-in template name: 'A3-landscape' | 'A4-landscape' | etc.
@@ -105,6 +106,7 @@ export const defaultSettings: AppSettings = {
   // Canvas / symbol
   symbolRotationStep: 90,
   symbolRotationDirection: 'cw',
+  symbolRotationKeepConnections: true,
 
   // Sheet
   defaultSheet: 'A3-landscape',

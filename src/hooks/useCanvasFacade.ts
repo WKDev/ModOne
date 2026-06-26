@@ -37,8 +37,9 @@ import {
   alignComponents,
   distributeComponents,
   flipComponents,
-  rotateComponents,
+  rotateAndUpdateWires,
 } from '../components/OneCanvas/utils/canvas-commands';
+import { useSettingsStore } from '../stores/settingsStore';
 import type { CanvasFacadeReturn, WireDrawingState } from '../types/canvasFacade';
 
 // ============================================================================
@@ -353,9 +354,19 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
     (degrees: number) => {
       if (!documentId || !activeDocumentState) return;
       pushHistory(documentId);
+      const keep = useSettingsStore.getState().getMergedSettings().symbolRotationKeepConnections;
       if (document && isCanvasDocument(document)) {
         updateCanvasData(documentId, (docData) => {
-          docData.components = rotateComponents(docData.components, documentSelectedIds, degrees);
+          const result = rotateAndUpdateWires(
+            docData.components,
+            docData.wires,
+            docData.junctions,
+            documentSelectedIds,
+            degrees,
+            keep
+          );
+          docData.components = result.components;
+          docData.wires = result.wires;
         });
         return;
       }
@@ -366,12 +377,20 @@ export function useCanvasFacade(documentId: string | null): CanvasFacadeReturn {
               (candidate) => candidate.id === docData.schematic.activePageId
             ) ?? null;
           if (!page) return;
-          const components = rotateComponents(
-            new Map(Object.entries(page.circuit.components)) as Map<string, Block>,
+          const components = new Map(Object.entries(page.circuit.components)) as Map<string, Block>;
+          const junctions = page.circuit.junctions
+            ? (new Map(Object.entries(page.circuit.junctions)) as Map<string, Junction>)
+            : undefined;
+          const result = rotateAndUpdateWires(
+            components,
+            page.circuit.wires,
+            junctions,
             documentSelectedIds,
-            degrees
+            degrees,
+            keep
           );
-          page.circuit.components = Object.fromEntries(components);
+          page.circuit.components = Object.fromEntries(result.components);
+          page.circuit.wires = result.wires;
           page.updatedAt = new Date().toISOString();
           docData.schematic.updatedAt = new Date().toISOString();
         });

@@ -1,4 +1,7 @@
-import type { Block } from '../types';
+import type { Block, Wire, Junction } from '../types';
+import { isPortEndpoint } from '../types';
+import { getPortAbsolutePosition } from './wirePathCalculator';
+import { recalculateAutoHandles } from './canvasHelpers';
 
 function getSelectedComponents(
   components: Map<string, Block>,
@@ -137,6 +140,83 @@ export function rotateComponents(
   });
 
   return nextComponents;
+}
+
+function isWireConnectedToSelection(wire: Wire, sel: Set<string>): boolean {
+  return (
+    (isPortEndpoint(wire.from) && sel.has(wire.from.componentId)) ||
+    (isPortEndpoint(wire.to) && sel.has(wire.to.componentId))
+  );
+}
+
+function cloneWire(w: Wire): Wire {
+  return {
+    ...w,
+    from: { ...w.from },
+    to: { ...w.to },
+    handles: w.handles?.map((h) => ({ ...h, position: { ...h.position } })),
+  };
+}
+
+/**
+ * Rotate selected components and update their connected wires per policy.
+ *
+ * - keepConnections=true: recompute wire routes so they follow the rotated
+ *   ports. The logical connection is preserved, so 4×90° (rotation back to 0)
+ *   restores the exact original layout.
+ * - keepConnections=false: detach — convert each connected port endpoint to a
+ *   floating endpoint frozen at its PRE-rotation world position, so the wire
+ *   stays put and is no longer bound to the rotated symbol.
+ *
+ * Pure: returns new components map and wires array; inputs are not mutated.
+ */
+export function rotateAndUpdateWires(
+  components: Map<string, Block>,
+  wires: Wire[],
+  junctions: Map<string, Junction> | undefined,
+  selectedIds: Set<string>,
+  degrees: number,
+  keepConnections: boolean
+): { components: Map<string, Block>; wires: Wire[] } {
+  const sel = new Set(Array.from(selectedIds).filter((id) => components.has(id)));
+  if (sel.size === 0) {
+    return { components: new Map(components), wires };
+  }
+
+  let nextWires = wires;
+
+  // Detach must read ORIGINAL (pre-rotation) port positions.
+  if (!keepConnections) {
+    nextWires = wires.map((w) => {
+      if (!isWireConnectedToSelection(w, sel)) return w;
+      const next = cloneWire(w);
+      if (isPortEndpoint(next.from) && sel.has(next.from.componentId)) {
+        const block = components.get(next.from.componentId);
+        const pos = block && getPortAbsolutePosition(block, next.from.portId);
+        if (pos) next.from = { position: pos };
+      }
+      if (isPortEndpoint(next.to) && sel.has(next.to.componentId)) {
+        const block = components.get(next.to.componentId);
+        const pos = block && getPortAbsolutePosition(block, next.to.portId);
+        if (pos) next.to = { position: pos };
+      }
+      return next;
+    });
+  }
+
+  const nextComponents = rotateComponents(components, sel, degrees);
+
+  // Maintain: reroute connected wires against the rotated components.
+  if (keepConnections) {
+    nextWires = wires.map((w) => {
+      if (!isWireConnectedToSelection(w, sel)) return w;
+      const next = cloneWire(w);
+      next.handles = recalculateAutoHandles(next, nextComponents, junctions);
+      return next;
+    });
+  }
+
+  return { components: nextComponents, wires: nextWires };
 }
 
 /**

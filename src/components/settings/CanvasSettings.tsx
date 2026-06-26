@@ -90,6 +90,31 @@ export function CanvasSettings({ searchFilter = '' }: CanvasSettingsProps) {
           </p>
         </div>
       )}
+
+      {/* 회전 시 와이어 연결 유지 */}
+      {isVisible(['rotation', 'wire', 'connection', '회전', '와이어', '연결', '포트', 'port']) && (
+        <div className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            id="symbolRotationKeepConnections"
+            checked={settings.symbolRotationKeepConnections}
+            onChange={(e) => updatePending('symbolRotationKeepConnections', e.target.checked)}
+            className="mt-1 w-4 h-4 text-[var(--accent-color)] bg-[var(--bg-secondary)] border-[var(--border-color)] rounded focus:ring-[var(--accent-color)]"
+          />
+          <div>
+            <label
+              htmlFor="symbolRotationKeepConnections"
+              className="block text-sm font-medium text-[var(--text-primary)] cursor-pointer"
+            >
+              회전 시 와이어 연결 유지
+            </label>
+            <p className="text-xs text-[var(--text-muted)]">
+              심볼을 회전할 때 포트에 연결된 와이어를 따라오게 합니다. 끄면 회전 시 연결이
+              끊겨 와이어가 제자리에 남습니다.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

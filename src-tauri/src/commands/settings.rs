@@ -60,6 +60,8 @@ pub struct AppSettings {
     pub symbol_rotation_step: u32,
     #[serde(default)]
     pub symbol_rotation_direction: RotationDirection,
+    #[serde(default = "default_true")]
+    pub symbol_rotation_keep_connections: bool,
 
     // Sheet settings
     #[serde(default = "default_sheet")]
@@ -181,6 +183,7 @@ impl Default for AppSettings {
             // Canvas / symbol
             symbol_rotation_step: default_rotation_step(),
             symbol_rotation_direction: RotationDirection::Cw,
+            symbol_rotation_keep_connections: true,
 
             // Sheet
             default_sheet: default_sheet(),
@@ -325,6 +328,7 @@ mod tests {
         let settings = AppSettings::default();
         assert_eq!(settings.symbol_rotation_step, 90);
         assert_eq!(settings.symbol_rotation_direction, RotationDirection::Cw);
+        assert!(settings.symbol_rotation_keep_connections);
     }
 
     #[test]

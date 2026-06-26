@@ -57,7 +57,8 @@ import {
   recalculateAutoHandles,
 } from '../components/OneCanvas/utils/canvasHelpers';
 import { polylineToHandles, simplifyWireHandles, enforceOrthogonalPolyline } from '../components/OneCanvas/utils/wireSimplifier';
-import { alignComponents, distributeComponents, flipComponents } from '../components/OneCanvas/utils/canvas-commands';
+import { alignComponents, distributeComponents, flipComponents, rotateAndUpdateWires } from '../components/OneCanvas/utils/canvas-commands';
+import { useSettingsStore } from './settingsStore';
 import {
   GRID_MODULE_MM,
   GRID_VERSION,
@@ -585,22 +586,21 @@ export const useCanvasStore = create<CanvasStore>()(
       rotateComponent: (id, degrees) => {
         set(
           (state) => {
-            const component = state.components.get(id);
-            if (!component) return;
+            if (!state.components.has(id)) return;
 
             pushHistorySnapshot(state);
 
-            // Calculate new rotation (cumulative, normalized to 0-359; degrees may be negative)
-            const currentRotation = component.rotation || 0;
-            const newRotation = (((currentRotation + degrees) % 360) + 360) % 360;
-
-            // Update component with new rotation
-            state.components.set(id, {
-              ...component,
-              rotation: newRotation,
-            } as Block);
-
-            // Mark as dirty for save tracking
+            const keep = useSettingsStore.getState().getMergedSettings().symbolRotationKeepConnections;
+            const result = rotateAndUpdateWires(
+              state.components as Map<string, Block>,
+              state.wires,
+              state.junctions,
+              new Set([id]),
+              degrees,
+              keep
+            );
+            state.components = result.components;
+            state.wires = result.wires;
             state.isDirty = true;
           },
           false,
@@ -611,28 +611,24 @@ export const useCanvasStore = create<CanvasStore>()(
       rotateSelectedComponents: (degrees) => {
         set(
           (state) => {
-            const selectedComponents = getAllSelectedIds(state.selection)
+            const selected = getAllSelectedIds(state.selection)
               .filter((id) => state.components.has(id));
 
-            if (selectedComponents.length === 0) return;
+            if (selected.length === 0) return;
 
             pushHistorySnapshot(state);
 
-            // Rotate each selected component
-            selectedComponents.forEach((id) => {
-              const component = state.components.get(id);
-              if (!component) return;
-
-              const currentRotation = component.rotation || 0;
-              const newRotation = (((currentRotation + degrees) % 360) + 360) % 360;
-
-              state.components.set(id, {
-                ...component,
-                rotation: newRotation,
-              } as Block);
-            });
-
-            // Mark as dirty
+            const keep = useSettingsStore.getState().getMergedSettings().symbolRotationKeepConnections;
+            const result = rotateAndUpdateWires(
+              state.components as Map<string, Block>,
+              state.wires,
+              state.junctions,
+              new Set(selected),
+              degrees,
+              keep
+            );
+            state.components = result.components;
+            state.wires = result.wires;
             state.isDirty = true;
           },
           false,
