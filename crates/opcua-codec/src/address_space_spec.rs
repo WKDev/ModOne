@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use modone_contract::{CanonicalAccess, CanonicalAddress, CanonicalAreaKind};
 
-use crate::mapping::MappingAccessLevel;
+use crate::mapping::{MappingAccessLevel, OpcUaMappingConfig};
 use crate::memory::OpcUaNodeId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,6 +42,12 @@ pub struct OpcUaNodeSpec {
     /// Optional human-readable description for the OPC UA Variable node's
     /// Description attribute. Sourced from [`OpcUaMappingConfig::description`].
     pub description: Option<String>,
+    /// Type interpretation for this node: target OPC UA data type, register
+    /// span (word count), byte order, and (later) scaling/deadband. The live
+    /// server uses this to create the node with the correct `DataType`, to read
+    /// the register span on publish, and to decompose client writes back into
+    /// registers. For boolean/raw nodes this is the `default_for_address` config.
+    pub mapping: OpcUaMappingConfig,
 }
 
 impl OpcUaNodeSpec {

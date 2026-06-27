@@ -9,6 +9,7 @@ pub mod audit;
 pub mod auth;
 pub mod backend_impl;
 pub mod control;
+pub mod node_values;
 pub mod server;
 pub mod types;
 

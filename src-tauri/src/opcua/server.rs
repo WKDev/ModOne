@@ -6,9 +6,7 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 
-use crate::plc_runtime::{
-    CanonicalAddress, CanonicalMemory, CanonicalMemoryError, CanonicalValue,
-};
+use crate::plc_runtime::{CanonicalAddress, CanonicalMemory};
 
 #[cfg(feature = "opcua-server")]
 use super::address_space::OpcUaAccessLevel;
@@ -657,16 +655,17 @@ impl OpcUaServer {
                     ensure_folder_path(&mut as_lock, ns, &mut folders, &node_spec.path_segments);
                 let node_id = NodeId::new(ns, node_spec.node_id.identifier.clone());
 
+                // Node DataType + initial value are driven by the per-tag mapping
+                // config (Int32/Float/Double/…), not just is_bool. See node_values.
+                let data_type = node_spec.mapping.opcua_data_type;
                 let vb =
-                    VariableBuilder::new(&node_id, &node_spec.browse_name, &node_spec.display_name);
-                let vb = if node_spec.is_bool {
-                    vb.data_type(DataTypeId::Boolean).value(false)
-                } else {
-                    vb.data_type(DataTypeId::UInt16).value(0u16)
-                };
+                    VariableBuilder::new(&node_id, &node_spec.browse_name, &node_spec.display_name)
+                        .data_type(super::node_values::data_type_id_for(data_type))
+                        .value(super::node_values::initial_variant_for(data_type));
                 let vb = if node_spec.requires_live_value_getter() {
                     let canonical_memory = Arc::clone(&canonical_memory);
-                    let canonical_address = node_spec.canonical_address;
+                    let base = node_spec.canonical_address;
+                    let mapping = node_spec.mapping.clone();
                     let getter = AttrFnGetter::new_boxed(
                         move |_node_id,
                               timestamps_to_return,
@@ -678,8 +677,13 @@ impl OpcUaServer {
                                 return Ok(None);
                             }
 
-                            let value = canonical_memory.read().read(canonical_address);
-                            Ok(Some(canonical_data_value(value, timestamps_to_return)))
+                            let mem = canonical_memory.read();
+                            Ok(Some(super::node_values::read_node_data_value(
+                                &mem,
+                                base,
+                                &mapping,
+                                timestamps_to_return,
+                            )))
                         },
                     );
                     vb.value_getter(getter)
@@ -693,16 +697,25 @@ impl OpcUaServer {
                 };
                 let vb = if node_spec.access_level == OpcUaAccessLevel::ReadWrite {
                     let opcua_memory = Arc::clone(&self.opcua_memory);
-                    let identifier = node_spec.node_id.identifier.clone();
+                    let base = node_spec.canonical_address;
+                    let mapping = node_spec.mapping.clone();
                     let setter = AttrFnSetter::new_boxed(
                         move |_node_id, _attr_id, _range, value: DataValue| {
-                            let canonical_addr = opcua_memory
-                                .resolve_identifier(&identifier)
-                                .ok_or(StatusCode::BadNodeIdUnknown)?;
                             let variant =
                                 value.value.as_ref().ok_or(StatusCode::BadTypeMismatch)?;
-                            let canonical_value = variant_to_canonical_value(variant)?;
-                            opcua_memory.record_external_write(canonical_addr, canonical_value);
+                            // Decode the client value to the node's mapped type, then
+                            // decompose it into the canonical register write(s).
+                            let mapped = super::node_values::variant_to_mapped(
+                                variant,
+                                mapping.opcua_data_type,
+                            )?;
+                            let writes = super::node_values::mapped_to_register_writes(
+                                &mapped, base, &mapping,
+                            )
+                            .map_err(|_| StatusCode::BadTypeMismatch)?;
+                            for (addr, canonical_value) in writes {
+                                opcua_memory.record_external_write(addr, canonical_value);
+                            }
                             Ok(())
                         },
                     );
@@ -786,54 +799,33 @@ impl OpcUaServer {
         &self,
         windows: &[crate::modbus::DirtyPublishWindow],
         canonical_memory: &CanonicalMemory,
-        publish_map: &HashMap<CanonicalAddress, Vec<OpcUaNodeId>>,
+        _publish_map: &HashMap<CanonicalAddress, Vec<OpcUaNodeId>>,
     ) -> Result<(), OpcUaError> {
-        use opcua::server::prelude::*;
-
-        let namespace_index = self.namespace_index.load(Ordering::Acquire);
-        if !self.server_initialised.load(Ordering::Acquire) || namespace_index == 0 {
-            return Ok(());
-        }
-
-        let server = match self.inner_server.lock().as_ref().cloned() {
-            Some(server) => server,
-            None => return Ok(()),
-        };
-        let server_guard = server.read();
-        let address_space = server_guard.address_space();
-        let mut as_lock = address_space.write();
-        let now = DateTime::now();
-
-        for (canonical_addr, node_ids) in publish_map {
-            let in_window = windows.iter().any(|window| {
-                window.area == canonical_addr.area
-                    && canonical_addr.index >= window.start_index
-                    && canonical_addr.index <= window.end_index
-            });
-            if !in_window {
-                continue;
-            }
-
-            if let Ok(value) = canonical_memory.read(*canonical_addr) {
-                let variant = match value {
-                    CanonicalValue::Bool(b) => Variant::Boolean(b),
-                    CanonicalValue::U16(w) => Variant::UInt16(w),
-                };
-                for node_id in node_ids {
-                    let opcua_node_id = NodeId::new(namespace_index, node_id.identifier.clone());
-                    let _ = as_lock.set_variable_value(&opcua_node_id, variant.clone(), &now, &now);
-                }
-            }
-        }
-
-        Ok(())
+        self.publish_nodes(canonical_memory, Some(windows))
     }
 
     #[cfg(feature = "opcua-server")]
     fn sync_all_opcua_node_values(
         &self,
         canonical_memory: &CanonicalMemory,
-        publish_map: &HashMap<CanonicalAddress, Vec<OpcUaNodeId>>,
+        _publish_map: &HashMap<CanonicalAddress, Vec<OpcUaNodeId>>,
+    ) -> Result<(), OpcUaError> {
+        self.publish_nodes(canonical_memory, None)
+    }
+
+    /// Publish typed node values into the live address space.
+    ///
+    /// Iterates the stored [`AddressSpaceSpec`] nodes (each carries its mapping
+    /// config), reads the backing register span, and sets the type-correct
+    /// Variant. When `windows` is `Some`, only nodes whose register span
+    /// intersects a dirty window are published; when `None`, all nodes are
+    /// synced. Using the spec (rather than the per-address publish map) lets
+    /// multi-register types (Int32/Float/…) read their full span.
+    #[cfg(feature = "opcua-server")]
+    fn publish_nodes(
+        &self,
+        canonical_memory: &CanonicalMemory,
+        windows: Option<&[crate::modbus::DirtyPublishWindow]>,
     ) -> Result<(), OpcUaError> {
         use opcua::server::prelude::*;
 
@@ -841,6 +833,11 @@ impl OpcUaServer {
         if !self.server_initialised.load(Ordering::Acquire) || namespace_index == 0 {
             return Ok(());
         }
+
+        let spec_guard = self.address_spec.lock();
+        let Some(spec) = spec_guard.as_ref() else {
+            return Ok(());
+        };
 
         let server = match self.inner_server.lock().as_ref().cloned() {
             Some(server) => server,
@@ -851,16 +848,20 @@ impl OpcUaServer {
         let mut as_lock = address_space.write();
         let now = DateTime::now();
 
-        for (canonical_addr, node_ids) in publish_map {
-            if let Ok(value) = canonical_memory.read(*canonical_addr) {
-                let variant = match value {
-                    CanonicalValue::Bool(b) => Variant::Boolean(b),
-                    CanonicalValue::U16(w) => Variant::UInt16(w),
-                };
-                for node_id in node_ids {
-                    let opcua_node_id = NodeId::new(namespace_index, node_id.identifier.clone());
-                    let _ = as_lock.set_variable_value(&opcua_node_id, variant.clone(), &now, &now);
+        for node in &spec.nodes {
+            if let Some(windows) = windows {
+                if !super::node_values::node_dirty(node.canonical_address, &node.mapping, windows) {
+                    continue;
                 }
+            }
+            if let Ok(mapped) = super::node_values::read_node_mapped(
+                canonical_memory,
+                node.canonical_address,
+                &node.mapping,
+            ) {
+                let variant = super::node_values::mapped_value_to_variant(&mapped);
+                let opcua_node_id = NodeId::new(namespace_index, node.node_id.identifier.clone());
+                let _ = as_lock.set_variable_value(&opcua_node_id, variant, &now, &now);
             }
         }
 
@@ -1431,79 +1432,7 @@ fn build_server_endpoint(
     ServerEndpoint::new(path, crate_policy, security_mode, user_token_ids)
 }
 
-#[cfg(feature = "opcua-server")]
-fn variant_to_canonical_value(
-    variant: &opcua::server::prelude::Variant,
-) -> Result<CanonicalValue, opcua::server::prelude::StatusCode> {
-    use opcua::server::prelude::{StatusCode, Variant};
-
-    match variant {
-        Variant::Boolean(value) => Ok(CanonicalValue::Bool(*value)),
-        Variant::UInt16(value) => Ok(CanonicalValue::U16(*value)),
-        Variant::Int16(value) if *value >= 0 => Ok(CanonicalValue::U16(*value as u16)),
-        Variant::Int16(_) => Err(StatusCode::BadOutOfRange),
-        Variant::Int32(value) if *value >= 0 && *value <= u16::MAX as i32 => {
-            Ok(CanonicalValue::U16(*value as u16))
-        }
-        Variant::Int32(_) => Err(StatusCode::BadOutOfRange),
-        Variant::UInt32(value) if *value <= u16::MAX as u32 => {
-            Ok(CanonicalValue::U16(*value as u16))
-        }
-        Variant::UInt32(_) => Err(StatusCode::BadOutOfRange),
-        _ => Err(StatusCode::BadTypeMismatch),
-    }
-}
-
-#[cfg(feature = "opcua-server")]
-fn canonical_data_value(
-    value: Result<CanonicalValue, CanonicalMemoryError>,
-    timestamps_to_return: opcua::server::prelude::TimestampsToReturn,
-) -> opcua::server::prelude::DataValue {
-    use opcua::server::prelude::{DataValue, DateTime, StatusCode, Variant};
-
-    match value {
-        Ok(CanonicalValue::Bool(value)) => {
-            let now = DateTime::now();
-            let mut data_value = DataValue::from((Variant::Boolean(value), StatusCode::Good));
-            data_value.set_timestamps(timestamps_to_return, now, now);
-            data_value
-        }
-        Ok(CanonicalValue::U16(value)) => {
-            let now = DateTime::now();
-            let mut data_value = DataValue::from((Variant::UInt16(value), StatusCode::Good));
-            data_value.set_timestamps(timestamps_to_return, now, now);
-            data_value
-        }
-        Err(error) => {
-            let status = canonical_read_error_status(&error);
-            let now = DateTime::now();
-            let mut data_value = DataValue {
-                value: None,
-                status: Some(status),
-                source_timestamp: None,
-                source_picoseconds: None,
-                server_timestamp: None,
-                server_picoseconds: None,
-            };
-            data_value.set_timestamps(timestamps_to_return, now, now);
-            data_value
-        }
-    }
-}
-
-#[cfg(feature = "opcua-server")]
-fn canonical_read_error_status(error: &CanonicalMemoryError) -> opcua::server::prelude::StatusCode {
-    use opcua::server::prelude::StatusCode;
-
-    match error {
-        CanonicalMemoryError::AddressOutOfRange { .. }
-        | CanonicalMemoryError::BitIndexOutOfRange { .. }
-        | CanonicalMemoryError::BitIndexOnBitArea { .. } => StatusCode::BadNodeIdUnknown,
-        CanonicalMemoryError::TypeMismatch { .. }
-        | CanonicalMemoryError::WriteNotAllowed { .. }
-        | CanonicalMemoryError::SnapshotSizeMismatch { .. } => StatusCode::BadUnexpectedError,
-    }
-}
+// Variant↔canonical 및 typed read 변환은 node_values.rs로 이전됨(server.rs 비대화 방지).
 
 #[cfg(feature = "opcua-server")]
 fn bootstrap_server_pki(config: &OpcUaConfig) -> Result<CertificateMetadata, OpcUaError> {
@@ -1615,32 +1544,7 @@ fn absolute_pki_path(root: &Path, relative_or_absolute: &Path) -> PathBuf {
 #[cfg(all(test, feature = "opcua-server"))]
 mod tests {
     use super::*;
-    use opcua::server::prelude::{StatusCode, Variant};
     use tempfile::tempdir;
-
-    #[test]
-    fn variant_to_canonical_value_rejects_out_of_range_and_wrong_type() {
-        assert_eq!(
-            variant_to_canonical_value(&Variant::UInt16(42)).unwrap(),
-            CanonicalValue::U16(42)
-        );
-        assert_eq!(
-            variant_to_canonical_value(&Variant::Int32(65535)).unwrap(),
-            CanonicalValue::U16(65535)
-        );
-        assert_eq!(
-            variant_to_canonical_value(&Variant::Int16(-1)).unwrap_err(),
-            StatusCode::BadOutOfRange
-        );
-        assert_eq!(
-            variant_to_canonical_value(&Variant::UInt32(70000)).unwrap_err(),
-            StatusCode::BadOutOfRange
-        );
-        assert_eq!(
-            variant_to_canonical_value(&Variant::Double(1.5)).unwrap_err(),
-            StatusCode::BadTypeMismatch
-        );
-    }
 
     #[test]
     fn bootstrap_server_pki_rejects_broken_cert_key_pairs() {

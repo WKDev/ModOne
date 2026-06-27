@@ -7,7 +7,7 @@ use crate::project::{PlcAddressWindow, PlcHardwareTopology, PlcIoDirection, PlcS
 use crate::sim::tag_registry::SharedTagRegistry;
 use crate::sim::types::{TagAccessLevel, TagClass, TagDefinition};
 
-use super::mapping::OpcUaMappingStore;
+use super::mapping::{OpcUaMappingConfig, OpcUaMappingStore};
 use super::memory::OpcUaNodeId;
 
 // 순수 노드 스펙 타입/헬퍼는 address_space_spec.rs로 분리(crate 이전 대상).
@@ -197,6 +197,7 @@ pub fn build_address_space_spec(
                 kind: OpcUaNodeKind::RawPrimary,
                 engineering_unit: None,
                 description: None,
+                mapping: OpcUaMappingConfig::default_for_address(canonical_address),
             });
 
             primary_node_map.insert(canonical_address, node_id.clone());
@@ -228,6 +229,7 @@ pub fn build_address_space_spec(
                         kind: OpcUaNodeKind::VendorAlias,
                         engineering_unit: None,
                         description: None,
+                        mapping: OpcUaMappingConfig::default_for_address(canonical_address),
                     });
                     push_publish_node(&mut publish_map, canonical_address, alias_node_id);
                 }
@@ -237,14 +239,19 @@ pub fn build_address_space_spec(
 
     for tag in tag_registry.list(true) {
         let node_id = OpcUaNodeId::new(format!("tag/{}", tag.tag_id));
-        // If a mapping config exists for this tag, use its access_level and
-        // description; otherwise fall back to the tag's own access level.
-        let mapping_cfg = mapping_store.and_then(|store| store.get(&tag.tag_id));
-        let access_level = mapping_cfg
+        // Resolve the mapping config for this tag. When an explicit config is in
+        // the store, its access_level and description override the tag's own. When
+        // absent, fall back to a safe default derived from the canonical address
+        // (and the tag's own access level). The live server uses `mapping` for the
+        // node's DataType, register-span publish, and write decomposition.
+        let explicit_cfg = mapping_store.and_then(|store| store.get(&tag.tag_id));
+        let access_level = explicit_cfg
             .as_ref()
             .map(|cfg| access_level_from_mapping(cfg.access_level))
             .unwrap_or_else(|| access_level_from_tag(tag.access));
-        let description = mapping_cfg.and_then(|cfg| cfg.description);
+        let description = explicit_cfg.as_ref().and_then(|cfg| cfg.description.clone());
+        let mapping = explicit_cfg
+            .unwrap_or_else(|| OpcUaMappingConfig::default_for_address(tag.canonical_address));
 
         // Build path_segments from folderPath if present, otherwise fall back
         // to the default "Raw" or "Semantic" flat classification.
@@ -261,6 +268,7 @@ pub fn build_address_space_spec(
             kind: OpcUaNodeKind::Tag,
             engineering_unit: tag.engineering_unit.clone(),
             description,
+            mapping,
         });
         push_publish_node(&mut publish_map, tag.canonical_address, node_id);
     }
@@ -345,6 +353,7 @@ mod tests {
 
     #[test]
     fn live_value_getter_targets_tags_and_writable_non_tags_only() {
+        use super::super::mapping::OpcUaMappingConfig;
         let address = CanonicalAddress::new(CanonicalAreaKind::DataWord, 0);
         let base = OpcUaNodeSpec {
             node_id: OpcUaNodeId::new("node/example"),
@@ -357,6 +366,7 @@ mod tests {
             kind: OpcUaNodeKind::RawPrimary,
             engineering_unit: None,
             description: None,
+            mapping: OpcUaMappingConfig::default_for_address(address),
         };
 
         let raw_readonly = base.clone();
