@@ -35,12 +35,15 @@
 - [ ] terminal_block 가변 단자 — 전용 속성 편집기 없음, 후속(B에서 일반화하거나 별도)
 - [x] 트랙 A → main 병합 (main 9857a9f, 다른 세션 Modbus/멀티-CPU 작업과 clean 병합)
 
-## Q2 트랙 B — 선언적 XML PortTemplate (진행 중)
+## Q2 트랙 B — 선언적 XML PortTemplate (설계 확정, 구현 보류)
 계획·결정: `q2b-porttemplate-plan.md` (B-1 명시속성 / B-2 순수유틸 / B-3 IndustrialProperties / B-4 XML수기 먼저)
-- [ ] Phase 1 — PortTemplate 타입 + 파서 + 직렬화 + 라운드트립 테스트
-- [ ] Phase 2 — `resolveInstancePorts(def, instanceProps)` + customSymbolBridge 인스턴스 인지
-- [ ] Phase 3 — IndustrialProperties 인스턴스 속성 UI + ports 재계산
-- [ ] Phase 4 — 데모 PortTemplate 심볼 + 검증
+- [x] 설계 완성 — 파서 3경로 매핑(TS 서비스=builtin/에디터, Rust=프로젝트 커스텀 로드)
+- [x] Rust 비용 분석 — import는 verbatim write(직렬화 불필요), 파서는 unknown 스킵(graceful). Rust는 파서+타입만, 재빌드 비용 있음
+- [ ] **Phase 1 — TS 데이터 레이어** (타입+파싱+직렬화+라운드트립). 다음 세션 착수점
+- [ ] Phase 2 — TS `resolveInstancePorts` + customSymbolBridge 인스턴스 인지
+- [ ] Phase 3 — TS IndustrialProperties 인스턴스 속성 UI + ports 재계산
+- [ ] Phase 4 — builtin 데모 PortTemplate 심볼 + 검증
+- [ ] Phase 5 (보류) — Rust 파서+타입 패리티 (프로젝트 저장 커스텀 심볼 동적 포트 복원, Rust 재빌드)
 - [ ] (Q2=T2 시) scope/terminal_block을 PortTemplate로 마이그레이션
 - [ ] (Q2=T3 시) `behaviorTemplates.ts`에 구조 생성 훅(generatePorts) 추가
 - [ ] (Q1=a 시) 논리 시뮬: archetype 추가 (counter/timer/contactor 등)
