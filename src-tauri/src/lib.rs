@@ -104,6 +104,7 @@ use commands::{
     update_project_config,
     // Modbus commands
     modbus_bulk_write,
+    modbus_get_generators,
     modbus_get_status,
     modbus_list_serial_ports,
     modbus_load_memory_csv,
@@ -112,6 +113,7 @@ use commands::{
     modbus_read_holding_registers,
     modbus_read_input_registers,
     modbus_save_memory_csv,
+    modbus_set_generators,
     modbus_start_rtu,
     modbus_start_tcp,
     modbus_stop_rtu,
@@ -618,6 +620,8 @@ pub fn run() {
             modbus_read_input_registers,
             modbus_write_input_register,
             modbus_bulk_write,
+            modbus_set_generators,
+            modbus_get_generators,
             modbus_save_memory_csv,
             modbus_load_memory_csv,
             // Canvas commands

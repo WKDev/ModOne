@@ -38,6 +38,30 @@ export interface MemoryBatchChangeEvent {
   changes: MemoryChangeEvent[];
 }
 
+/** Observability event emitted for each Modbus request/response exchange */
+export interface ModbusTrafficEvent {
+  /** ISO 8601 timestamp */
+  timestamp: string;
+  /** Transport protocol */
+  protocol: 'tcp' | 'rtu';
+  /** Client address (IP:port for TCP, port name for RTU) */
+  client_addr: string;
+  /** Target unit ID (slave address) */
+  unit_id: number;
+  /** Function code (e.g. 0x03) */
+  function_code: number;
+  /** Human-readable function name */
+  function_name: string;
+  /** Start address, if parseable */
+  start_address: number | null;
+  /** Quantity/count, if parseable */
+  quantity: number | null;
+  /** Exception code, if the response was an exception */
+  exception_code: number | null;
+  /** Whether the response was successful (not an exception) */
+  success: boolean;
+}
+
 /** Event emitted when a client connects or disconnects */
 export interface ConnectionEvent {
   /** Type of event */
@@ -117,6 +141,36 @@ export interface ModbusStatus {
   rtu_baud_rate?: number;
 }
 
+// ============================================================================
+// Value Generator Types
+// ============================================================================
+
+/** Target memory region for a value generator */
+export type GeneratorTarget = 'coil' | 'discrete' | 'holding' | 'input';
+
+/** Waveform driving a value generator */
+export type Waveform = 'sine' | 'ramp' | 'square' | 'random' | 'counter';
+
+/** A single value generator that drives a memory address with a waveform */
+export interface GeneratorConfig {
+  /** Stable id (client-generated) */
+  id: string;
+  /** Whether this generator is active */
+  enabled: boolean;
+  /** Target memory region */
+  target: GeneratorTarget;
+  /** Address to drive */
+  address: number;
+  /** Waveform shape */
+  waveform: Waveform;
+  /** Cycle period in milliseconds */
+  period_ms: number;
+  /** Output lower bound */
+  min: number;
+  /** Output upper bound */
+  max: number;
+}
+
 /** A single write operation for bulk writes */
 export interface WriteOperation {
   /** Type of memory to write: "coil", "discrete", "holding", or "input" */
@@ -139,4 +193,6 @@ export const MODBUS_EVENTS = {
   MEMORY_BATCH_CHANGED: 'modbus:memory-batch-changed',
   /** Connection status event */
   CONNECTION: 'modbus:connection',
+  /** Request/response traffic event */
+  TRAFFIC: 'modbus:traffic',
 } as const;

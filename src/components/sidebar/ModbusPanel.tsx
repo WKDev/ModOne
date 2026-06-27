@@ -13,6 +13,9 @@ import {
 } from '../protocol/ProtocolPanelPrimitives';
 import type { ProjectConfigPatch } from '../../types/project';
 import type { RtuConfig, TcpServerConfig } from '../../types/modbus';
+import { TrafficLogPanel } from './modbus/TrafficLogPanel';
+import { ClientStatsPanel } from './modbus/ClientStatsPanel';
+import { GeneratorPanel } from './modbus/GeneratorPanel';
 
 function parseTcpAddress(address: string, fallbackHost: string | null): TcpServerConfig {
   const trimmed = address.trim();
@@ -67,7 +70,6 @@ export function ModbusPanel() {
     status,
     error,
     isConnecting,
-    connections,
     coilCache,
     discreteCache,
     holdingRegisterCache,
@@ -378,29 +380,22 @@ export function ModbusPanel() {
             <div className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--color-text-muted)]">
               Active Clients
             </div>
-            {connections.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-[var(--color-border)] px-3 py-3 text-sm text-[var(--color-text-muted)]">
-                No active Modbus clients.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {connections.map((connection) => (
-                  <div
-                    key={`${connection.protocol}-${connection.clientAddr}`}
-                    className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2"
-                  >
-                    <div className="text-sm text-[var(--color-text-secondary)]">
-                      {connection.clientAddr}
-                    </div>
-                    <div className="text-xs text-[var(--color-text-muted)]">
-                      {connection.protocol.toUpperCase()} ·{' '}
-                      {new Date(connection.connectedAt).toLocaleTimeString()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <ClientStatsPanel />
           </div>
+        </PanelSection>
+
+        <PanelSection
+          title="Traffic"
+          description="Live request/response log from connected Modbus clients."
+        >
+          <TrafficLogPanel />
+        </PanelSection>
+
+        <PanelSection
+          title="Value Generators"
+          description="Drive registers/coils with waveforms to exercise HMI trends and alarms."
+        >
+          <GeneratorPanel />
         </PanelSection>
       </PanelShell>
     </div>
