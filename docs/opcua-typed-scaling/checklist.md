@@ -19,13 +19,13 @@
       - openssl 빌드는 Strawberry perl 필요(C:\Strawberry\perl\bin PATH 앞에). 순수 테스트는 `--no-default-features`.
       - 정리: 고아가 된 `variant_to_canonical_value`/`canonical_data_value`/`canonical_read_error_status` 제거
 
-## Phase 2 — 스케일링 (raw↔eng)
-- [ ] P2.1 codec `ScalingConfig { kind: None|Linear|SquareRoot, raw_low, raw_high, eng_low, eng_high, clamp }` + serde camelCase
-- [ ] P2.2 순수 `scaling.rs`: `raw_to_eng`/`eng_to_raw` + 단위테스트 (경계/역변환/0분모 가드)
-- [ ] P2.3 read_typed에서 scaling 적용 → 노출 타입 Double 강제 / write에서 역scaling
-- [ ] P2.4 TS 타입(tagImportExport) + CSV/JSON import/export 필드
-- [ ] P2.5 UI: `OpcUaMappingSection`에 스케일링 편집
-- [ ] P2.6 테스트 + 커밋
+## Phase 2 — 스케일링 (raw↔eng) — 백엔드 완료, 프론트 남음
+- [x] P2.1 codec `ScalingConfig { kind: None|Linear|SquareRoot, raw_low/high, eng_low/high, clamp }` + serde camelCase, `scaling_active()`, `effective_opcua_data_type()`
+- [x] P2.2 순수 `scaling.rs`: `raw_to_eng`/`eng_to_raw` + 8개 단위테스트 (경계/역변환/제곱근/0분모 가드)
+- [x] P2.3 node_values: read에서 scaling→Double 노출, write에서 역scaling(round+saturate). server.rs 노드 생성/setter는 effective type 사용. 순수 왕복 2테스트 + E2E 회귀 통과
+- [ ] P2.4 TS 타입(tagImportExport) + CSV/JSON import/export 필드  ← 남음
+- [ ] P2.5 UI: `OpcUaMappingSection`에 스케일링 편집  ← 남음
+- 참고: serde가 `#[serde(default, skip_serializing_if=is_disabled)]`라 프로젝트 저장/로드는 이미 round-trip(비활성 시 JSON 생략). 즉 프로젝트 파일로는 지금도 설정 가능, UI만 없음.
 
 ## Phase 3 — 데드밴드 (publish 억제)
 - [ ] P3.1 codec `DeadbandConfig { kind: None|Absolute|Percent, value }` + serde + TS

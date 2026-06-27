@@ -3,7 +3,9 @@
 
 use app_lib::modbus::DirtyPublishWindow;
 use app_lib::opcua::node_values::{mapped_to_register_writes, node_dirty, read_node_mapped};
-use app_lib::opcua::{ByteOrder, MappedValue, OpcUaDataType, OpcUaMappingConfig};
+use app_lib::opcua::{
+    ByteOrder, MappedValue, OpcUaDataType, OpcUaMappingConfig, ScalingConfig, ScalingKind,
+};
 use app_lib::plc_runtime::{
     CanonicalAddress, CanonicalAreaKind, CanonicalMemory, CanonicalValue, CanonicalWriteSource,
 };
@@ -80,6 +82,45 @@ fn boolean_node_reads_bit() {
 
     let cfg = OpcUaMappingConfig::default_for_address(base);
     assert_eq!(read_node_mapped(&mem, base, &cfg).unwrap(), MappedValue::Boolean(true));
+}
+
+fn scaled_u16_config() -> OpcUaMappingConfig {
+    // UInt16 raw 0..27648 mapped linearly to engineering 0..100.
+    OpcUaMappingConfig {
+        opcua_data_type: OpcUaDataType::UInt16,
+        word_count: 1,
+        scaling: ScalingConfig {
+            kind: ScalingKind::Linear,
+            raw_low: 0.0,
+            raw_high: 27648.0,
+            eng_low: 0.0,
+            eng_high: 100.0,
+            clamp: true,
+        },
+        ..Default::default()
+    }
+}
+
+#[test]
+fn scaled_node_reads_engineering_value_as_double() {
+    let mut mem = CanonicalMemory::new();
+    let base = CanonicalAddress::new(CanonicalAreaKind::DataWord, 5);
+    mem.write(base, CanonicalValue::U16(13824), CanonicalWriteSource::Simulation)
+        .unwrap();
+
+    match read_node_mapped(&mem, base, &scaled_u16_config()).unwrap() {
+        MappedValue::Double(v) => assert!((v - 50.0).abs() < 1e-6, "got {v}"),
+        other => panic!("expected Double engineering value, got {other:?}"),
+    }
+}
+
+#[test]
+fn scaled_write_reverse_scales_to_raw_register() {
+    let base = CanonicalAddress::new(CanonicalAreaKind::DataWord, 5);
+    // Client writes engineering 50.0 -> raw 13824.
+    let writes =
+        mapped_to_register_writes(&MappedValue::Double(50.0), base, &scaled_u16_config()).unwrap();
+    assert_eq!(writes, vec![(base, CanonicalValue::U16(13824))]);
 }
 
 #[test]

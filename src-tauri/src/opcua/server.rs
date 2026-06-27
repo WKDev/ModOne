@@ -656,8 +656,10 @@ impl OpcUaServer {
                 let node_id = NodeId::new(ns, node_spec.node_id.identifier.clone());
 
                 // Node DataType + initial value are driven by the per-tag mapping
-                // config (Int32/Float/Double/…), not just is_bool. See node_values.
-                let data_type = node_spec.mapping.opcua_data_type;
+                // config (Int32/Float/Double/…), not just is_bool. When scaling is
+                // active the effective type is Double (engineering value). See
+                // node_values.
+                let data_type = node_spec.mapping.effective_opcua_data_type();
                 let vb =
                     VariableBuilder::new(&node_id, &node_spec.browse_name, &node_spec.display_name)
                         .data_type(super::node_values::data_type_id_for(data_type))
@@ -707,7 +709,7 @@ impl OpcUaServer {
                             // decompose it into the canonical register write(s).
                             let mapped = super::node_values::variant_to_mapped(
                                 variant,
-                                mapping.opcua_data_type,
+                                mapping.effective_opcua_data_type(),
                             )?;
                             let writes = super::node_values::mapped_to_register_writes(
                                 &mapped, base, &mapping,

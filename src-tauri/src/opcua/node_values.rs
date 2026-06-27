@@ -8,8 +8,8 @@ use crate::modbus::DirtyPublishWindow;
 use crate::plc_runtime::{CanonicalAddress, CanonicalMemory, CanonicalMemoryError, CanonicalValue};
 
 use super::{
-    read_registers_to_mapped, write_mapped_to_registers, MappedValue, MappingError, OpcUaDataType,
-    OpcUaMappingConfig,
+    eng_to_raw, raw_to_eng, read_registers_to_mapped, write_mapped_to_registers, MappedValue,
+    MappingError, OpcUaDataType, OpcUaMappingConfig,
 };
 
 /// Error reading a node's typed value from canonical memory.
@@ -44,7 +44,17 @@ pub fn read_node_mapped(
         };
         regs.push(word);
     }
-    read_registers_to_mapped(mapping, &regs).map_err(NodeValueError::Mapping)
+    let raw = read_registers_to_mapped(mapping, &regs).map_err(NodeValueError::Mapping)?;
+
+    // When scaling is active, expose the engineering value as Double.
+    if mapping.scaling_active() {
+        let raw_f = mapped_numeric_to_f64(&raw)
+            .ok_or(NodeValueError::Mapping(MappingError::UnsupportedType(
+                mapping.opcua_data_type,
+            )))?;
+        return Ok(MappedValue::Double(raw_to_eng(&mapping.scaling, raw_f)));
+    }
+    Ok(raw)
 }
 
 /// Decomposes a written [`MappedValue`] into the canonical register writes it
@@ -61,7 +71,21 @@ pub fn mapped_to_register_writes(
     if let MappedValue::Boolean(b) = value {
         return Ok(vec![(base, CanonicalValue::Bool(*b))]);
     }
-    let regs = write_mapped_to_registers(mapping, value)?;
+
+    // When scaling is active the client writes the engineering value (Double);
+    // reverse-scale it back to the underlying raw register type before encoding.
+    let underlying;
+    let encode = if mapping.scaling_active() {
+        let eng = mapped_numeric_to_f64(value)
+            .ok_or(MappingError::UnsupportedType(mapping.opcua_data_type))?;
+        let raw = eng_to_raw(&mapping.scaling, eng);
+        underlying = f64_to_underlying(mapping.opcua_data_type, raw)?;
+        &underlying
+    } else {
+        value
+    };
+
+    let regs = write_mapped_to_registers(mapping, encode)?;
     let addrs = mapping.register_range(base).addresses();
     Ok(addrs
         .into_iter()
@@ -90,6 +114,45 @@ fn canonical_truthy(v: CanonicalValue) -> bool {
         CanonicalValue::Bool(b) => b,
         CanonicalValue::U16(w) => w != 0,
     }
+}
+
+/// Extracts a numeric [`MappedValue`] as `f64` for scaling. Returns `None` for
+/// Boolean / String (non-numeric).
+fn mapped_numeric_to_f64(value: &MappedValue) -> Option<f64> {
+    match value {
+        MappedValue::SByte(v) => Some(*v as f64),
+        MappedValue::Byte(v) => Some(*v as f64),
+        MappedValue::Int16(v) => Some(*v as f64),
+        MappedValue::UInt16(v) => Some(*v as f64),
+        MappedValue::Int32(v) => Some(*v as f64),
+        MappedValue::UInt32(v) => Some(*v as f64),
+        MappedValue::Int64(v) => Some(*v as f64),
+        MappedValue::UInt64(v) => Some(*v as f64),
+        MappedValue::Float(v) => Some(*v as f64),
+        MappedValue::Double(v) => Some(*v),
+        MappedValue::Boolean(_) | MappedValue::String(_) => None,
+    }
+}
+
+/// Converts a reverse-scaled raw `f64` into the underlying numeric
+/// [`MappedValue`]. Integer types round to nearest and saturate to range
+/// (Rust `as` is a saturating float→int cast).
+fn f64_to_underlying(target: OpcUaDataType, raw: f64) -> Result<MappedValue, MappingError> {
+    Ok(match target {
+        OpcUaDataType::SByte => MappedValue::SByte(raw.round() as i8),
+        OpcUaDataType::Byte => MappedValue::Byte(raw.round() as u8),
+        OpcUaDataType::Int16 => MappedValue::Int16(raw.round() as i16),
+        OpcUaDataType::UInt16 => MappedValue::UInt16(raw.round() as u16),
+        OpcUaDataType::Int32 => MappedValue::Int32(raw.round() as i32),
+        OpcUaDataType::UInt32 => MappedValue::UInt32(raw.round() as u32),
+        OpcUaDataType::Int64 => MappedValue::Int64(raw.round() as i64),
+        OpcUaDataType::UInt64 => MappedValue::UInt64(raw.round() as u64),
+        OpcUaDataType::Float => MappedValue::Float(raw as f32),
+        OpcUaDataType::Double => MappedValue::Double(raw),
+        OpcUaDataType::Boolean | OpcUaDataType::String => {
+            return Err(MappingError::UnsupportedType(target))
+        }
+    })
 }
 
 /// A type-correct zero/empty [`MappedValue`] for the given data type. Used to

@@ -528,6 +528,7 @@ mod tests {
                 access_level: MappingAccessLevel::ReadOnly,
                 description: None,
                 string_config: None,
+                scaling: Default::default(),
             },
         );
         // Tag B: DataWord 200..202, Int32 (2 words)
@@ -540,6 +541,7 @@ mod tests {
                 access_level: MappingAccessLevel::ReadOnly,
                 description: None,
                 string_config: None,
+                scaling: Default::default(),
             },
         );
         // Tag C: DataWord 300, UInt16 (1 word) — not dirty
@@ -552,6 +554,7 @@ mod tests {
                 access_level: MappingAccessLevel::ReadOnly,
                 description: None,
                 string_config: None,
+                scaling: Default::default(),
             },
         );
 
@@ -662,6 +665,7 @@ mod tests {
                 access_level: MappingAccessLevel::ReadOnly,
                 description: None,
                 string_config: None,
+                scaling: Default::default(),
             },
         );
 
@@ -703,6 +707,7 @@ mod tests {
                 access_level: MappingAccessLevel::ReadOnly,
                 description: None,
                 string_config: None,
+                scaling: Default::default(),
             },
         );
 
@@ -734,6 +739,7 @@ mod tests {
                 access_level: MappingAccessLevel::ReadOnly,
                 description: None,
                 string_config: None,
+                scaling: Default::default(),
             },
         );
 

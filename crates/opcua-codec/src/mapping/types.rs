@@ -57,6 +57,12 @@ impl OpcUaDataType {
     pub fn is_bool_type(&self) -> bool {
         matches!(self, Self::Boolean)
     }
+
+    /// Returns `true` for numeric types (everything except Boolean and String).
+    /// Scaling and deadband only apply to numeric types.
+    pub fn is_numeric(&self) -> bool {
+        !matches!(self, Self::Boolean | Self::String)
+    }
 }
 
 impl std::fmt::Display for OpcUaDataType {
