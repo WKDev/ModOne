@@ -12,6 +12,7 @@ use tokio::sync::Mutex;
 use tokio_serial::{DataBits, Parity, SerialPortBuilderExt, SerialStream, StopBits};
 
 use super::pdu;
+use super::telemetry;
 use super::types::{ConnectionEvent, ModbusError};
 use super::ModbusMemory;
 
@@ -238,10 +239,21 @@ impl ModbusRtuServer {
         let unit_id = self.config.unit_id;
         let inter_frame_delay =
             std::time::Duration::from_micros(self.config.inter_frame_delay_us());
+        let app_handle = Arc::clone(&self.app_handle);
+        let port_name = self.config.com_port.clone();
 
         // Spawn the RTU loop
         self.task_handle = Some(tokio::spawn(async move {
-            rtu_loop(port, memory, running, unit_id, inter_frame_delay).await;
+            rtu_loop(
+                port,
+                memory,
+                running,
+                unit_id,
+                inter_frame_delay,
+                app_handle,
+                port_name,
+            )
+            .await;
         }));
 
         Ok(())
@@ -359,12 +371,15 @@ fn build_response_frame(unit_id: u8, response_pdu: &[u8]) -> Vec<u8> {
 }
 
 /// The main RTU communication loop
+#[allow(clippy::too_many_arguments)]
 async fn rtu_loop(
     port: Arc<Mutex<Option<SerialStream>>>,
     memory: Arc<ModbusMemory>,
     running: Arc<AtomicBool>,
     unit_id: u8,
     inter_frame_delay: std::time::Duration,
+    app_handle: Arc<RwLock<Option<Arc<tauri::AppHandle>>>>,
+    port_name: String,
 ) {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -414,6 +429,18 @@ async fn rtu_loop(
                         // Process the request
                         let response_pdu =
                             pdu::process_request(&memory, function_code, request_pdu);
+
+                        // Emit observability event for the traffic log
+                        telemetry::emit_traffic(
+                            &app_handle,
+                            telemetry::ModbusTrafficEvent::from_exchange(
+                                "rtu",
+                                &port_name,
+                                frame_buffer[0],
+                                request_pdu,
+                                &response_pdu,
+                            ),
+                        );
 
                         // Build and send response (only if not broadcast)
                         if frame_buffer[0] != 0 {

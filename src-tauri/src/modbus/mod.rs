@@ -4,9 +4,11 @@
 //! native 전송 셸(TCP/RTU 소켓 서버)과 Tauri 이벤트 싱크만 보유하고, codec 의
 //! 공개 표면을 `crate::modbus::X` 경로로 재노출한다.
 
+pub mod generator;
 pub mod rtu;
 pub mod tauri_sink;
 pub mod tcp;
+pub mod telemetry;
 pub mod types;
 
 // codec 데이터 모델/코덱/어댑터/정책 재노출 (기존 `crate::modbus::X` 경로 호환).
@@ -17,6 +19,7 @@ pub use modbus_codec::{
     ModbusMappingSource, ModbusMemory, ProtocolAdapter,
 };
 
+pub use generator::{GeneratorConfig, GeneratorManager, GeneratorTarget, Waveform};
 pub use rtu::{
     list_available_ports, ModbusRtuServer, PortInfo, RtuConfig, RtuDataBits, RtuParity, RtuStopBits,
 };
