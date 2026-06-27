@@ -39,4 +39,14 @@
 1. a439eb3 crates/modone-audit 추출 (+잠재버그 2건 수정)
 2. 197fba6 opcua를 엔진 소비자로
 3. d98a74b 런타임 감사 훅 + 조회 커맨드
-4. (이번) 프론트 패널
+4. d526213 프론트 패널 / f745cd7 main 병합
+5. 0f30d10 **시작 패닉 수정** (아래)
+
+## 2026-06-27 — 실제 앱 실행 검증에서 런타임 버그 발견·수정
+
+- **증상.** `pnpm tauri dev`로 띄우니 시작 즉시 패닉: `there is no reactor running, must be called from the context of a Tokio 1.x runtime` (state.rs:66). 앱 exit 101.
+- **원인.** 크레이트 `start_retention_scheduler`가 `tokio::spawn`을 호출하는데, Tauri `setup()`은 tokio 런타임 컨텍스트 **밖**에서 돈다. 원본 opcua는 `tauri::async_runtime::spawn`(컨텍스트 무관)을 써서 괜찮았던 것 — 크레이트를 tauri-free로 만들며 이 보장을 잃었다.
+- **놓친 이유.** `cargo check`·`cargo test -p modone-audit`·`tsc` 전부 통과. 단위테스트가 스케줄러를 "런타임 없는 컨텍스트에서" 시작하지 않아 못 잡음. **실제 앱을 띄워야만** 드러나는 종류.
+- **수정(0f30d10).** 보존 루프는 async 불필요(주기적 sync 호출) → `std::thread + mpsc::recv_timeout`으로 교체. 런타임 무관, tokio 의존 제거.
+- **e2e 검증(CDP).** 실 백엔드에 `runtime_query_audit_log` 등록 확인 → `sim_run`/`sim_stop` 호출 → DB에 sim_start/sim_stop 2건 기록 → `RuntimeAuditLogPanel`(하단 탭 자동 노출)에 렌더 확인. 스크린샷 캡처.
+- **교훈.** Tauri `setup()`/명령 외 컨텍스트에서 백그라운드 작업 spawn 시 `tokio::spawn` 금지 → `tauri::async_runtime::spawn` 또는 std 스레드. [[tauri-setup-no-tokio-context]]
