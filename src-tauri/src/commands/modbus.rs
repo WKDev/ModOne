@@ -11,8 +11,9 @@ use tokio::sync::Mutex;
 
 use crate::commands::network::NetworkState;
 use crate::modbus::{
-    list_available_ports, MemoryMapSettings, ModbusMemory, ModbusRtuServer, ModbusTcpServer,
-    PortInfo, RtuConfig, RtuDataBits, RtuParity, RtuStopBits, TauriEventSink, TcpConfig,
+    list_available_ports, GeneratorConfig, GeneratorManager, MemoryMapSettings, ModbusMemory,
+    ModbusRtuServer, ModbusTcpServer, PortInfo, RtuConfig, RtuDataBits, RtuParity, RtuStopBits,
+    TauriEventSink, TcpConfig,
 };
 use crate::project::{ModbusSimulationTransport, Parity as ProjectParity, ProjectConfig};
 
@@ -24,6 +25,8 @@ pub struct ModbusState {
     pub tcp_server: Mutex<Option<ModbusTcpServer>>,
     /// RTU server instance (if running)
     pub rtu_server: Mutex<Option<ModbusRtuServer>>,
+    /// Value generator engine (drives memory with waveforms)
+    pub generators: GeneratorManager,
     /// Transport currently owned by project-driven simulation lifecycle.
     project_owned_transport: Mutex<Option<ProjectOwnedTransport>>,
 }
@@ -36,10 +39,13 @@ enum ProjectOwnedTransport {
 
 impl Default for ModbusState {
     fn default() -> Self {
+        let memory = Arc::new(ModbusMemory::new(&MemoryMapSettings::default()));
+        let generators = GeneratorManager::new(Arc::clone(&memory));
         Self {
-            memory: Arc::new(ModbusMemory::new(&MemoryMapSettings::default())),
+            memory,
             tcp_server: Mutex::new(None),
             rtu_server: Mutex::new(None),
+            generators,
             project_owned_transport: Mutex::new(None),
         }
     }
@@ -732,6 +738,33 @@ pub async fn modbus_bulk_write(
     }
 
     Ok(())
+}
+
+// ============================================================================
+// Value Generator Commands
+// ============================================================================
+
+/// Replace the value-generator list. Engine auto-runs while any generator is enabled.
+#[tauri::command]
+pub async fn modbus_set_generators(
+    state: State<'_, ModbusState>,
+    app_handle: tauri::AppHandle,
+    generators: Vec<GeneratorConfig>,
+) -> Result<(), String> {
+    // Ensure simulation writes are observable in the UI.
+    state
+        .memory
+        .set_event_sink(Arc::new(TauriEventSink::new(app_handle)));
+    state.generators.set_generators(generators).await;
+    Ok(())
+}
+
+/// Get the current value-generator list.
+#[tauri::command]
+pub async fn modbus_get_generators(
+    state: State<'_, ModbusState>,
+) -> Result<Vec<GeneratorConfig>, String> {
+    Ok(state.generators.get_generators())
 }
 
 // ============================================================================

@@ -70,12 +70,13 @@ pub use layout::{
 
 // Re-export modbus commands and state
 pub use modbus::{
-    modbus_bulk_write, modbus_get_status, modbus_list_serial_ports, modbus_load_memory_csv,
-    modbus_read_coils, modbus_read_discrete_inputs, modbus_read_holding_registers,
-    modbus_read_input_registers, modbus_save_memory_csv, modbus_start_rtu, modbus_start_tcp,
-    modbus_stop_rtu, modbus_stop_tcp, modbus_write_coil, modbus_write_coils,
-    modbus_write_discrete_input, modbus_write_holding_register, modbus_write_holding_registers,
-    modbus_write_input_register, ModbusState,
+    modbus_bulk_write, modbus_get_generators, modbus_get_status, modbus_list_serial_ports,
+    modbus_load_memory_csv, modbus_read_coils, modbus_read_discrete_inputs,
+    modbus_read_holding_registers, modbus_read_input_registers, modbus_save_memory_csv,
+    modbus_set_generators, modbus_start_rtu, modbus_start_tcp, modbus_stop_rtu, modbus_stop_tcp,
+    modbus_write_coil, modbus_write_coils, modbus_write_discrete_input,
+    modbus_write_holding_register, modbus_write_holding_registers, modbus_write_input_register,
+    ModbusState,
 };
 
 // Re-export canvas commands
