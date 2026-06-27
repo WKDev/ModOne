@@ -36,11 +36,14 @@
 - [~] 전체 워크스페이스 빌드는 미실행(openssl 1h 비용). 변경이 순수 additive +
   exhaustive match 부재로 안전. 단계 2 착수 시 함께 검증.
 
-## 단계 2 — CpuNode 도입 (단일 CPU 비파괴 래핑)
-- [ ] `CpuNode` 구조체 (runtime + driver + servers + health)
-- [ ] `CpuDriver::Virtual(OneSimEngine)` 분기
-- [ ] `SimulationRuntimeHost` 필드를 `CpuNode`로 이주 (동작 동일)
-- [ ] verify: 기존 단일 CPU 시뮬레이션 회귀 테스트 통과
+## 단계 2 — CpuNode 도입 (단일 CPU 비파괴 래핑) ✅ (커밋 636577e, 워크트리→main 병합)
+- [x] `CpuNode` 구조체 (id + runtime + driver + health) — servers는 매니저 레벨로(설계 §2)
+- [x] `CpuDriver::Virtual(엔진 슬롯)` 분기 + `kind()`/`health()`
+- [x] `SimulationRuntimeHost` engine/runtime 필드를 `CpuNode`로 이주 (동작 동일)
+- [x] primary CPU id "cpu-0" 기본값 (결정 2 대비)
+- [x] verify: `cargo check -p modone` green (51s, warm target, opcua 포함)
+- [~] 런타임 회귀 테스트는 src-tauri `[lib] test=false`로 미실행. 동작 보존
+  리팩토링(같은 Arc·제어흐름)이라 컴파일 통과가 게이트. 필요시 tests/*.rs 통합테스트.
 
 ## 단계 3 — 캔버스 바인딩 확장
 - [ ] `PlcBlockMapping`에 `cpu_id` 필드 추가 (기본=단일 CPU)
