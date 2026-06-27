@@ -7,9 +7,21 @@
 ## 단계 0 — 설계 (현재)
 - [x] 통일 모델 확정 ("CPU = 메모리 + 전진 에이전트")
 - [x] `ProtocolAdapter` 방향 뒤집기로 실 CPU 수용 확인
-- [x] 권위(write-owner) 모델 정의
+- [x] 권위(write-owner) 모델 정의 → **area-aware로 개정 필요** (review C.1)
 - [x] inter-CPU 링크 모델 + 동기화 모드(유저 설정) 정의
 - [x] 설계 문서 작성
+- [x] 1차 비판 검토 ([01-design-review.md](./01-design-review.md))
+- [ ] 검토 결과로 00-design 개정 (review §D 6개 항목)
+
+## 단계 0.5 — 검토에서 드러난 셸 비용 (00-design §9 무게중심 이동)
+> 엔진 N개는 쉽다. 진짜 비용은 아래 경계 레이어다.
+- [ ] 태그 레지스트리 키 = `(cpu_id, addr)` (전제조건, review B.3)
+- [ ] Tauri State = `CpuManager` **단수** manage + 커맨드 `cpu_id` 라우팅 (B.1)
+- [ ] 이벤트에 cpu_id 포함 + 프론트 상태 `Record<cpuId, ...>` (A.2)
+- [ ] 서버 = 단일 엔드포인트 + unit_id/네임스페이스 라우팅 (B.2, 코덱 작업)
+- [ ] area-aware authority 분류표 확정 (C.1, E)
+- [ ] 실 CPU = 엔진/디버거 없는 경량 노드, 디버그 커맨드 거부 (C.2)
+- [ ] 링크 dst 스캔-위상 코히어런스 + 순환 금지 config 검증 (C.3, C.4)
 
 ## 단계 1 — 코어 타입 골격 (crates, wasm-safe)
 - [ ] `CpuId` 타입 (contract 크레이트) → verify: `cargo build -p modone-contract`

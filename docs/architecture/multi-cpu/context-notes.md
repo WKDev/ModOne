@@ -47,3 +47,33 @@
 ### 마이그레이션 원칙
 - 단일 CPU → N CPU는 **비파괴**. CPU 1개짜리 `CpuManager`로 기존 동작을 먼저
   감싸고, config 없으면 단일 가상 CPU로 폴백. 각 단계 빌드 green + 회귀 없음.
+
+## 2026-06-27 — 1차 설계 검토 (코드 검증)
+
+전체 결과: [01-design-review.md](./01-design-review.md). 요약만 여기 남긴다.
+
+### 깨진 가정: "N개 인스턴스화하면 끝"은 30%만 맞다
+- ✅ 엔진 코어(CanonicalRuntimeFacade/Timer/Counter)는 전역 static 없음, N개 OK.
+- ❌ 경계 레이어가 전부 단일 CPU 가정: 태그키 충돌, Tauri State 단일,
+  커맨드 50+, 이벤트 채널 cpu_id 없음, 서버 단일 포트.
+- **재정의**: 이건 엔진 리팩토링이 아니라 **셸/경계 리팩토링**. 작업량 ~70%가 셸.
+
+### 검토가 만든 더 나은 결정 3가지
+1. Tauri State는 N개 manage가 아니라 `CpuManager` **단수** manage + 커맨드
+   `cpu_id` 라우팅(None=primary). 하위 호환 + State 폭발 방지.
+   (탐색 에이전트의 `manage(HashMap)` 제안은 기각.)
+2. 서버는 N포트가 아니라 **단일 엔드포인트 + 논리 라우팅**. Modbus unit_id →
+   CpuId(코덱 신규 작업), OPC-UA 네임스페이스/CPU. 별도 포트는 옵션.
+3. 태그 레지스트리 키 = `(cpu_id, addr)`가 cpu 네임스페이스의 **단일 시임**.
+   이걸 고치면 캔버스/모니터링/바인딩이 자동 cpu-aware. §6 "작은 수술"의 전제.
+
+### 신규 발견 설계 구멍 (탐색이 못 잡음)
+- **권위 모델이 기존 서버 write-back을 깰 수 있음**. → area-aware authority로
+  개정(입력성 영역=외부 writable, 출력성=CPU 소유). 일반 write-owner 가드 폐기.
+- 실 CPU엔 엔진/디버거 없음 → `CpuDriver::Real`은 경량, 디버그 커맨드 거부.
+- 링크 dst 스캔-위상 코히어런스(torn read) + 순환 링크 발진 방지 필요.
+
+### 다음 세션이 결정할 것
+- area-aware authority 분류표(어떤 canonical area가 외부 writable인가) — 미확정.
+- 커맨드 cpu_id primary 기본값 규칙.
+- 1차 서버 노출 범위: unit_id 라우팅 vs "노출은 1 CPU만, 내부 N개"(비용 절감).
