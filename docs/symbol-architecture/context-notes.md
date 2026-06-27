@@ -32,5 +32,20 @@
 - 파일 크기 규칙: PropertiesPanel(1132줄)을 건드리는 김에 `inspectors/`로 PinInspector·SymbolPropertiesEditor·공유 fields를 분리해 902줄로 축소. **남은 backlog: ShapeInspector/VisualStateOverridePanel도 추후 분리하면 800 이하 가능.**
 - 검증: `npx tsc --noEmit` 무에러, SymbolEditor 테스트 166 + 심볼 XML 497 통과, 신규 `inspectors.test.tsx` 7 통과.
 
+### 완료 — Q2 트랙 A (scope 가변 포트)
+- 핵심 메커니즘 발견: 포트는 `absolutePosition` 없으면 `getPortLocalOffset`이 `position+offset`으로 분배(`wirePathCalculator.ts:44`). 'left' → `y=height*offset`. PowerSource가 이 방식이라 absolutePosition 없이 동작.
+- 그래서 `getScopePorts(channels)`는 offset 기반(absolutePosition 미설정) 좌측 입력 포트 N개. offset=(i+1)/(N+1)로 코너 회피 등간격.
+- 생성 시점: `createBlockInstance`에서 mergedProps 먼저 계산하도록 재배열 후 scope 분기 추가(powersource 패턴과 동일). channels는 mergedProps에서 읽음.
+- 기존 불일치 수정: scope.symbol.xml channels 기본값 1→4. 심볼이 포트 4개를 갖고 있었으므로 4가 정합. 테스트 회귀 없음(xml-loader-integration 250 통과).
+- 의도적 제외: terminal_block은 전용 속성 편집기가 없어 channels 같은 즉시 편집 경로가 없음 → 트랙 A에서 제외. 잘못된 가정(terminalCount→포트 매핑)을 피함. 트랙 B 또는 별도 작업으로.
+- 알려진 한계: channels 축소 시(4→2) 사라진 포트에 붙어 있던 와이어는 dangling. PowerSource polarity 변경과 동일한 기존 동작이라 트랙 A 범위 밖.
+
+### 실앱 검증 시도 (2026-06-27)
+- 브라우저 mock 하네스(`tests/e2e/fixtures/tauri-mocks.ts`)로 7099 dev 서버 띄워 Playwright 검증 시도.
+- **발견·수정한 진짜 버그**: `canvasCommands.addComponent`가 `createBlockInstance`를 우회해 인라인 생성하며 scope 포트를 channels로 안 만듦 → scope 분기 추가(commit 17c7162). 두 번째 생성 경로의 정합성 확보.
+- **라이브 스크린샷 검증은 미완**: mock의 `plugin:path|document_dir`가 null 반환 → 새 프로젝트 폴더가 `null/...`이 되어 프로젝트 생성 다이얼로그가 안 닫힘. 캔버스를 못 열어 scope를 배치하지 못함. OneCanvas는 PIXI라 핀이 DOM에 없어 DOM 카운트 검증도 불가.
+- 결론: 이건 mock 하네스 한계(실제 Tauri는 진짜 path API라 정상)지 Track A 코드 문제 아님. 로직은 유닛/통합 테스트로 검증됨(parametricPorts 6 + OneCanvas 135 + 통합 250).
+- 진짜 실앱 검증이 필요하면 메모리 `visual-test-loop-cdp`(실 WebView2 + remote-debugging port) 경로 또는 사용자가 Tauri 앱에서 직접 확인.
+
 ### 다음 결정 포인트 (미진행)
-- Q2(파라메트릭 포트, T2 vs T3)와 Q1 하이브리드의 아날로그 끼움 인터페이스 설계는 아직. 사용자 지시 대기.
+- 트랙 B(선언적 XML PortTemplate + 커스텀 심볼 인스턴스 UI), Q1 하이브리드의 아날로그 끼움 인터페이스. 사용자 지시 대기.

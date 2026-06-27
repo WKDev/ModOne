@@ -12,6 +12,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::broadcast;
 
 use super::pdu;
+use super::telemetry;
 use super::types::{ConnectionEvent, ConnectionInfo, ModbusError, TcpConfig};
 use super::ModbusMemory;
 
@@ -147,7 +148,7 @@ impl ModbusTcpServer {
                                 let app_handle_clone = Arc::clone(&app_handle);
 
                                 tokio::spawn(async move {
-                                    if let Err(e) = handle_connection(stream, &memory, unit_id).await {
+                                    if let Err(e) = handle_connection(stream, &memory, unit_id, &app_handle_clone, &peer_addr_str).await {
                                         log::error!("Error handling Modbus connection from {}: {}", peer_addr, e);
                                     }
 
@@ -213,6 +214,8 @@ async fn handle_connection(
     mut stream: TcpStream,
     memory: &ModbusMemory,
     unit_id: u8,
+    app_handle: &Arc<RwLock<Option<Arc<tauri::AppHandle>>>>,
+    client_addr: &str,
 ) -> Result<(), std::io::Error> {
     let mut request_buffer = vec![0u8; MBAP_HEADER_SIZE + MAX_PDU_SIZE];
 
@@ -264,10 +267,19 @@ async fn handle_connection(
 
         // Process the request
         let function_code = request_buffer[MBAP_HEADER_SIZE];
-        let response_pdu = pdu::process_request(
-            memory,
-            function_code,
-            &request_buffer[MBAP_HEADER_SIZE..MBAP_HEADER_SIZE + pdu_len],
+        let request_pdu = &request_buffer[MBAP_HEADER_SIZE..MBAP_HEADER_SIZE + pdu_len];
+        let response_pdu = pdu::process_request(memory, function_code, request_pdu);
+
+        // Emit observability event for the traffic log (fire-and-forget)
+        telemetry::emit_traffic(
+            app_handle,
+            telemetry::ModbusTrafficEvent::from_exchange(
+                "tcp",
+                client_addr,
+                slave_id,
+                request_pdu,
+                &response_pdu,
+            ),
         );
 
         // Build response

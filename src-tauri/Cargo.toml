@@ -34,6 +34,8 @@ sim-engine = { path = "../crates/sim-engine" }
 modbus-codec = { path = "../crates/modbus-codec" }
 # OPC UA pure core (codec/address-space spec/adapter/backend trait)
 opcua-codec = { path = "../crates/opcua-codec" }
+# 도메인 무관 SQLite 감사 로그 엔진 (opcua·runtime 운영 감사 공용)
+modone-audit = { path = "../crates/modone-audit" }
 
 # Tauri core
 tauri = { version = "2", features = ["devtools"] }

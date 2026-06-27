@@ -132,6 +132,9 @@ pub enum CanonicalWriteSource {
     InternalRuntime,
     Simulation,
     ExternalProtocol,
+    /// inter-CPU 메모리 링크의 복사. 접근 판정상 외부 취급(InternalOnly 영역 쓰기
+    /// 불가). 감사·구분을 위해 ExternalProtocol 과 별도 변형으로 둔다.
+    CpuLink,
     SnapshotRestore,
     Migration,
     Test,

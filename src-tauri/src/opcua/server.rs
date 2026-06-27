@@ -11,7 +11,7 @@ use crate::plc_runtime::{CanonicalAddress, CanonicalMemory};
 #[cfg(feature = "opcua-server")]
 use super::address_space::OpcUaAccessLevel;
 use super::address_space::AddressSpaceSpec;
-use super::audit::{AuditEventType, AuditLoggerState, AuditSeverity};
+use super::audit::{AuditEventType, AuditLoggerState, AuditSeverity, OpcuaAuditState, OpcuaAuditStore};
 use super::memory::{OpcUaMemory, OpcUaNodeId};
 use super::types::{OpcUaConfig, OpcUaError, OpcUaSessionInfo, OpcUaStatus};
 #[cfg(feature = "opcua-server")]
@@ -999,7 +999,7 @@ impl SessionMonitor {
 
         let handle = tokio::spawn(async move {
             // Open a dedicated audit logger for the monitor task.
-            let audit_logger = match super::audit::AuditLogger::open(&audit_data_dir) {
+            let audit_logger = match super::audit::open_opcua_audit(&audit_data_dir) {
                 Ok(logger) => logger,
                 Err(e) => {
                     log::error!("Session monitor: failed to open audit logger: {e}");

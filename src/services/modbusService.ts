@@ -10,13 +10,16 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { toast } from 'sonner';
 import type {
   ConnectionEvent,
+  GeneratorConfig,
   ModbusStatus,
+  ModbusTrafficEvent,
   RtuConfig,
   PortInfo,
   TcpServerConfig,
   WriteOperation,
   MemoryType,
 } from '../types/modbus';
+import { MODBUS_EVENTS } from '../types/modbus';
 
 /**
  * Modbus service for interacting with the Tauri backend
@@ -399,11 +402,52 @@ export const modbusService = {
     }
   },
 
+  // ============================================================================
+  // Value Generators
+  // ============================================================================
+
+  /**
+   * Replace the value-generator list (engine auto-runs while any is enabled).
+   */
+  async setGenerators(generators: GeneratorConfig[]): Promise<void> {
+    try {
+      await invoke('modbus_set_generators', { generators });
+    } catch (error) {
+      toast.error('Failed to update Modbus generators', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  },
+
+  /**
+   * Get the current value-generator list.
+   */
+  async getGenerators(): Promise<GeneratorConfig[]> {
+    try {
+      return await invoke('modbus_get_generators');
+    } catch (error) {
+      toast.error('Failed to get Modbus generators', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  },
+
   /**
    * Listen for Modbus connection lifecycle events.
    */
   async onConnectionEvent(callback: (event: ConnectionEvent) => void): Promise<UnlistenFn> {
-    return listen<ConnectionEvent>('modbus:connection', (event) => {
+    return listen<ConnectionEvent>(MODBUS_EVENTS.CONNECTION, (event) => {
+      callback(event.payload);
+    });
+  },
+
+  /**
+   * Listen for Modbus request/response traffic events.
+   */
+  async onTrafficEvent(callback: (event: ModbusTrafficEvent) => void): Promise<UnlistenFn> {
+    return listen<ModbusTrafficEvent>(MODBUS_EVENTS.TRAFFIC, (event) => {
       callback(event.payload);
     });
   },

@@ -12,7 +12,7 @@ use crate::commands::tags::MappingStoreState;
 use crate::opcua::auth::UserRole;
 use crate::opcua::{
     resolve_verified_credentials_audited, AuditLogQuery, AuditLogResult,
-    AuditLoggerState, CredentialCache, OpcUaConfig, OpcUaMappingStore, OpcUaMemory,
+    AuditLoggerState, CredentialCache, OpcUaConfig, OpcuaAuditState, OpcUaMappingStore, OpcUaMemory,
     OpcUaSecurityPolicy, OpcUaServer, OpcUaServerControl, OpcUaSessionInfo, OpcUaStatus,
     UserAccountInfo, UserAccountStore,
 };

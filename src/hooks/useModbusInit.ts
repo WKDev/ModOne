@@ -1,15 +1,17 @@
 import { useEffect } from 'react';
 import { modbusService } from '../services/modbusService';
 import { useModbusStore } from '../stores/modbusStore';
+import { useModbusTrafficStore } from '../stores/modbusTrafficStore';
 
 /**
- * Centralizes Modbus status fetch + connection event subscription.
+ * Centralizes Modbus status fetch + connection/traffic event subscription.
  */
 export function useModbusInit() {
   const { fetchStatus, handleConnectionEvent } = useModbusStore();
 
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
+    let unlistenConnection: (() => void) | undefined;
+    let unlistenTraffic: (() => void) | undefined;
 
     fetchStatus();
 
@@ -17,11 +19,19 @@ export function useModbusInit() {
       handleConnectionEvent(event);
       void fetchStatus();
     }).then((dispose) => {
-      unlisten = dispose;
+      unlistenConnection = dispose;
+    });
+
+    const appendTraffic = useModbusTrafficStore.getState().appendTraffic;
+    modbusService.onTrafficEvent((event) => {
+      appendTraffic(event);
+    }).then((dispose) => {
+      unlistenTraffic = dispose;
     });
 
     return () => {
-      unlisten?.();
+      unlistenConnection?.();
+      unlistenTraffic?.();
     };
   }, [fetchStatus, handleConnectionEvent]);
 }
