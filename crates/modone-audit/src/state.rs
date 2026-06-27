@@ -1,9 +1,11 @@
 //! thread-safe 감사 저장소 래퍼 + 백그라운드 보존 스케줄러.
 
+use std::sync::mpsc;
 use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 
 use parking_lot::Mutex;
-use tokio::sync::mpsc;
 
 use crate::store::AuditStore;
 use crate::types::{AuditClientInfo, AuditLogEntry, AuditLogQuery, AuditLogResult, AuditSeverity};
@@ -51,29 +53,32 @@ impl AuditStoreState {
         *self.retention_interval_secs.lock() = secs.max(60);
     }
 
-    /// 주기적으로 보존 정책을 적용하는 백그라운드 태스크 시작. 이미 돌고 있으면 먼저 중지.
+    /// 주기적으로 보존 정책을 적용하는 백그라운드 스레드 시작. 이미 돌고 있으면 먼저 중지.
     ///
-    /// 주의: tokio 런타임 컨텍스트 안에서 호출해야 한다(Tauri setup 등).
+    /// 전용 OS 스레드 + `recv_timeout`으로 구현해 비동기 런타임에 의존하지 않는다.
+    /// (Tauri `setup()`은 tokio 런타임 컨텍스트 밖이라 `tokio::spawn`이 패닉났던 이력.)
     pub fn start_retention_scheduler(&self) {
         self.stop_retention_scheduler();
         let interval_secs = *self.retention_interval_secs.lock();
-        let (tx, mut rx) = mpsc::channel::<()>(1);
+        let (tx, rx) = mpsc::channel::<()>();
         *self.retention_cancel_tx.lock() = Some(tx);
 
         let inner = Arc::clone(&self.inner);
-        let interval_duration = std::time::Duration::from_secs(interval_secs);
+        let interval = Duration::from_secs(interval_secs);
 
-        tokio::spawn(async move {
-            let mut ticker = tokio::time::interval(interval_duration);
-            // 첫 tick은 즉시 발생 — 시작 시 이미 적용했다고 보고 건너뜀.
-            ticker.tick().await;
+        thread::spawn(move || {
             log::info!(
                 "Audit log retention scheduler started (interval: {}s)",
                 interval_secs
             );
             loop {
-                tokio::select! {
-                    _ = ticker.tick() => {
+                // 다음 주기까지 대기하다, 취소 신호(또는 송신측 drop)면 종료.
+                match rx.recv_timeout(interval) {
+                    Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => {
+                        log::info!("Audit log retention scheduler stopped");
+                        break;
+                    }
+                    Err(mpsc::RecvTimeoutError::Timeout) => {
                         let result = {
                             let guard = inner.lock();
                             guard.as_ref().map(|s| s.enforce_retention())
@@ -86,10 +91,6 @@ impl AuditStoreState {
                             _ => {}
                         }
                     }
-                    _ = rx.recv() => {
-                        log::info!("Audit log retention scheduler stopped");
-                        break;
-                    }
                 }
             }
         });
@@ -98,7 +99,7 @@ impl AuditStoreState {
     /// 보존 스케줄러 중지.
     pub fn stop_retention_scheduler(&self) {
         if let Some(tx) = self.retention_cancel_tx.lock().take() {
-            let _ = tx.try_send(());
+            let _ = tx.send(());
         }
     }
 
