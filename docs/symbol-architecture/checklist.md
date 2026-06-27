@@ -5,13 +5,16 @@
 - [x] archetype/behavior 계층이 코드 백드이고 OneCanvas 런타임 전용임을 확인
 - [x] scope channels↔ports 불일치(정적 포트) 확인
 - [x] 3-tier 모델 + 결정/미결정 정리 (`design.md`)
-- [ ] **Q1 시뮬레이션 깊이 결정** (논리 확장 / SPICE급 / 단계적 하이브리드)
-- [ ] **Q2 파라메트릭 포트 우선 위치 결정** (T2 선언 XML / T3 코드)
-- [ ] **Q3 (2) 에디터 시맨틱 저작을 독립 선행할지 결정**
+- [x] **Q1 시뮬레이션 깊이 결정** → **단계적 하이브리드** (지금 논리 수준, archetype 심에 아날로그 후속 가능하게 설계만 열어둠)
+- [ ] **Q2 파라메트릭 포트 우선 위치 결정** (T2 선언 XML / T3 코드) — 보류, 하이브리드/Q3 이후
+- [x] **Q3 (2) 에디터 시맨틱 저작 선행 결정** → **선행 진행**
 
-## 구현 단계 (결정 후 — 아직 시작 안 함)
-- [ ] (Q3=yes 시) SymbolEditor: 핀 electricalType 셀렉터 추가
-- [ ] (Q3=yes 시) SymbolEditor: Property 저작 패널 추가
+## 구현 단계 — Q3 선행 (완료)
+- [x] SymbolEditor 현재 핀/속성 편집 UI 정밀 조사
+- [x] SymbolEditor: 핀 Detailed Type(electricalType V2) + Functional Role 셀렉터 추가 — `inspectors/PinInspector.tsx`
+- [x] SymbolEditor: Symbol Properties 저작 패널 추가 — `inspectors/SymbolPropertiesEditor.tsx`
+- [x] 공유 Section/Field/inputClass 추출 — `inspectors/fields.tsx` (PropertiesPanel 1132→902줄)
+- [x] XML 라운드트립 확인 — tsc 클린 + 심볼 파서/로더 테스트 497 + 신규 인스펙터 7 통과
 - [ ] (Q2=T2 시) `<ms:PortTemplate repeat=...>` 스키마 + 로더 확장
 - [ ] (Q2=T2 시) scope/terminal_block을 PortTemplate로 마이그레이션
 - [ ] (Q2=T3 시) `behaviorTemplates.ts`에 구조 생성 훅(generatePorts) 추가

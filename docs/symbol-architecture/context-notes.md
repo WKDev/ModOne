@@ -21,6 +21,16 @@
 - Falstad의 시뮬레이터 전용 소자(C 묶음: Noise/AM/FM/Audio/External-JS 등)는 산업 제어 스캐메틱 범위 밖이라 제외.
 - 단순 팔레트 채우기(B 묶음 일괄 XML 작성)는 사용자 관심사 아님 → 후순위.
 
-### 다음 세션이 먼저 할 일
-- `design.md` 4절의 Q1/Q2/Q3에 대한 사용자 결정을 받는다. 특히 Q1(시뮬 깊이)이 전체 규모를 가른다.
-- 결정 전까지 구현 코드는 건드리지 않는다.
+### 결정됨 (2026-06-27)
+- **Q1 = 단계적 하이브리드.** 지금은 논리 수준 시뮬 유지, archetype 계층에 아날로그를 나중에 끼울 수 있는 인터페이스만 열어둔다. nodal 솔버는 후속.
+- **Q3 = 선행.** 에디터 시맨틱 저작(핀 electricalType 셀렉터 + Property 저작 패널)을 시뮬과 독립적으로 먼저 구현. 비용 작고 즉시 효용.
+- **Q2 = 보류.** 파라메트릭 포트는 하이브리드/Q3 이후로.
+
+### 완료 — Q3 구현
+- 배선 발견: PropertiesPanel은 이미 `onChange(symbol)`/`onUpdatePin`을 받으므로 SymbolEditor.tsx 수정 불필요. 모델 필드만 채우면 `symbolXmlParser`가 `electricalType="${pin.electricalType ?? pin.type}"`와 Properties를 자동 직렬화.
+- 핀 두 타입 필드 공존 처리: v1 `type`(5종, 색/단순)과 v2 `electricalType`(12종 KiCad)이 별개. "Detailed Type" 셀렉터에서 power_in/power_out 등 선택 시 `V2_TO_V1_CATEGORY`로 v1 `type`을 자동 동기화해 색·XML 일관성 유지.
+- 파일 크기 규칙: PropertiesPanel(1132줄)을 건드리는 김에 `inspectors/`로 PinInspector·SymbolPropertiesEditor·공유 fields를 분리해 902줄로 축소. **남은 backlog: ShapeInspector/VisualStateOverridePanel도 추후 분리하면 800 이하 가능.**
+- 검증: `npx tsc --noEmit` 무에러, SymbolEditor 테스트 166 + 심볼 XML 497 통과, 신규 `inspectors.test.tsx` 7 통과.
+
+### 다음 결정 포인트 (미진행)
+- Q2(파라메트릭 포트, T2 vs T3)와 Q1 하이브리드의 아날로그 끼움 인터페이스 설계는 아직. 사용자 지시 대기.

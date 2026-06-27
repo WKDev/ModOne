@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { Save, AlertCircle, Check, ChevronDown, ChevronRight, Copy, Trash2, Layers2 } from 'lucide-react';
+import { Save, AlertCircle, Check, Copy, Trash2, Layers2 } from 'lucide-react';
 import type { GraphicPrimitive, GraphicPrimitiveOverride, SymbolDefinition, SymbolPin, SymbolVisualVariant } from '../../types/symbol';
 import type { BehaviorRule } from '../../types/behaviorRules';
 import type { PinUpdate } from './editorModel';
@@ -7,7 +7,9 @@ import { saveSymbol } from '../../services/symbolService';
 import { validateSymbol } from '../../utils/symbolValidation';
 import { BehaviorRulesPanel } from './BehaviorRulesPanel';
 import { AnimationsPanel } from './AnimationsPanel';
-import { PIN_TYPES, PIN_TYPE_LABEL, PIN_SHAPES, PIN_SHAPE_LABEL } from './pinStyle';
+import { Section, Field, inputClass } from './inspectors/fields';
+import { PinInspector } from './inspectors/PinInspector';
+import { SymbolPropertiesEditor } from './inspectors/SymbolPropertiesEditor';
 
 // ============================================================================
 // Types
@@ -99,76 +101,6 @@ function resolveOverride(
   const variant = (symbol.visualStates as Record<string, SymbolVisualVariant> | undefined)?.[stateName];
   return variant?.primitiveOverrides?.[primitiveId];
 }
-
-// ============================================================================
-// Collapsible Section
-// ============================================================================
-
-interface SectionProps {
-  title: string;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-  badge?: string;
-}
-
-function Section({ title, children, defaultOpen = true, badge }: SectionProps) {
-  const [open, setOpen] = useState(defaultOpen);
-
-  return (
-    <div className="border-b border-neutral-700 last:border-b-0">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-neutral-750 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-neutral-300 uppercase tracking-wider">{title}</span>
-          {badge && (
-            <span className="px-1.5 py-0.5 text-[10px] rounded bg-blue-600/40 text-blue-300 font-medium">
-              {badge}
-            </span>
-          )}
-        </div>
-        {open ? (
-          <ChevronDown size={12} className="text-neutral-500" />
-        ) : (
-          <ChevronRight size={12} className="text-neutral-500" />
-        )}
-      </button>
-      {open && <div className="px-4 pb-4 space-y-3">{children}</div>}
-    </div>
-  );
-}
-
-// ============================================================================
-// Field Components
-// ============================================================================
-
-interface FieldProps {
-  id: string;
-  label: string;
-  required?: boolean;
-  error?: string;
-  children: React.ReactNode;
-}
-
-function Field({ id: _id, label, required, error, children }: FieldProps) {
-  return (
-    <div className="space-y-1">
-      <label className="block text-xs font-medium text-neutral-400">
-        {label}
-        {required && <span className="text-red-400 ml-0.5">*</span>}
-      </label>
-      {children}
-      {error && <p className="text-xs text-red-400">{error}</p>}
-    </div>
-  );
-}
-
-const inputClass = (hasError?: boolean) =>
-  `w-full px-2 py-1.5 bg-neutral-900 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-    hasError ? 'border-red-500' : 'border-neutral-700'
-  }`;
 
 // ============================================================================
 // Visual State Override Panel
@@ -534,180 +466,7 @@ function ShapeInspector({
   }
 
   if (selectedItem.type === 'pin') {
-    const { pin } = selectedItem;
-
-    return (
-      <Section title="Pin Inspector" defaultOpen={true} badge="Pin">
-        <Field id="pin-name" label="Pin Name" required>
-          <input
-            id="pin-name"
-            type="text"
-            value={pin.name}
-            onChange={(e) => onUpdatePin?.(pin.id, { name: e.target.value })}
-            className={inputClass()}
-            placeholder="e.g. VCC, GND, IN1"
-          />
-        </Field>
-
-        <Field id="pin-number" label="Pin Number">
-          <input
-            id="pin-number"
-            type="text"
-            value={pin.number}
-            onChange={(e) => onUpdatePin?.(pin.id, { number: e.target.value })}
-            className={inputClass()}
-            placeholder="e.g. 1, A1"
-          />
-        </Field>
-
-        <div className="grid grid-cols-2 gap-2">
-          <Field id="pin-type" label="Electrical Type">
-            <select
-              id="pin-type"
-              value={pin.type}
-              data-testid="pin-type-select"
-              onChange={(e) => onUpdatePin?.(pin.id, { type: e.target.value as SymbolPin['type'] })}
-              className={inputClass()}
-            >
-              {PIN_TYPES.map((t) => (
-                <option key={t} value={t}>{PIN_TYPE_LABEL[t]}</option>
-              ))}
-            </select>
-          </Field>
-
-          <Field id="pin-shape" label="Shape">
-            <select
-              id="pin-shape"
-              value={pin.shape}
-              data-testid="pin-shape-select"
-              onChange={(e) => onUpdatePin?.(pin.id, { shape: e.target.value as SymbolPin['shape'] })}
-              className={inputClass()}
-            >
-              {PIN_SHAPES.map((s) => (
-                <option key={s} value={s}>{PIN_SHAPE_LABEL[s]}</option>
-              ))}
-            </select>
-          </Field>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <Field id="pin-orientation" label="Orientation">
-            <select
-              id="pin-orientation"
-              value={pin.orientation}
-              onChange={(e) => onUpdatePin?.(pin.id, { orientation: e.target.value as SymbolPin['orientation'] })}
-              className={inputClass()}
-            >
-              <option value="right">Right →</option>
-              <option value="left">Left ←</option>
-              <option value="up">Up ↑</option>
-              <option value="down">Down ↓</option>
-            </select>
-          </Field>
-
-          <Field id="pin-length" label="Length">
-            <input
-              id="pin-length"
-              type="number"
-              min={0}
-              step={5}
-              value={pin.length}
-              onChange={(e) => onUpdatePin?.(pin.id, { length: parseFloat(e.target.value) || 0 })}
-              className={inputClass()}
-            />
-          </Field>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <Field id="pin-pos-x" label="Position X">
-            <input
-              id="pin-pos-x"
-              type="number"
-              value={pin.position.x}
-              onChange={(e) => onUpdatePin?.(pin.id, { position: { ...pin.position, x: parseFloat(e.target.value) || 0 } })}
-              className={inputClass()}
-              step={1}
-            />
-          </Field>
-          <Field id="pin-pos-y" label="Position Y">
-            <input
-              id="pin-pos-y"
-              type="number"
-              value={pin.position.y}
-              onChange={(e) => onUpdatePin?.(pin.id, { position: { ...pin.position, y: parseFloat(e.target.value) || 0 } })}
-              className={inputClass()}
-              step={1}
-            />
-          </Field>
-        </div>
-
-        {/* Display & visibility */}
-        <Field id="pin-group" label="Group (optional)">
-          <input
-            id="pin-group"
-            type="text"
-            value={pin.group ?? ''}
-            onChange={(e) => onUpdatePin?.(pin.id, { group: e.target.value || undefined })}
-            className={inputClass()}
-            placeholder="e.g. Power, Data"
-          />
-        </Field>
-
-        <Field id="pin-desc" label="Description (tooltip)">
-          <input
-            id="pin-desc"
-            type="text"
-            value={pin.description ?? ''}
-            onChange={(e) => onUpdatePin?.(pin.id, { description: e.target.value || undefined })}
-            className={inputClass()}
-            placeholder="Optional"
-          />
-        </Field>
-
-        <div className="flex items-center gap-3 px-1 pt-1">
-          <label className="flex items-center gap-1.5 text-xs text-neutral-300 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              data-testid="pin-name-visible"
-              checked={pin.nameVisible !== false}
-              onChange={(e) => onUpdatePin?.(pin.id, { nameVisible: e.target.checked })}
-              className="accent-blue-500"
-            />
-            Name
-          </label>
-          <label className="flex items-center gap-1.5 text-xs text-neutral-300 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              data-testid="pin-number-visible"
-              checked={pin.numberVisible !== false}
-              onChange={(e) => onUpdatePin?.(pin.id, { numberVisible: e.target.checked })}
-              className="accent-blue-500"
-            />
-            Number
-          </label>
-          <label className="flex items-center gap-1.5 text-xs text-neutral-300 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              data-testid="pin-hidden"
-              checked={!!pin.hidden}
-              onChange={(e) => onUpdatePin?.(pin.id, { hidden: e.target.checked })}
-              className="accent-blue-500"
-            />
-            Hidden
-          </label>
-          <label className="flex items-center gap-1.5 text-xs text-neutral-300 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              data-testid="pin-locked"
-              checked={!!pin.locked}
-              onChange={(e) => onUpdatePin?.(pin.id, { locked: e.target.checked })}
-              className="accent-blue-500"
-            />
-            Lock
-          </label>
-        </div>
-      </Section>
-    );
+    return <PinInspector pin={selectedItem.pin} onUpdatePin={onUpdatePin} />;
   }
 
   return null;
@@ -1022,6 +781,18 @@ export function PropertiesPanel({
               placeholder="1.0.0"
             />
           </Field>
+        </Section>
+
+        {/* ── Symbol Properties (instance params: voltage, netName, …) ── */}
+        <Section title="Symbol Properties" defaultOpen={false} badge={
+          symbol.properties.length > 0 ? String(symbol.properties.length) : undefined
+        }>
+          <SymbolPropertiesEditor
+            properties={symbol.properties}
+            onChange={(properties) =>
+              onChange({ ...symbol, properties, updatedAt: new Date().toISOString() })
+            }
+          />
         </Section>
 
         {/* ── Behavior Rules (IFTTT) ── */}

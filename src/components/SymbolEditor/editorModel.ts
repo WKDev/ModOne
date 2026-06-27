@@ -10,6 +10,8 @@ export type PinUpdate = Partial<
     | 'name'
     | 'number'
     | 'type'
+    | 'electricalType'
+    | 'functionalRole'
     | 'orientation'
     | 'position'
     | 'shape'
