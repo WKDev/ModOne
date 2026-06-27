@@ -151,4 +151,21 @@ export function getPowerSourcePorts(polarity: PowerPolarity): Port[] {
   return [{ id: 'out', type: 'output', label: '+', position: 'bottom' }];
 }
 
+/**
+ * Parametric ports for an oscilloscope based on its channel count.
+ * Returns `channels` input ports evenly distributed down the left edge.
+ * Offset-based (no absolutePosition) so getPortLocalOffset spaces them by
+ * `height * offset` — same mechanism as getPowerSourcePorts.
+ */
+export function getScopePorts(channels: number): Port[] {
+  const n = Math.max(1, Math.round(channels));
+  return Array.from({ length: n }, (_, i) => ({
+    id: `ch${i + 1}`,
+    type: 'input',
+    label: `CH${i + 1}`,
+    position: 'left',
+    offset: (i + 1) / (n + 1),
+  }));
+}
+
 export default BLOCK_DEFINITIONS;

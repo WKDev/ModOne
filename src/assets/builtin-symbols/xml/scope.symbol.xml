@@ -55,7 +55,7 @@
 
   <ms:Properties>
     <ms:Property key="channels" type="number" editorType="number" visible="true">
-      <ms:DefaultValue>1</ms:DefaultValue>
+      <ms:DefaultValue>4</ms:DefaultValue>
     </ms:Property>
     <ms:Property key="triggerMode" type="string" editorType="text" visible="true">
       <ms:DefaultValue>auto</ms:DefaultValue>

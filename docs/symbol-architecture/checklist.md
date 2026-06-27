@@ -26,8 +26,13 @@
 - [x] **기존 선례 발견**: `PowerSourceProperties`가 polarity 변경 시 `getPowerSourcePorts()`로 ports 재계산해 함께 저장 → 코드 백드 per-type 포트 함수 패턴이 이미 검증됨.
 - [x] 갭 확인: `ScopeProperties.handleChannelsChange`는 channels만 바꾸고 ports 미재계산. terminal_block도 동일.
 - [x] **설계 문서 작성** — `q2-parametric-ports.md` (트랙 A/B 스키마·로더·UI 설계 + 단계적 권장안)
-- [ ] 트랙 A/B 시작 방식 사용자 확정 (권장: A 먼저)
-- [ ] (트랙 A) `getScopePorts`/`getTerminalBlockPorts` + 속성 편집기 재계산
+- [x] 트랙 A/B 시작 방식 사용자 확정 → **A 먼저**
+- [x] (트랙 A) `getScopePorts(channels)` 추가 — offset 기반 좌측 입력 포트 (`blockDefinitions.ts`)
+- [x] (트랙 A) 생성 시 scope 포트 = channels 기반 (`blockFactory.ts`)
+- [x] (트랙 A) `ScopeProperties.handleChannelsChange`에서 ports 재계산
+- [x] (트랙 A) scope 심볼 channels 기본값 1→4 (포트 수와 일치, 원 불일치 수정)
+- [x] (트랙 A) 검증 — tsc 클린 + parametricPorts 6 + OneCanvas 135 + 통합 250 통과
+- [ ] terminal_block 가변 단자 — 전용 속성 편집기 없음, 후속(B에서 일반화하거나 별도)
 - [ ] (트랙 B) `<ms:PortTemplate>` 스키마 + 인스턴스 인지 포트 해석 + 커스텀 심볼 인스턴스 UI
 - [ ] (Q2=T2 시) scope/terminal_block을 PortTemplate로 마이그레이션
 - [ ] (Q2=T3 시) `behaviorTemplates.ts`에 구조 생성 훅(generatePorts) 추가

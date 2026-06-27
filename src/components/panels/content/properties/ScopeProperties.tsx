@@ -6,6 +6,7 @@
 
 import { memo, useCallback, useState, useEffect } from 'react';
 import { CommonProperties } from './CommonProperties';
+import { getScopePorts } from '../../../OneCanvas/blockDefinitions';
 import type { ScopeBlock, TriggerMode, Block } from '../../../OneCanvas/types';
 
 // ============================================================================
@@ -71,10 +72,11 @@ export const ScopeProperties = memo(function ScopeProperties({
     setLocalVoltageScale((component.voltageScale || 5).toString());
   }, [component.id, component.timeBase, component.voltageScale]);
 
-  // Handle channel count change
+  // Handle channel count change — recompute ports so the symbol's terminals
+  // track the channel count (mirrors PowerSourceProperties' polarity handling).
   const handleChannelsChange = useCallback(
     (channels: 1 | 2 | 3 | 4) => {
-      onChange({ channels } as Partial<ScopeBlock>);
+      onChange({ channels, ports: getScopePorts(channels) } as Partial<ScopeBlock>);
     },
     [onChange]
   );

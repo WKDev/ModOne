@@ -4,6 +4,7 @@ import {
   getDefaultBlockProps,
   getDefaultPorts,
   getPowerSourcePorts,
+  getScopePorts,
 } from '../blockDefinitions';
 import { createBehaviorPatch } from './behaviorTemplates';
 
@@ -13,18 +14,23 @@ export function createBlockInstance(
   position: Position,
   props: Partial<Block> = {}
 ): Block {
-  let ports = getDefaultPorts(type);
-  if (type === 'powersource') {
-    const polarity = (props as Record<string, unknown>).polarity as string | undefined;
-    if (polarity === 'ground' || polarity === 'negative' || polarity === 'positive') {
-      ports = getPowerSourcePorts(polarity);
-    }
-  }
-
   const mergedProps = {
     ...getDefaultBlockProps(type),
     ...props,
   } as Partial<Block>;
+
+  // Ports default to the type's static set, but parametric types derive theirs
+  // from an instance property (polarity / channels) so edits stay consistent.
+  let ports = getDefaultPorts(type);
+  if (type === 'powersource') {
+    const polarity = (mergedProps as Record<string, unknown>).polarity as string | undefined;
+    if (polarity === 'ground' || polarity === 'negative' || polarity === 'positive') {
+      ports = getPowerSourcePorts(polarity);
+    }
+  } else if (type === 'scope') {
+    const channels = (mergedProps as Record<string, unknown>).channels as number | undefined;
+    ports = getScopePorts(channels ?? 4);
+  }
 
   return {
     id,
