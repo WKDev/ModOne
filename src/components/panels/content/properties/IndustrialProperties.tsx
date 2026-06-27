@@ -7,6 +7,7 @@
 
 import { memo, useCallback, useState, useEffect } from 'react';
 import { CommonProperties } from './CommonProperties';
+import { SymbolInstanceProperties } from './SymbolInstanceProperties';
 import type { Block } from '../../../OneCanvas/types';
 import type { ComponentInstance } from '@/types/circuit';
 
@@ -160,6 +161,11 @@ export const IndustrialProperties = memo(function IndustrialProperties({
       <div className="px-2 py-1 bg-neutral-800 rounded text-xs text-neutral-400 text-center uppercase tracking-wider">
         {component.type.replace(/_/g, ' ')}
       </div>
+
+      {/* Custom symbol instance properties (incl. parametric port count) */}
+      {component.type === 'custom_symbol' && (
+        <SymbolInstanceProperties component={component as Block} onChange={onChange} />
+      )}
 
       {/* Dynamic fields */}
       {fields.map((field) => (
