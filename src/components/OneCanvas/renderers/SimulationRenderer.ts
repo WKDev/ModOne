@@ -12,6 +12,14 @@ import type { Container, Ticker } from 'pixi.js';
 import type { BlockRenderer } from './BlockRenderer';
 import type { WireRenderer } from './WireRenderer';
 import type { ComponentBehaviorState } from '@/types/behavior';
+import type { SymbolAnimationSpec } from '@/types/symbol';
+import {
+  applyAnimationFrame,
+  captureAnimationBase,
+  resetAnimationFrame,
+  type AnimatableTarget,
+  type AnimationBase,
+} from '@/lib/symbolAnimation';
 import { getBuiltinSymbolForBlockType } from '@/assets/builtin-symbols';
 
 const COLOR_DEFAULT = 0xffffff;
@@ -65,12 +73,10 @@ export interface SimulationRendererConfig {
 }
 
 interface ActiveBlockAnimation {
-  target: {
-    rotation: number;
-    pivot?: { set(x: number, y: number): void };
-  };
-  baseRotation: number;
-  speed: number;
+  target: AnimatableTarget;
+  spec: SymbolAnimationSpec;
+  base: AnimationBase;
+  elapsed: number;
 }
 
 export class SimulationRenderer {
@@ -86,12 +92,12 @@ export class SimulationRenderer {
   private _blockAnimations = new Map<string, ActiveBlockAnimation[]>();
 
   private readonly _tickAnimations = (ticker: Ticker): void => {
-    const deltaSeconds = ticker.deltaMS / 1000;
-    if (deltaSeconds <= 0) return;
+    if (ticker.deltaMS <= 0) return;
 
     for (const animations of this._blockAnimations.values()) {
       for (const animation of animations) {
-        animation.target.rotation += ((animation.speed ?? 0) * Math.PI / 180) * deltaSeconds;
+        animation.elapsed += ticker.deltaMS;
+        applyAnimationFrame(animation.target, animation.spec, animation.elapsed, animation.base);
       }
     }
   };
@@ -332,17 +338,19 @@ export class SimulationRenderer {
     }
 
     const animations: ActiveBlockAnimation[] = [];
-    for (const { displayObject, baseRotation, spec } of visual.animationTargets.values()) {
-      if (spec.type !== 'rotate') continue;
-      if (spec.pivot && 'pivot' in displayObject) {
-        displayObject.pivot.set(spec.pivot.x, spec.pivot.y);
+    for (const targets of visual.animationTargets.values()) {
+      for (const { displayObject, spec } of targets) {
+        if (spec.type === 'rotate' && spec.pivot && 'pivot' in displayObject) {
+          displayObject.pivot.set(spec.pivot.x, spec.pivot.y);
+        }
+        // _stopBlockAnimations ran first, so the display object is at its base.
+        animations.push({
+          target: displayObject,
+          spec,
+          base: captureAnimationBase(displayObject),
+          elapsed: 0,
+        });
       }
-      displayObject.rotation = baseRotation;
-      animations.push({
-        target: displayObject,
-        baseRotation,
-        speed: spec.speed ?? 120,
-      });
     }
 
     if (animations.length > 0) {
@@ -357,7 +365,7 @@ export class SimulationRenderer {
     if (!existing) return;
 
     for (const animation of existing) {
-      animation.target.rotation = animation.baseRotation;
+      resetAnimationFrame(animation.target, animation.spec, animation.base);
     }
     this._blockAnimations.delete(blockId);
   }

@@ -25,6 +25,11 @@ import {
 import { Container, type Ticker } from 'pixi.js';
 
 import type { GraphicPrimitive, SymbolAnimationSpec, SymbolDefinition } from '@/types/symbol';
+import {
+  applyAnimationFrame,
+  captureAnimationBase,
+  type AnimationBase,
+} from '@/lib/symbolAnimation';
 import type { EditorAction } from './SymbolEditor';
 import type { GhostShape, SymbolEditorHostHandle, SymbolEditorLayerConfig, SymbolEditorLayerName } from './types';
 import { SYMBOL_EDITOR_LAYERS } from './types';
@@ -276,17 +281,19 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
     const activeAnimationsRef = useRef(activeAnimations);
     activeAnimationsRef.current = activeAnimations;
 
-    // ── Live preview animation (ticker spin) state ──
-    // The list of currently-spinning targets, rebuilt on every render of the
+    // ── Live preview animation (ticker) state ──
+    // The list of currently-playing targets, rebuilt on every render of the
     // symbol (PrimitiveRenderer recreates its containers each renderAll).
-    const runningAnimationsRef = useRef<Array<{ container: Container; speed: number }>>([]);
+    const runningAnimationsRef = useRef<
+      Array<{ container: Container; spec: SymbolAnimationSpec; base: AnimationBase; elapsed: number }>
+    >([]);
     const tickerActiveRef = useRef(false);
     // Stable tick fn (created once) so ticker.add/remove stay symmetric.
     const tickAnimationsRef = useRef((ticker: Ticker) => {
-      const dt = ticker.deltaMS / 1000;
-      if (dt <= 0) return;
+      if (ticker.deltaMS <= 0) return;
       for (const a of runningAnimationsRef.current) {
-        a.container.rotation += ((a.speed * Math.PI) / 180) * dt;
+        a.elapsed += ticker.deltaMS;
+        applyAnimationFrame(a.container, a.spec, a.elapsed, a.base);
       }
     });
     const selectedIdsRef = useRef(selectedIds);
@@ -554,13 +561,17 @@ export const SymbolEditorHost = forwardRef<SymbolEditorHostHandle, SymbolEditorH
     const syncAnimations = () => {
       const renderer = primitiveRendererRef.current;
       const ticker = pixiAppRef.current?.app.ticker;
-      const next: Array<{ container: Container; speed: number }> = [];
+      const next: Array<{ container: Container; spec: SymbolAnimationSpec; base: AnimationBase; elapsed: number }> = [];
       if (renderer) {
         for (const spec of activeAnimationsRef.current ?? []) {
-          if (spec.type !== 'rotate') continue;
           const target = renderer.getAnimationTarget(spec.target);
           if (!target) continue;
-          next.push({ container: target.container, speed: spec.speed ?? 120 });
+          next.push({
+            container: target.container,
+            spec,
+            base: captureAnimationBase(target.container),
+            elapsed: 0,
+          });
         }
       }
       runningAnimationsRef.current = next;

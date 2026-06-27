@@ -85,8 +85,64 @@ describe('BlockRenderer', () => {
     const visual = renderer.getBlockVisual(block.id);
 
     expect(visual?.activeVisualState).toBe('running');
-    expect(visual?.animationTargets.has('rotor')).toBe(true);
+    expect(visual?.animationTargets.get('rotor')).toHaveLength(1);
 
     renderer.destroy();
+  });
+
+  it('captures multiple animations targeting the same primitive', () => {
+    const multiAnimSymbol: SymbolDefinition = {
+      id: 'custom:multi-anim',
+      name: 'Multi Anim',
+      version: '1.0.0',
+      category: 'test',
+      createdAt: '2026-03-16T00:00:00Z',
+      updatedAt: '2026-03-16T00:00:00Z',
+      width: 40,
+      height: 40,
+      graphics: [
+        { id: 'box', kind: 'rect', x: 4, y: 4, width: 32, height: 32, stroke: '#888', fill: 'transparent', strokeWidth: 2 },
+      ],
+      pins: [
+        { id: 'p1', name: 'P1', number: '1', type: 'passive', shape: 'line', position: { x: 0, y: 20 }, orientation: 'left', length: 0 },
+      ],
+      properties: [],
+      visualStates: { on: { primitiveOverrides: {} } },
+      animations: {
+        on: [
+          { type: 'rotate', target: 'box', speed: 90 },
+          { type: 'blink', target: 'box', duration: 500 },
+        ],
+      },
+    };
+    registerCustomSymbol(multiAnimSymbol);
+
+    const layer = new Container();
+    const renderer = new BlockRenderer({ layer });
+    const block: Block = {
+      id: 'multi-1',
+      type: 'custom_symbol',
+      position: { x: 0, y: 0 },
+      size: { width: 40, height: 40 },
+      ports: [],
+      symbolId: multiAnimSymbol.id,
+      instanceProperties: {},
+    } as Block;
+
+    renderer.renderBlock(block);
+    renderer.setBlockBehaviorState(block.id, {
+      componentId: block.id,
+      templateId: 'archetype:lamp',
+      archetype: 'lamp',
+      visualState: 'on',
+      powered: true,
+    });
+
+    const targets = renderer.getBlockVisual(block.id)?.animationTargets.get('box');
+    expect(targets).toHaveLength(2);
+    expect(targets?.map((t) => t.spec.type)).toEqual(['rotate', 'blink']);
+
+    renderer.destroy();
+    unregisterCustomSymbol(multiAnimSymbol.id);
   });
 });

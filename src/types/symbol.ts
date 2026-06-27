@@ -174,14 +174,26 @@ export interface SymbolVisualVariant {
   primitiveOverrides?: Record<string, GraphicPrimitiveOverride>;
 }
 
+/** PowerPoint-style lightweight animation kinds playable on a symbol state. */
+export type SymbolAnimationType = 'rotate' | 'fade-in' | 'fade-out' | 'blink' | 'move';
+
 export interface SymbolAnimationSpec {
-  /** Animation type. v1 only supports lightweight rotation. */
-  type: 'rotate';
+  /** Animation kind. */
+  type: SymbolAnimationType;
   /** Target primitive ID to animate */
   target: string;
-  /** Degrees per second */
+  /** rotate: degrees per second (default 120). */
   speed?: number;
-  /** Optional pivot override in symbol coordinates */
+  /**
+   * Duration in ms (default 1000). fade-in/fade-out: ramp time.
+   * blink: one full on+off cycle. move: one full back-and-forth.
+   */
+  duration?: number;
+  /** move: peak horizontal offset in symbol units. */
+  dx?: number;
+  /** move: peak vertical offset in symbol units. */
+  dy?: number;
+  /** rotate: pivot override in symbol coordinates. */
   pivot?: { x: number; y: number };
 }
 
