@@ -1022,8 +1022,8 @@ describe('Full Pipeline Integration', () => {
   });
 
   describe('symbolBridge — BUILTIN_SYMBOLS covers all canonical types', () => {
-    it('BUILTIN_SYMBOLS contains exactly 45 symbols', () => {
-      expect(BUILTIN_SYMBOLS.size).toBe(45);
+    it('BUILTIN_SYMBOLS contains exactly 46 symbols', () => {
+      expect(BUILTIN_SYMBOLS.size).toBe(46);
     });
 
     it('all symbols have required fields: id, name, version, category', () => {

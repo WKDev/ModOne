@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ms:SymbolDefinition
+  xmlns:ms="http://modone.io/schema/symbol/1.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://modone.io/schema/symbol/1.0 ../../symbol-schema/modone-symbol.xsd"
+  id="builtin:terminal_strip"
+  name="Terminal Strip"
+  version="1.0.0"
+  domain="circuit"
+  placeable="true">
+
+  <ms:Description>Feed-through terminal strip with a configurable number of terminals (parametric ports)</ms:Description>
+  <ms:Category>connection</ms:Category>
+  <ms:Author>ModOne</ms:Author>
+  <ms:CreatedAt>2026-06-27T00:00:00Z</ms:CreatedAt>
+  <ms:UpdatedAt>2026-06-27T00:00:00Z</ms:UpdatedAt>
+
+  <ms:Layout width="20" height="80" unit="mm"/>
+
+  <ms:Ports>
+    <ms:PortTemplate repeat="terminals" min="1" max="12"
+      idPattern="in{i}" namePattern="{i}" numberFrom="1"
+      type="passive" electricalType="passive" functionalRole="general"
+      orientation="left" shape="line"
+      x="0" yStart="10" yStep="10"/>
+    <ms:PortTemplate repeat="terminals" min="1" max="12"
+      idPattern="out{i}" namePattern="{i}" numberFrom="1"
+      type="passive" electricalType="passive" functionalRole="general"
+      orientation="right" shape="line"
+      x="20" yStart="10" yStep="10"/>
+  </ms:Ports>
+
+  <ms:Graphics>
+    <ms:Rect x="6" y="6" width="8" height="68" stroke="#888" fill="transparent" strokeWidth="1"/>
+  </ms:Graphics>
+
+  <ms:Properties>
+    <ms:Property key="designation" type="string" editorType="text" visible="true">
+      <ms:DefaultValue>X1</ms:DefaultValue>
+    </ms:Property>
+    <ms:Property key="terminals" type="number" editorType="number" visible="true">
+      <ms:DefaultValue>3</ms:DefaultValue>
+    </ms:Property>
+  </ms:Properties>
+
+</ms:SymbolDefinition>

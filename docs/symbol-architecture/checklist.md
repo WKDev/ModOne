@@ -42,7 +42,7 @@
 - [x] **Phase 1 — TS 데이터 레이어** — `PortTemplate` 타입(types/symbol.ts) + services 파서 파싱/직렬화 + 라운드트립 테스트(portTemplateRoundtrip 3). 동작 변화 없음, 회귀 없음(심볼 XML/로더 417 그린)
 - [x] **Phase 2 — TS 인스턴스 포트 해석** — `resolveInstancePorts.ts`(expandPortTemplate/resolveEffectivePins/resolveInstancePorts, pin 중심). **라이브 배선**: `symbolBlockDefAdapter.getAllPins`가 resolveEffectivePins 사용 → builtin/심볼파생 블록이 기본 속성값으로 템플릿 포트 획득. customSymbolBridge·symbolBridge 인스턴스 인지(instanceProps). 유틸 테스트 7 + OneCanvas 145 + 통합 250 그린. (커스텀 심볼 dead 래퍼 대신 라이브 getAllPins 경로에 끼움)
 - [x] **Phase 3 — TS 인스턴스 속성 UI + ports 재계산** — `SymbolInstanceProperties.tsx`(custom 심볼 def.properties 편집, 변경 시 resolveInstancePorts로 ports 재계산해 저장). IndustrialProperties가 custom_symbol일 때 렌더. 테스트 3 + 패널 54 그린. (에디터 주도라 placement 경로 불명에도 동작)
-- [ ] Phase 4 — builtin 데모 PortTemplate 심볼 + 검증
+- [x] **Phase 4 — builtin 데모 PortTemplate 심볼 + 검증** — `terminal_strip.symbol.xml`(terminals 속성 → 좌입력/우출력 N쌍, 2 PortTemplate). 실제 builtin 로더 로드 + 무손실 라운드트립(builtinXmlRoundtrip 46) + resolve 파이프라인 검증(terminalStripParametric 5: 기본3·가변·클램프1..12·좌표). 통합 250 그린(개수 45→46 갱신)
 - [ ] Phase 5 (보류) — Rust 파서+타입 패리티 (프로젝트 저장 커스텀 심볼 동적 포트 복원, Rust 재빌드)
 - [ ] (Q2=T2 시) scope/terminal_block을 PortTemplate로 마이그레이션
 - [ ] (Q2=T3 시) `behaviorTemplates.ts`에 구조 생성 훅(generatePorts) 추가
