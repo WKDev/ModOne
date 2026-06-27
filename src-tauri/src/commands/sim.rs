@@ -17,12 +17,14 @@ use crate::commands::opcua::{
     OpcUaState, UserAccountStoreState,
 };
 use crate::opcua::AuditLoggerState;
+use modone_audit::{AuditLogQuery, AuditLogResult};
 use crate::modbus::ModbusMemory;
 use crate::plc_runtime::{
     resolve_vendor_profile, CanonicalAddress, CanonicalValue, CanonicalWriteSource, VendorAddress,
 };
 use crate::project::{PlcSettings, ProjectConfig, SharedProjectManager};
 use crate::sim::{
+    audit::RuntimeAuditState,
     debugger::{SimDebugger, StepResult, StepType},
     executor::{compile_program, LadderProgram},
     memory::CanonicalRuntimeFacade,
@@ -171,6 +173,7 @@ pub async fn sim_run(
     mapping_store_state: State<'_, crate::commands::tags::MappingStoreState>,
     project_state: State<'_, SharedProjectManager>,
     canvas_sync_state: State<'_, CanvasSyncState>,
+    runtime_audit: State<'_, RuntimeAuditState>,
     params: Option<SimRunParams>,
 ) -> Result<(), String> {
     let project_config = current_project_config(&project_state)?;
@@ -222,13 +225,17 @@ pub async fn sim_run(
         }
     }
 
-    state.host().run(
+    let result = state.host().run(
         app,
         project_config,
         plc_settings,
         canvas_sync_state.canvas_sync(),
         params.and_then(|p| p.config),
-    )
+    );
+    if result.is_ok() {
+        runtime_audit.sim_event("sim_start", "Simulation started");
+    }
+    result
 }
 
 /// Stop the simulation
@@ -239,8 +246,10 @@ pub async fn sim_stop(
     modbus_state: State<'_, ModbusState>,
     network_state: State<'_, NetworkState>,
     opcua_state: State<'_, OpcUaState>,
+    runtime_audit: State<'_, RuntimeAuditState>,
 ) -> Result<(), String> {
     state.host().stop(&app)?;
+    runtime_audit.sim_event("sim_stop", "Simulation stopped");
     let audit_logger_state = app.try_state::<AuditLoggerState>();
     opcua_stop_project_simulation(&app, &opcua_state, audit_logger_state.as_deref())?;
     modbus_stop_project_simulation(&modbus_state, &network_state).await
@@ -248,14 +257,30 @@ pub async fn sim_stop(
 
 /// Pause the simulation
 #[tauri::command]
-pub fn sim_pause(app: AppHandle, state: State<'_, SimState>) -> Result<(), String> {
-    state.host().pause(&app)
+pub fn sim_pause(
+    app: AppHandle,
+    state: State<'_, SimState>,
+    runtime_audit: State<'_, RuntimeAuditState>,
+) -> Result<(), String> {
+    let result = state.host().pause(&app);
+    if result.is_ok() {
+        runtime_audit.sim_event("sim_pause", "Simulation paused");
+    }
+    result
 }
 
 /// Resume the simulation
 #[tauri::command]
-pub fn sim_resume(app: AppHandle, state: State<'_, SimState>) -> Result<(), String> {
-    state.host().resume(&app)
+pub fn sim_resume(
+    app: AppHandle,
+    state: State<'_, SimState>,
+    runtime_audit: State<'_, RuntimeAuditState>,
+) -> Result<(), String> {
+    let result = state.host().resume(&app);
+    if result.is_ok() {
+        runtime_audit.sim_event("sim_resume", "Simulation resumed");
+    }
+    result
 }
 
 /// Reset the simulation
@@ -266,8 +291,10 @@ pub async fn sim_reset(
     modbus_state: State<'_, ModbusState>,
     network_state: State<'_, NetworkState>,
     opcua_state: State<'_, OpcUaState>,
+    runtime_audit: State<'_, RuntimeAuditState>,
 ) -> Result<(), String> {
     state.host().reset(&app);
+    runtime_audit.sim_event("sim_reset", "Simulation reset");
     let audit_logger_state = app.try_state::<AuditLoggerState>();
     opcua_stop_project_simulation(&app, &opcua_state, audit_logger_state.as_deref())?;
     modbus_stop_project_simulation(&modbus_state, &network_state).await?;
@@ -931,11 +958,15 @@ pub fn sim_step(
 
 /// Continue execution after pause
 #[tauri::command]
-pub fn sim_continue(app: AppHandle, state: State<'_, SimState>) -> Result<(), String> {
+pub fn sim_continue(
+    app: AppHandle,
+    state: State<'_, SimState>,
+    runtime_audit: State<'_, RuntimeAuditState>,
+) -> Result<(), String> {
     state.debugger().continue_execution();
 
     // Resume the engine
-    sim_resume(app, state)
+    sim_resume(app, state, runtime_audit)
 }
 
 /// Get debugger state
@@ -973,10 +1004,12 @@ pub fn ladder_stop_monitoring(state: State<'_, SimState>) -> Result<(), String> 
 pub fn ladder_force_device(
     state: State<'_, SimState>,
     project_state: State<'_, SharedProjectManager>,
+    runtime_audit: State<'_, RuntimeAuditState>,
     request: WatchBindingRequest,
     value: serde_json::Value,
 ) -> Result<(), String> {
     let (binding, display_address) = resolve_runtime_binding(Some(&project_state), &request)?;
+    runtime_audit.force_set(&display_address, &value);
     state.host().monitoring().force_device(ForcedDeviceValue {
         binding,
         display_address,
@@ -990,6 +1023,7 @@ pub fn ladder_force_device(
 pub fn ladder_release_force(
     state: State<'_, SimState>,
     project_state: State<'_, SharedProjectManager>,
+    runtime_audit: State<'_, RuntimeAuditState>,
     request: WatchBindingRequest,
 ) -> Result<(), String> {
     let (binding, display_address) = resolve_runtime_binding(Some(&project_state), &request)?;
@@ -997,5 +1031,15 @@ pub fn ladder_release_force(
         .host()
         .monitoring()
         .release_force(&display_address, &binding);
+    runtime_audit.force_release(&display_address);
     Ok(())
+}
+
+/// Query the runtime operational audit log (force/sim control events) with filters.
+#[tauri::command]
+pub fn runtime_query_audit_log(
+    runtime_audit: State<'_, RuntimeAuditState>,
+    query: AuditLogQuery,
+) -> Result<AuditLogResult, String> {
+    runtime_audit.query(&query)
 }

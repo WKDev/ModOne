@@ -7,6 +7,7 @@
 pub use sim_engine::{counter, debugger, executor, memory, tag_registry, timer, types};
 
 // native 셸 — 전송/Tauri/tokio 비동기 드라이버는 여기 잔류.
+pub mod audit;
 pub mod canvas_sync;
 pub mod engine;
 pub mod monitoring;
@@ -14,6 +15,7 @@ pub mod protocol_runtime;
 pub mod runtime_host;
 pub mod tag_events;
 
+pub use audit::RuntimeAuditState;
 pub use canvas_sync::{
     CanvasSync, CanvasSyncError, CanvasSyncResult, PlcBlockMapping, PlcBlockType, PlcInputChange,
     PlcOutputUpdate, PlcOutputsEvent,

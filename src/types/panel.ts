@@ -24,7 +24,8 @@ export type PanelType =
   | 'symbol-editor'
   | 'tag-browser'
   | 'welcome'
-  | 'opcua-server';
+  | 'opcua-server'
+  | 'runtime-audit-log';
 
 /**
  * Runtime state of a panel instance.
