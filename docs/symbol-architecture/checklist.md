@@ -33,7 +33,14 @@
 - [x] (트랙 A) scope 심볼 channels 기본값 1→4 (포트 수와 일치, 원 불일치 수정)
 - [x] (트랙 A) 검증 — tsc 클린 + parametricPorts 6 + OneCanvas 135 + 통합 250 통과
 - [ ] terminal_block 가변 단자 — 전용 속성 편집기 없음, 후속(B에서 일반화하거나 별도)
-- [ ] (트랙 B) `<ms:PortTemplate>` 스키마 + 인스턴스 인지 포트 해석 + 커스텀 심볼 인스턴스 UI
+- [x] 트랙 A → main 병합 (main 9857a9f, 다른 세션 Modbus/멀티-CPU 작업과 clean 병합)
+
+## Q2 트랙 B — 선언적 XML PortTemplate (진행 중)
+계획·결정: `q2b-porttemplate-plan.md` (B-1 명시속성 / B-2 순수유틸 / B-3 IndustrialProperties / B-4 XML수기 먼저)
+- [ ] Phase 1 — PortTemplate 타입 + 파서 + 직렬화 + 라운드트립 테스트
+- [ ] Phase 2 — `resolveInstancePorts(def, instanceProps)` + customSymbolBridge 인스턴스 인지
+- [ ] Phase 3 — IndustrialProperties 인스턴스 속성 UI + ports 재계산
+- [ ] Phase 4 — 데모 PortTemplate 심볼 + 검증
 - [ ] (Q2=T2 시) scope/terminal_block을 PortTemplate로 마이그레이션
 - [ ] (Q2=T3 시) `behaviorTemplates.ts`에 구조 생성 훅(generatePorts) 추가
 - [ ] (Q1=a 시) 논리 시뮬: archetype 추가 (counter/timer/contactor 등)
