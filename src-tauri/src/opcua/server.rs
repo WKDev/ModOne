@@ -49,6 +49,10 @@ pub struct OpcUaServer {
     server_initialised: AtomicBool,
     #[cfg(feature = "opcua-server")]
     namespace_index: AtomicU16,
+    /// Per-node last-published numeric value, keyed by node identifier. Used to
+    /// apply per-tag publish deadband (suppress sub-threshold changes).
+    #[cfg(feature = "opcua-server")]
+    last_published: Mutex<HashMap<String, f64>>,
 }
 
 impl OpcUaServer {
@@ -67,6 +71,8 @@ impl OpcUaServer {
             server_initialised: AtomicBool::new(false),
             #[cfg(feature = "opcua-server")]
             namespace_index: AtomicU16::new(0),
+            #[cfg(feature = "opcua-server")]
+            last_published: Mutex::new(HashMap::new()),
         }
     }
 
@@ -771,6 +777,7 @@ impl OpcUaServer {
             server.write().abort();
             self.server_initialised.store(false, Ordering::Release);
             self.namespace_index.store(0, Ordering::Release);
+            self.last_published.lock().clear();
         }
     }
 
@@ -850,21 +857,48 @@ impl OpcUaServer {
         let mut as_lock = address_space.write();
         let now = DateTime::now();
 
+        // `windows.is_some()` is an incremental (dirty) publish where deadband
+        // suppression applies; `None` is a full sync that re-baselines all nodes.
+        let incremental = windows.is_some();
+
         for node in &spec.nodes {
             if let Some(windows) = windows {
                 if !super::node_values::node_dirty(node.canonical_address, &node.mapping, windows) {
                     continue;
                 }
             }
-            if let Ok(mapped) = super::node_values::read_node_mapped(
+            let Ok(mapped) = super::node_values::read_node_mapped(
                 canonical_memory,
                 node.canonical_address,
                 &node.mapping,
-            ) {
-                let variant = super::node_values::mapped_value_to_variant(&mapped);
-                let opcua_node_id = NodeId::new(namespace_index, node.node_id.identifier.clone());
-                let _ = as_lock.set_variable_value(&opcua_node_id, variant, &now, &now);
+            ) else {
+                continue;
+            };
+
+            // Publish deadband: on an incremental publish, suppress numeric
+            // changes below the configured threshold; always re-baseline.
+            if node.mapping.deadband_active() {
+                if let Some(new_v) = super::node_values::mapped_numeric_to_f64(&mapped) {
+                    let mut last = self.last_published.lock();
+                    if incremental {
+                        if let Some(&prev) = last.get(&node.node_id.identifier) {
+                            if !super::passes_deadband(
+                                &node.mapping.deadband,
+                                prev,
+                                new_v,
+                                node.mapping.deadband_reference_span(),
+                            ) {
+                                continue;
+                            }
+                        }
+                    }
+                    last.insert(node.node_id.identifier.clone(), new_v);
+                }
             }
+
+            let variant = super::node_values::mapped_value_to_variant(&mapped);
+            let opcua_node_id = NodeId::new(namespace_index, node.node_id.identifier.clone());
+            let _ = as_lock.set_variable_value(&opcua_node_id, variant, &now, &now);
         }
 
         Ok(())

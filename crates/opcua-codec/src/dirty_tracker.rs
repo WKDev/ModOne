@@ -529,6 +529,7 @@ mod tests {
                 description: None,
                 string_config: None,
                 scaling: Default::default(),
+                deadband: Default::default(),
             },
         );
         // Tag B: DataWord 200..202, Int32 (2 words)
@@ -542,6 +543,7 @@ mod tests {
                 description: None,
                 string_config: None,
                 scaling: Default::default(),
+                deadband: Default::default(),
             },
         );
         // Tag C: DataWord 300, UInt16 (1 word) — not dirty
@@ -555,6 +557,7 @@ mod tests {
                 description: None,
                 string_config: None,
                 scaling: Default::default(),
+                deadband: Default::default(),
             },
         );
 
@@ -666,6 +669,7 @@ mod tests {
                 description: None,
                 string_config: None,
                 scaling: Default::default(),
+                deadband: Default::default(),
             },
         );
 
@@ -708,6 +712,7 @@ mod tests {
                 description: None,
                 string_config: None,
                 scaling: Default::default(),
+                deadband: Default::default(),
             },
         );
 
@@ -740,6 +745,7 @@ mod tests {
                 description: None,
                 string_config: None,
                 scaling: Default::default(),
+                deadband: Default::default(),
             },
         );
 

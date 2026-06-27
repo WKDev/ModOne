@@ -116,9 +116,9 @@ fn canonical_truthy(v: CanonicalValue) -> bool {
     }
 }
 
-/// Extracts a numeric [`MappedValue`] as `f64` for scaling. Returns `None` for
-/// Boolean / String (non-numeric).
-fn mapped_numeric_to_f64(value: &MappedValue) -> Option<f64> {
+/// Extracts a numeric [`MappedValue`] as `f64` (for scaling / deadband).
+/// Returns `None` for Boolean / String (non-numeric).
+pub fn mapped_numeric_to_f64(value: &MappedValue) -> Option<f64> {
     match value {
         MappedValue::SByte(v) => Some(*v as f64),
         MappedValue::Byte(v) => Some(*v as f64),

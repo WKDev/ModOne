@@ -36,11 +36,12 @@ pub use auth::{
 pub use address_space::is_bool_address;
 pub use opcua_codec::dirty_tracker::{DirtyTracker, SharedDirtyTracker};
 pub use opcua_codec::mapping::{
-    ByteOrder, MappedValue, MappingAccessLevel, MappingError, OpcUaDataType, OpcUaMappingConfig,
-    OpcUaMappingStore, RegisterRange, ScalingConfig, ScalingKind, SharedMappingStore,
-    StringEncoding, StringMappingConfig, eng_to_raw, f32_to_registers, f64_to_registers,
-    raw_to_eng, read_bool_mapped, read_registers_to_mapped, registers_to_f32, registers_to_f64,
-    registers_to_string, string_to_registers, write_bool_mapped, write_mapped_to_registers,
+    ByteOrder, DeadbandConfig, DeadbandKind, MappedValue, MappingAccessLevel, MappingError,
+    OpcUaDataType, OpcUaMappingConfig, OpcUaMappingStore, RegisterRange, ScalingConfig, ScalingKind,
+    SharedMappingStore, StringEncoding, StringMappingConfig, eng_to_raw, f32_to_registers,
+    f64_to_registers, passes_deadband, raw_to_eng, read_bool_mapped, read_registers_to_mapped,
+    registers_to_f32, registers_to_f64, registers_to_string, string_to_registers, write_bool_mapped,
+    write_mapped_to_registers,
 };
 pub use opcua_codec::memory::OpcUaMemory;
 pub use server::OpcUaServer;

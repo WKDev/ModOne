@@ -27,8 +27,13 @@
 - [ ] P2.5 UI: `OpcUaMappingSection`에 스케일링 편집  ← 남음
 - 참고: serde가 `#[serde(default, skip_serializing_if=is_disabled)]`라 프로젝트 저장/로드는 이미 round-trip(비활성 시 JSON 생략). 즉 프로젝트 파일로는 지금도 설정 가능, UI만 없음.
 
-## Phase 3 — 데드밴드 (publish 억제)
-- [ ] P3.1 codec `DeadbandConfig { kind: None|Absolute|Percent, value }` + serde + TS
-- [ ] P3.2 순수 필터 `passes_deadband(last, new, &cfg) -> bool` + 테스트
-- [ ] P3.3 노드별 last-published 값 상태 + publish 억제
-- [ ] P3.4 UI + import/export + 커밋
+## Phase 3 — 데드밴드 (publish 억제) — 백엔드 완료, 프론트 남음
+- [x] P3.1 codec `DeadbandConfig { kind: None|Absolute|Percent, value }` + serde(skip if disabled). OpcUaMappingConfig에 deadband 필드 + deadband_active()/deadband_reference_span()
+- [x] P3.2 순수 `passes_deadband(cfg, last, new, span) -> bool` + 5 테스트 (절대/백분율/span없음/검증)
+- [x] P3.3 server: 노드별 last_published(HashMap) 상태, publish_nodes에서 incremental 시 임계 미만 억제·full sync는 re-baseline, stop 시 clear. E2E 회귀 통과
+- [ ] P3.4 UI + import/export  ← 프론트와 함께
+
+## Phase 4 — 프론트엔드 (스케일링 + 데드밴드 공통)  ← 남음
+- [ ] get/set 매핑 커맨드(`get_tag_opcua_mapping`/`set_tag_opcua_mapping`) + tagService + 타입
+- [ ] OpcUaMappingSection을 편집 가능하게(데이터타입/워드/바이트오더/접근/스케일링/데드밴드). 현재 read-only이고 데이터타입을 동적계산하던 것 → 저장 매핑 반영
+- [ ] CSV/JSON import/export에 scaling/deadband 필드

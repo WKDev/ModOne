@@ -11,6 +11,7 @@ use crate::mapping::*;
             description: None,
             string_config: None,
             scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         }
     }
 

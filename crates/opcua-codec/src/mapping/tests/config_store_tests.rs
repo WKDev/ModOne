@@ -45,6 +45,7 @@ use std::collections::HashMap;
             description: Some("Motor speed".to_string()),
             string_config: None,
             scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         };
         assert!(cfg.validate().is_ok());
     }
@@ -59,6 +60,7 @@ use std::collections::HashMap;
             description: None,
             string_config: None,
             scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         };
         assert!(cfg.validate().is_err());
     }
@@ -73,6 +75,7 @@ use std::collections::HashMap;
             description: None,
             string_config: None,
             scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         };
         assert!(cfg.validate().is_err());
     }
@@ -103,6 +106,7 @@ use std::collections::HashMap;
             description: Some("Temperature sensor".to_string()),
             string_config: None,
             scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         };
         let json = serde_json::to_string(&cfg).unwrap();
         let deserialized: OpcUaMappingConfig = serde_json::from_str(&json).unwrap();
@@ -143,6 +147,7 @@ use std::collections::HashMap;
             description: None,
             string_config: None,
             scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         };
         assert!(cfg.validate().is_ok());
     }
@@ -826,6 +831,7 @@ use std::collections::HashMap;
             description: None,
             string_config: None,
             scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         }
     }
 
@@ -838,6 +844,7 @@ use std::collections::HashMap;
             description: None,
             string_config: None,
             scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         }
     }
 
@@ -1192,6 +1199,7 @@ use std::collections::HashMap;
             description: None,
             string_config: None,
             scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         };
         let range = cfg.register_range(addr);
 
@@ -1212,6 +1220,7 @@ use std::collections::HashMap;
             description: None,
             string_config: None,
             scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         };
         let range = cfg.register_range(addr);
 
@@ -1410,6 +1419,7 @@ use std::collections::HashMap;
             description: None,
             string_config: None,
             scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         };
 
         let addr_a = CanonicalAddress::new(CanonicalAreaKind::DataWord, 0);

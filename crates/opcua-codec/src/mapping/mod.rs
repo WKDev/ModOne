@@ -9,6 +9,7 @@
 mod byte_order;
 mod config;
 mod convert;
+mod deadband;
 mod scaling;
 mod store;
 mod string_codec;
@@ -19,6 +20,7 @@ mod tests;
 
 pub use byte_order::ByteOrder;
 pub use config::{OpcUaMappingConfig, StringEncoding, StringMappingConfig};
+pub use deadband::{passes_deadband, DeadbandConfig, DeadbandKind};
 pub use scaling::{eng_to_raw, raw_to_eng, ScalingConfig, ScalingKind};
 pub use convert::{
     f32_to_registers, f64_to_registers, read_bool_mapped, read_registers_to_mapped,

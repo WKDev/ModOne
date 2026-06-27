@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use modone_contract::CanonicalAddress;
 
-use crate::mapping::{ByteOrder, MappingAccessLevel, OpcUaDataType, RegisterRange, ScalingConfig};
+use crate::mapping::{
+    ByteOrder, DeadbandConfig, MappingAccessLevel, OpcUaDataType, RegisterRange, ScalingConfig,
+};
 
 /// Per-tag OPC UA mapping configuration.
 ///
@@ -56,6 +58,12 @@ pub struct OpcUaMappingConfig {
     /// Defaults to disabled (identity) and is omitted from JSON when disabled.
     #[serde(default, skip_serializing_if = "ScalingConfig::is_disabled")]
     pub scaling: ScalingConfig,
+
+    /// Optional publish deadband. When enabled on a numeric type, the live server
+    /// suppresses node updates whose value change is below the threshold.
+    /// Defaults to disabled and is omitted from JSON when disabled.
+    #[serde(default, skip_serializing_if = "DeadbandConfig::is_disabled")]
+    pub deadband: DeadbandConfig,
 }
 
 impl OpcUaMappingConfig {
@@ -69,6 +77,7 @@ impl OpcUaMappingConfig {
             description: None,
             string_config: None,
             scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         }
     }
 
@@ -82,6 +91,7 @@ impl OpcUaMappingConfig {
             description: None,
             string_config: None,
             scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         }
     }
 
@@ -135,6 +145,7 @@ impl OpcUaMappingConfig {
         }
         // Warn if string_config is set on a non-String type (not an error, but ignored)
         self.scaling.validate()?;
+        self.deadband.validate()?;
         Ok(())
     }
 
@@ -153,6 +164,22 @@ impl OpcUaMappingConfig {
             OpcUaDataType::Double
         } else {
             self.opcua_data_type
+        }
+    }
+
+    /// Returns `true` when deadband suppression is enabled *and* applicable
+    /// (numeric type). Deadband on Boolean/String is silently inert.
+    pub fn deadband_active(&self) -> bool {
+        self.deadband.is_enabled() && self.opcua_data_type.is_numeric()
+    }
+
+    /// Reference span for Percent deadband — the engineering range width when
+    /// scaling is active, otherwise `None` (Percent then does not suppress).
+    pub fn deadband_reference_span(&self) -> Option<f64> {
+        if self.scaling_active() {
+            Some(self.scaling.eng_high - self.scaling.eng_low)
+        } else {
+            None
         }
     }
 
@@ -180,6 +207,7 @@ impl OpcUaMappingConfig {
                 ..Default::default()
             }),
             scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         }
     }
 }
