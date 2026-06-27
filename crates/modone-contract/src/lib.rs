@@ -7,12 +7,18 @@
 
 pub mod adapter;
 pub mod clock;
+pub mod cpu;
 pub mod event_bus;
+pub mod field_link;
+pub mod link;
 pub mod memory;
 pub mod types;
 
 pub use adapter::{DirtyPublishWindow, ProtocolAdapter};
+pub use cpu::{CpuHealth, CpuId, CpuKind};
 pub use event_bus::CanonicalMemoryBus;
+pub use field_link::FieldLink;
+pub use link::{CanonicalRange, LinkEndpoint, LinkSyncMode, MemoryLink};
 pub use memory::{CanonicalMemory, CanonicalMemoryError, CanonicalMemorySnapshot};
 pub use types::{
     CanonicalAccess, CanonicalAddress, CanonicalAreaKind, CanonicalMemoryBatchChange,
