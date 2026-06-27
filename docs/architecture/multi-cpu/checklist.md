@@ -1,0 +1,49 @@
+<!-- 멀티-CPU 아키텍처 구현 체크리스트 — 설계(00-design.md) 기준 -->
+# 멀티-CPU 체크리스트
+
+> 기준 문서: [00-design.md](./00-design.md). 이번 라운드는 **설계 + trait 추상까지**.
+> 구체 프로토콜 구현은 의도적으로 미착수(unchecked).
+
+## 단계 0 — 설계 (현재)
+- [x] 통일 모델 확정 ("CPU = 메모리 + 전진 에이전트")
+- [x] `ProtocolAdapter` 방향 뒤집기로 실 CPU 수용 확인
+- [x] 권위(write-owner) 모델 정의
+- [x] inter-CPU 링크 모델 + 동기화 모드(유저 설정) 정의
+- [x] 설계 문서 작성
+
+## 단계 1 — 코어 타입 골격 (crates, wasm-safe)
+- [ ] `CpuId` 타입 (contract 크레이트) → verify: `cargo build -p modone-contract`
+- [ ] `MemoryLink` + `LinkSyncMode`(eventual/periodic/on_scan) 타입
+- [ ] `FieldLink` **trait 정의**만 (구현 없음) → verify: trait이 wasm 타깃 컴파일
+- [ ] `CanonicalRuntimeFacade`에 영역별 write-owner 태그 필드/가드 설계 반영
+- [ ] verify: `cargo build` (workspace) green
+
+## 단계 2 — CpuNode 도입 (단일 CPU 비파괴 래핑)
+- [ ] `CpuNode` 구조체 (runtime + driver + servers + health)
+- [ ] `CpuDriver::Virtual(OneSimEngine)` 분기
+- [ ] `SimulationRuntimeHost` 필드를 `CpuNode`로 이주 (동작 동일)
+- [ ] verify: 기존 단일 CPU 시뮬레이션 회귀 테스트 통과
+
+## 단계 3 — 캔버스 바인딩 확장
+- [ ] `PlcBlockMapping`에 `cpu_id` 필드 추가 (기본=단일 CPU)
+- [ ] `CanvasSync`가 cpu_id로 메모리 라우팅
+- [ ] verify: 기존 캔버스 PLC 블록 바인딩 회귀 없음
+
+## 단계 4 — CpuManager + 멀티 spawn
+- [ ] `CpuManager { cpus, links }`
+- [ ] CPU별 스캔/폴 태스크 spawn (add/remove/start/stop)
+- [ ] 프로젝트 config `cpus`/`links` 스키마 + 파서 (없으면 단일 가상 CPU 폴백)
+- [ ] verify: 가상 CPU 2개 동시 구동 + 상태 분리 확인
+
+## 단계 5 — MemoryLink 태스크
+- [ ] src 버스 구독 → dst external write 복사 태스크
+- [ ] `LinkSyncMode` 3종 동작
+- [ ] dst 영역 write-owner = 링크로 잠금
+- [ ] 품질(stale) 전파
+- [ ] verify: 가상↔가상 링크로 값 전달 E2E
+
+## 단계 6 — 실 프로토콜 클라이언트 (후속, 별도 워크트리 후보)
+- [ ] `FieldLink` 구현: Modbus master
+- [ ] `FieldLink` 구현: OPC-UA client
+- [ ] `CpuHealth` 연결/재접속/타임아웃
+- [ ] verify: 실 장비(or 시뮬) 대상 read/write 루프
