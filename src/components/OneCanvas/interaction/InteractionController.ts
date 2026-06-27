@@ -101,6 +101,13 @@ export class InteractionController {
 
   // Wire drawing state
   _wireFrom: WireEndpoint | null = null;
+  /**
+   * Deferred wire-tap start: when a wire drawing begins ON an existing wire,
+   * we record the wire id + tap point here instead of splitting immediately.
+   * The junction is materialized only in completeWire (avoids orphan
+   * junctions / split wires if the user cancels with ESC).
+   */
+  _wireFromTap: { wireId: string; position: Position } | null = null;
   _wireFromExitDirection: PortPosition | null = null;
   _wireSnapTarget: WireSnapTarget | null = null;
   _wireDrawingReturnState: 'idle' | 'wire_mode' = 'idle';

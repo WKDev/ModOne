@@ -55,6 +55,21 @@ export function handleWireDrawingMove(self: InteractionController, worldPos: Pos
         parentId: portHit.parentId,
         position: portHit.position,
       };
+    } else {
+      // Fall back to wire-level snapping: an existing junction, or a point on
+      // an existing wire (which becomes a junction on completion). Exclude the
+      // source wire when the drawing itself started from a wire tap.
+      const wireSnap = self._hitTester.findNearestWireSnap(
+        worldPos,
+        self._wireFromTap?.wireId
+      );
+      if (wireSnap) {
+        self._wireSnapTarget = {
+          type: wireSnap.type === 'junction' ? 'junction' : 'wire',
+          id: wireSnap.id,
+          position: wireSnap.position,
+        };
+      }
     }
   }
 
@@ -99,12 +114,36 @@ export function handleWireModePointerDown(
     self._pointerStartWorld = worldPos;
     self._pointerStartScreen = worldPos;
     startWireDrawing(self, worldPos, target);
+  } else if (target.type === 'junction') {
+    // Start from an existing junction
+    self._wireDrawingReturnState = 'wire_mode';
+    self._state = 'wire_drawing';
+    self._wireFrom = { junctionId: target.id };
+    self._wireFromTap = null;
+    self._wireFromExitDirection = null;
+    self._wireDrawingFromPos = target.position;
+    self._lastMoveWorld = target.position;
+    self._wireSnapTarget = null;
+    self._wireBendPoints = [];
+  } else if (target.type === 'segment') {
+    // Start from a point on an existing wire — a tap. The junction is created
+    // lazily in completeWire (deferred), so cancelling leaves no orphan.
+    self._wireDrawingReturnState = 'wire_mode';
+    self._state = 'wire_drawing';
+    self._wireFrom = null;
+    self._wireFromTap = { wireId: target.id, position: target.position };
+    self._wireFromExitDirection = null;
+    self._wireDrawingFromPos = target.position;
+    self._lastMoveWorld = target.position;
+    self._wireSnapTarget = null;
+    self._wireBendPoints = [];
   } else {
     // Start from empty canvas — FloatingEndpoint
     const snappedPos = snapToGridCtx(self, worldPos);
     self._wireDrawingReturnState = 'wire_mode';
     self._state = 'wire_drawing';
     self._wireFrom = { position: snappedPos };
+    self._wireFromTap = null;
     self._wireFromExitDirection = null;
     self._wireDrawingFromPos = snappedPos;
     self._lastMoveWorld = snappedPos;
@@ -126,7 +165,7 @@ export function handleWireDrawingPointerDown(
     return;
   }
 
-  // If clicking on a port, complete wire there
+  // If clicking directly on a port / junction / wire, complete wire there.
   const target = self._hitTester.hitTest(worldPos);
   if (target.type === 'port') {
     self._wireSnapTarget = {
@@ -138,6 +177,16 @@ export function handleWireDrawingPointerDown(
     completeWire(self);
     return;
   }
+  if (target.type === 'junction') {
+    self._wireSnapTarget = { type: 'junction', id: target.id, position: target.position };
+    completeWire(self);
+    return;
+  }
+  if (target.type === 'segment') {
+    self._wireSnapTarget = { type: 'wire', id: target.id, position: target.position };
+    completeWire(self);
+    return;
+  }
 
   // Click on empty canvas — record bend point orthogonally constrained
   const snappedPos = snapToOrthogonalCtx(self, snapToGridCtx(self, worldPos));
@@ -145,30 +194,43 @@ export function handleWireDrawingPointerDown(
 }
 
 export function completeWire(self: InteractionController, _endPosition?: Position): void {
-  if (!self._wireFrom) {
+  // A valid start is either a connected endpoint (port/junction) or a deferred
+  // wire tap. A floating start (empty canvas) cannot be completed.
+  const hasValidStart =
+    self._wireFromTap !== null ||
+    (self._wireFrom !== null && !isFloatingEndpoint(self._wireFrom));
+  if (!hasValidStart || !self._facade) {
     resetWireDrawing(self);
     return;
   }
 
-  // Cancel if starting from a floating endpoint (not connected to anything)
-  if (isFloatingEndpoint(self._wireFrom)) {
-    resetWireDrawing(self);
-    return;
-  }
-
+  // Resolve the destination endpoint from the snap target.
   let to: WireEndpoint | null = null;
-
   if (self._wireSnapTarget) {
     const snapTarget = self._wireSnapTarget;
     if (snapTarget.type === 'port' && snapTarget.parentId) {
       to = { componentId: snapTarget.parentId, portId: snapTarget.id };
     } else if (snapTarget.type === 'junction') {
-      to = { junctionId: snapTarget.id } as WireEndpoint;
+      to = { junctionId: snapTarget.id };
+    } else if (snapTarget.type === 'wire') {
+      // Tapping a wire: split it at the snap point, connect to the new junction.
+      const jid = self._facade.createJunctionOnWire(snapTarget.id, snapTarget.position);
+      if (jid) to = { junctionId: jid };
     }
   }
-  // No floating endpoint creation — wire must end at a port or junction
+  // No floating endpoint creation — wire must end at a port, junction, or wire.
 
-  if (to && self._facade) {
+  // Resolve the source endpoint, materializing a deferred wire tap if needed.
+  let from: WireEndpoint | null = self._wireFrom;
+  if (self._wireFromTap) {
+    const jid = self._facade.createJunctionOnWire(
+      self._wireFromTap.wireId,
+      self._wireFromTap.position
+    );
+    from = jid ? { junctionId: jid } : null;
+  }
+
+  if (from && to) {
     // Convert user bend points to WireHandle format
     const handles = self._wireBendPoints.length > 0
       ? self._wireBendPoints.map(pos => ({
@@ -178,7 +240,7 @@ export function completeWire(self: InteractionController, _endPosition?: Positio
       }))
       : undefined;
 
-    self._facade.addWire(self._wireFrom, to, {
+    self._facade.addWire(from, to, {
       fromExitDirection: self._wireFromExitDirection ?? undefined,
       handles,
     });
@@ -191,6 +253,7 @@ export function resetWireDrawing(self: InteractionController): void {
   self._visuals.clearWirePreview();
   self._visuals.hidePortSnap();
   self._wireFrom = null;
+  self._wireFromTap = null;
   self._wireFromExitDirection = null;
   self._lastMoveWorld = null;
   self._wireSnapTarget = null;
