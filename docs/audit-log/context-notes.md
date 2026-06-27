@@ -17,3 +17,26 @@
 1. `design.md` §3 결정(추출 B / 최소변경 A) 확정.
 2. Phase 1 범위 합의 후 `checklist.md`의 Phase 1 항목부터.
 3. 관련 코드: `opcua/audit.rs`(엔진), `commands/sim.rs:973~`(force 커맨드), `sim/monitoring.rs:135~`(force 내부), `lib.rs:428`(등록 패턴).
+
+## 2026-06-27 — 구현 (워크트리 feat/audit-log-runtime)
+
+- **결정 확정: (B) 범용 크레이트 추출.** 사용자가 "워크트리에서 1번((B)+Phase1)" 지시.
+- **엔진 = 새 크레이트 `crates/modone-audit`.** src-tauri 안 모듈이 아니라 크레이트로 뺀 이유. `[lib]test=false`라 src-tauri 단위테스트는 실행 불가지만, 크레이트는 `cargo test -p modone-audit`로 **실제 실행**된다(17개 통과). 거대파일(2174줄) 분해도 겸함. types/store/state로 분리.
+- **추출 중 잠재버그 2건 발견·수정.** `AuditLogQuery::default()`의 limit이 0이라 쿼리가 항상 0건 반환(manual Default 200으로 수정), set_max_rows 최소 100 clamp 미반영 테스트. 둘 다 `[lib]test=false`로 기존 테스트가 실행된 적 없어 잠복했음.
+- **opcua/audit.rs는 ~430줄로 슬림화.** enum(AuditEventCategory/Type) + 확장 트레잇(OpcuaAuditStore=Result 반환, OpcuaAuditState=no-op 반환) + 인증/계정 헬퍼만 유지. AuditLogger/AuditLoggerState는 엔진 타입 별칭. DB 경로는 `open_opcua_audit()` 자유함수로 보존.
+- **드롭한 미사용 헬퍼.** log_auth_unknown_user*, log_auth_disabled_account_with_ip (소비자 전수조사 결과 미사용).
+- **런타임 감사.** `sim/audit.rs`의 `RuntimeAuditState`(newtype — opcua 감사와 **Tauri State 타입 충돌 회피**), 별도 DB `<app_data>/runtime/audit_log.db`. force=Warning, 시뮬상태=Info. 훅은 Tauri 커맨드 레벨(`ladder_force_device`/`release`/`sim_run/stop/pause/resume/reset`). `sim_continue`가 `sim_resume`를 직접 호출해 함께 시그니처 수정.
+- **빌드 함정 회피.** 워크트리 빈 target는 openssl ~1시간. `CARGO_TARGET_DIR`을 메인 체크아웃 target으로 지정 + `scripts/with-perl.ps1 -- cargo check -p modone`(`-p`가 PS 파라미터로 오인되니 `--` 구분자 필수) → openssl 캐시 재사용으로 **38초** 컴파일 통과(경고는 전부 기존 dead-code).
+- **never-type fallback 힌트(sim.rs)는 빌드 차단 아님.** 2021 에디션 미래경고(★), 기존 opcua_query_audit_log와 동일 패턴.
+- **프론트.** `runtimeAuditService.ts` + `RuntimeAuditLogPanel.tsx`(tool zone). category/eventType이 opcua union과 안 맞아 런타임 전용 타입 정의(AuditSeverity만 재사용). 가상스크롤 없이 단순(limit 200). `tsc --noEmit` 통과.
+
+### 검증 명령 (재현용)
+- 엔진 테스트: `cargo test -p modone-audit` (빠름, openssl 무관).
+- src-tauri 컴파일: `$env:CARGO_TARGET_DIR='C:\Users\chanh\Projects\ModOne\target'; .\scripts\with-perl.ps1 -- cargo check -p modone`.
+- 프론트: `npx tsc --noEmit`.
+
+### 커밋
+1. a439eb3 crates/modone-audit 추출 (+잠재버그 2건 수정)
+2. 197fba6 opcua를 엔진 소비자로
+3. d98a74b 런타임 감사 훅 + 조회 커맨드
+4. (이번) 프론트 패널
