@@ -34,7 +34,7 @@ import { useSymbolStore } from '../../../stores/symbolStore';
 import { isCanvasDocument } from '../../../types/document';
 import type { CanvasDocumentData } from '../../../types/document';
 import type { BlockType, Block } from '../../OneCanvas/types';
-import { getBlockSize, getDefaultPorts, getDefaultBlockProps, getPowerSourcePorts } from '../../OneCanvas/blockDefinitions';
+import { getBlockSize, getDefaultPorts, getDefaultBlockProps, getPowerSourcePorts, getScopePorts } from '../../OneCanvas/blockDefinitions';
 import { generateId, snapToGridPosition } from '../../OneCanvas/utils/canvasHelpers';
 import { alignComponents, distributeComponents } from '../../OneCanvas/utils/canvas-commands';
 import {
@@ -111,6 +111,9 @@ function addComponent(type: BlockType, position: { x: number; y: number }) {
     let ports = getDefaultPorts(type);
     if (type === 'powersource') {
       ports = getPowerSourcePorts('positive');
+    } else if (type === 'scope') {
+      const channels = (getDefaultBlockProps('scope') as Record<string, unknown>).channels as number | undefined;
+      ports = getScopePorts(channels ?? 4);
     }
 
     const newBlock: Block = {
