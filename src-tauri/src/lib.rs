@@ -93,6 +93,7 @@ use commands::{
     // Simulation commands
     ladder_force_device,
     ladder_release_force,
+    runtime_query_audit_log,
     ladder_start_monitoring,
     ladder_stop_monitoring,
     list_layouts,
@@ -442,6 +443,23 @@ pub fn run() {
                         app.manage(AuditLoggerState::default());
                     }
                 }
+
+                // Initialize runtime operational audit logger (force/sim control).
+                // 별도 DB(<app_data>/runtime/audit_log.db) — OPC UA 감사와 분리.
+                match crate::sim::RuntimeAuditState::open(&app_data_dir) {
+                    Ok(state) => {
+                        if let Err(e) = state.inner().enforce_retention() {
+                            log::warn!("Runtime audit retention enforcement failed: {e}");
+                        }
+                        state.inner().start_retention_scheduler();
+                        app.manage(state);
+                        log::info!("Runtime operational audit logger initialized");
+                    }
+                    Err(e) => {
+                        log::error!("Failed to initialize runtime audit logger: {e}");
+                        app.manage(crate::sim::RuntimeAuditState::empty());
+                    }
+                }
             }
 
             // Wire tag event bridge with app handle and start subscriber
@@ -730,6 +748,7 @@ pub fn run() {
             ladder_stop_monitoring,
             ladder_force_device,
             ladder_release_force,
+            runtime_query_audit_log,
             // Explorer commands
             list_project_files,
             read_file_contents,
