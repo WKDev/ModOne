@@ -33,7 +33,9 @@
 - [x] P3.3 server: 노드별 last_published(HashMap) 상태, publish_nodes에서 incremental 시 임계 미만 억제·full sync는 re-baseline, stop 시 clear. E2E 회귀 통과
 - [ ] P3.4 UI + import/export  ← 프론트와 함께
 
-## Phase 4 — 프론트엔드 (스케일링 + 데드밴드 공통)  ← 남음
-- [ ] get/set 매핑 커맨드(`get_tag_opcua_mapping`/`set_tag_opcua_mapping`) + tagService + 타입
-- [ ] OpcUaMappingSection을 편집 가능하게(데이터타입/워드/바이트오더/접근/스케일링/데드밴드). 현재 read-only이고 데이터타입을 동적계산하던 것 → 저장 매핑 반영
-- [ ] CSV/JSON import/export에 scaling/deadband 필드
+## Phase 4 — 프론트엔드 (스케일링 + 데드밴드 공통) ✅ 대부분 완료
+- [x] get/set 매핑 커맨드(`get_tag_opcua_mapping`/`set_tag_opcua_mapping`, tags.rs) + lib.rs/commands 등록 + tagService + `types/opcuaMapping.ts`
+- [x] `OpcUaMappingEditor.tsx`: 데이터타입/워드/바이트오더/접근/스케일링/데드밴드 편집 + 저장(서버 재시작 시 적용 안내). OpcUaMappingSection이 read-only 파생 대신 에디터 렌더
+- [x] JSON export에 opcuaScaling/opcuaDeadband(활성 시) + TS JsonExportTagLeaf 타입
+- [ ] (follow-up) **import 측 매핑 필드 파싱** — JSON/CSV import는 원래 opcua* 매핑 필드를 전혀 안 받음(기존 갭). scaling/deadband 포함 전체 매핑 import는 별도 작업으로 분리. 지금은 UI/프로젝트 저장으로 설정 가능.
+- 검증: `cargo check --lib`(opcua-server) green, `tsc --noEmit` green.

@@ -17,6 +17,7 @@ import type {
   UpdateTagRequest,
 } from '../types/tags';
 import { TAG_EVENTS } from '../types/tags';
+import type { OpcUaMappingConfig } from '../types/opcuaMapping';
 
 export const tagService = {
   async listTags(includeRaw?: boolean): Promise<TagDefinition[]> {
@@ -26,6 +27,30 @@ export const tagService = {
       });
     } catch (error) {
       toast.error('태그 목록 조회 실패', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  },
+
+  /** Fetch a tag's OPC UA mapping config (stored, or a default if unset). */
+  async getTagOpcUaMapping(tagId: string): Promise<OpcUaMappingConfig> {
+    try {
+      return await invoke<OpcUaMappingConfig>('get_tag_opcua_mapping', { tagId });
+    } catch (error) {
+      toast.error('OPC UA 매핑 조회 실패', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  },
+
+  /** Store a tag's OPC UA mapping config. Applies on next server (re)start. */
+  async setTagOpcUaMapping(tagId: string, config: OpcUaMappingConfig): Promise<void> {
+    try {
+      await invoke('set_tag_opcua_mapping', { tagId, config });
+    } catch (error) {
+      toast.error('OPC UA 매핑 저장 실패', {
         description: error instanceof Error ? error.message : String(error),
       });
       throw error;

@@ -161,6 +161,8 @@ use commands::{
     update_tag_definition,
     write_tag,
     set_watched_tags,
+    get_tag_opcua_mapping,
+    set_tag_opcua_mapping,
     TagEventBridgeState,
     // Tag import/export commands
     import_tags_csv,
@@ -802,6 +804,8 @@ pub fn run() {
             update_tag_definition,
             write_tag,
             set_watched_tags,
+            get_tag_opcua_mapping,
+            set_tag_opcua_mapping,
             // Tag import/export commands
             import_tags_csv,
             import_tags_json,
