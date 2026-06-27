@@ -11,15 +11,18 @@
 - [x] inter-CPU 링크 모델 + 동기화 모드(유저 설정) 정의
 - [x] 설계 문서 작성
 - [x] 1차 비판 검토 ([01-design-review.md](./01-design-review.md))
-- [ ] 검토 결과로 00-design 개정 (review §D 6개 항목)
+- [x] 미결정 3건 확정 ([02-decisions.md](./02-decisions.md))
+- [ ] 결정 반영해 00-design 개정 (review §D + 02-decisions §개정 지시)
 
 ## 단계 0.5 — 검토에서 드러난 셸 비용 (00-design §9 무게중심 이동)
 > 엔진 N개는 쉽다. 진짜 비용은 아래 경계 레이어다.
 - [ ] 태그 레지스트리 키 = `(cpu_id, addr)` (전제조건, review B.3)
 - [ ] Tauri State = `CpuManager` **단수** manage + 커맨드 `cpu_id` 라우팅 (B.1)
 - [ ] 이벤트에 cpu_id 포함 + 프론트 상태 `Record<cpuId, ...>` (A.2)
-- [ ] 서버 = 단일 엔드포인트 + unit_id/네임스페이스 라우팅 (B.2, 코덱 작업)
-- [ ] area-aware authority 분류표 확정 (C.1, E)
+- [ ] 서버 = 단일 엔드포인트 + unit_id/네임스페이스 라우팅 (결정 3, 코덱 멀티-unit 신규)
+- [ ] authority = 기존 CanonicalAccess/WriteSource 재사용 + `CpuLink` 변형 추가 (결정 1)
+- [ ] 링크 타깃 정적 config 검증 (dst 겹침/래더 쓰기영역 겹침 거부) (결정 1)
+- [ ] 커맨드 `cpu_id: Option<CpuId>` + primary 규칙 (결정 2)
 - [ ] 실 CPU = 엔진/디버거 없는 경량 노드, 디버그 커맨드 거부 (C.2)
 - [ ] 링크 dst 스캔-위상 코히어런스 + 순환 금지 config 검증 (C.3, C.4)
 

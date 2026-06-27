@@ -73,7 +73,26 @@
 - 실 CPU엔 엔진/디버거 없음 → `CpuDriver::Real`은 경량, 디버그 커맨드 거부.
 - 링크 dst 스캔-위상 코히어런스(torn read) + 순환 링크 발진 방지 필요.
 
-### 다음 세션이 결정할 것
-- area-aware authority 분류표(어떤 canonical area가 외부 writable인가) — 미확정.
-- 커맨드 cpu_id primary 기본값 규칙.
-- 1차 서버 노출 범위: unit_id 라우팅 vs "노출은 1 CPU만, 내부 N개"(비용 절감).
+## 2026-06-27 — 미결정 3건 확정 (02-decisions.md)
+
+### 결정 1: authority는 재발명 금지, 기존 모델 재사용
+- **반전된 발견**: 검토 C.1 "area-aware authority 신규 설계"는 틀렸다. 이미
+  `types.rs:102-152`에 CanonicalAccess/WriteSource + area별 default_access 존재.
+  Timer/Counter/System=InternalOnly, Special=ReadOnly, 나머지=ReadWrite.
+- 멀티-CPU는 (a) `CanonicalWriteSource::CpuLink` 변형 추가(외부 취급),
+  (b) **정적 링크 검증**(dst 겹침 금지 + 가상 dst가 래더 쓰기영역과 겹치면
+  거부)만 더하면 됨. 런타임 per-cell owner 시스템 폐기 → 비용 급감.
+- 순환 발진(검토 C.4)도 이 정적 규칙으로 해소.
+
+### 결정 2: 커맨드 cpu_id = Option, None=primary
+- primary = config `primary:true` 플래그, 없으면 선언 첫 CPU. 단일 CPU 프로젝트는
+  자동 primary → 기존 sim_* 커맨드/프론트 **완전 하위 호환**.
+
+### 결정 3 (유저): v1 서버 노출 = 단일 엔드포인트 + unit_id/네임스페이스 라우팅
+- Modbus 한 리스너(502) + unit_id→CpuId 디스패치. **modbus-codec 멀티-unit
+  신규 작업이 v1 범위에 들어옴**(현재 단일 unit만, 코덱에 디스패치 부재 확인).
+- OPC-UA 한 서버 + CPU별 네임스페이스. CPU별 별도 포트는 비채택.
+- unit_id↔cpu_id 매핑 테이블 필요(태그키 (cpu_id,addr)와 결합).
+
+### 다음 할 일
+- 위 3결정을 00-design에 반영(§3 권위 교체, §2 서버 라우팅, 커맨드 라우팅 명문화).

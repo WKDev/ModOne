@@ -100,8 +100,10 @@ A→B, B→A가 겹치는 범위를 link하면 dirty 전파가 무한 핑퐁할 
 - §9 마이그레이션 → 무게중심을 셸(태그키·State·커맨드·이벤트·서버)로 이동.
   "엔진 N개"는 쉬운 단계, 진짜 비용은 그 다음.
 
-## E. 미결정 (다음 세션 결정 필요)
-- area-aware authority의 정확한 분류표(어떤 canonical area가 외부 writable인가).
-- 커맨드 `cpu_id` 기본값(primary) 선정 규칙 — config 첫 CPU? 명시 플래그?
-- unit_id 라우팅을 1차에 넣을지, 아니면 1차는 "단일 노출 CPU"로 제한할지
-  (서버 노출은 1개 CPU만, 내부는 N개 — 비용 절감 옵션).
+## E. 미결정 → **해소됨** ([02-decisions.md](./02-decisions.md))
+- ~~area-aware authority 분류표~~ → **이미 존재**(types.rs). 재사용 + `CpuLink`
+  변형 + 정적 링크 검증. 검토 C.1/§3 초안 폐기. (결정 1)
+- ~~커맨드 cpu_id 기본값~~ → `Option<CpuId>`, None=primary, primary=명시
+  플래그 or 선언 첫 CPU. 단일 CPU 완전 하위 호환. (결정 2)
+- ~~서버 노출 범위~~ → 단일 엔드포인트 + unit_id/네임스페이스 라우팅(유저
+  확정). modbus-codec 멀티-unit 디스패치를 v1 범위로. (결정 3)
