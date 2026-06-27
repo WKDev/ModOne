@@ -162,6 +162,31 @@ export class HitTester {
     };
   }
 
+  /**
+   * Find the nearest wire-level snap target (junction or wire segment) for wire
+   * connection snapping. Junctions win over wire segments on overlap.
+   * Returns a 'junction' hit or a 'segment' hit (carrying the wire id + the
+   * closest point on the wire), or null. Ports are handled separately by
+   * findNearestPort and take priority over this.
+   */
+  findNearestWireSnap(worldPos: Position, excludeWireId?: string): HitTestResult | null {
+    const searchRadius = Math.max(
+      this._config.wireHitRadius,
+      this._config.junctionHitRadius
+    );
+    const candidates = this._spatialIndex.queryPoint(worldPos, searchRadius);
+    if (candidates.length === 0) return null;
+
+    // Junction wins over wire segment on overlap.
+    const junctionHit = this._testJunctions(worldPos, candidates);
+    if (junctionHit) return junctionHit;
+
+    const wireHit = this._testWireSegments(worldPos, candidates);
+    if (wireHit && wireHit.id !== excludeWireId) return wireHit;
+
+    return null;
+  }
+
   // --------------------------------------------------------------------------
   // Private: Precise Geometric Tests
   // --------------------------------------------------------------------------
