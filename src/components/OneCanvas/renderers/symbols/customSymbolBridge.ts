@@ -1,6 +1,7 @@
 import { GraphicsContext } from 'pixi.js';
-import type { SymbolDefinition, GraphicPrimitive, SymbolPin } from '../../../../types/symbol';
-import type { Port, PortType, PortPosition } from '../../types';
+import type { SymbolDefinition, GraphicPrimitive } from '../../../../types/symbol';
+import type { Port } from '../../types';
+import { buildStaticPorts, resolveInstancePorts } from './resolveInstancePorts';
 
 // ---------------------------------------------------------------------------
 // Internal caches
@@ -130,37 +131,6 @@ function drawArc(
 }
 
 // ---------------------------------------------------------------------------
-// SymbolPin[] → Port[]
-// ---------------------------------------------------------------------------
-
-const PIN_TYPE_TO_PORT_TYPE: Record<string, PortType> = {
-  input: 'input',
-  output: 'output',
-  bidirectional: 'bidirectional',
-  power: 'input',
-  passive: 'bidirectional',
-};
-
-const PIN_ORIENTATION_TO_PORT_POSITION: Record<string, PortPosition> = {
-  right: 'right',
-  left: 'left',
-  up: 'top',
-  down: 'bottom',
-};
-
-function buildPorts(pins: SymbolPin[]): Port[] {
-  return pins
-    .filter((pin) => !pin.hidden)
-    .map((pin) => ({
-      id: pin.id,
-      type: PIN_TYPE_TO_PORT_TYPE[pin.type] ?? 'bidirectional',
-      label: pin.name,
-      position: PIN_ORIENTATION_TO_PORT_POSITION[pin.orientation] ?? 'left',
-      absolutePosition: { x: pin.position.x, y: pin.position.y },
-    }));
-}
-
-// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -203,14 +173,22 @@ export function getCustomSymbolSize(
   return { width: def.width, height: def.height };
 }
 
-export function getCustomSymbolPorts(symbolId: string): Port[] | null {
-  let ports = portsCache.get(symbolId);
-  if (ports) return ports;
-
+export function getCustomSymbolPorts(
+  symbolId: string,
+  instanceProps?: Record<string, string | number | boolean>,
+): Port[] | null {
   const def = definitionCache.get(symbolId);
   if (!def) return null;
 
-  ports = buildPorts(def.pins);
+  // Parametric symbols depend on the instance's properties — resolve fresh.
+  if (def.portTemplates && def.portTemplates.length > 0) {
+    return resolveInstancePorts(def, instanceProps);
+  }
+
+  // Static symbols: cache by id.
+  let ports = portsCache.get(symbolId);
+  if (ports) return ports;
+  ports = buildStaticPorts(def.pins);
   portsCache.set(symbolId, ports);
   return ports;
 }

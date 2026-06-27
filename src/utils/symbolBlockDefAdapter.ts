@@ -18,6 +18,7 @@ import type { SymbolDefinition, SymbolPin } from '../types/symbol';
 import type { BlockDefinition } from '../components/OneCanvas/blockDefinitions';
 import type { Port, PortType, PortPosition, Size } from '../components/OneCanvas/types';
 import { getBuiltinSymbolForBlockType } from '../assets/builtin-symbols';
+import { resolveEffectivePins } from '../components/OneCanvas/renderers/symbols/resolveInstancePorts';
 import { normalizeSymbolPortToMm, normalizeSymbolSizeToMm } from '../components/OneCanvas/canvasUnits';
 
 // ---------------------------------------------------------------------------
@@ -103,7 +104,8 @@ export function symbolPinToPort(
  */
 export function getAllPins(symbol: SymbolDefinition): SymbolPin[] {
   const allPins = [
-    ...symbol.pins,
+    // static pins + PortTemplate-expanded pins (using property defaults)
+    ...resolveEffectivePins(symbol),
     ...(symbol.units?.flatMap((unit) => unit.pins) ?? []),
   ];
   const seen = new Set<string>();

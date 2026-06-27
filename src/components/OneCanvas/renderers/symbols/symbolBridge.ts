@@ -103,6 +103,9 @@ export function getSymbolSizeFromDef(
 /**
  * Get ports by symbol ID.
  */
-export function getSymbolPortsFromDef(symbolId: string) {
-  return getCustomSymbolPorts(symbolId);
+export function getSymbolPortsFromDef(
+  symbolId: string,
+  instanceProps?: Record<string, string | number | boolean>,
+) {
+  return getCustomSymbolPorts(symbolId, instanceProps);
 }
