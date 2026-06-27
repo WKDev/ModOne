@@ -11,6 +11,9 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+// OPC UA 감사 헬퍼(log_auth_*/log_credential_*)를 AuditLoggerState에서 호출하기 위함.
+use super::audit::OpcuaAuditState;
+
 /// Default bcrypt cost factor. 12 is a good balance between security and performance.
 const DEFAULT_BCRYPT_COST: u32 = 12;
 

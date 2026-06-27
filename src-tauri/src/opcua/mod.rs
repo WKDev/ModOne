@@ -25,8 +25,9 @@ pub use opcua_codec::adapter::OpcUaAdapter;
 pub use opcua_codec::backend::OpcUaServerBackend;
 pub use control::OpcUaServerControl;
 pub use audit::{
-    AuditClientInfo, AuditEventCategory, AuditEventType, AuditLogEntry, AuditLogQuery,
-    AuditLogResult, AuditLogger, AuditLoggerState, AuditSeverity,
+    open_opcua_audit, AuditClientInfo, AuditEventCategory, AuditEventType, AuditLogEntry,
+    AuditLogQuery, AuditLogResult, AuditLogger, AuditLoggerState, AuditSeverity, OpcuaAuditState,
+    OpcuaAuditStore,
 };
 pub use auth::{
     AuthError, CredentialCache, UserAccount, UserAccountInfo, UserAccountStore, UserRole,

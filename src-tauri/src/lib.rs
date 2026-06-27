@@ -425,7 +425,7 @@ pub fn run() {
                 log::info!("OPC UA user account store loaded from {:?}", app_data_dir);
 
                 // Initialize OPC UA audit logger (SQLite)
-                match opcua::AuditLogger::open(&app_data_dir) {
+                match opcua::open_opcua_audit(&app_data_dir) {
                     Ok(audit_logger) => {
                         let state = AuditLoggerState::new(audit_logger);
                         // Enforce retention on startup
