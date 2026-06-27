@@ -559,6 +559,28 @@ describe('symbolDefinitionToXml', () => {
     expect(reparsed.visualStates?.energized?.primitiveOverrides?.['body']?.stroke).toBe('#22c55e');
   });
 
+  it('round-trips animations of every type (rotate/fade/blink/move)', () => {
+    const parsed = parseSymbolXml(MINIMAL_RELAY_XML).data!;
+    const withAnims: SymbolDefinition = {
+      ...parsed,
+      animations: {
+        energized: [
+          { type: 'rotate', target: 'body', speed: 90, pivot: { x: 40, y: 40 } },
+          { type: 'fade-in', target: 'body', duration: 500 },
+          { type: 'blink', target: 'body', duration: 800 },
+          { type: 'move', target: 'body', dx: 12, dy: -4, duration: 1200 },
+        ],
+      },
+    };
+    const reparsed = parseSymbolXml(symbolDefinitionToXml(withAnims)).data!;
+    const specs = reparsed.animations?.energized ?? [];
+    expect(specs).toHaveLength(4);
+    expect(specs[0]).toMatchObject({ type: 'rotate', target: 'body', speed: 90, pivot: { x: 40, y: 40 } });
+    expect(specs[1]).toMatchObject({ type: 'fade-in', target: 'body', duration: 500 });
+    expect(specs[2]).toMatchObject({ type: 'blink', target: 'body', duration: 800 });
+    expect(specs[3]).toMatchObject({ type: 'move', target: 'body', dx: 12, dy: -4, duration: 1200 });
+  });
+
   it('uses ms: namespace prefix in output', () => {
     const parsed = parseSymbolXml(MINIMAL_RELAY_XML).data!;
     const xml = symbolDefinitionToXml(parsed);

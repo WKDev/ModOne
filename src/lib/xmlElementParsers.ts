@@ -1,4 +1,4 @@
-import type { GraphicPrimitive, GraphicPrimitiveOverride, SymbolProperty, SymbolUnit, SymbolVisualVariant, SymbolAnimationSpec, PinElectricalType, PinElectricalTypeV2, PinFunctionalRole, PinShape, PinOrientation } from "@/types/symbol";
+import type { GraphicPrimitive, GraphicPrimitiveOverride, SymbolProperty, SymbolUnit, SymbolVisualVariant, SymbolAnimationSpec, SymbolAnimationType, PinElectricalType, PinElectricalTypeV2, PinFunctionalRole, PinShape, PinOrientation } from "@/types/symbol";
 import type { SymbolBehaviorBinding, BehaviorArchetype, BehaviorTemplateId } from "@/types/behavior";
 import type { BehaviorRule, BehaviorCondition, BehaviorAction, BlockDomain, ConditionType, ActionType } from "@/types/behaviorRules";
 import { NS, attr, boolAttr, childEl, childEls, childText, elText, numAttr, requiredAttr } from "./xmlDomUtils";
@@ -460,6 +460,10 @@ export function parseVisualStates(
 // Animations Parser
 // ============================================================================
 
+const ANIMATION_TYPES: ReadonlySet<string> = new Set<SymbolAnimationType>([
+  'rotate', 'fade-in', 'fade-out', 'blink', 'move',
+]);
+
 export function parseAnimations(
   animsEl: Element,
   path: string,
@@ -483,13 +487,16 @@ export function parseAnimations(
         continue;
       }
 
-      if (type === 'rotate') {
+      if (ANIMATION_TYPES.has(type)) {
         const pivotXRaw = attr(animEl, 'pivotX');
         const pivotYRaw = attr(animEl, 'pivotY');
         const spec: SymbolAnimationSpec = {
-          type: 'rotate',
+          type: type as SymbolAnimationType,
           target,
           speed: attr(animEl, 'speed') !== undefined ? numAttr(animEl, 'speed') : undefined,
+          duration: attr(animEl, 'duration') !== undefined ? numAttr(animEl, 'duration') : undefined,
+          dx: attr(animEl, 'dx') !== undefined ? numAttr(animEl, 'dx') : undefined,
+          dy: attr(animEl, 'dy') !== undefined ? numAttr(animEl, 'dy') : undefined,
           pivot:
             pivotXRaw !== undefined && pivotYRaw !== undefined
               ? { x: parseFloat(pivotXRaw), y: parseFloat(pivotYRaw) }
@@ -498,7 +505,7 @@ export function parseAnimations(
         specs.push(spec);
       } else {
         issues.push({
-          message: `Animation type '${type}' not yet supported by renderer`,
+          message: `Animation type '${type}' not recognized`,
           level: 'warning',
           path,
         });

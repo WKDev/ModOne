@@ -1,6 +1,14 @@
-// 비주얼 스테이트별 회전 애니메이션(SymbolAnimationSpec)을 편집하는 패널
-import type { SymbolAnimationSpec } from '../../types/symbol';
+// 비주얼 스테이트별 애니메이션(회전/페이드/깜빡임/이동)을 편집하는 패널
+import type { SymbolAnimationSpec, SymbolAnimationType } from '../../types/symbol';
 import { Plus, Trash2 } from 'lucide-react';
+
+const ANIM_TYPE_OPTIONS: Array<{ value: SymbolAnimationType; label: string }> = [
+  { value: 'rotate', label: 'Rotate' },
+  { value: 'fade-in', label: 'Fade in' },
+  { value: 'fade-out', label: 'Fade out' },
+  { value: 'blink', label: 'Blink' },
+  { value: 'move', label: 'Move' },
+];
 
 interface AnimationsPanelProps {
   /** Visual state names the animation can be attached to. */
@@ -76,7 +84,7 @@ export function AnimationsPanel({ stateNames, graphics, animations, onChange }: 
   return (
     <div className="px-4 py-2 space-y-2">
       <p className="text-[10px] text-neutral-500">
-        지정한 Visual State가 활성일 때 대상 도형을 회전시킨다. 배치된 캔버스의 시뮬레이션에서 재생된다.
+        지정한 Visual State가 활성일 때 대상 도형에 애니메이션을 재생한다. Preview 모드와 배치된 캔버스의 시뮬레이션에서 모두 재생된다.
       </p>
 
       {rows.length === 0 && (
@@ -84,8 +92,11 @@ export function AnimationsPanel({ stateNames, graphics, animations, onChange }: 
       )}
 
       {rows.map((row) => (
-        <div key={`${row.state}-${row.index}`} className="flex items-end gap-1.5">
-          <label className="flex-1">
+        <div
+          key={`${row.state}-${row.index}`}
+          className="flex flex-wrap items-end gap-1.5 border-b border-neutral-800/60 pb-2"
+        >
+          <label className="flex-1 min-w-[80px]">
             <span className="block text-[9px] uppercase tracking-wider text-neutral-500">State</span>
             <select
               value={row.state}
@@ -97,7 +108,7 @@ export function AnimationsPanel({ stateNames, graphics, animations, onChange }: 
               ))}
             </select>
           </label>
-          <label className="flex-1">
+          <label className="flex-1 min-w-[80px]">
             <span className="block text-[9px] uppercase tracking-wider text-neutral-500">Target</span>
             <select
               value={row.spec.target}
@@ -109,15 +120,66 @@ export function AnimationsPanel({ stateNames, graphics, animations, onChange }: 
               ))}
             </select>
           </label>
-          <label className="w-16">
-            <span className="block text-[9px] uppercase tracking-wider text-neutral-500">°/s</span>
-            <input
-              type="number"
-              value={row.spec.speed ?? 120}
-              onChange={(e) => updateRow(row.state, row.index, { speed: Number(e.target.value) })}
+          <label className="flex-1 min-w-[80px]">
+            <span className="block text-[9px] uppercase tracking-wider text-neutral-500">Type</span>
+            <select
+              value={row.spec.type}
+              onChange={(e) => updateRow(row.state, row.index, { type: e.target.value as SymbolAnimationType })}
               className={inputClass}
-            />
+            >
+              {ANIM_TYPE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
           </label>
+
+          {row.spec.type === 'rotate' && (
+            <label className="w-16">
+              <span className="block text-[9px] uppercase tracking-wider text-neutral-500">°/s</span>
+              <input
+                type="number"
+                value={row.spec.speed ?? 120}
+                onChange={(e) => updateRow(row.state, row.index, { speed: Number(e.target.value) })}
+                className={inputClass}
+              />
+            </label>
+          )}
+
+          {row.spec.type === 'move' && (
+            <>
+              <label className="w-14">
+                <span className="block text-[9px] uppercase tracking-wider text-neutral-500">dx</span>
+                <input
+                  type="number"
+                  value={row.spec.dx ?? 8}
+                  onChange={(e) => updateRow(row.state, row.index, { dx: Number(e.target.value) })}
+                  className={inputClass}
+                />
+              </label>
+              <label className="w-14">
+                <span className="block text-[9px] uppercase tracking-wider text-neutral-500">dy</span>
+                <input
+                  type="number"
+                  value={row.spec.dy ?? 0}
+                  onChange={(e) => updateRow(row.state, row.index, { dy: Number(e.target.value) })}
+                  className={inputClass}
+                />
+              </label>
+            </>
+          )}
+
+          {row.spec.type !== 'rotate' && (
+            <label className="w-20">
+              <span className="block text-[9px] uppercase tracking-wider text-neutral-500">ms</span>
+              <input
+                type="number"
+                value={row.spec.duration ?? 1000}
+                onChange={(e) => updateRow(row.state, row.index, { duration: Number(e.target.value) })}
+                className={inputClass}
+              />
+            </label>
+          )}
+
           <button
             type="button"
             onClick={() => removeRow(row.state, row.index)}
@@ -135,7 +197,7 @@ export function AnimationsPanel({ stateNames, graphics, animations, onChange }: 
         disabled={graphics.length === 0}
         className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded bg-neutral-700 text-neutral-200 hover:bg-neutral-600 disabled:opacity-50"
       >
-        <Plus size={12} /> Add rotate animation
+        <Plus size={12} /> Add animation
       </button>
       {graphics.length === 0 && (
         <p className="text-[10px] text-amber-400/80">회전시킬 도형이 필요하다 (도형을 먼저 그려라).</p>

@@ -229,6 +229,9 @@ export function serializeAnimationsBlock(
         `type="${spec.type}"`,
         `target="${xmlEsc(spec.target)}"`,
         spec.speed !== undefined ? `speed="${spec.speed}"` : null,
+        spec.duration !== undefined ? `duration="${spec.duration}"` : null,
+        spec.dx !== undefined ? `dx="${spec.dx}"` : null,
+        spec.dy !== undefined ? `dy="${spec.dy}"` : null,
         spec.pivot ? `pivotX="${spec.pivot.x}" pivotY="${spec.pivot.y}"` : null,
       ].filter(Boolean).join(' ');
       return `${indent}    <ms:Animation ${parts}/>`;
