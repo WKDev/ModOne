@@ -338,17 +338,19 @@ export class SimulationRenderer {
     }
 
     const animations: ActiveBlockAnimation[] = [];
-    for (const { displayObject, spec } of visual.animationTargets.values()) {
-      if (spec.type === 'rotate' && spec.pivot && 'pivot' in displayObject) {
-        displayObject.pivot.set(spec.pivot.x, spec.pivot.y);
+    for (const targets of visual.animationTargets.values()) {
+      for (const { displayObject, spec } of targets) {
+        if (spec.type === 'rotate' && spec.pivot && 'pivot' in displayObject) {
+          displayObject.pivot.set(spec.pivot.x, spec.pivot.y);
+        }
+        // _stopBlockAnimations ran first, so the display object is at its base.
+        animations.push({
+          target: displayObject,
+          spec,
+          base: captureAnimationBase(displayObject),
+          elapsed: 0,
+        });
       }
-      // _stopBlockAnimations ran first, so the display object is at its base.
-      animations.push({
-        target: displayObject,
-        spec,
-        base: captureAnimationBase(displayObject),
-        elapsed: 0,
-      });
     }
 
     if (animations.length > 0) {

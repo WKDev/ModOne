@@ -99,7 +99,8 @@ export interface BlockVisualHandle {
   container: Container;
   symbolRoot: Container;
   tintables: readonly TintableDisplayNode[];
-  animationTargets: ReadonlyMap<string, BlockAnimationTarget>;
+  /** Per-primitive animation specs (a primitive may carry several). */
+  animationTargets: ReadonlyMap<string, BlockAnimationTarget[]>;
   activeVisualState: string | null;
   definitionId: string | null;
 }
@@ -111,7 +112,7 @@ interface BlockDisplayObject {
   label: Text | null;
   designation: Text | null;
   tintables: TintableDisplayNode[];
-  animationTargets: Map<string, BlockAnimationTarget>;
+  animationTargets: Map<string, BlockAnimationTarget[]>;
   primaryGraphics: Graphics | null;
   definitionId: string | null;
   activeVisualState: string | null;
@@ -567,13 +568,16 @@ export class BlockRenderer {
       }
 
       if (primitive.id) {
-        const animationSpec = getAnimationsForState(definition, state).find((spec) => spec.target === primitive.id);
-        if (animationSpec) {
-          dobj.animationTargets.set(primitive.id, {
-            displayObject: rendered.display,
-            baseRotation: rendered.display.rotation,
-            spec: animationSpec,
-          });
+        const specs = getAnimationsForState(definition, state).filter((spec) => spec.target === primitive.id);
+        if (specs.length > 0) {
+          dobj.animationTargets.set(
+            primitive.id,
+            specs.map((spec) => ({
+              displayObject: rendered.display,
+              baseRotation: rendered.display.rotation,
+              spec,
+            })),
+          );
         }
       }
     }

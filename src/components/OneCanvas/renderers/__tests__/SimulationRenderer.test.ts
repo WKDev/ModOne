@@ -35,11 +35,13 @@ describe('SimulationRenderer', () => {
       animationTargets: new Map([
         [
           'rotor',
-          {
-            displayObject: rotor as never,
-            baseRotation: 0,
-            spec: { type: 'rotate', target: 'rotor', speed: 180 },
-          },
+          [
+            {
+              displayObject: rotor as never,
+              baseRotation: 0,
+              spec: { type: 'rotate', target: 'rotor', speed: 180 },
+            },
+          ],
         ],
       ]),
     };
