@@ -10,6 +10,8 @@ use crate::mapping::*;
             access_level: MappingAccessLevel::ReadWrite,
             description: None,
             string_config: None,
+            scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         }
     }
 

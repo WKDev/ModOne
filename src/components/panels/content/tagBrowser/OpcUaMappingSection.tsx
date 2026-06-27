@@ -2,28 +2,11 @@ import { memo, useState, useCallback } from 'react';
 import { ChevronDown, ChevronRight, Radio } from 'lucide-react';
 import type { TagDefinition } from '../../../../types/tags';
 import { useOpcUaStore, selectRunning } from '../../../../stores/opcuaStore';
+import { OpcUaMappingEditor } from './OpcUaMappingEditor';
 
 // ============================================================================
 // Helpers
 // ============================================================================
-
-/** Map tag data type to OPC UA data type name */
-function mapOpcUaDataType(tag: TagDefinition): string {
-  const addr = tag.canonicalAddress;
-  // Bit-level addresses → Boolean, word-level → UInt16
-  if (addr.bitIndex !== undefined) return 'Boolean';
-  const bitAreas = [
-    'InputBit', 'OutputBit', 'InternalBit', 'RetentiveBit',
-    'SpecialBit', 'TimerDoneBit', 'CounterDoneBit', 'SystemBit',
-  ];
-  if (bitAreas.includes(addr.area)) return 'Boolean';
-  return 'UInt16';
-}
-
-/** Map tag access to OPC UA access level string */
-function mapOpcUaAccessLevel(access: TagDefinition['access']): string {
-  return access === 'readwrite' ? 'CurrentRead | CurrentWrite' : 'CurrentRead';
-}
 
 /** Build the OPC UA node ID string for a tag */
 function buildNodeId(tag: TagDefinition): string {
@@ -124,8 +107,6 @@ export const OpcUaMappingSection = memo(function OpcUaMappingSection({
   const nodeId = buildNodeId(tag);
   const browseName = tag.displayName;
   const browsePath = buildBrowsePath(tag);
-  const dataType = mapOpcUaDataType(tag);
-  const accessLevel = mapOpcUaAccessLevel(tag.access);
   const namespaceIndex = '2';
 
   return (
@@ -169,11 +150,8 @@ export const OpcUaMappingSection = memo(function OpcUaMappingSection({
           {/* Browse Path */}
           <MappingRow label="탐색 경로" value={browsePath} mono />
 
-          {/* OPC UA Data Type */}
-          <MappingRow label="데이터 타입" value={dataType} />
-
-          {/* Access Level */}
-          <MappingRow label="접근 레벨" value={accessLevel} />
+          {/* Editable mapping: data type / byte order / access / scaling / deadband */}
+          <OpcUaMappingEditor tagId={tag.tagId} />
 
           {/* Server status hint */}
           {!isRunning && (

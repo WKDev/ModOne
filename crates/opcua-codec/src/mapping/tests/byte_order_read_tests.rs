@@ -10,6 +10,8 @@ use crate::mapping::*;
             access_level: MappingAccessLevel::ReadOnly,
             description: None,
             string_config: None,
+            scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         }
     }
 
@@ -763,6 +765,8 @@ use crate::mapping::*;
                 max_string_length: Some(10),
                 ..Default::default()
             }),
+            scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         };
         let err = cfg.validate().unwrap_err();
         assert!(err.contains("exceeds maxStringLength"));
@@ -790,6 +794,8 @@ use crate::mapping::*;
                 null_terminated: true,
                 max_string_length: Some(10),
             }),
+            scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         };
         let json = serde_json::to_string(&cfg).unwrap();
         let de: OpcUaMappingConfig = serde_json::from_str(&json).unwrap();
@@ -812,6 +818,8 @@ use crate::mapping::*;
             access_level: MappingAccessLevel::ReadOnly,
             description: None,
             string_config: Some(StringMappingConfig::default()),
+            scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         };
         let json = serde_json::to_string(&cfg).unwrap();
         assert!(!json.contains("maxStringLength"));
@@ -887,6 +895,8 @@ use crate::mapping::*;
                 null_terminated: true,
                 max_byte_length: None,
             }),
+            scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         };
         assert!(cfg.validate().is_ok());
 
@@ -913,6 +923,8 @@ use crate::mapping::*;
                 null_terminated: true,
                 max_string_length: Some(8),
             }),
+            scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         };
         assert!(cfg.validate().is_ok());
     }
@@ -926,6 +938,8 @@ use crate::mapping::*;
             access_level: MappingAccessLevel::ReadOnly,
             description: None,
             string_config: None,
+            scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         };
         assert!(cfg.validate().is_ok());
 

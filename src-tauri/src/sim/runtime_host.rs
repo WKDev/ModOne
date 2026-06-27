@@ -7,8 +7,11 @@ use crate::modbus::{ModbusAdapter, ModbusMemory};
 use crate::plc_runtime::resolve_modbus_mapping_policy;
 use crate::project::{PlcSettings, ProjectConfig};
 
+use modone_contract::CpuId;
+
 use super::canvas_sync::CanvasSync;
 use super::counter::CounterManager;
+use super::cpu_node::{CpuNode, PRIMARY_CPU_ID};
 use super::debugger::SimDebugger;
 use super::engine::{EngineEvent, OneSimEngine};
 use super::executor::CompiledProgram;
@@ -25,9 +28,8 @@ const SIM_STATE_CHANGE_EVENT: &str = "sim:state-change";
 const SIM_WATCHDOG_EVENT: &str = "sim:watchdog";
 
 pub struct SimulationRuntimeHost {
-    engine: Arc<Mutex<Option<Arc<OneSimEngine>>>>,
+    cpu: CpuNode,
     debugger: Arc<SimDebugger>,
-    runtime: Arc<CanonicalRuntimeFacade>,
     modbus_memory: Option<Arc<ModbusMemory>>,
     program: Arc<Mutex<Option<CompiledProgram>>>,
     scan_task: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
@@ -44,12 +46,11 @@ impl SimulationRuntimeHost {
         tag_registry: SharedTagRegistry,
     ) -> Self {
         Self {
-            engine: Arc::new(Mutex::new(None)),
+            cpu: CpuNode::new_virtual(CpuId::from(PRIMARY_CPU_ID), runtime),
             debugger: Arc::new(SimDebugger::with_tag_registry(
                 100,
                 Arc::clone(&tag_registry),
             )),
-            runtime,
             modbus_memory: None,
             program: Arc::new(Mutex::new(None)),
             scan_task: Arc::new(Mutex::new(None)),
@@ -72,11 +73,11 @@ impl SimulationRuntimeHost {
     }
 
     pub fn engine(&self) -> Arc<Mutex<Option<Arc<OneSimEngine>>>> {
-        Arc::clone(&self.engine)
+        Arc::clone(self.cpu.engine_slot())
     }
 
     pub fn runtime(&self) -> &Arc<CanonicalRuntimeFacade> {
-        &self.runtime
+        self.cpu.runtime()
     }
 
     pub fn debugger(&self) -> Arc<SimDebugger> {
@@ -107,7 +108,7 @@ impl SimulationRuntimeHost {
         canvas_sync: Option<Arc<CanvasSync>>,
         config_override: Option<SimulationConfig>,
     ) -> Result<(), String> {
-        let mut engine_guard = self.engine.lock();
+        let mut engine_guard = self.cpu.engine_slot().lock();
 
         if let Some(ref engine) = *engine_guard {
             if engine.is_running() {
@@ -117,7 +118,7 @@ impl SimulationRuntimeHost {
 
         if engine_guard.is_none() {
             let engine = Arc::new(OneSimEngine::with_components(
-                Arc::clone(&self.runtime),
+                Arc::clone(self.cpu.runtime()),
                 Arc::new(TimerManager::new()),
                 Arc::new(CounterManager::new()),
             ));
@@ -136,7 +137,7 @@ impl SimulationRuntimeHost {
         *self.canvas_sync.write() = canvas_sync;
         self.monitoring.start(
             app.clone(),
-            Arc::clone(&self.runtime),
+            Arc::clone(self.cpu.runtime()),
             Arc::clone(&self.debugger),
             Arc::clone(&self.tag_registry),
             Arc::clone(engine.timer_mgr()),
@@ -173,7 +174,7 @@ impl SimulationRuntimeHost {
 
     pub fn stop(&self, app: &AppHandle) -> Result<(), String> {
         let stopped = {
-            let engine_guard = self.engine.lock();
+            let engine_guard = self.cpu.engine_slot().lock();
             if let Some(ref engine) = *engine_guard {
                 engine.stop();
                 true
@@ -197,7 +198,7 @@ impl SimulationRuntimeHost {
     }
 
     pub fn pause(&self, app: &AppHandle) -> Result<(), String> {
-        let engine_guard = self.engine.lock();
+        let engine_guard = self.cpu.engine_slot().lock();
         let engine = engine_guard
             .as_ref()
             .ok_or_else(|| "Simulation is not running".to_string())?;
@@ -207,7 +208,7 @@ impl SimulationRuntimeHost {
     }
 
     pub fn resume(&self, app: &AppHandle) -> Result<(), String> {
-        let engine_guard = self.engine.lock();
+        let engine_guard = self.cpu.engine_slot().lock();
         let engine = engine_guard
             .as_ref()
             .ok_or_else(|| "Simulation is not running".to_string())?;
@@ -218,7 +219,7 @@ impl SimulationRuntimeHost {
 
     pub fn reset(&self, app: &AppHandle) {
         {
-            let mut engine_guard = self.engine.lock();
+            let mut engine_guard = self.cpu.engine_slot().lock();
             if let Some(ref engine) = *engine_guard {
                 engine.stop();
             }
@@ -241,7 +242,8 @@ impl SimulationRuntimeHost {
     }
 
     pub fn status(&self) -> SimulationStatus {
-        self.engine
+        self.cpu
+            .engine_slot()
             .lock()
             .as_ref()
             .map(|engine| engine.get_status())
@@ -249,7 +251,8 @@ impl SimulationRuntimeHost {
     }
 
     pub fn scan_info(&self) -> ScanCycleInfo {
-        self.engine
+        self.cpu
+            .engine_slot()
             .lock()
             .as_ref()
             .map(|engine| engine.get_scan_info())
@@ -283,12 +286,12 @@ impl SimulationRuntimeHost {
         };
 
         let adapter = Arc::new(ModbusAdapter::new(
-            self.runtime.handle(),
+            self.cpu.runtime().handle(),
             Arc::clone(modbus_memory),
             policy,
         ));
         self.protocol_runtime
-            .attach_adapter("modbus", Arc::clone(&self.runtime), adapter)
+            .attach_adapter("modbus", Arc::clone(self.cpu.runtime()), adapter)
     }
 
     fn spawn_event_forwarder(&self, app: AppHandle, engine: Arc<OneSimEngine>) {
@@ -299,7 +302,7 @@ impl SimulationRuntimeHost {
         let mut rx = engine.subscribe_events();
         let monitoring = Arc::clone(&self.monitoring);
         let protocol_runtime = Arc::clone(&self.protocol_runtime);
-        let runtime = Arc::clone(&self.runtime);
+        let runtime = Arc::clone(self.cpu.runtime());
         let canvas_sync = Arc::clone(&self.canvas_sync);
         let tag_registry = Arc::clone(&self.tag_registry);
         let event_task = tokio::spawn(async move {

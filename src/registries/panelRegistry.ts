@@ -27,6 +27,7 @@ import { TagBrowserPanel } from '../components/panels/content/TagBrowserPanel';
 import { WelcomePanel } from '../components/panels/content/WelcomePanel';
 import { ProjectSettingsPanel } from '../components/panels/content/ProjectSettingsPanel';
 import { OpcUaServerPanel } from '../components/panels/content/OpcUaServerPanel';
+import { RuntimeAuditLogPanel } from '../components/panels/content/RuntimeAuditLogPanel';
 
 export interface PanelRegistration {
   label: string;
@@ -121,6 +122,11 @@ const registry = {
     label: 'OPC UA Server',
     zone: 'editor',
     component: OpcUaServerPanel,
+  },
+  'runtime-audit-log': {
+    label: 'Runtime Audit Log',
+    zone: 'tool',
+    component: RuntimeAuditLogPanel,
   },
 } satisfies Record<PanelType, PanelRegistration>;
 

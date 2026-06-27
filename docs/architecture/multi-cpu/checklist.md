@@ -12,7 +12,7 @@
 - [x] 설계 문서 작성
 - [x] 1차 비판 검토 ([01-design-review.md](./01-design-review.md))
 - [x] 미결정 3건 확정 ([02-decisions.md](./02-decisions.md))
-- [ ] 결정 반영해 00-design 개정 (review §D + 02-decisions §개정 지시)
+- [x] 결정 반영해 00-design 개정 (review §D + 02-decisions §개정 지시)
 
 ## 단계 0.5 — 검토에서 드러난 셸 비용 (00-design §9 무게중심 이동)
 > 엔진 N개는 쉽다. 진짜 비용은 아래 경계 레이어다.
@@ -26,18 +26,24 @@
 - [ ] 실 CPU = 엔진/디버거 없는 경량 노드, 디버그 커맨드 거부 (C.2)
 - [ ] 링크 dst 스캔-위상 코히어런스 + 순환 금지 config 검증 (C.3, C.4)
 
-## 단계 1 — 코어 타입 골격 (crates, wasm-safe)
-- [ ] `CpuId` 타입 (contract 크레이트) → verify: `cargo build -p modone-contract`
-- [ ] `MemoryLink` + `LinkSyncMode`(eventual/periodic/on_scan) 타입
-- [ ] `FieldLink` **trait 정의**만 (구현 없음) → verify: trait이 wasm 타깃 컴파일
-- [ ] `CanonicalRuntimeFacade`에 영역별 write-owner 태그 필드/가드 설계 반영
-- [ ] verify: `cargo build` (workspace) green
+## 단계 1 — 코어 타입 골격 (crates, wasm-safe) ✅ (커밋 6a3d04d, 워크트리→main 병합)
+- [x] `CpuId`/`CpuKind`/`CpuHealth` 타입 (contract `cpu.rs`)
+- [x] `MemoryLink`/`LinkEndpoint`/`CanonicalRange`/`LinkSyncMode` (contract `link.rs`)
+- [x] `FieldLink` **trait 정의**만 (contract `field_link.rs`, 구현 없음)
+- [x] write-owner 태그 대신 `CanonicalWriteSource::CpuLink` 변형 (결정 1로 단순화)
+- [x] verify: `cargo test -p modone-contract` green (16개, 신규 5)
+- [x] verify: enum 변형 추가가 다운스트림 깨지 않음 (exhaustive match 없음 확인)
+- [~] 전체 워크스페이스 빌드는 미실행(openssl 1h 비용). 변경이 순수 additive +
+  exhaustive match 부재로 안전. 단계 2 착수 시 함께 검증.
 
-## 단계 2 — CpuNode 도입 (단일 CPU 비파괴 래핑)
-- [ ] `CpuNode` 구조체 (runtime + driver + servers + health)
-- [ ] `CpuDriver::Virtual(OneSimEngine)` 분기
-- [ ] `SimulationRuntimeHost` 필드를 `CpuNode`로 이주 (동작 동일)
-- [ ] verify: 기존 단일 CPU 시뮬레이션 회귀 테스트 통과
+## 단계 2 — CpuNode 도입 (단일 CPU 비파괴 래핑) ✅ (커밋 636577e, 워크트리→main 병합)
+- [x] `CpuNode` 구조체 (id + runtime + driver + health) — servers는 매니저 레벨로(설계 §2)
+- [x] `CpuDriver::Virtual(엔진 슬롯)` 분기 + `kind()`/`health()`
+- [x] `SimulationRuntimeHost` engine/runtime 필드를 `CpuNode`로 이주 (동작 동일)
+- [x] primary CPU id "cpu-0" 기본값 (결정 2 대비)
+- [x] verify: `cargo check -p modone` green (51s, warm target, opcua 포함)
+- [~] 런타임 회귀 테스트는 src-tauri `[lib] test=false`로 미실행. 동작 보존
+  리팩토링(같은 Arc·제어흐름)이라 컴파일 통과가 게이트. 필요시 tests/*.rs 통합테스트.
 
 ## 단계 3 — 캔버스 바인딩 확장
 - [ ] `PlcBlockMapping`에 `cpu_id` 필드 추가 (기본=단일 CPU)

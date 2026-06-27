@@ -151,7 +151,8 @@ pub use canvas_sync::{
 
 // Re-export simulation commands
 pub use sim::{
-    ladder_force_device, ladder_release_force, ladder_start_monitoring, ladder_stop_monitoring,
+    ladder_force_device, ladder_release_force, runtime_query_audit_log,
+    ladder_start_monitoring, ladder_stop_monitoring,
     sim_add_breakpoint, sim_add_watch, sim_continue, sim_create_raw_tag, sim_get_breakpoints,
     sim_get_debugger_state, sim_get_memory_snapshot, sim_get_scan_info, sim_get_status,
     sim_get_tag, sim_get_watches, sim_list_tags, sim_load_program, sim_pause, sim_read_binding,
@@ -207,7 +208,7 @@ pub use opcua::{
 };
 
 // Re-export tag commands and state
-pub use tags::{check_canonical_address_duplicate, create_tag, delete_tag, delete_tags, list_tags, read_tags, set_watched_tags, update_tag_definition, write_tag, TagEventBridgeState};
+pub use tags::{check_canonical_address_duplicate, create_tag, delete_tag, delete_tags, get_tag_opcua_mapping, list_tags, read_tags, set_tag_opcua_mapping, set_watched_tags, update_tag_definition, write_tag, TagEventBridgeState};
 
 // Re-export tag import/export commands
 pub use tag_import_export::{export_tags_csv, export_tags_json, export_tags_nodeset2, import_tags_csv, import_tags_json, validate_csv_import, validate_json_import};

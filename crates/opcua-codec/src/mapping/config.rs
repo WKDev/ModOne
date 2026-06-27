@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use modone_contract::CanonicalAddress;
 
-use crate::mapping::{ByteOrder, MappingAccessLevel, OpcUaDataType, RegisterRange};
+use crate::mapping::{
+    ByteOrder, DeadbandConfig, MappingAccessLevel, OpcUaDataType, RegisterRange, ScalingConfig,
+};
 
 /// Per-tag OPC UA mapping configuration.
 ///
@@ -49,6 +51,19 @@ pub struct OpcUaMappingConfig {
     /// user-specified maximum register count (`maxStringLength`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub string_config: Option<StringMappingConfig>,
+
+    /// Optional raw↔engineering scaling. When enabled (`kind != None`) on a
+    /// numeric type, the OPC UA node exposes the engineering value as `Double`
+    /// and client writes are reverse-scaled back to the raw register type.
+    /// Defaults to disabled (identity) and is omitted from JSON when disabled.
+    #[serde(default, skip_serializing_if = "ScalingConfig::is_disabled")]
+    pub scaling: ScalingConfig,
+
+    /// Optional publish deadband. When enabled on a numeric type, the live server
+    /// suppresses node updates whose value change is below the threshold.
+    /// Defaults to disabled and is omitted from JSON when disabled.
+    #[serde(default, skip_serializing_if = "DeadbandConfig::is_disabled")]
+    pub deadband: DeadbandConfig,
 }
 
 impl OpcUaMappingConfig {
@@ -61,6 +76,8 @@ impl OpcUaMappingConfig {
             access_level: MappingAccessLevel::ReadOnly,
             description: None,
             string_config: None,
+            scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         }
     }
 
@@ -73,6 +90,8 @@ impl OpcUaMappingConfig {
             access_level: MappingAccessLevel::ReadOnly,
             description: None,
             string_config: None,
+            scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         }
     }
 
@@ -125,7 +144,43 @@ impl OpcUaMappingConfig {
             }
         }
         // Warn if string_config is set on a non-String type (not an error, but ignored)
+        self.scaling.validate()?;
+        self.deadband.validate()?;
         Ok(())
+    }
+
+    /// Returns `true` when scaling is enabled *and* applicable — i.e. the
+    /// underlying type is numeric (not Boolean/String). Scaling on a non-numeric
+    /// type is silently inert.
+    pub fn scaling_active(&self) -> bool {
+        self.scaling.is_enabled() && self.opcua_data_type.is_numeric()
+    }
+
+    /// The OPC UA data type actually exposed on the live node. When scaling is
+    /// active the node presents the engineering value as `Double`; otherwise it
+    /// is the declared `opcua_data_type`.
+    pub fn effective_opcua_data_type(&self) -> OpcUaDataType {
+        if self.scaling_active() {
+            OpcUaDataType::Double
+        } else {
+            self.opcua_data_type
+        }
+    }
+
+    /// Returns `true` when deadband suppression is enabled *and* applicable
+    /// (numeric type). Deadband on Boolean/String is silently inert.
+    pub fn deadband_active(&self) -> bool {
+        self.deadband.is_enabled() && self.opcua_data_type.is_numeric()
+    }
+
+    /// Reference span for Percent deadband — the engineering range width when
+    /// scaling is active, otherwise `None` (Percent then does not suppress).
+    pub fn deadband_reference_span(&self) -> Option<f64> {
+        if self.scaling_active() {
+            Some(self.scaling.eng_high - self.scaling.eng_low)
+        } else {
+            None
+        }
     }
 
     /// Creates a String mapping config with the specified register count.
@@ -151,6 +206,8 @@ impl OpcUaMappingConfig {
                 max_string_length: Some(max_string_length),
                 ..Default::default()
             }),
+            scaling: ScalingConfig::default(),
+            deadband: DeadbandConfig::default(),
         }
     }
 }

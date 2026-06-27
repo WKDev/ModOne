@@ -93,6 +93,7 @@ use commands::{
     // Simulation commands
     ladder_force_device,
     ladder_release_force,
+    runtime_query_audit_log,
     ladder_start_monitoring,
     ladder_stop_monitoring,
     list_layouts,
@@ -163,6 +164,8 @@ use commands::{
     update_tag_definition,
     write_tag,
     set_watched_tags,
+    get_tag_opcua_mapping,
+    set_tag_opcua_mapping,
     TagEventBridgeState,
     // Tag import/export commands
     import_tags_csv,
@@ -425,7 +428,7 @@ pub fn run() {
                 log::info!("OPC UA user account store loaded from {:?}", app_data_dir);
 
                 // Initialize OPC UA audit logger (SQLite)
-                match opcua::AuditLogger::open(&app_data_dir) {
+                match opcua::open_opcua_audit(&app_data_dir) {
                     Ok(audit_logger) => {
                         let state = AuditLoggerState::new(audit_logger);
                         // Enforce retention on startup
@@ -440,6 +443,23 @@ pub fn run() {
                     Err(e) => {
                         log::error!("Failed to initialize OPC UA audit logger: {e}");
                         app.manage(AuditLoggerState::default());
+                    }
+                }
+
+                // Initialize runtime operational audit logger (force/sim control).
+                // 별도 DB(<app_data>/runtime/audit_log.db) — OPC UA 감사와 분리.
+                match crate::sim::RuntimeAuditState::open(&app_data_dir) {
+                    Ok(state) => {
+                        if let Err(e) = state.inner().enforce_retention() {
+                            log::warn!("Runtime audit retention enforcement failed: {e}");
+                        }
+                        state.inner().start_retention_scheduler();
+                        app.manage(state);
+                        log::info!("Runtime operational audit logger initialized");
+                    }
+                    Err(e) => {
+                        log::error!("Failed to initialize runtime audit logger: {e}");
+                        app.manage(crate::sim::RuntimeAuditState::empty());
                     }
                 }
             }
@@ -730,6 +750,7 @@ pub fn run() {
             ladder_stop_monitoring,
             ladder_force_device,
             ladder_release_force,
+            runtime_query_audit_log,
             // Explorer commands
             list_project_files,
             read_file_contents,
@@ -806,6 +827,8 @@ pub fn run() {
             update_tag_definition,
             write_tag,
             set_watched_tags,
+            get_tag_opcua_mapping,
+            set_tag_opcua_mapping,
             // Tag import/export commands
             import_tags_csv,
             import_tags_json,

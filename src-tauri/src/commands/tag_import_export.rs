@@ -1389,6 +1389,18 @@ fn build_json_export_leaf(
     obj.insert("opcuaWordCount".to_string(), serde_json::json!(mapping.word_count));
     obj.insert("opcuaByteOrder".to_string(), serde_json::Value::String(mapping.byte_order.to_string()));
     obj.insert("opcuaAccessLevel".to_string(), serde_json::Value::String(mapping.access_level.to_string()));
+    // Scaling / deadband — emitted only when active, using the canonical serde
+    // representation (matches the frontend ScalingConfig/DeadbandConfig types).
+    if mapping.scaling.is_enabled() {
+        if let Ok(v) = serde_json::to_value(mapping.scaling) {
+            obj.insert("opcuaScaling".to_string(), v);
+        }
+    }
+    if mapping.deadband.is_enabled() {
+        if let Ok(v) = serde_json::to_value(mapping.deadband) {
+            obj.insert("opcuaDeadband".to_string(), v);
+        }
+    }
     serde_json::Value::Object(obj)
 }
 

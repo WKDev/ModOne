@@ -126,6 +126,10 @@ export interface JsonExportTagLeaf {
   opcuaWordCount: number;
   opcuaByteOrder: string;
   opcuaAccessLevel: string;
+  /** Present only when scaling is enabled for the tag. */
+  opcuaScaling?: import('./opcuaMapping').ScalingConfig;
+  /** Present only when a publish deadband is enabled for the tag. */
+  opcuaDeadband?: import('./opcuaMapping').DeadbandConfig;
 }
 
 /**

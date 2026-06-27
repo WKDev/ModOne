@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use crate::opcua::{OpcUaMappingStore, SharedMappingStore};
+use crate::opcua::{OpcUaMappingConfig, OpcUaMappingStore, SharedMappingStore};
 use crate::plc_runtime::{CanonicalAddress, CanonicalAreaKind, CanonicalWriteSource};
 use crate::sim::tag_events::TagTypedValue;
 use crate::sim::types::{RegisterTagRequest, TagAccessLevel};
@@ -410,6 +410,38 @@ pub fn delete_tags(
         mapping_store.store.remove_many(&deleted);
     }
     Ok(deleted)
+}
+
+/// Returns the OPC UA mapping config for a tag — the stored config if one
+/// exists, otherwise a safe default derived from the tag's canonical address.
+#[tauri::command]
+pub fn get_tag_opcua_mapping(
+    state: State<'_, SimState>,
+    mapping_store: State<'_, MappingStoreState>,
+    tag_id: String,
+) -> Result<OpcUaMappingConfig, String> {
+    if let Some(config) = mapping_store.store.get(&tag_id) {
+        return Ok(config);
+    }
+    let tag = state
+        .tag_registry()
+        .resolve(&tag_id)
+        .map_err(|e| e.to_string())?;
+    Ok(OpcUaMappingConfig::default_for_address(tag.canonical_address))
+}
+
+/// Stores (or replaces) the OPC UA mapping config for a tag, including data
+/// type, byte order, scaling, and deadband. Takes effect on the next OPC UA
+/// server (re)start, when the address space is rebuilt from the store.
+#[tauri::command]
+pub fn set_tag_opcua_mapping(
+    mapping_store: State<'_, MappingStoreState>,
+    tag_id: String,
+    config: OpcUaMappingConfig,
+) -> Result<(), String> {
+    config.validate()?;
+    mapping_store.store.insert(tag_id, config);
+    Ok(())
 }
 
 #[tauri::command]
