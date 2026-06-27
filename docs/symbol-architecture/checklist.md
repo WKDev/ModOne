@@ -39,7 +39,7 @@
 계획·결정: `q2b-porttemplate-plan.md` (B-1 명시속성 / B-2 순수유틸 / B-3 IndustrialProperties / B-4 XML수기 먼저)
 - [x] 설계 완성 — 파서 3경로 매핑(TS 서비스=builtin/에디터, Rust=프로젝트 커스텀 로드)
 - [x] Rust 비용 분석 — import는 verbatim write(직렬화 불필요), 파서는 unknown 스킵(graceful). Rust는 파서+타입만, 재빌드 비용 있음
-- [ ] **Phase 1 — TS 데이터 레이어** (타입+파싱+직렬화+라운드트립). 다음 세션 착수점
+- [x] **Phase 1 — TS 데이터 레이어** — `PortTemplate` 타입(types/symbol.ts) + services 파서 파싱/직렬화 + 라운드트립 테스트(portTemplateRoundtrip 3). 동작 변화 없음, 회귀 없음(심볼 XML/로더 417 그린)
 - [ ] Phase 2 — TS `resolveInstancePorts` + customSymbolBridge 인스턴스 인지
 - [ ] Phase 3 — TS IndustrialProperties 인스턴스 속성 UI + ports 재계산
 - [ ] Phase 4 — builtin 데모 PortTemplate 심볼 + 검증

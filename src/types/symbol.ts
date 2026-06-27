@@ -234,6 +234,44 @@ export interface SymbolProperty {
 }
 
 // ============================================================================
+// Port Template (parametric / repeating ports)
+// ============================================================================
+
+/**
+ * A repeating port group whose count is driven by an instance property.
+ * Resolved at placement/edit time into N concrete ports (see resolveInstancePorts).
+ * Position is expressed with explicit start/step (no expression DSL).
+ */
+export interface PortTemplate {
+  /** Property key whose value controls the repeat count */
+  repeat: string;
+  /** Clamp bounds for the resolved count (default min 1) */
+  min?: number;
+  max?: number;
+  /** id pattern; `{i}` → 1-based index (e.g. "ch{i}") */
+  idPattern: string;
+  /** name pattern; `{i}` → 1-based index (e.g. "CH{i}") */
+  namePattern?: string;
+  /** starting port number (default 1) */
+  numberFrom?: number;
+  /** electrical category (v1) */
+  type: PinElectricalType;
+  /** detailed electrical type (v2) */
+  electricalType?: PinElectricalTypeV2;
+  functionalRole?: PinFunctionalRole;
+  orientation: PinOrientation;
+  shape?: PinShape;
+  /** fixed coordinate on the axis perpendicular to the edge */
+  x?: number;
+  y?: number;
+  /** distribution along the edge (left/right → yStart/yStep; top/bottom → xStart/xStep) */
+  xStart?: number;
+  xStep?: number;
+  yStart?: number;
+  yStep?: number;
+}
+
+// ============================================================================
 // Symbol Definition
 // ============================================================================
 
@@ -263,6 +301,8 @@ export interface SymbolDefinition {
   graphics: GraphicPrimitive[];
   /** Pins on the symbol */
   pins: SymbolPin[];
+  /** Optional parametric port templates (count driven by an instance property) */
+  portTemplates?: PortTemplate[];
   /** Optional multi-unit definitions */
   units?: SymbolUnit[];
   /** Configurable properties */

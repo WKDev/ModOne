@@ -7,6 +7,7 @@
 import type {
   SymbolDefinition,
   SymbolPin,
+  PortTemplate,
   SymbolUnit,
   SymbolProperty,
   GraphicPrimitive,
@@ -207,6 +208,35 @@ function parsePort(el: Element): SymbolPin {
     nameVisible: boolAttr(el, 'nameVisible'),
     numberVisible: boolAttr(el, 'numberVisible'),
     hidden: boolAttr(el, 'hidden'),
+  };
+}
+
+function parsePortTemplates(portsEl: Element | null): PortTemplate[] | undefined {
+  if (!portsEl) return undefined;
+  const els = children(portsEl, 'PortTemplate');
+  if (els.length === 0) return undefined;
+  return els.map(parsePortTemplate);
+}
+
+function parsePortTemplate(el: Element): PortTemplate {
+  return {
+    repeat: attr(el, 'repeat') ?? '',
+    min: numAttr(el, 'min'),
+    max: numAttr(el, 'max'),
+    idPattern: attr(el, 'idPattern') ?? 'p{i}',
+    namePattern: attr(el, 'namePattern'),
+    numberFrom: numAttr(el, 'numberFrom'),
+    type: (attr(el, 'type') as PortTemplate['type']) ?? 'input',
+    electricalType: attr(el, 'electricalType') as PortTemplate['electricalType'],
+    functionalRole: attr(el, 'functionalRole') as PortTemplate['functionalRole'],
+    orientation: (attr(el, 'orientation') as PortTemplate['orientation']) ?? 'left',
+    shape: attr(el, 'shape') as PortTemplate['shape'],
+    x: numAttr(el, 'x'),
+    y: numAttr(el, 'y'),
+    xStart: numAttr(el, 'xStart'),
+    xStep: numAttr(el, 'xStep'),
+    yStart: numAttr(el, 'yStart'),
+    yStep: numAttr(el, 'yStep'),
   };
 }
 
@@ -467,6 +497,7 @@ function parseSymbolDefinitionElement(el: Element): SymbolDefinition {
     height: (layoutEl ? numAttr(layoutEl, 'height') : undefined) ?? 60,
     graphics: parseGraphics(child(el, 'Graphics')),
     pins: parsePorts(child(el, 'Ports')),
+    portTemplates: parsePortTemplates(child(el, 'Ports')),
     units: parseUnits(child(el, 'Units')),
     properties: parseProperties(child(el, 'Properties')),
     behavior: parseBehavior(child(el, 'Behavior')),
@@ -511,6 +542,28 @@ export function symbolToXml(sym: SymbolDefinition): string {
     lines.push(`${ind(3)}shape="${pin.shape}" orientation="${pin.orientation}"`);
     lines.push(`${ind(3)}x="${pin.position.x}" y="${pin.position.y}" length="${pin.length}" sortOrder="${pin.sortOrder ?? 1}"`);
     lines.push(`${ind(3)}nameVisible="${pin.nameVisible ?? true}" numberVisible="${pin.numberVisible ?? true}"/>`);
+  }
+  for (const t of sym.portTemplates ?? []) {
+    const attrs = [
+      `repeat="${esc(t.repeat)}"`,
+      t.min != null ? `min="${t.min}"` : '',
+      t.max != null ? `max="${t.max}"` : '',
+      `idPattern="${esc(t.idPattern)}"`,
+      t.namePattern ? `namePattern="${esc(t.namePattern)}"` : '',
+      t.numberFrom != null ? `numberFrom="${t.numberFrom}"` : '',
+      `type="${t.type}"`,
+      t.electricalType ? `electricalType="${t.electricalType}"` : '',
+      t.functionalRole ? `functionalRole="${t.functionalRole}"` : '',
+      `orientation="${t.orientation}"`,
+      t.shape ? `shape="${t.shape}"` : '',
+      t.x != null ? `x="${t.x}"` : '',
+      t.y != null ? `y="${t.y}"` : '',
+      t.xStart != null ? `xStart="${t.xStart}"` : '',
+      t.xStep != null ? `xStep="${t.xStep}"` : '',
+      t.yStart != null ? `yStart="${t.yStart}"` : '',
+      t.yStep != null ? `yStep="${t.yStep}"` : '',
+    ].filter(Boolean).join(' ');
+    lines.push(`${ind(2)}<ms:PortTemplate ${attrs}/>`);
   }
   lines.push(`${ind(1)}</ms:Ports>`);
   lines.push('');
