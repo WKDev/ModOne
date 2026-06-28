@@ -50,7 +50,7 @@
 계획: `q1-hybrid-analog-plan.md` (seam = propagateVoltage 자리 → CircuitSolver 인터페이스)
 - [x] 현재 시뮬 계층 정밀 조사 — 토폴로지(CircuitGraph/nets/nodeVoltages) 이미 존재, 비어 있는 건 실제 V/I 계산뿐
 - [x] 설계 완성 — CircuitSolver 인터페이스 + LogicSolver(기본)/AnalogSolver(MNA, 후속), 출력 확장(voltage/current), 단계 Q1.1~Q1.4
-- [ ] **Q1.1 — Seam만**: CircuitSolver 인터페이스 + LogicSolver(현재 로직 래핑) + simulateCircuit 솔버 주입. 회귀 0 성공기준. 다음 착수점
+- [x] **Q1.1 — Seam** — `circuitSolver.ts`(CircuitSolver 인터페이스) + `logicSolver`(propagateVoltage 위임, 기본) + simulateCircuit `options.solver` 주입(호출부 2곳 교체). **회귀 0** — 기존 sim 106 그린 + seam 테스트 3(기본 logic / 주입 솔버 사용 / fallback)
 - [ ] Q1.2 — buildCircuitModel(Block 파라미터 → sources/branches)
 - [ ] Q1.3 — AnalogSolver(MNA, DC 저항 먼저) — 큰 작업
 - [ ] Q1.4 — 하이브리드 소비(archetype 임계값) + 전압/전류 오버레이

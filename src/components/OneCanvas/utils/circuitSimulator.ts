@@ -26,6 +26,7 @@ import {
   type SwitchStateMap,
 } from './switchEvaluator';
 import { buildNets, type Net } from './netBuilder';
+import type { CircuitSolver } from './circuitSolver';
 import {
   deriveComponentBehaviorState,
   mergeRuntimeDeviceState,
@@ -62,6 +63,8 @@ export interface SimulationResult {
 export interface SimulationOptions {
   maxPathLength?: number;
   detectShortCircuits?: boolean;
+  /** Node-voltage solver. Defaults to the logic-level solver (boolean propagation). */
+  solver?: CircuitSolver;
 }
 
 // ============================================================================
@@ -100,6 +103,12 @@ export function propagateVoltage(
 
   return nodeVoltages;
 }
+
+/** Default solver — the existing boolean power-propagation, behind the CircuitSolver seam. */
+export const logicSolver: CircuitSolver = {
+  id: 'logic',
+  solveNodeVoltages: propagateVoltage,
+};
 
 export function equalizeNetVoltages(
   nodeVoltages: Map<string, number>,
@@ -300,6 +309,7 @@ export function simulateCircuit(
   options: SimulationOptions = {}
 ): SimulationResult {
   try {
+    const solver = options.solver ?? logicSolver;
     const baseGraph = buildCircuitGraph(components, wires, junctions);
 
     const switchStatesPre = evaluateSwitchStates(components, runtimeState);
@@ -308,7 +318,7 @@ export function simulateCircuit(
       maxPathLength: options.maxPathLength,
       detectShortCircuits: options.detectShortCircuits,
     });
-    const nodeVoltagesPre = propagateVoltage(graphPre, currentPathsPre);
+    const nodeVoltagesPre = solver.solveNodeVoltages(graphPre, currentPathsPre);
     const poweredComponentsPre = determinePoweredComponents(
       nodeVoltagesPre,
       currentPathsPre,
@@ -329,7 +339,7 @@ export function simulateCircuit(
       maxPathLength: options.maxPathLength,
       detectShortCircuits: options.detectShortCircuits,
     });
-    const nodeVoltages = propagateVoltage(graph, currentPaths);
+    const nodeVoltages = solver.solveNodeVoltages(graph, currentPaths);
 
     const componentsMap = new Map(components.map((c) => [c.id, c]));
     const junctionsMap = new Map(junctions.map((j) => [j.id, j]));
