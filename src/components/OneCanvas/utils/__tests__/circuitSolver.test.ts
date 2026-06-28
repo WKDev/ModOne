@@ -1,6 +1,6 @@
 // CircuitSolver seam — 기본 LogicSolver와 주입 솔버 사용을 검증 (Q1.1, 회귀 0)
 import { describe, it, expect, vi } from 'vitest';
-import { simulateCircuit, logicSolver, propagateVoltage } from '../circuitSimulator';
+import { simulateCircuit, logicSolver } from '../circuitSimulator';
 import type { CircuitSolver } from '../circuitSolver';
 import type { RuntimeState } from '@/types/behavior';
 
@@ -12,9 +12,9 @@ const emptyRuntime: RuntimeState = {
 };
 
 describe('CircuitSolver seam', () => {
-  it('logicSolver is the default solver and delegates to propagateVoltage', () => {
+  it('logicSolver is the default solver (logic-level)', () => {
     expect(logicSolver.id).toBe('logic');
-    expect(logicSolver.solveNodeVoltages).toBe(propagateVoltage);
+    expect(typeof logicSolver.solveNodeVoltages).toBe('function');
   });
 
   it('simulateCircuit uses an injected solver for node voltages', () => {

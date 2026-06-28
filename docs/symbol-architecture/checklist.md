@@ -51,9 +51,10 @@
 - [x] 현재 시뮬 계층 정밀 조사 — 토폴로지(CircuitGraph/nets/nodeVoltages) 이미 존재, 비어 있는 건 실제 V/I 계산뿐
 - [x] 설계 완성 — CircuitSolver 인터페이스 + LogicSolver(기본)/AnalogSolver(MNA, 후속), 출력 확장(voltage/current), 단계 Q1.1~Q1.4
 - [x] **Q1.1 — Seam** — `circuitSolver.ts`(CircuitSolver 인터페이스) + `logicSolver`(propagateVoltage 위임, 기본) + simulateCircuit `options.solver` 주입(호출부 2곳 교체). **회귀 0** — 기존 sim 106 그린 + seam 테스트 3(기본 logic / 주입 솔버 사용 / fallback)
-- [ ] Q1.2 — buildCircuitModel(Block 파라미터 → sources/branches)
-- [ ] Q1.3 — AnalogSolver(MNA, DC 저항 먼저) — 큰 작업
-- [ ] Q1.4 — 하이브리드 소비(archetype 임계값) + 전압/전류 오버레이
+- [x] **Q1.2 — 모델 추출 + seam 진화** — seam을 `SolveContext`(graph/paths/components/wires/junctions)로 확장. `analog/buildResistiveModel.ts`(그래프→저항 모델: 와이어/닫힌스위치=Union-Find 단락, 전원=전압원, 부하=저항(archetype 기본 R), 접지=0V). 회귀 0
+- [x] **Q1.3 — AnalogSolver (MNA DC)** — `analog/linearSolve.ts`(가우스 소거, 의존성 0) + `analog/dcAnalysis.ts`(MNA) + `analog/analogSolver.ts`(추출→solveDc→그래프노드 매핑, 특이행렬 시 logic fallback). 검증: dcAnalysis 6(분압5V·직렬8V·병렬·특이) + analogSolver 2(실회로 분압 24/12/0·fallback). 8 그린
+- [x] **Q1.4 — 솔버 선택(옵션 레벨)** — `UseSimulationOptions extends SimulationOptions`이라 `useSimulation(..., { solver: analogSolver })`가 코드 변경 없이 동작. nodeVoltages가 실전압이 됨
+- [ ] Q1.4 후속(UX) — 솔버 토글 UI + 전압/전류 캔버스 오버레이 (live 렌더 손대므로 별도)
 
 ## 마무리
 - [ ] 변경 커밋

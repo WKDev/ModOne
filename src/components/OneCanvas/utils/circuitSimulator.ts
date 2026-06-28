@@ -107,7 +107,7 @@ export function propagateVoltage(
 /** Default solver — the existing boolean power-propagation, behind the CircuitSolver seam. */
 export const logicSolver: CircuitSolver = {
   id: 'logic',
-  solveNodeVoltages: propagateVoltage,
+  solveNodeVoltages: (ctx) => propagateVoltage(ctx.graph, ctx.paths),
 };
 
 export function equalizeNetVoltages(
@@ -318,7 +318,9 @@ export function simulateCircuit(
       maxPathLength: options.maxPathLength,
       detectShortCircuits: options.detectShortCircuits,
     });
-    const nodeVoltagesPre = solver.solveNodeVoltages(graphPre, currentPathsPre);
+    const nodeVoltagesPre = solver.solveNodeVoltages({
+      graph: graphPre, paths: currentPathsPre, components, wires, junctions,
+    });
     const poweredComponentsPre = determinePoweredComponents(
       nodeVoltagesPre,
       currentPathsPre,
@@ -339,7 +341,9 @@ export function simulateCircuit(
       maxPathLength: options.maxPathLength,
       detectShortCircuits: options.detectShortCircuits,
     });
-    const nodeVoltages = solver.solveNodeVoltages(graph, currentPaths);
+    const nodeVoltages = solver.solveNodeVoltages({
+      graph, paths: currentPaths, components, wires, junctions,
+    });
 
     const componentsMap = new Map(components.map((c) => [c.id, c]));
     const junctionsMap = new Map(junctions.map((j) => [j.id, j]));
