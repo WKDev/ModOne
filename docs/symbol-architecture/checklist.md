@@ -54,6 +54,7 @@
 - [x] **Q1.2 — 모델 추출 + seam 진화** — seam을 `SolveContext`(graph/paths/components/wires/junctions)로 확장. `analog/buildResistiveModel.ts`(그래프→저항 모델: 와이어/닫힌스위치=Union-Find 단락, 전원=전압원, 부하=저항(archetype 기본 R), 접지=0V). 회귀 0
 - [x] **Q1.3 — AnalogSolver (MNA DC)** — `analog/linearSolve.ts`(가우스 소거, 의존성 0) + `analog/dcAnalysis.ts`(MNA) + `analog/analogSolver.ts`(추출→solveDc→그래프노드 매핑, 특이행렬 시 logic fallback). 검증: dcAnalysis 6(분압5V·직렬8V·병렬·특이) + analogSolver 2(실회로 분압 24/12/0·fallback). 8 그린
 - [x] **Q1.4 — 솔버 선택(옵션 레벨)** — `UseSimulationOptions extends SimulationOptions`이라 `useSimulation(..., { solver: analogSolver })`가 코드 변경 없이 동작. nodeVoltages가 실전압이 됨
+- [x] **Q1.4 — per-component 전압 배선** — `ComponentBehaviorState.voltage` 추가, `deriveBehaviorStates`가 nodeVoltages에서 컴포넌트 포트 최대 전압을 채움. solver→nodeVoltages→behaviorState.voltage 전 체인 테스트(motor 24V). 라이브 렌더 무변경
 - [ ] Q1.4 후속(UX) — 솔버 토글 UI + 전압/전류 캔버스 오버레이 (live 렌더 손대므로 별도)
 
 ## 마무리

@@ -265,9 +265,20 @@ function deriveBehaviorStates(
   runtimeState: RuntimeState,
   poweredComponents: Set<string>,
   reachableNodes: Set<string>,
-  switchStates: SwitchStateMap
+  switchStates: SwitchStateMap,
+  nodeVoltages: Map<string, number>
 ): Map<string, ComponentBehaviorState> {
   const states = new Map<string, ComponentBehaviorState>();
+
+  // Highest solved voltage across a component's ports (0 if none).
+  const componentVoltage = (component: Block): number => {
+    let max = 0;
+    for (const port of component.ports) {
+      const v = nodeVoltages.get(`${component.id}:${port.id}`);
+      if (v !== undefined && v > max) max = v;
+    }
+    return max;
+  };
 
   for (const component of components) {
     const switchState = switchStates.states.get(component.id);
@@ -290,6 +301,7 @@ function deriveBehaviorStates(
     );
 
     if (derived) {
+      derived.voltage = componentVoltage(component);
       states.set(component.id, derived);
     }
   }
@@ -370,7 +382,8 @@ export function simulateCircuit(
       resolvedRuntimeState,
       poweredComponents,
       reachableNodes,
-      switchStates
+      switchStates,
+      nodeVoltages
     );
 
     return {

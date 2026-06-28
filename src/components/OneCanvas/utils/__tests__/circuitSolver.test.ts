@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { simulateCircuit, logicSolver } from '../circuitSimulator';
 import type { CircuitSolver } from '../circuitSolver';
 import type { RuntimeState } from '@/types/behavior';
+import type { Block } from '../../types';
 
 const emptyRuntime: RuntimeState = {
   plcOutputs: new Map(),
@@ -33,5 +34,23 @@ describe('CircuitSolver seam', () => {
     const result = simulateCircuit([], [], [], emptyRuntime);
     expect(result.success).toBe(true);
     expect(result.nodeVoltages instanceof Map).toBe(true);
+  });
+
+  it('threads solved node voltages into per-component behaviorState.voltage', () => {
+    const motor = {
+      id: 'M1',
+      type: 'motor',
+      position: { x: 0, y: 0 },
+      size: { width: 40, height: 40 },
+      ports: [
+        { id: 'u', type: 'input', label: 'U', position: 'left' },
+        { id: 'pe', type: 'input', label: 'PE', position: 'bottom' },
+      ],
+    } as unknown as Block;
+    const solver: CircuitSolver = { id: 'test', solveNodeVoltages: () => new Map([['M1:u', 24]]) };
+
+    const result = simulateCircuit([motor], [], [], emptyRuntime, { solver });
+
+    expect(result.behaviorStates.get('M1')?.voltage).toBe(24);
   });
 });

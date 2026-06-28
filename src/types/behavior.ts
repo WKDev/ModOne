@@ -94,6 +94,8 @@ export interface ComponentBehaviorState {
   lit?: boolean;
   running?: boolean;
   pressed?: boolean;
+  /** Highest solved voltage across this component's ports (analog solver). */
+  voltage?: number;
 }
 
 export function createEmptyRuntimeState(): RuntimeState {
