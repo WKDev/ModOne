@@ -43,12 +43,17 @@
 - [x] **Phase 2 — TS 인스턴스 포트 해석** — `resolveInstancePorts.ts`(expandPortTemplate/resolveEffectivePins/resolveInstancePorts, pin 중심). **라이브 배선**: `symbolBlockDefAdapter.getAllPins`가 resolveEffectivePins 사용 → builtin/심볼파생 블록이 기본 속성값으로 템플릿 포트 획득. customSymbolBridge·symbolBridge 인스턴스 인지(instanceProps). 유틸 테스트 7 + OneCanvas 145 + 통합 250 그린. (커스텀 심볼 dead 래퍼 대신 라이브 getAllPins 경로에 끼움)
 - [x] **Phase 3 — TS 인스턴스 속성 UI + ports 재계산** — `SymbolInstanceProperties.tsx`(custom 심볼 def.properties 편집, 변경 시 resolveInstancePorts로 ports 재계산해 저장). IndustrialProperties가 custom_symbol일 때 렌더. 테스트 3 + 패널 54 그린. (에디터 주도라 placement 경로 불명에도 동작)
 - [x] **Phase 4 — builtin 데모 PortTemplate 심볼 + 검증** — `terminal_strip.symbol.xml`(terminals 속성 → 좌입력/우출력 N쌍, 2 PortTemplate). 실제 builtin 로더 로드 + 무손실 라운드트립(builtinXmlRoundtrip 46) + resolve 파이프라인 검증(terminalStripParametric 5: 기본3·가변·클램프1..12·좌표). 통합 250 그린(개수 45→46 갱신)
+- [x] **트랙 B(Phase 1~4) → main 병합** (main 623cfb2, audit-log 작업과 clean 병합)
 - [ ] Phase 5 (보류) — Rust 파서+타입 패리티 (프로젝트 저장 커스텀 심볼 동적 포트 복원, Rust 재빌드)
-- [ ] (Q2=T2 시) scope/terminal_block을 PortTemplate로 마이그레이션
-- [ ] (Q2=T3 시) `behaviorTemplates.ts`에 구조 생성 훅(generatePorts) 추가
-- [ ] (Q1=a 시) 논리 시뮬: archetype 추가 (counter/timer/contactor 등)
-- [ ] (Q1=b/c 시) nodal 솔버 PoC, archetype 심에 끼울 인터페이스 설계
-- [ ] 회귀 테스트: `builtinXmlRoundtrip.test.ts` 등 통과
+
+## Q1 — 단계적 하이브리드 시뮬레이션 (설계 완성, 구현 보류)
+계획: `q1-hybrid-analog-plan.md` (seam = propagateVoltage 자리 → CircuitSolver 인터페이스)
+- [x] 현재 시뮬 계층 정밀 조사 — 토폴로지(CircuitGraph/nets/nodeVoltages) 이미 존재, 비어 있는 건 실제 V/I 계산뿐
+- [x] 설계 완성 — CircuitSolver 인터페이스 + LogicSolver(기본)/AnalogSolver(MNA, 후속), 출력 확장(voltage/current), 단계 Q1.1~Q1.4
+- [ ] **Q1.1 — Seam만**: CircuitSolver 인터페이스 + LogicSolver(현재 로직 래핑) + simulateCircuit 솔버 주입. 회귀 0 성공기준. 다음 착수점
+- [ ] Q1.2 — buildCircuitModel(Block 파라미터 → sources/branches)
+- [ ] Q1.3 — AnalogSolver(MNA, DC 저항 먼저) — 큰 작업
+- [ ] Q1.4 — 하이브리드 소비(archetype 임계값) + 전압/전류 오버레이
 
 ## 마무리
 - [ ] 변경 커밋
